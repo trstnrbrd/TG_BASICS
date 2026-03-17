@@ -1,0 +1,9 @@
+# Sensitive config
+config/mailer.php
+
+# XAMPP / system files
+.DS_Store
+Thumbs.db
+
+# PHP logs
+*.log

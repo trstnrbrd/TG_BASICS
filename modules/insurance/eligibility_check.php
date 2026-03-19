@@ -2,6 +2,40 @@
 session_start();
 require_once '../../config/db.php';
 
+// AJAX handler
+if (isset($_GET['ajax']) && $_GET['ajax'] === '1') {
+    $q = trim($_GET['search'] ?? '');
+    if ($q === '') { echo ''; exit; }
+    $like = "%$q%";
+    $stmt = $conn->prepare("
+        SELECT c.client_id, c.full_name, c.contact_number,
+               v.vehicle_id, v.plate_number, v.make, v.model, v.year_model
+        FROM clients c
+        INNER JOIN vehicles v ON c.client_id = v.client_id
+        WHERE c.full_name LIKE ? OR v.plate_number LIKE ?
+        ORDER BY c.full_name ASC
+        LIMIT 8
+    ");
+    $stmt->bind_param('ss', $like, $like);
+    $stmt->execute();
+    $rows = $stmt->get_result();
+    if ($rows->num_rows === 0) {
+        echo '<div style="padding:1rem;text-align:center;font-size:0.8rem;color:var(--text-muted);">No results found</div>';
+        exit;
+    }
+    while ($r = $rows->fetch_assoc()) {
+        echo '
+        <div class="live-result-item" onclick="window.location=\'?vehicle_id=' . $r['vehicle_id'] . '\'" style="padding:0.75rem 1rem;cursor:pointer;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);transition:background 0.1s;" onmouseover="this.style.background=\'var(--gold-pale)\'" onmouseout="this.style.background=\'\'">
+          <div>
+            <div style="font-weight:700;font-size:0.85rem;color:var(--text-primary);">' . htmlspecialchars($r['full_name']) . '</div>
+            <div style="font-size:0.72rem;color:var(--text-muted);">' . htmlspecialchars($r['make'] . ' ' . $r['model'] . ' ' . $r['year_model']) . '</div>
+          </div>
+          <span class="badge-dark">' . htmlspecialchars($r['plate_number']) . '</span>
+        </div>';
+    }
+    exit;
+}
+
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
     header("Location: ../../login.php");
     exit;
@@ -106,7 +140,7 @@ require_once '../../includes/topbar.php';
     </div>
 
     <!-- SEARCH CARD -->
-    <div class="card" style="margin-bottom:1.25rem;">
+    <div class="card" style="margin-bottom:1.25rem;overflow:visible;">
       <div class="card-header">
         <div class="card-icon"><?= icon('magnifying-glass', 16) ?></div>
         <div>
@@ -114,25 +148,24 @@ require_once '../../includes/topbar.php';
           <div class="card-sub">Search by client name or plate number</div>
         </div>
       </div>
-      <div style="padding:1.5rem;">
-        <form method="GET" action="">
-          <div style="display:flex;gap:0.75rem;">
-            <div style="position:relative;flex:1;">
-              <span style="position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;font-size:0.85rem;line-height:1;"><?= icon('magnifying-glass', 14) ?></span>
-              <input
-                type="text"
-                name="search"
-                placeholder="e.g. Juan dela Cruz or NCH 7952"
-                value="<?= htmlspecialchars($search) ?>"
-                autocomplete="off"
-                style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text-primary);padding:0.7rem 0.9rem 0.7rem 2.4rem;border-radius:9px;font-family:'Plus Jakarta Sans',sans-serif;font-size:0.85rem;outline:none;transition:border-color 0.15s,box-shadow 0.15s;"
-                onfocus="this.style.borderColor='var(--gold-bright)';this.style.boxShadow='0 0 0 3px rgba(212,160,23,0.1)'"
-                onblur="this.style.borderColor='var(--border)';this.style.boxShadow='none'"
-              />
-            </div>
-            <button type="submit" class="btn-primary"><?= icon('shield-check', 14) ?> Check Eligibility</button>
-          </div>
-        </form>
+      <div style="padding:1.5rem;overflow:visible;position:relative;">
+        <div style="position:relative;">
+  <div style="display:flex;gap:0.75rem;">
+    <div style="position:relative;flex:1;">
+      <span style="position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;font-size:0.85rem;line-height:1;"><?= icon('magnifying-glass', 14) ?></span>
+      <input
+        type="text"
+        id="live-search"
+        placeholder="e.g. Juan dela Cruz or NCH 7952"
+        autocomplete="off"
+        style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text-primary);padding:0.7rem 0.9rem 0.7rem 2.4rem;border-radius:9px;font-family:'Plus Jakarta Sans',sans-serif;font-size:0.85rem;outline:none;transition:border-color 0.15s,box-shadow 0.15s;"
+        onfocus="this.style.borderColor='var(--gold-bright)';this.style.boxShadow='0 0 0 3px rgba(212,160,23,0.1)'"
+        onblur="setTimeout(()=>{document.getElementById('live-dropdown').style.display='none'},200)"
+      />
+    </div>
+  </div>
+  <div id="live-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg-3);border:1px solid var(--border);border-radius:9px;box-shadow:var(--shadow-md);z-index:50;margin-top:0.35rem;overflow:hidden;"></div>
+</div>
 
         <?php if ($search !== '' && count($search_results) === 0): ?>
           <div class="empty-state">
@@ -263,5 +296,34 @@ require_once '../../includes/topbar.php';
 
   </div>
 </div>
+
+<script>
+const liveSearch = document.getElementById('live-search');
+const liveDropdown = document.getElementById('live-dropdown');
+let timer;
+
+if (liveSearch) {
+  liveSearch.addEventListener('input', function () {
+    clearTimeout(timer);
+    const val = this.value.trim();
+    if (val.length === 0) {
+      liveDropdown.style.display = 'none';
+      return;
+    }
+    timer = setTimeout(() => {
+      fetch('eligibility_check.php?ajax=1&search=' + encodeURIComponent(val))
+        .then(res => res.text())
+        .then(html => {
+          if (html.trim() === '') {
+            liveDropdown.style.display = 'none';
+          } else {
+            liveDropdown.innerHTML = html;
+            liveDropdown.style.display = 'block';
+          }
+        });
+    }, 300);
+  });
+}
+</script>
 
 <?php require_once '../../includes/footer.php'; ?>

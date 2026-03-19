@@ -130,12 +130,12 @@ require_once '../../includes/topbar.php';
               <th>Email</th>
               <th>Vehicles</th>
               <th>Date Added</th>
-              <th>Actions</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             <?php $i = 1; while ($row = $result->fetch_assoc()): ?>
-            <tr>
+            <tr style="cursor:pointer;" onclick="window.location='view_client.php?id=<?= $row['client_id'] ?>'">
               <td style="color:var(--text-muted);font-size:0.72rem;"><?= $i++ ?></td>
               <td style="font-weight:700;color:var(--text-primary);font-size:0.85rem;"><?= htmlspecialchars($row['full_name']) ?></td>
               <td><?= htmlspecialchars($row['contact_number']) ?></td>
@@ -146,7 +146,6 @@ require_once '../../includes/topbar.php';
               <td style="font-size:0.75rem;color:var(--text-muted);"><?= date('M d, Y', strtotime($row['created_at'])) ?></td>
               <td>
                 <div style="display:flex;gap:0.4rem;">
-                  <a href="view_client.php?id=<?= $row['client_id'] ?>" class="btn-sm-gold">View</a>
                   <a href="delete_client.php?id=<?= $row['client_id'] ?>"
                      class="btn-sm-gold"
                      style="background:var(--danger-bg);color:var(--danger);border-color:var(--danger-border);"

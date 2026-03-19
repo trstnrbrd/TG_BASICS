@@ -86,7 +86,7 @@ require_once '../includes/topbar.php';
           </thead>
           <tbody>
             <?php while ($row = $recent_list->fetch_assoc()): ?>
-            <tr>
+            <tr style="cursor:pointer;" onclick="window.location='clients/view_client.php?id=<?= $row['client_id'] ?>'">
               <td style="font-weight:700;color:var(--text-primary);"><?= htmlspecialchars($row['full_name']) ?></td>
               <td style="color:var(--text-muted);font-size:0.75rem;"><?= htmlspecialchars($row['contact_number']) ?></td>
               <td><span class="badge badge-gold"><?= icon('vehicle', 12) ?> <?= $row['vehicle_count'] ?></span></td>

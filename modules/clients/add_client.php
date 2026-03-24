@@ -116,19 +116,19 @@ require_once '../../includes/topbar.php';
             <div class="field">
               <label class="field-label">Contact Number <span class="req">*</span></label>
               <input type="text" name="contact_number" class="field-input"
-                placeholder="e.g. 09xxxxxxxxx"
+                placeholder="09*********"
                 value="<?= htmlspecialchars($_POST['contact_number'] ?? '') ?>"/>
             </div>
             <div class="field">
               <label class="field-label">Email Address</label>
               <input type="email" name="email" class="field-input"
-                placeholder="e.g. juan@email.com"
+                placeholder="username@email.com"
                 value="<?= htmlspecialchars($_POST['email'] ?? '') ?>"/>
             </div>
             <div class="field">
               <label class="field-label">Address <span class="req">*</span></label>
               <input type="text" name="address" class="field-input"
-                placeholder="e.g. San Roque, Pandi, Bulacan"
+                placeholder="San Roque, Pandi, Bulacan"
                 value="<?= htmlspecialchars($_POST['address'] ?? '') ?>"/>
             </div>
           </div>
@@ -138,26 +138,26 @@ require_once '../../includes/topbar.php';
             <div class="field">
               <label class="field-label">Plate Number <span class="req">*</span></label>
               <input type="text" name="plate_number" class="field-input"
-                placeholder="e.g. NCH 7952"
+                placeholder="ABC 1234"
                 value="<?= htmlspecialchars($_POST['plate_number'] ?? '') ?>"
                 style="text-transform:uppercase;"/>
             </div>
             <div class="field">
               <label class="field-label">Make <span class="req">*</span></label>
               <input type="text" name="make" class="field-input"
-                placeholder="e.g. Toyota"
+                placeholder="Toyota"
                 value="<?= htmlspecialchars($_POST['make'] ?? '') ?>"/>
             </div>
             <div class="field">
               <label class="field-label">Model <span class="req">*</span></label>
               <input type="text" name="model" class="field-input"
-                placeholder="e.g. Innova"
+                placeholder="Innova"
                 value="<?= htmlspecialchars($_POST['model'] ?? '') ?>"/>
             </div>
             <div class="field">
               <label class="field-label">Year Model <span class="req">*</span></label>
               <input type="number" name="year_model" class="field-input"
-                placeholder="e.g. 2020" min="1990" max="<?= date('Y') + 1 ?>"
+               min="1990" max="<?= date('Y') + 1 ?>"
                 value="<?= htmlspecialchars($_POST['year_model'] ?? '') ?>"/>
             </div>
             <div class="field">
@@ -167,15 +167,13 @@ require_once '../../includes/topbar.php';
                 value="<?= htmlspecialchars($_POST['color'] ?? '') ?>"/>
             </div>
             <div class="field">
-              <label class="field-label">Motor Number</label>
+              <label class="field-label">Engine Number</label>
               <input type="text" name="motor_number" class="field-input"
-                placeholder="e.g. 1GD0134717"
                 value="<?= htmlspecialchars($_POST['motor_number'] ?? '') ?>"/>
             </div>
             <div class="field span-2">
-              <label class="field-label">Serial Number</label>
+              <label class="field-label">Chassis Number</label>
               <input type="text" name="serial_number" class="field-input"
-                placeholder="e.g. PA2CA8EM1G0002449"
                 value="<?= htmlspecialchars($_POST['serial_number'] ?? '') ?>"/>
             </div>
           </div>

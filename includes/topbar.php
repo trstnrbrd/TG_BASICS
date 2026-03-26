@@ -23,10 +23,12 @@ $initials_display  = substr(implode('', array_map(fn($w) => strtoupper($w[0]), e
     </div>
   </div>
   <div class="topbar-right">
-    <div class="user-chip">
-      <div class="user-avatar"><?= htmlspecialchars($initials_display) ?></div>
-      <span class="user-chip-label"><?= htmlspecialchars($full_name_display) ?> &mdash; <?= $role_label ?></span>
+    <div id="user-dropdown-root"
+      data-name="<?= htmlspecialchars($full_name_display) ?>"
+      data-initials="<?= htmlspecialchars($initials_display) ?>"
+      data-role="<?= $role_label ?>"
+      data-username="<?= htmlspecialchars($_SESSION['username'] ?? '') ?>"
+      data-base="<?= $base_path ?>">
     </div>
-    <a href="<?= $base_path ?>auth/logout.php" class="btn-logout"><?= icon('lock-closed', 14) ?> Logout</a>
   </div>
 </div>

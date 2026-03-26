@@ -130,23 +130,61 @@ require_once __DIR__ . '/icons.php';
     padding: 0.35rem 0.75rem 0.35rem 0.45rem;
     border-radius: 100px; font-size: 0.75rem;
     color: var(--text-secondary); font-weight: 500; white-space: nowrap;
+    cursor: pointer; transition: all 0.15s; user-select: none;
   }
+  .user-chip:hover { border-color: var(--gold-muted); background: var(--gold-pale); }
   .user-avatar {
     width: 24px; height: 24px; border-radius: 50%;
     background: linear-gradient(135deg, var(--gold-bright), var(--gold));
     display: flex; align-items: center; justify-content: center;
     font-size: 0.62rem; font-weight: 800; color: #fff; flex-shrink: 0;
   }
-
-  .btn-logout {
-    background: transparent; color: var(--text-muted);
-    border: 1px solid var(--border); padding: 0.35rem 0.85rem;
-    border-radius: 8px; font-size: 0.75rem;
-    font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 500;
-    cursor: pointer; text-decoration: none; transition: all 0.15s;
-    display: inline-flex; align-items: center; gap: 0.35rem; white-space: nowrap;
+  .user-chip-chevron {
+    transition: transform 0.2s ease; color: var(--text-muted);
+    display: flex; align-items: center; margin-left: 0.1rem;
   }
-  .btn-logout:hover { border-color: var(--danger); color: var(--danger); background: var(--danger-bg); }
+  .user-chip-chevron.open { transform: rotate(180deg); }
+
+  /* ── USER DROPDOWN ── */
+  .user-dropdown-wrap { position: relative; }
+  .user-dropdown {
+    position: absolute; top: calc(100% + 6px); right: 0;
+    width: 260px; background: var(--bg-3);
+    border: 1px solid var(--border); border-radius: 12px;
+    box-shadow: var(--shadow-lg); z-index: 100; overflow: hidden;
+  }
+  .user-dropdown-header {
+    padding: 1rem 1.1rem; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 0.75rem; background: var(--bg-2);
+  }
+  .user-dropdown-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--gold-bright), var(--gold));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem; font-weight: 800; color: #fff; flex-shrink: 0;
+  }
+  .user-dropdown-name { font-size: 0.82rem; font-weight: 700; color: var(--text-primary); line-height: 1.3; }
+  .user-dropdown-meta { font-size: 0.68rem; color: var(--text-muted); }
+  .user-dropdown-menu { padding: 0.4rem; }
+  .user-dropdown-item {
+    display: flex; align-items: center; gap: 0.6rem;
+    padding: 0.6rem 0.75rem; border-radius: 8px;
+    font-size: 0.78rem; font-weight: 500; color: var(--text-secondary);
+    text-decoration: none; transition: all 0.12s; cursor: pointer;
+    border: none; background: none; width: 100%;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+  .user-dropdown-item:hover { background: var(--gold-pale); color: var(--gold); }
+  .user-dropdown-item svg { flex-shrink: 0; }
+
+  @keyframes dropdownIn {
+    from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes dropdownOut {
+    from { opacity: 1; transform: translateY(0) scale(1); }
+    to   { opacity: 0; transform: translateY(-8px) scale(0.97); }
+  }
 
   /* ── CONTENT ── */
   .content { padding: 2rem; }
@@ -300,8 +338,7 @@ require_once __DIR__ . '/icons.php';
     .page-header { padding: 1rem; border-radius: 10px; }
     .user-chip { padding: 0.3rem 0.5rem 0.3rem 0.35rem; font-size: 0; }
     .user-chip .user-avatar { font-size: 0.62rem; }
-    .btn-logout { padding: 0.35rem 0.6rem; font-size: 0; }
-    .btn-logout::before { content: '🔒'; font-size: 0.85rem; }
+    .user-chip-chevron { display: none; }
   }
 </style>
 

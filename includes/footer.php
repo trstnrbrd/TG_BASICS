@@ -99,6 +99,84 @@ $footer_scripts = $footer_scripts ?? '';
 
   loadExpiryBadge();
 
+  // ── USER DROPDOWN ──
+  function UserDropdown({ fullName, initials, role, username, basePath }) {
+    const [open, setOpen] = useState(false);
+    const [closing, setClosing] = useState(false);
+    const wrapRef = useRef(null);
+
+    const handleClose = () => {
+      setClosing(true);
+      setTimeout(() => { setOpen(false); setClosing(false); }, 150);
+    };
+
+    const handleToggle = () => {
+      if (open) handleClose();
+      else setOpen(true);
+    };
+
+    useEffect(() => {
+      const handler = (e) => {
+        if (wrapRef.current && !wrapRef.current.contains(e.target)) handleClose();
+      };
+      if (open) document.addEventListener('mousedown', handler);
+      return () => document.removeEventListener('mousedown', handler);
+    }, [open]);
+
+    return (
+      <div className="user-dropdown-wrap" ref={wrapRef}>
+        <div className="user-chip" onClick={handleToggle}>
+          <div className="user-avatar">{initials}</div>
+          <span className="user-chip-label">{fullName} &mdash; {role}</span>
+          <span className={`user-chip-chevron ${open ? 'open' : ''}`}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </span>
+        </div>
+
+        {open && (
+          <div className="user-dropdown"
+            style={{ animation: `${closing ? 'dropdownOut' : 'dropdownIn'} 0.18s ease forwards` }}>
+            <div className="user-dropdown-header">
+              <div className="user-dropdown-avatar">{initials}</div>
+              <div>
+                <div className="user-dropdown-name">{fullName}</div>
+                <div className="user-dropdown-meta">@{username} &middot; {role}</div>
+              </div>
+            </div>
+            <div className="user-dropdown-menu">
+              <a href={`${basePath}modules/settings.php`} className="user-dropdown-item" onClick={handleClose}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+                Edit Profile
+              </a>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Mount user dropdown
+  const userDropdownRoot = document.getElementById('user-dropdown-root');
+  if (userDropdownRoot) {
+    const { name, initials, role, username, base } = userDropdownRoot.dataset;
+    ReactDOM.createRoot(userDropdownRoot).render(
+      <UserDropdown
+        fullName={name}
+        initials={initials}
+        role={role}
+        username={username}
+        basePath={base}
+      />
+    );
+  }
+
 </script>
 
 <?php if ($footer_scripts): ?>

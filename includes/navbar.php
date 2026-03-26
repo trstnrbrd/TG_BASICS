@@ -65,6 +65,10 @@ $role        = $_SESSION['role'] ?? '';
        class="nav-item <?= $active_page === 'manage_users' ? 'active' : '' ?>">
       <span class="nav-icon"><?= icon('users', 16) ?></span> Manage Users
     </a>
+    <a href="<?= $base_path ?>modules/activity_log.php"
+       class="nav-item <?= $active_page === 'activity_log' ? 'active' : '' ?>">
+      <span class="nav-icon"><?= icon('clipboard-list', 16) ?></span> Activity Log
+    </a>
     <?php endif; ?>
 
     <div class="nav-group-label">System</div>

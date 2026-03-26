@@ -54,6 +54,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ins = $conn->prepare("INSERT INTO vehicles (client_id, plate_number, make, model, year_model, color, motor_number, serial_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         $ins->bind_param('isssssss', $client_id, $plate_number, $make, $model, $year_model, $color, $motor_number, $serial_number);
         if ($ins->execute()) {
+            // Audit log
+            $log = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'VEHICLE_ADDED', ?)");
+            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' added vehicle ' . ($plate_number ?: 'no plate') . ' (' . $make . ' ' . $model . ') to client ID ' . $client_id . '.';
+            $log->bind_param('is', $_SESSION['user_id'], $desc);
+            $log->execute();
+
             header("Location: view_client.php?id=" . $client_id . "&success=Vehicle added successfully.");
             exit;
         } else {

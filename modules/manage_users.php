@@ -99,13 +99,13 @@ $users = $conn->query("
     ORDER BY FIELD(role, 'super_admin', 'admin', 'mechanic'), full_name ASC
 ");
 
-// ── LOAD AUDIT LOGS ──
+// ── LOAD RECENT AUDIT LOGS ──
 $logs = $conn->query("
     SELECT a.log_id, a.action, a.description, a.created_at, u.full_name
     FROM audit_logs a
     INNER JOIN users u ON a.user_id = u.user_id
     ORDER BY a.created_at DESC
-    LIMIT 30
+    LIMIT 10
 ");
 
 $page_title  = 'Manage Users';
@@ -261,12 +261,17 @@ require_once '../includes/topbar.php';
 
     <!-- AUDIT LOGS -->
     <div class="card">
-      <div class="card-header">
-        <div class="card-icon"><?= icon('clipboard-list', 16) ?></div>
-        <div>
-          <div class="card-title">Audit Log</div>
-          <div class="card-sub">Last 30 system events</div>
+      <div class="card-header" style="justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+          <div class="card-icon"><?= icon('clipboard-list', 16) ?></div>
+          <div>
+            <div class="card-title">Recent Activity</div>
+            <div class="card-sub">Last 10 system events</div>
+          </div>
         </div>
+        <a href="activity_log.php" class="btn-sm-gold">
+          View All <?= icon('chevron-right', 12) ?>
+        </a>
       </div>
       <?php if ($logs->num_rows > 0): ?>
       <table class="tg-table">
@@ -285,6 +290,11 @@ require_once '../includes/topbar.php';
               'LOGOUT'           => 'badge-gray',
               'ACCOUNT_CREATED'  => 'badge-gold',
               'ACCOUNT_DELETED'  => 'badge-red',
+              'PASSWORD_RESET'   => 'badge-yellow',
+              'CLIENT_ADDED'     => 'badge-green',
+              'CLIENT_UPDATED'   => 'badge-yellow',
+              'VEHICLE_ADDED'    => 'badge-green',
+              'POLICY_CREATED'   => 'badge-gold',
               'POLICY_SAVED'     => 'badge-green',
             ];
             $ab = $action_badges[$log['action']] ?? 'badge-gray';

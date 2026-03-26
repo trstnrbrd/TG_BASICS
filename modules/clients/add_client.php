@@ -54,6 +54,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ins_vehicle->bind_param('isssssss', $client_id, $plate_number, $make, $model, $year_model, $color, $motor_number, $serial_number);
         $ins_vehicle->execute();
 
+        // Audit log
+        $log = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'CLIENT_ADDED', ?)");
+        $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' added client "' . $full_name . '" with vehicle ' . ($plate_number ?: 'no plate') . ' (' . $make . ' ' . $model . ').';
+        $log->bind_param('is', $_SESSION['user_id'], $desc);
+        $log->execute();
+
         header("Location: client_list.php?success=" . urlencode($full_name . ' has been added successfully.'));
         exit;
     }

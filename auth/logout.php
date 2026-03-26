@@ -1,7 +1,7 @@
 <?php
 session_start();
-require_once 'config/db.php';
-require_once 'includes/icons.php';
+require_once '../config/db.php';
+require_once '../includes/icons.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_logout'])) {
     if (isset($_SESSION['user_id'])) {
@@ -13,14 +13,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_logout'])) {
     }
     session_unset();
     session_destroy();
-    header("Location: index.php");
+    header("Location: ../index.php");
     exit;
 }
 
 $full_name = $_SESSION['full_name'] ?? 'User';
 $role      = $_SESSION['role'] ?? 'admin';
 $first     = explode(' ', $full_name)[0];
-$back      = ($role === 'mechanic') ? 'modules/repair/dashboard_mechanic.php' : 'modules/dashboard_admin.php';
+$back      = ($role === 'mechanic') ? '../modules/repair/dashboard_mechanic.php' : '../modules/dashboard_admin.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -29,7 +29,7 @@ $back      = ($role === 'mechanic') ? 'modules/repair/dashboard_mechanic.php' : 
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Logging Out | TG-BASICS</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="assets/css/logout.css"/>
+<link rel="stylesheet" href="../assets/css/logout.css"/>
 </head>
 <body>
 

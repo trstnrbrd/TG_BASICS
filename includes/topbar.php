@@ -27,6 +27,6 @@ $initials_display  = substr(implode('', array_map(fn($w) => strtoupper($w[0]), e
       <div class="user-avatar"><?= htmlspecialchars($initials_display) ?></div>
       <span class="user-chip-label"><?= htmlspecialchars($full_name_display) ?> &mdash; <?= $role_label ?></span>
     </div>
-    <a href="<?= $base_path ?>logout.php" class="btn-logout"><?= icon('lock-closed', 14) ?> Logout</a>
+    <a href="<?= $base_path ?>auth/logout.php" class="btn-logout"><?= icon('lock-closed', 14) ?> Logout</a>
   </div>
 </div>

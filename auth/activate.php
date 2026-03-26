@@ -1,7 +1,7 @@
 <?php
 session_start();
-require_once 'config/db.php';
-require_once 'includes/icons.php';
+require_once '../config/db.php';
+require_once '../includes/icons.php';
 
 $token   = trim($_GET['token'] ?? '');
 $error   = '';
@@ -51,14 +51,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user && !$user['is_active']) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Activate Account | TG-BASICS</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="assets/css/activate.css"/>
+<link rel="stylesheet" href="../assets/css/activate.css"/>
 </head>
 <body>
 <div class="wrap">
 
   <div class="brand">
     <div class="brand-logo-ring">
-      <img src="assets/img/tg_logo.png" alt="TG Customworks"/>
+      <img src="../assets/img/tg_logo.png" alt="TG Customworks"/>
     </div>
     <div class="brand-name">TG<span>-BASICS</span></div>
     <div class="brand-tag">Account Activation</div>
@@ -162,7 +162,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user && !$user['is_active']) {
 
 </div>
 
-<script src="assets/js/activate.js"></script>
+<script src="../assets/js/activate.js"></script>
 
 </body>
 </html>

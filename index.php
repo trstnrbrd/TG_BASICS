@@ -21,7 +21,7 @@
   </a>
   <div class="nav-right">
     <span class="nav-label">Internal system &mdash; authorized users only</span>
-    <a href="login.php" class="btn-login-nav"><?= icon('lock-closed', 14) ?> Sign In</a>
+    <a href="auth/login.php" class="btn-login-nav"><?= icon('lock-closed', 14) ?> Sign In</a>
   </div>
 </nav>
 
@@ -44,7 +44,7 @@
         TG-BASICS centralizes client records, insurance policies, repair workflows, and billing for TG Customworks and Basic Car Insurance Services into a single platform.
       </p>
       <div class="hero-actions">
-        <a href="login.php" class="btn-primary-hero">
+        <a href="auth/login.php" class="btn-primary-hero">
           <?= icon('lock-closed', 14) ?> Sign In to TG-BASICS
         </a>
         <a href="#modules" class="btn-secondary-hero">

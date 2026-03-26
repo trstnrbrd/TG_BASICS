@@ -37,7 +37,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === '1') {
 }
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
-    header("Location: ../../login.php");
+    header("Location: ../../auth/login.php");
     exit;
 }
 

@@ -1,11 +1,11 @@
 <?php
 session_start();
-require_once 'config/db.php';
-require_once 'config/mailer.php';
-require_once 'includes/icons.php';
+require_once '../config/db.php';
+require_once '../config/mailer.php';
+require_once '../includes/icons.php';
 
 if (isset($_SESSION['user_id'])) {
-    header("Location: modules/dashboard_admin.php");
+    header("Location: ../modules/dashboard_admin.php");
     exit;
 }
 
@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $ins->bind_param('iss', $user['user_id'], $token, $expires_at);
             $ins->execute();
 
-            $reset_link = 'http://localhost/tg-basics/reset_password.php?token=' . $token;
+            $reset_link = 'http://localhost/tg-basics/auth/reset_password.php?token=' . $token;
             sendPasswordResetEmail($user['email'], $user['full_name'], $reset_link);
         }
 
@@ -53,14 +53,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Forgot Password | TG-BASICS</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="assets/css/activate.css"/>
+<link rel="stylesheet" href="../assets/css/activate.css"/>
 </head>
 <body>
 <div class="wrap">
 
   <div class="brand">
     <div class="brand-logo-ring">
-      <img src="assets/img/tg_logo.png" alt="TG Customworks"/>
+      <img src="../assets/img/tg_logo.png" alt="TG Customworks"/>
     </div>
     <div class="brand-name">TG<span>-BASICS</span></div>
     <div class="brand-tag">Password Recovery</div>

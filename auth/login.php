@@ -1,13 +1,13 @@
 <?php
 session_start();
-require_once 'config/db.php';
-require_once 'includes/icons.php';
+require_once '../config/db.php';
+require_once '../includes/icons.php';
 
 if (isset($_SESSION['user_id'])) {
     if ($_SESSION['role'] === 'mechanic') {
-        header("Location: modules/repair/dashboard_mechanic.php");
+        header("Location: ../modules/repair/dashboard_mechanic.php");
     } else {
-        header("Location: modules/dashboard_admin.php");
+        header("Location: ../modules/dashboard_admin.php");
     }
     exit;
 }
@@ -55,9 +55,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $_SESSION['full_name'] = $user['full_name'];
 
                     if ($user['role'] === 'mechanic') {
-                        header("Location: modules/repair/dashboard_mechanic.php");
+                        header("Location: ../modules/repair/dashboard_mechanic.php");
                     } else {
-                        header("Location: modules/dashboard_admin.php");
+                        header("Location: ../modules/dashboard_admin.php");
                     }
                     exit;
                 }
@@ -93,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Sign In | TG-BASICS</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="assets/css/login.css"/>
+<link rel="stylesheet" href="../assets/css/login.css"/>
 </head>
 <body>
 
@@ -107,7 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
   <div class="login-brand">
     <div class="brand-logo-wrap">
-      <img src="assets/img/tg_logo.png" alt="TG Logo"/>
+      <img src="../assets/img/tg_logo.png" alt="TG Logo"/>
     </div>
     <div class="brand-name">TG<span>-BASICS</span></div>
     <div class="brand-tagline">Brokerage and Auto Shop Integrated Client System</div>
@@ -159,7 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       No self-registration. Contact your administrator for account access.<br/>
       <a href="forgot_password.php">Forgot your password?</a>
       &nbsp;&middot;&nbsp;
-      <a href="index.php"><?= icon('arrow-left', 12) ?> Back to Home</a>
+      <a href="../index.php"><?= icon('arrow-left', 12) ?> Back to Home</a>
     </div>
   </div>
 
@@ -168,7 +168,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
-<script type="text/babel" src="assets/js/login.js"></script>
+<script type="text/babel" src="../assets/js/login.js"></script>
 
 <script>
   document.getElementById('pw-toggle').addEventListener('click', function () {

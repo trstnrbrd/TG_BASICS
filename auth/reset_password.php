@@ -1,10 +1,10 @@
 <?php
 session_start();
-require_once 'config/db.php';
-require_once 'includes/icons.php';
+require_once '../config/db.php';
+require_once '../includes/icons.php';
 
 if (isset($_SESSION['user_id'])) {
-    header("Location: modules/dashboard_admin.php");
+    header("Location: ../modules/dashboard_admin.php");
     exit;
 }
 
@@ -80,14 +80,14 @@ $invalid = !$record || $record['used'] || strtotime($record['expires_at']) < tim
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Reset Password | TG-BASICS</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="assets/css/activate.css"/>
+<link rel="stylesheet" href="../assets/css/activate.css"/>
 </head>
 <body>
 <div class="wrap">
 
   <div class="brand">
     <div class="brand-logo-ring">
-      <img src="assets/img/tg_logo.png" alt="TG Customworks"/>
+      <img src="../assets/img/tg_logo.png" alt="TG Customworks"/>
     </div>
     <div class="brand-name">TG<span>-BASICS</span></div>
     <div class="brand-tag">Password Reset</div>
@@ -200,7 +200,7 @@ $invalid = !$record || $record['used'] || strtotime($record['expires_at']) < tim
 
 </div>
 
-<script src="assets/js/activate.js"></script>
+<script src="../assets/js/activate.js"></script>
 
 </body>
 </html>

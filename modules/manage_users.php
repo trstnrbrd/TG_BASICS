@@ -4,7 +4,7 @@ require_once '../config/db.php';
 require_once '../config/mailer.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'super_admin') {
-    header("Location: ../login.php");
+    header("Location: ../auth/login.php");
     exit;
 }
 
@@ -75,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
         if ($ins->execute()) {
             $new_user_id      = $conn->insert_id;
-            $activation_link  = 'http://localhost/tg-basics/activate.php?token=' . $token;
+            $activation_link  = 'http://localhost/tg-basics/auth/activate.php?token=' . $token;
 
             $sent = sendActivationEmail($new_email, $new_name, $activation_link);
 

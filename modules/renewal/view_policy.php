@@ -36,6 +36,51 @@ if (!$policy) {
     exit;
 }
 
+// ── HANDLE PAYMENT UPDATE ──
+$pay_errors  = [];
+$pay_success = false;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
+    $payment_amount = trim($_POST['payment_amount'] ?? '');
+    $payment_notes  = trim($_POST['payment_notes'] ?? '');
+
+    if ($payment_amount === '' || !is_numeric($payment_amount))
+        $pay_errors[] = 'Payment amount must be a valid number.';
+    elseif ((float)$payment_amount <= 0)
+        $pay_errors[] = 'Payment amount must be greater than zero.';
+    elseif ((float)$payment_amount > (float)$policy['balance'])
+        $pay_errors[] = 'Payment amount cannot exceed the remaining balance of PHP ' . number_format($policy['balance'], 2) . '.';
+
+    if (empty($pay_errors)) {
+        $new_amount_paid = (float)$policy['amount_paid'] + (float)$payment_amount;
+        $new_balance     = (float)$policy['total_premium'] - $new_amount_paid;
+        $new_status      = ($new_balance <= 0) ? 'Paid' : 'Partial';
+
+        $new_notes = $policy['notes'];
+        if ($payment_notes !== '') {
+            $note_entry = '[Payment ' . date('M d, Y') . '] ' . $payment_notes;
+            $new_notes  = $new_notes ? $new_notes . "\n" . $note_entry : $note_entry;
+        }
+
+        $upd = $conn->prepare("UPDATE insurance_policies SET amount_paid = ?, balance = ?, payment_status = ?, notes = ? WHERE policy_id = ?");
+        $upd->bind_param('ddssi', $new_amount_paid, $new_balance, $new_status, $new_notes, $policy_id);
+
+        if ($upd->execute()) {
+            // Audit log
+            $uid = $_SESSION['user_id'];
+            $log = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'PAYMENT_RECORDED', ?)");
+            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' recorded payment of PHP ' . number_format((float)$payment_amount, 2) . ' for policy ' . $policy['policy_number'] . '. New balance: PHP ' . number_format($new_balance, 2) . '. Status: ' . $new_status . '.';
+            $log->bind_param('is', $uid, $desc);
+            $log->execute();
+
+            header("Location: view_policy.php?id=" . $policy_id . "&success=" . urlencode("Payment of PHP " . number_format((float)$payment_amount, 2) . " recorded successfully."));
+            exit;
+        } else {
+            $pay_errors[] = 'Database error. Please try again.';
+        }
+    }
+}
+
 $days     = (int)$policy['days_left'];
 $expired  = $policy['policy_end'] < date('Y-m-d');
 
@@ -83,6 +128,10 @@ require_once '../../includes/topbar.php';
   <div class="content">
 
     <a href="renewal_list.php" class="back-link"><?= icon('arrow-left', 14) ?> Back to Renewal Tracking</a>
+
+    <?php if (isset($_GET['success'])): ?>
+    <div class="alert alert-success"><?= htmlspecialchars($_GET['success']) ?></div>
+    <?php endif; ?>
 
     <!-- POLICY STATUS BANNER -->
     <div style="background:var(--sidebar-bg);border-radius:12px;padding:1.5rem 1.75rem;margin-bottom:1.25rem;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
@@ -223,12 +272,17 @@ require_once '../../includes/topbar.php';
 
     <!-- PAYMENT STATUS -->
     <div class="card">
-      <div class="card-header">
-        <div class="card-icon"><?= icon('receipt', 16) ?></div>
-        <div>
-          <div class="card-title">Payment Status</div>
-          <div class="card-sub">Balance and payment tracking</div>
+      <div class="card-header" style="justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+          <div class="card-icon"><?= icon('receipt', 16) ?></div>
+          <div>
+            <div class="card-title">Payment Status</div>
+            <div class="card-sub">Balance and payment tracking</div>
+          </div>
         </div>
+        <span class="badge" style="background:<?= $policy['payment_status'] === 'Paid' ? 'var(--success-bg)' : ($policy['payment_status'] === 'Partial' ? 'var(--warning-bg)' : 'var(--danger-bg)') ?>;color:<?= $policy['payment_status'] === 'Paid' ? 'var(--success)' : ($policy['payment_status'] === 'Partial' ? 'var(--warning)' : 'var(--danger)') ?>;font-weight:700;font-size:0.72rem;padding:0.3rem 0.75rem;border-radius:100px;">
+          <?= $policy['payment_status'] ?>
+        </span>
       </div>
       <div style="padding:1.5rem;">
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.25rem;">
@@ -249,9 +303,47 @@ require_once '../../includes/topbar.php';
         </div>
 
         <?php if ($policy['notes']): ?>
-        <div class="info-box">
+        <div class="info-box" style="margin-bottom:1.25rem;">
           <?= icon('information-circle', 14) ?>
-          <span><strong>Notes:</strong> <?= htmlspecialchars($policy['notes']) ?></span>
+          <span><strong>Notes:</strong> <?= nl2br(htmlspecialchars($policy['notes'])) ?></span>
+        </div>
+        <?php endif; ?>
+
+        <?php if ((float)$policy['balance'] > 0): ?>
+        <!-- RECORD PAYMENT FORM -->
+        <div style="border-top:1px solid var(--border);padding-top:1.25rem;">
+          <div class="field-section"><?= icon('banknotes', 14) ?> Record Payment</div>
+
+          <?php if (!empty($pay_errors)): ?>
+          <div class="alert alert-danger" style="margin-bottom:1rem;">
+            <?php foreach ($pay_errors as $e): ?>
+            <div style="font-size:0.78rem;">&#8226; <?= htmlspecialchars($e) ?></div>
+            <?php endforeach; ?>
+          </div>
+          <?php endif; ?>
+
+          <form method="POST" action="">
+            <input type="hidden" name="record_payment" value="1"/>
+            <div class="form-grid" style="margin-bottom:1rem;">
+              <div class="field">
+                <label class="field-label">Payment Amount (PHP) <span class="req">*</span></label>
+                <input type="number" step="0.01" min="0.01" max="<?= $policy['balance'] ?>" name="payment_amount" id="payment_amount" class="field-input"
+                  placeholder="0.00" value="<?= htmlspecialchars($_POST['payment_amount'] ?? '') ?>"/>
+                <span class="field-hint">Remaining balance: PHP <?= number_format($policy['balance'], 2) ?></span>
+                <span class="field-hint" id="balance-after" style="font-weight:600;"></span>
+              </div>
+              <div class="field">
+                <label class="field-label">Payment Notes</label>
+                <input type="text" name="payment_notes" class="field-input"
+                  placeholder="e.g. Cash payment, GCash, etc."
+                  value="<?= htmlspecialchars($_POST['payment_notes'] ?? '') ?>"/>
+                <span class="field-hint">Optional remarks for this payment.</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+              <button type="submit" class="btn-primary"><?= icon('check-circle', 14) ?> Record Payment</button>
+            </div>
+          </form>
         </div>
         <?php endif; ?>
       </div>
@@ -260,4 +352,28 @@ require_once '../../includes/topbar.php';
   </div>
 </div>
 
-<?php require_once '../../includes/footer.php'; ?>
+<?php
+if ((float)$policy['balance'] > 0) {
+    $footer_scripts = '
+      const payInput = document.getElementById("payment_amount");
+      if (payInput) {
+        payInput.addEventListener("input", function() {
+          const balance = ' . (float)$policy['balance'] . ';
+          const payment = parseFloat(this.value) || 0;
+          const after = balance - payment;
+          const el = document.getElementById("balance-after");
+          if (payment > 0 && payment <= balance) {
+            el.textContent = "Balance after payment: PHP " + after.toLocaleString("en-PH", {minimumFractionDigits:2, maximumFractionDigits:2});
+            el.style.color = after <= 0 ? "var(--success)" : "var(--warning)";
+          } else if (payment > balance) {
+            el.textContent = "Amount exceeds remaining balance";
+            el.style.color = "var(--danger)";
+          } else {
+            el.textContent = "";
+          }
+        });
+      }
+    ';
+}
+require_once '../../includes/footer.php';
+?>

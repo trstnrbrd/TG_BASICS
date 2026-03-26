@@ -42,9 +42,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $upd->bind_param('ssssi', $full_name, $contact_number, $email, $address, $client_id);
         if ($upd->execute()) {
             // Audit log
+            $uid = $_SESSION['user_id'];
             $log = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'CLIENT_UPDATED', ?)");
             $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' updated client "' . $full_name . '" (ID ' . $client_id . ').';
-            $log->bind_param('is', $_SESSION['user_id'], $desc);
+            $log->bind_param('is', $uid, $desc);
             $log->execute();
 
             header("Location: view_client.php?id=" . $client_id . "&success=Client updated successfully.");

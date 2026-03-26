@@ -116,9 +116,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($ins->execute()) {
             // Audit log
+            $uid = $_SESSION['user_id'];
             $log = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'POLICY_CREATED', ?)");
             $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' created policy ' . $policy_number . ' (' . $coverage_type . ') for vehicle ' . ($vehicle['plate_number'] ?? '') . ' — Premium: ₱' . number_format($total_premium, 2) . '.';
-            $log->bind_param('is', $_SESSION['user_id'], $desc);
+            $log->bind_param('is', $uid, $desc);
             $log->execute();
 
             $success = true;

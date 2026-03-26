@@ -8,14 +8,33 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'supe
 }
 
 $full_name = $_SESSION['full_name'];
-$initials  = substr(implode('', array_map(fn($w) => strtoupper($w[0]), explode(' ', $full_name))), 0, 2);
+$first_name = explode(' ', $full_name)[0];
 
+// ── STATS QUERIES ──
 $total_clients  = $conn->query("SELECT COUNT(*) as c FROM clients")->fetch_assoc()['c'];
 $total_vehicles = $conn->query("SELECT COUNT(*) as c FROM vehicles")->fetch_assoc()['c'];
 $recent_clients = $conn->query("SELECT COUNT(*) as c FROM clients WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)")->fetch_assoc()['c'];
-$active_repairs  = 0;
-$claims_progress = 0;
+$recent_vehicles = $conn->query("SELECT COUNT(*) as c FROM vehicles WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)")->fetch_assoc()['c'];
 
+$total_policies   = $conn->query("SELECT COUNT(*) as c FROM insurance_policies")->fetch_assoc()['c'];
+$active_policies  = $conn->query("SELECT COUNT(*) as c FROM insurance_policies WHERE policy_end >= CURDATE()")->fetch_assoc()['c'];
+$expiring_soon    = $conn->query("SELECT COUNT(*) as c FROM insurance_policies WHERE DATEDIFF(policy_end, CURDATE()) BETWEEN 0 AND 30")->fetch_assoc()['c'];
+$urgent_policies  = $conn->query("SELECT COUNT(*) as c FROM insurance_policies WHERE DATEDIFF(policy_end, CURDATE()) BETWEEN 0 AND 7")->fetch_assoc()['c'];
+
+// ── RENEWAL ALERTS (policies expiring within 30 days) ──
+$renewals = $conn->query("
+    SELECT p.policy_id, p.policy_number, p.policy_end, p.coverage_type,
+           DATEDIFF(p.policy_end, CURDATE()) as days_left,
+           c.full_name, v.plate_number, v.make, v.model
+    FROM insurance_policies p
+    INNER JOIN vehicles v ON p.vehicle_id = v.vehicle_id
+    INNER JOIN clients c ON p.client_id = c.client_id
+    WHERE DATEDIFF(p.policy_end, CURDATE()) BETWEEN 0 AND 30
+    ORDER BY p.policy_end ASC
+    LIMIT 6
+");
+
+// ── RECENT CLIENTS ──
 $recent_list = $conn->query("
     SELECT c.client_id, c.full_name, c.contact_number, c.created_at,
            COUNT(v.vehicle_id) as vehicle_count
@@ -26,13 +45,49 @@ $recent_list = $conn->query("
     LIMIT 5
 ");
 
+// ── RECENT ACTIVITY (from audit_logs) ──
+$activity = $conn->query("
+    SELECT a.action, a.description, a.created_at, u.full_name as actor
+    FROM audit_logs a
+    INNER JOIN users u ON a.user_id = u.user_id
+    ORDER BY a.created_at DESC
+    LIMIT 8
+");
+
+$activity_items = [];
+while ($row = $activity->fetch_assoc()) {
+    $ts = strtotime($row['created_at']);
+    $diff = time() - $ts;
+    if ($diff < 60)        $time_ago = 'Just now';
+    elseif ($diff < 3600)  $time_ago = floor($diff / 60) . 'm ago';
+    elseif ($diff < 86400) $time_ago = floor($diff / 3600) . 'h ago';
+    elseif ($diff < 172800) $time_ago = 'Yesterday, ' . date('g:i A', $ts);
+    else $time_ago = date('M d, g:i A', $ts);
+
+    $activity_items[] = [
+        'action'      => $row['action'],
+        'description' => $row['description'],
+        'time_ago'    => $time_ago,
+    ];
+}
+
+// ── GREETING ──
+$hour = (int)date('G');
+if ($hour < 12)      $greeting = 'Good morning';
+elseif ($hour < 17)  $greeting = 'Good afternoon';
+else                  $greeting = 'Good evening';
+
+// ── DATE ──
+$date_display = date('l, F j, Y');
+
 $page_title  = 'Dashboard';
 $active_page = 'dashboard';
 $base_path   = '../';
 require_once '../includes/header.php';
 require_once '../includes/navbar.php';
-
 ?>
+
+<link rel="stylesheet" href="<?= $base_path ?>assets/css/dashboard.css"/>
 
 <div class="main">
 
@@ -44,158 +99,249 @@ require_once '../includes/topbar.php';
 
   <div class="content">
 
-    <!-- WELCOME BANNER -->
-    <div style="background:var(--sidebar-bg);border-radius:12px;padding:1.5rem 2rem;margin-bottom:1.75rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;position:relative;overflow:hidden;">
-      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--gold-bright),var(--gold-muted),transparent);"></div>
-      <div style="position:absolute;right:2rem;top:50%;transform:translateY(-50%);font-size:6rem;font-weight:800;color:rgba(212,160,23,0.05);letter-spacing:-3px;pointer-events:none;">TG</div>
-      <div style="position:relative;z-index:1;">
-        <div style="font-size:0.72rem;color:rgba(200,192,176,0.5);letter-spacing:1.5px;text-transform:uppercase;font-weight:600;margin-bottom:0.3rem;">Good day</div>
-        <div style="font-size:1.35rem;font-weight:800;color:#fff;letter-spacing:-0.3px;margin-bottom:0.2rem;">
-          Welcome back, <span style="color:var(--gold-bright);"><?= htmlspecialchars(explode(' ', $full_name)[0]) ?></span>
+    <!-- WELCOME -->
+    <div class="dash-welcome">
+      <div class="dash-welcome-watermark">TG-BASICS</div>
+      <div class="dash-welcome-left">
+        <div class="dash-welcome-eyebrow">
+          <div class="dash-welcome-eyebrow-dot"></div>
+          <?= $greeting ?>
         </div>
-        <div style="font-size:0.75rem;color:rgba(200,192,176,0.45);">TG Customworks &amp; Basic Car Insurance Services &mdash; Pandi, Bulacan</div>
+        <div class="dash-welcome-title">
+          Welcome back, <span><?= htmlspecialchars($first_name) ?></span>
+        </div>
+        <div class="dash-welcome-sub">TG Customworks &amp; Basic Car Insurance Services &mdash; Pandi, Bulacan</div>
       </div>
-      <div style="position:relative;z-index:1;text-align:right;">
-        <div style="font-size:2rem;font-weight:800;color:var(--gold-bright);line-height:1;letter-spacing:-1px;"><?= date('d') ?></div>
-        <div style="font-size:0.7rem;color:rgba(200,192,176,0.45);text-transform:uppercase;letter-spacing:1.5px;font-weight:600;"><?= date('M Y') ?></div>
+      <div class="dash-welcome-right">
+        <div class="dash-date"><?= $date_display ?></div>
       </div>
     </div>
 
     <!-- STAT CARDS -->
-    <div id="stats-root" style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.75rem;"></div>
-
-    <!-- BOTTOM GRID -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;">
-
-      <!-- RECENT CLIENTS -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-icon"><?= icon('users', 16) ?></div>
-          <div>
-            <div class="card-title">Recent Clients</div>
-            <div class="card-sub">Last 5 added</div>
+    <div class="dash-stats">
+      <?php
+      $stats = [
+          ['icon' => 'user',         'theme' => 'gold',  'label' => 'Total Clients',  'value' => $total_clients,  'trend' => ($recent_clients > 0 ? '+' . $recent_clients . ' this month' : 'No new'),  'up' => $recent_clients > 0],
+          ['icon' => 'shield-check', 'theme' => 'green', 'label' => 'Active Policies', 'value' => $active_policies, 'trend' => $total_policies . ' total', 'up' => false],
+          ['icon' => 'clock',        'theme' => ($urgent_policies > 0 ? 'red' : 'amber'), 'label' => 'Expiring Soon', 'value' => $expiring_soon, 'trend' => ($urgent_policies > 0 ? $urgent_policies . ' urgent' : 'Within 30 days'), 'up' => false],
+          ['icon' => 'vehicle',      'theme' => 'blue',  'label' => 'Total Vehicles', 'value' => $total_vehicles, 'trend' => ($recent_vehicles > 0 ? '+' . $recent_vehicles . ' this month' : 'Registered'), 'up' => $recent_vehicles > 0],
+      ];
+      $theme_map = [
+          'gold'  => ['accent' => 'linear-gradient(90deg,#D4A017,#E8D5A3)', 'icon_bg' => 'var(--gold-light)',   'icon_color' => 'var(--gold)'],
+          'green' => ['accent' => 'linear-gradient(90deg,#2E7D52,#52B788)', 'icon_bg' => 'var(--success-bg)',   'icon_color' => 'var(--success)'],
+          'amber' => ['accent' => 'linear-gradient(90deg,#B8860B,#D4A017)', 'icon_bg' => 'var(--warning-bg)',   'icon_color' => 'var(--warning)'],
+          'red'   => ['accent' => 'linear-gradient(90deg,#C0392B,#E74C3C)', 'icon_bg' => 'var(--danger-bg)',    'icon_color' => 'var(--danger)'],
+          'blue'  => ['accent' => 'linear-gradient(90deg,#1A6B9A,#3498DB)', 'icon_bg' => 'var(--info-bg)',      'icon_color' => 'var(--info)'],
+      ];
+      foreach ($stats as $s):
+          $t = $theme_map[$s['theme']];
+      ?>
+      <div class="dash-stat">
+        <div class="dash-stat-accent" style="background:<?= $t['accent'] ?>;"></div>
+        <div class="dash-stat-top">
+          <div class="dash-stat-icon" style="background:<?= $t['icon_bg'] ?>;color:<?= $t['icon_color'] ?>;">
+            <?= icon($s['icon'], 18) ?>
           </div>
-          <a href="clients/client_list.php" style="margin-left:auto;font-size:0.72rem;color:var(--gold);text-decoration:none;font-weight:600;">View all &rarr;</a>
+          <span class="dash-stat-badge" style="background:<?= $s['up'] ? 'var(--success-bg)' : 'var(--bg)' ?>;color:<?= $s['up'] ? 'var(--success)' : 'var(--text-muted)' ?>;<?= $s['up'] ? '' : 'border:1px solid var(--border);' ?>">
+            <?= $s['trend'] ?>
+          </span>
         </div>
-        <?php if ($recent_list->num_rows > 0): ?>
-        <table class="tg-table">
-          <thead>
-            <tr>
-              <th>Name</th><th>Contact</th><th>Vehicles</th><th>Added</th>
-            </tr>
-          </thead>
-          <tbody>
-            <?php while ($row = $recent_list->fetch_assoc()): ?>
-            <tr style="cursor:pointer;" onclick="window.location='clients/view_client.php?id=<?= $row['client_id'] ?>'">
-              <td style="font-weight:700;color:var(--text-primary);"><?= htmlspecialchars($row['full_name']) ?></td>
-              <td style="color:var(--text-muted);font-size:0.75rem;"><?= htmlspecialchars($row['contact_number']) ?></td>
-              <td><span class="badge badge-gold"><?= icon('vehicle', 12) ?> <?= $row['vehicle_count'] ?></span></td>
-              <td style="font-size:0.72rem;color:var(--text-muted);"><?= date('M d', strtotime($row['created_at'])) ?></td>
-            </tr>
-            <?php endwhile; ?>
-          </tbody>
-        </table>
-        <?php else: ?>
-        <div class="empty-state">
-          <div class="empty-icon"><?= icon('users', 28) ?></div>
-          <div class="empty-title">No clients yet</div>
-          <div class="empty-desc">Start by adding your first client.</div>
-        </div>
-        <?php endif; ?>
+        <div class="dash-stat-value"><?= $s['value'] ?></div>
+        <div class="dash-stat-label"><?= $s['label'] ?></div>
       </div>
-
-      <!-- QUICK ACTIONS -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-icon"><?= icon('arrow-right', 16) ?></div>
-          <div>
-            <div class="card-title">Quick Actions</div>
-            <div class="card-sub">Common tasks</div>
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;padding:1.25rem;">
-          <?php
-          $actions = [
-            ['clients/add_client.php',          icon('user',16),             'Add Client',       'New client and vehicle'],
-            ['insurance/eligibility_check.php', icon('shield-check',16),     'New Policy',       'Check eligibility first'],
-            ['repair/repair_list.php',          icon('wrench',16),           'New Repair Job',   'Log incoming vehicle'],
-            ['claims/claims_list.php',          icon('clipboard-list',16),   'Log Claim',        'New insurance claim'],
-            ['clients/client_list.php',         icon('magnifying-glass',16), 'Search Records',   'Find client or plate'],
-            ['repair/quotation_list.php',       icon('receipt',16),          'Generate Receipt', 'Quotation to e-receipt'],
-          ];
-          foreach ($actions as $a): ?>
-          <a href="<?= $a[0] ?>" style="display:flex;align-items:center;gap:0.75rem;padding:1rem 1.1rem;background:var(--bg);border:1px solid var(--border);border-radius:10px;text-decoration:none;transition:all 0.15s;"
-            onmouseover="this.style.background='var(--gold-pale)';this.style.borderColor='var(--gold-muted)'"
-            onmouseout="this.style.background='var(--bg)';this.style.borderColor='var(--border)'">
-            <div style="width:38px;height:38px;border-radius:9px;background:var(--gold-light);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;"><?= $a[1] ?></div>
-            <div>
-              <div style="font-size:0.78rem;font-weight:700;color:var(--text-primary);"><?= $a[2] ?></div>
-              <div style="font-size:0.67rem;color:var(--text-muted);margin-top:0.1rem;"><?= $a[3] ?></div>
-            </div>
-          </a>
-          <?php endforeach; ?>
-        </div>
-      </div>
-
+      <?php endforeach; ?>
     </div>
+
+    <!-- MAIN GRID -->
+    <div class="dash-grid">
+
+      <!-- LEFT COLUMN -->
+      <div>
+
+        <!-- RENEWAL ALERTS -->
+        <div class="card" style="margin-bottom:1.25rem;">
+          <div class="card-header" style="justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:0.75rem;">
+              <div class="card-icon"><?= icon('clock', 16) ?></div>
+              <div>
+                <div class="card-title">Renewal Alerts</div>
+                <div class="card-sub">Policies expiring within 30 days</div>
+              </div>
+            </div>
+            <?php if ($expiring_soon > 0): ?>
+            <a href="renewal/renewal_list.php?filter=expiring" class="btn-sm-gold">
+              View All <?= icon('chevron-right', 12) ?>
+            </a>
+            <?php endif; ?>
+          </div>
+          <?php if ($renewals->num_rows > 0): ?>
+            <?php while ($r = $renewals->fetch_assoc()):
+              $is_urgent = $r['days_left'] <= 7;
+            ?>
+            <a href="renewal/view_policy.php?id=<?= $r['policy_id'] ?>" class="renewal-row">
+              <div class="renewal-dot <?= $is_urgent ? 'urgent' : 'expiring' ?>"></div>
+              <div class="renewal-info">
+                <div class="renewal-name"><?= htmlspecialchars($r['full_name']) ?></div>
+                <div class="renewal-meta">
+                  <?= htmlspecialchars($r['plate_number'] ?: 'No plate') ?> &middot;
+                  <?= htmlspecialchars($r['make'] . ' ' . $r['model']) ?> &middot;
+                  <?= htmlspecialchars($r['policy_number']) ?>
+                </div>
+              </div>
+              <div class="renewal-days <?= $is_urgent ? 'urgent' : 'expiring' ?>">
+                <?php if ($r['days_left'] == 0): ?>
+                  Expires today
+                <?php elseif ($r['days_left'] == 1): ?>
+                  1 day left
+                <?php else: ?>
+                  <?= $r['days_left'] ?> days left
+                <?php endif; ?>
+              </div>
+            </a>
+            <?php endwhile; ?>
+          <?php else: ?>
+            <div class="empty-state" style="padding:2rem;">
+              <div style="font-size:1.5rem;opacity:0.3;margin-bottom:0.4rem;"><?= icon('check-circle', 28) ?></div>
+              <div class="empty-title">All clear</div>
+              <div class="empty-desc">No policies expiring within 30 days.</div>
+            </div>
+          <?php endif; ?>
+        </div>
+
+        <!-- RECENT CLIENTS -->
+        <div class="card">
+          <div class="card-header" style="justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:0.75rem;">
+              <div class="card-icon"><?= icon('users', 16) ?></div>
+              <div>
+                <div class="card-title">Recent Clients</div>
+                <div class="card-sub">Last 5 added</div>
+              </div>
+            </div>
+            <a href="clients/client_list.php" class="btn-sm-gold">
+              View All <?= icon('chevron-right', 12) ?>
+            </a>
+          </div>
+          <?php if ($recent_list->num_rows > 0): ?>
+          <table class="tg-table">
+            <thead>
+              <tr><th>Name</th><th>Contact</th><th>Vehicles</th><th>Added</th></tr>
+            </thead>
+            <tbody>
+              <?php while ($row = $recent_list->fetch_assoc()): ?>
+              <tr style="cursor:pointer;" onclick="window.location='clients/view_client.php?id=<?= $row['client_id'] ?>'">
+                <td>
+                  <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <div style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--gold-bright),var(--gold));display:flex;align-items:center;justify-content:center;font-size:0.58rem;font-weight:800;color:#fff;flex-shrink:0;">
+                      <?= strtoupper(substr($row['full_name'], 0, 1)) ?>
+                    </div>
+                    <span style="font-weight:700;color:var(--text-primary);"><?= htmlspecialchars($row['full_name']) ?></span>
+                  </div>
+                </td>
+                <td style="color:var(--text-muted);font-size:0.75rem;"><?= htmlspecialchars($row['contact_number']) ?></td>
+                <td><span class="badge badge-gold"><?= $row['vehicle_count'] ?></span></td>
+                <td style="font-size:0.72rem;color:var(--text-muted);"><?= date('M d', strtotime($row['created_at'])) ?></td>
+              </tr>
+              <?php endwhile; ?>
+            </tbody>
+          </table>
+          <?php else: ?>
+          <div class="empty-state">
+            <div class="empty-icon"><?= icon('users', 28) ?></div>
+            <div class="empty-title">No clients yet</div>
+            <div class="empty-desc">Start by adding your first client.</div>
+          </div>
+          <?php endif; ?>
+        </div>
+
+      </div>
+
+      <!-- RIGHT COLUMN -->
+      <div>
+
+        <!-- RECENT ACTIVITY -->
+        <div class="card" style="margin-bottom:1.25rem;">
+          <div class="card-header" style="justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:0.75rem;">
+              <div class="card-icon"><?= icon('clipboard-list', 16) ?></div>
+              <div>
+                <div class="card-title">Recent Activity</div>
+                <div class="card-sub">Latest system events</div>
+              </div>
+            </div>
+            <?php if ($_SESSION['role'] === 'super_admin'): ?>
+            <a href="activity_log.php" class="btn-sm-gold">
+              Full Log <?= icon('chevron-right', 12) ?>
+            </a>
+            <?php endif; ?>
+          </div>
+          <?php if (empty($activity_items)): ?>
+          <div style="padding:2rem;text-align:center;color:var(--text-muted);font-size:0.8rem;">No recent activity.</div>
+          <?php else: ?>
+            <?php
+            $dot_colors = [
+                'LOGIN' => 'var(--success)', 'LOGOUT' => 'var(--text-muted)',
+                'ACCOUNT_CREATED' => 'var(--gold-bright)', 'ACCOUNT_DELETED' => 'var(--danger)',
+                'PASSWORD_RESET' => 'var(--warning)', 'CLIENT_ADDED' => 'var(--success)',
+                'CLIENT_UPDATED' => 'var(--warning)', 'VEHICLE_ADDED' => 'var(--success)',
+                'POLICY_CREATED' => 'var(--gold-bright)', 'POLICY_SAVED' => 'var(--success)',
+            ];
+            $total_items = count($activity_items);
+            foreach ($activity_items as $i => $item):
+                $dot_color = $dot_colors[$item['action']] ?? 'var(--border)';
+                $desc = htmlspecialchars($item['description']);
+                $desc = preg_replace('/^(\S+\s\S+)/', '<strong>$1</strong>', $desc);
+            ?>
+            <div class="activity-item">
+              <div class="activity-line">
+                <div class="activity-dot" style="background:<?= $dot_color ?>;"></div>
+                <?php if ($i < $total_items - 1): ?>
+                <div class="activity-connector"></div>
+                <?php endif; ?>
+              </div>
+              <div class="activity-body">
+                <div class="activity-text"><?= $desc ?></div>
+                <div class="activity-time"><?= htmlspecialchars($item['time_ago']) ?></div>
+              </div>
+            </div>
+            <?php endforeach; ?>
+          <?php endif; ?>
+        </div>
+
+        <!-- QUICK ACTIONS -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon"><?= icon('arrow-right', 16) ?></div>
+            <div>
+              <div class="card-title">Quick Actions</div>
+              <div class="card-sub">Common tasks</div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:0.5rem;padding:1rem;">
+            <?php
+            $actions = [
+              ['clients/add_client.php',          'user-plus',         'Add New Client',       'Client and vehicle registration'],
+              ['insurance/eligibility_check.php',  'shield-check',     'New Insurance Policy',  'Check eligibility and encode'],
+              ['clients/client_list.php',          'magnifying-glass',  'Search Records',        'Find client, vehicle, or policy'],
+              ['renewal/renewal_list.php',         'clock',            'Renewal Tracking',      'View policy expiry status'],
+            ];
+            foreach ($actions as $a): ?>
+            <a href="<?= $a[0] ?>" class="quick-action">
+              <div class="quick-action-icon"><?= icon($a[1], 16) ?></div>
+              <div>
+                <div class="quick-action-label"><?= $a[2] ?></div>
+                <div class="quick-action-hint"><?= $a[3] ?></div>
+              </div>
+            </a>
+            <?php endforeach; ?>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+
   </div>
 </div>
 
-<?php
-$footer_scripts = '
-  function AnimatedCounter({ target, duration = 1200 }) {
-    const [count, setCount] = useState(0);
-    useEffect(() => {
-      if (target === 0) { setCount(0); return; }
-      let start = 0;
-      const step = Math.ceil(target / (duration / 20));
-      const timer = setInterval(() => {
-        start += step;
-        if (start >= target) { setCount(target); clearInterval(timer); }
-        else setCount(start);
-      }, 20);
-      return () => clearInterval(timer);
-    }, [target]);
-    return React.createElement("span", null, count);
-  }
-
-  function StatCard({ icon, cardClass, label, value, trend, trendUp }) {
-    const colors = {
-      gold:  { top:"linear-gradient(90deg,#D4A017,#E8D5A3)", icon:"var(--gold-light)" },
-      green: { top:"linear-gradient(90deg,#2E7D52,#52B788)", icon:"var(--success-bg)" },
-      blue:  { top:"linear-gradient(90deg,#1A6B9A,#3498DB)", icon:"var(--info-bg)" },
-      red:   { top:"linear-gradient(90deg,#C0392B,#E74C3C)", icon:"var(--danger-bg)" },
-    };
-    const c = colors[cardClass] || colors.gold;
-    return React.createElement("div", {
-      style:{ background:"var(--bg-3)", border:"1px solid var(--border)", borderRadius:"12px", padding:"1.25rem", display:"flex", flexDirection:"column", gap:"0.75rem", boxShadow:"var(--shadow)", position:"relative", overflow:"hidden", transition:"box-shadow 0.2s,transform 0.2s" },
-      onMouseOver: e => { e.currentTarget.style.transform="translateY(-2px)"; e.currentTarget.style.boxShadow="var(--shadow-md)"; },
-      onMouseOut:  e => { e.currentTarget.style.transform="translateY(0)";    e.currentTarget.style.boxShadow="var(--shadow)"; },
-    },
-      React.createElement("div",{style:{position:"absolute",top:0,left:0,right:0,height:"3px",background:c.top,borderRadius:"12px 12px 0 0"}}),
-      React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
-        React.createElement("div",{style:{width:"40px",height:"40px",borderRadius:"10px",background:c.icon,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"0.7rem",fontWeight:"800",color:"var(--text-secondary)",letterSpacing:"0.5px"}},icon),
-        React.createElement("span",{style:{fontSize:"0.65rem",fontWeight:"700",padding:"0.2rem 0.5rem",borderRadius:"100px",background:trendUp?"var(--success-bg)":"var(--bg)",color:trendUp?"var(--success)":"var(--text-muted)",border:trendUp?"none":"1px solid var(--border)"}},trend)
-      ),
-      React.createElement("div",{style:{fontSize:"2rem",fontWeight:"800",color:"var(--text-primary)",lineHeight:"1",letterSpacing:"-1px"}},
-        React.createElement(AnimatedCounter,{target:value})
-      ),
-      React.createElement("div",{style:{fontSize:"0.7rem",color:"var(--text-muted)",fontWeight:"600",textTransform:"uppercase",letterSpacing:"0.8px"}},label)
-    );
-  }
-
-  const statsData = [
-    { icon:"CL", cardClass:"gold", label:"Total Clients",      value:' . (int)$total_clients  . ', trend:"+' . (int)$recent_clients . ' this month", trendUp:' . ($recent_clients > 0 ? 'true' : 'false') . ' },
-    { icon:"VH", cardClass:"gold", label:"Total Vehicles",     value:' . (int)$total_vehicles . ', trend:"Registered",   trendUp:false },
-    { icon:"RP", cardClass:"blue", label:"Active Repairs",     value:' . (int)$active_repairs  . ', trend:"In progress", trendUp:false },
-    { icon:"CL", cardClass:"red",  label:"Claims In Progress", value:' . (int)$claims_progress . ', trend:"Pending",     trendUp:false },
-  ];
-
-  ReactDOM.createRoot(document.getElementById("stats-root")).render(
-    React.createElement(React.Fragment, null,
-      statsData.map((s,i) => React.createElement(StatCard,{key:i,...s}))
-    )
-  );
-';
-require_once '../includes/footer.php';
-?>
+<?php require_once '../includes/footer.php'; ?>

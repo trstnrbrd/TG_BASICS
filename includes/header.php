@@ -260,6 +260,23 @@ require_once __DIR__ . '/icons.php';
   .form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem 1.25rem; }
   .span-2 { grid-column: span 2; }
   .span-3 { grid-column: span 3; }
+
+  /* Filter toolbar inputs */
+  .filter-input {
+    background: var(--bg-3); border: 1px solid var(--border); color: var(--text-primary);
+    padding: 0.6rem 0.9rem; border-radius: 9px; font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 0.82rem; outline: none; transition: border-color 0.15s, box-shadow 0.15s;
+    box-shadow: var(--shadow);
+  }
+  .filter-input:focus { border-color: var(--gold-bright); box-shadow: 0 0 0 3px rgba(212,160,23,0.1); }
+  .filter-input::placeholder { color: var(--text-muted); }
+  select.filter-input {
+    cursor: pointer; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239C9286' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 0.9rem center;
+    background-color: var(--bg-3); padding-right: 2.5rem;
+  }
+
   .form-actions { display: flex; justify-content: flex-end; gap: 0.6rem; padding: 1.1rem 1.5rem; background: var(--bg-2); border-top: 1px solid var(--border); flex-wrap: wrap; }
 
   /* ── ALERTS ── */

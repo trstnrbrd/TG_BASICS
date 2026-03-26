@@ -10,17 +10,50 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'supe
 $full_name = $_SESSION['full_name'];
 $initials  = substr(implode('', array_map(fn($w) => strtoupper($w[0]), explode(' ', $full_name))), 0, 2);
 
-$search = trim($_GET['search'] ?? '');
-$where  = '';
-$params = [];
-$types  = '';
+$search    = trim($_GET['search'] ?? '');
+$filter_by = $_GET['filter_by'] ?? 'all';
+$sort_by   = $_GET['sort'] ?? 'newest';
+$where     = '';
+$params    = [];
+$types     = '';
 
 if ($search !== '') {
-    $where  = "WHERE c.full_name LIKE ? OR v.plate_number LIKE ? OR c.contact_number LIKE ?";
-    $like   = "%$search%";
-    $params = [$like, $like, $like];
-    $types  = 'sss';
+    $like = "%$search%";
+    switch ($filter_by) {
+        case 'name':
+            $where  = "WHERE c.full_name LIKE ?";
+            $params = [$like];
+            $types  = 's';
+            break;
+        case 'plate':
+            $where  = "WHERE v.plate_number LIKE ?";
+            $params = [$like];
+            $types  = 's';
+            break;
+        case 'contact':
+            $where  = "WHERE c.contact_number LIKE ?";
+            $params = [$like];
+            $types  = 's';
+            break;
+        case 'email':
+            $where  = "WHERE c.email LIKE ?";
+            $params = [$like];
+            $types  = 's';
+            break;
+        default:
+            $where  = "WHERE (c.full_name LIKE ? OR v.plate_number LIKE ? OR c.contact_number LIKE ? OR c.email LIKE ?)";
+            $params = [$like, $like, $like, $like];
+            $types  = 'ssss';
+    }
 }
+
+$order = match ($sort_by) {
+    'oldest'   => 'c.created_at ASC',
+    'name_asc' => 'c.full_name ASC',
+    'name_desc'=> 'c.full_name DESC',
+    'vehicles' => 'vehicle_count DESC',
+    default    => 'c.created_at DESC',
+};
 
 $sql = "
     SELECT c.client_id, c.full_name, c.contact_number, c.email,
@@ -29,7 +62,7 @@ $sql = "
     LEFT JOIN vehicles v ON c.client_id = v.client_id
     $where
     GROUP BY c.client_id
-    ORDER BY c.created_at DESC
+    ORDER BY $order
 ";
 
 $stmt = $conn->prepare($sql);
@@ -86,28 +119,44 @@ require_once '../../includes/topbar.php';
     </div>
 
     <!-- TOOLBAR -->
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:1rem;flex-wrap:wrap;">
-      <form method="GET" action="" style="flex:1;min-width:200px;max-width:420px;">
-        <div style="position:relative;">
+    <form method="GET" action="" style="margin-bottom:1rem;">
+      <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
+
+        <!-- SEARCH INPUT -->
+        <div style="position:relative;flex:1;min-width:200px;max-width:400px;">
           <span style="position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;"><?= icon('magnifying-glass', 14) ?></span>
-          <input
-            type="text"
-            name="search"
-            placeholder="Search by name, plate number, or contact..."
+          <input type="text" name="search"
+            placeholder="Search clients..."
             value="<?= htmlspecialchars($search) ?>"
-            style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text-primary);padding:0.6rem 0.9rem 0.6rem 2.4rem;border-radius:9px;font-family:'Plus Jakarta Sans',sans-serif;font-size:0.82rem;outline:none;transition:border-color 0.15s,box-shadow 0.15s;box-shadow:var(--shadow);"
-            onfocus="this.style.borderColor='var(--gold-bright)';this.style.boxShadow='0 0 0 3px rgba(212,160,23,0.1)'"
-            onblur="this.style.borderColor='var(--border)';this.style.boxShadow='var(--shadow)'"
-          />
+            class="filter-input" style="padding-left:2.4rem;width:100%;"/>
         </div>
-      </form>
-      <div style="display:flex;gap:0.5rem;align-items:center;flex-shrink:0;">
-        <?php if ($search): ?>
+
+        <!-- FILTER BY -->
+        <select name="filter_by" class="filter-input" style="min-width:140px;">
+          <option value="all"     <?= $filter_by === 'all' ? 'selected' : '' ?>>All Fields</option>
+          <option value="name"    <?= $filter_by === 'name' ? 'selected' : '' ?>>Name</option>
+          <option value="plate"   <?= $filter_by === 'plate' ? 'selected' : '' ?>>Plate Number</option>
+          <option value="contact" <?= $filter_by === 'contact' ? 'selected' : '' ?>>Contact</option>
+          <option value="email"   <?= $filter_by === 'email' ? 'selected' : '' ?>>Email</option>
+        </select>
+
+        <!-- SORT BY -->
+        <select name="sort" class="filter-input" style="min-width:150px;">
+          <option value="newest"   <?= $sort_by === 'newest' ? 'selected' : '' ?>>Newest First</option>
+          <option value="oldest"   <?= $sort_by === 'oldest' ? 'selected' : '' ?>>Oldest First</option>
+          <option value="name_asc" <?= $sort_by === 'name_asc' ? 'selected' : '' ?>>Name A–Z</option>
+          <option value="name_desc"<?= $sort_by === 'name_desc' ? 'selected' : '' ?>>Name Z–A</option>
+          <option value="vehicles" <?= $sort_by === 'vehicles' ? 'selected' : '' ?>>Most Vehicles</option>
+        </select>
+
+        <!-- BUTTONS -->
+        <button type="submit" class="btn-primary"><?= icon('magnifying-glass', 14) ?> Search</button>
+        <?php if ($search || $filter_by !== 'all' || $sort_by !== 'newest'): ?>
         <a href="client_list.php" class="btn-ghost"><?= icon('x-mark', 14) ?> Clear</a>
         <?php endif; ?>
         <a href="add_client.php" class="btn-primary"><?= icon('plus', 14) ?> Add Client</a>
       </div>
-    </div>
+    </form>
 
     <!-- TABLE -->
     <div class="card" style="margin-bottom:0;">

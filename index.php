@@ -184,7 +184,7 @@
     <div class="roles-grid">
       <div class="role-card">
         <div class="role-header">
-          <div class="role-avatar"><?= icon('briefcase', 20) ?></div>
+          <div class="role-avatar"><?= icon('users', 20) ?></div>
           <div>
             <div class="role-title">Admin</div>
           </div>

@@ -1,6 +1,10 @@
 <?php
 session_start();
 require_once '../config/db.php';
+require_once '../config/settings.php';
+
+$urg_days = (int)getSetting($conn, 'renewal_urgent_days', '7');
+$exp_days = (int)getSetting($conn, 'renewal_expiring_days', '30');
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
     header("Location: ../auth/login.php");
@@ -18,8 +22,8 @@ $recent_vehicles = $conn->query("SELECT COUNT(*) as c FROM vehicles WHERE create
 
 $total_policies   = $conn->query("SELECT COUNT(*) as c FROM insurance_policies")->fetch_assoc()['c'];
 $active_policies  = $conn->query("SELECT COUNT(*) as c FROM insurance_policies WHERE policy_end >= CURDATE()")->fetch_assoc()['c'];
-$expiring_soon    = $conn->query("SELECT COUNT(*) as c FROM insurance_policies WHERE DATEDIFF(policy_end, CURDATE()) BETWEEN 0 AND 30")->fetch_assoc()['c'];
-$urgent_policies  = $conn->query("SELECT COUNT(*) as c FROM insurance_policies WHERE DATEDIFF(policy_end, CURDATE()) BETWEEN 0 AND 7")->fetch_assoc()['c'];
+$expiring_soon    = $conn->query("SELECT COUNT(*) as c FROM insurance_policies WHERE DATEDIFF(policy_end, CURDATE()) BETWEEN 0 AND $exp_days")->fetch_assoc()['c'];
+$urgent_policies  = $conn->query("SELECT COUNT(*) as c FROM insurance_policies WHERE DATEDIFF(policy_end, CURDATE()) BETWEEN 0 AND $urg_days")->fetch_assoc()['c'];
 
 // ── RENEWAL ALERTS (policies expiring within 30 days) ──
 $renewals = $conn->query("
@@ -29,7 +33,7 @@ $renewals = $conn->query("
     FROM insurance_policies p
     INNER JOIN vehicles v ON p.vehicle_id = v.vehicle_id
     INNER JOIN clients c ON p.client_id = c.client_id
-    WHERE DATEDIFF(p.policy_end, CURDATE()) BETWEEN 0 AND 30
+    WHERE DATEDIFF(p.policy_end, CURDATE()) BETWEEN 0 AND $exp_days
     ORDER BY p.policy_end ASC
     LIMIT 6
 ");
@@ -123,7 +127,7 @@ require_once '../includes/topbar.php';
       $stats = [
           ['icon' => 'user',         'theme' => 'gold',  'label' => 'Total Clients',  'value' => $total_clients,  'trend' => ($recent_clients > 0 ? '+' . $recent_clients . ' this month' : 'No new'),  'up' => $recent_clients > 0],
           ['icon' => 'shield-check', 'theme' => 'green', 'label' => 'Active Policies', 'value' => $active_policies, 'trend' => $total_policies . ' total', 'up' => false],
-          ['icon' => 'clock',        'theme' => ($urgent_policies > 0 ? 'red' : 'amber'), 'label' => 'Expiring Soon', 'value' => $expiring_soon, 'trend' => ($urgent_policies > 0 ? $urgent_policies . ' urgent' : 'Within 30 days'), 'up' => false],
+          ['icon' => 'clock',        'theme' => ($urgent_policies > 0 ? 'red' : 'amber'), 'label' => 'Expiring Soon', 'value' => $expiring_soon, 'trend' => ($urgent_policies > 0 ? $urgent_policies . ' urgent' : 'Within ' . $exp_days . ' days'), 'up' => false],
           ['icon' => 'vehicle',      'theme' => 'blue',  'label' => 'Total Vehicles', 'value' => $total_vehicles, 'trend' => ($recent_vehicles > 0 ? '+' . $recent_vehicles . ' this month' : 'Registered'), 'up' => $recent_vehicles > 0],
       ];
       $theme_map = [
@@ -165,7 +169,7 @@ require_once '../includes/topbar.php';
               <div class="card-icon"><?= icon('clock', 16) ?></div>
               <div>
                 <div class="card-title">Renewal Alerts</div>
-                <div class="card-sub">Policies expiring within 30 days</div>
+                <div class="card-sub">Policies expiring within <?= $exp_days ?> days</div>
               </div>
             </div>
             <?php if ($expiring_soon > 0): ?>
@@ -176,7 +180,7 @@ require_once '../includes/topbar.php';
           </div>
           <?php if ($renewals->num_rows > 0): ?>
             <?php while ($r = $renewals->fetch_assoc()):
-              $is_urgent = $r['days_left'] <= 7;
+              $is_urgent = $r['days_left'] <= $urg_days;
             ?>
             <a href="renewal/view_policy.php?id=<?= $r['policy_id'] ?>" class="renewal-row">
               <div class="renewal-dot <?= $is_urgent ? 'urgent' : 'expiring' ?>"></div>
@@ -203,7 +207,7 @@ require_once '../includes/topbar.php';
             <div class="empty-state" style="padding:2rem;">
               <div style="font-size:1.5rem;opacity:0.3;margin-bottom:0.4rem;"><?= icon('check-circle', 28) ?></div>
               <div class="empty-title">All clear</div>
-              <div class="empty-desc">No policies expiring within 30 days.</div>
+              <div class="empty-desc">No policies expiring within <?= $exp_days ?> days.</div>
             </div>
           <?php endif; ?>
         </div>

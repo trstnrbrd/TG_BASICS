@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../../config/db.php';
+require_once '../../config/settings.php';
 
 // AJAX handler
 if (isset($_GET['ajax']) && $_GET['ajax'] === '1') {
@@ -85,11 +86,12 @@ if ($selected_vid > 0) {
         $vehicle = $row;
         $client  = $row;
 
-        $current_year = (int)date('Y');
-        $year_model   = (int)$row['year_model'];
-        $age          = $current_year - $year_model;
+        $current_year    = (int)date('Y');
+        $year_model      = (int)$row['year_model'];
+        $age             = $current_year - $year_model;
+        $max_vehicle_age = (int)getSetting($conn, 'eligibility_max_age', '10');
 
-        $eligible = $age <= 10;
+        $eligible = $age <= $max_vehicle_age;
 
         $policy_check = $conn->prepare("
             SELECT policy_id FROM insurance_policies
@@ -136,7 +138,7 @@ require_once '../../includes/topbar.php';
     <!-- INFO BOX -->
     <div class="info-box" style="margin-bottom:1.25rem;">
       <?= icon('information-circle', 16) ?>
-      <span>PhilBritish Insurance covers vehicles that are <strong>10 years old or newer</strong> based on the year model. Vehicles older than 10 years are not eligible for new policy coverage.</span>
+      <span>PhilBritish Insurance covers vehicles that are <strong><?= (int)getSetting($conn, 'eligibility_max_age', '10') ?> years old or newer</strong> based on the year model. Vehicles older than <?= (int)getSetting($conn, 'eligibility_max_age', '10') ?> years are not eligible for new policy coverage.</span>
     </div>
 
     <!-- SEARCH CARD -->
@@ -220,12 +222,12 @@ require_once '../../includes/topbar.php';
           $status_class = 'eligible';
           $icon         = icon('check-circle', 20);
           $verdict      = 'Eligible for Coverage';
-          $reason       = 'This vehicle is ' . $eligibility['age'] . ' year' . ($eligibility['age'] !== 1 ? 's' : '') . ' old and qualifies under PhilBritish\'s 10-year eligibility rule. You may proceed to encode the policy.';
+          $reason       = 'This vehicle is ' . $eligibility['age'] . ' year' . ($eligibility['age'] !== 1 ? 's' : '') . ' old and qualifies under PhilBritish\'s ' . $max_vehicle_age . '-year eligibility rule. You may proceed to encode the policy.';
         } else {
           $status_class = 'ineligible';
           $icon         = icon('x-mark', 20);
           $verdict      = 'Not Eligible for Coverage';
-          $reason       = 'This vehicle is ' . $eligibility['age'] . ' years old and exceeds PhilBritish\'s 10-year eligibility limit. It cannot be covered under a new policy.';
+          $reason       = 'This vehicle is ' . $eligibility['age'] . ' years old and exceeds PhilBritish\'s ' . $max_vehicle_age . '-year eligibility limit. It cannot be covered under a new policy.';
         }
 
         $header_styles = [
@@ -277,7 +279,7 @@ require_once '../../includes/topbar.php';
 
           <div class="info-box">
             <?= icon('document', 14) ?>
-            <span><strong>PhilBritish Eligibility Rule:</strong> Vehicles must be 10 years old or newer from the current year to qualify for insurance coverage. Year model <?= $eligibility['year_model'] ?> means the vehicle is <?= $eligibility['age'] ?> year<?= $eligibility['age'] !== 1 ? 's' : '' ?> old as of <?= date('Y') ?>.</span>
+            <span><strong>PhilBritish Eligibility Rule:</strong> Vehicles must be <?= $max_vehicle_age ?> years old or newer from the current year to qualify for insurance coverage. Year model <?= $eligibility['year_model'] ?> means the vehicle is <?= $eligibility['age'] ?> year<?= $eligibility['age'] !== 1 ? 's' : '' ?> old as of <?= date('Y') ?>.</span>
           </div>
         </div>
 

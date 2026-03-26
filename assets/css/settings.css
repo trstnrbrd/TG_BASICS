@@ -1,0 +1,304 @@
+/* ── SETTINGS HORIZONTAL TABS ── */
+.settings-tabs-bar {
+    display: flex;
+    gap: 0.25rem;
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.35rem;
+    margin-bottom: 1.75rem;
+    box-shadow: var(--shadow);
+}
+
+.settings-tab-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border: none;
+    border-radius: 9px;
+    background: none;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.settings-tab-btn:hover {
+    background: var(--gold-pale);
+    color: var(--gold);
+}
+
+.settings-tab-btn.active {
+    background: var(--sidebar-bg);
+    color: var(--gold-bright);
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(28, 26, 23, 0.15);
+}
+
+.settings-tab-btn .tab-owner {
+    font-size: 0.55rem;
+    background: rgba(212, 160, 23, 0.15);
+    color: var(--gold);
+    padding: 0.12rem 0.45rem;
+    border-radius: 4px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.settings-tab-btn.active .tab-owner {
+    background: rgba(212, 160, 23, 0.2);
+    color: var(--gold-bright);
+}
+
+.settings-tab-btn svg { flex-shrink: 0; }
+
+/* ── SETTINGS PANEL ── */
+.settings-panel { display: none; }
+.settings-panel.active { display: block; }
+
+/* ── SECTION DIVIDER ── */
+.settings-section-title {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin: 2rem 0 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.settings-section-title:first-child {
+    margin-top: 0;
+}
+
+/* ── FORM GRID — SPACIOUS ── */
+.settings-form .card {
+    margin-bottom: 1.5rem;
+}
+
+.settings-form .card-body {
+    padding: 1.75rem;
+}
+
+.settings-form .form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem;
+}
+
+.settings-form .form-grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+}
+
+.settings-form .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.settings-form .span-2 {
+    grid-column: span 2;
+}
+
+.settings-form .field-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.settings-form .req { color: var(--danger); }
+
+.settings-form .field-input,
+.settings-form .field-select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 0.75rem 1rem;
+    border-radius: 9px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 0.85rem;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.settings-form .field-input:focus,
+.settings-form .field-select:focus {
+    border-color: var(--gold-bright);
+    box-shadow: 0 0 0 3px rgba(212, 160, 23, 0.1);
+    background: var(--bg-3);
+}
+
+.settings-form .field-input::placeholder {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+}
+
+.settings-form .field-hint {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+
+.settings-form .field-section {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+    margin-top: 1.25rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.settings-form .field-section:first-child {
+    margin-top: 0;
+}
+
+/* ── FORM ACTIONS ── */
+.settings-form .form-actions {
+    padding: 1rem 1.75rem;
+    background: var(--bg-2);
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+}
+
+/* ── 2FA TOGGLE SWITCH ── */
+.toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.75rem;
+    gap: 1.5rem;
+}
+
+.toggle-info {
+    flex: 1;
+}
+
+.toggle-info-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+}
+
+.toggle-info-desc {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+
+.toggle-switch {
+    position: relative;
+    width: 52px;
+    height: 28px;
+    flex-shrink: 0;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: var(--border);
+    border-radius: 28px;
+    transition: background 0.25s;
+}
+
+.toggle-slider::before {
+    content: "";
+    position: absolute;
+    height: 22px;
+    width: 22px;
+    left: 3px;
+    bottom: 3px;
+    background: #fff;
+    border-radius: 50%;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+    transition: transform 0.25s;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background: var(--success);
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+    transform: translateX(24px);
+}
+
+.toggle-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.2rem 0.6rem;
+    border-radius: 5px;
+    margin-top: 0.5rem;
+}
+
+.toggle-status.on {
+    background: rgba(46, 125, 82, 0.1);
+    color: var(--success);
+}
+
+.toggle-status.off {
+    background: rgba(156, 146, 134, 0.1);
+    color: var(--text-muted);
+}
+
+/* ── PENDING EMAIL BADGE ── */
+.pending-email-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    background: rgba(184, 134, 11, 0.1);
+    color: var(--gold);
+    padding: 0.3rem 0.65rem;
+    border-radius: 6px;
+    margin-top: 0.35rem;
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 768px) {
+    .settings-tabs-bar {
+        flex-direction: column;
+    }
+    .settings-form .form-grid {
+        grid-template-columns: 1fr;
+    }
+    .settings-form .form-grid-3 {
+        grid-template-columns: 1fr;
+    }
+    .settings-form .span-2 {
+        grid-column: span 1;
+    }
+    .toggle-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}

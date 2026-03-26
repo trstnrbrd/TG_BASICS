@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../config/db.php';
+require_once '../config/settings.php';
 require_once '../config/mailer.php';
 require_once '../includes/icons.php';
 
@@ -29,9 +30,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $inv->bind_param('i', $user['user_id']);
             $inv->execute();
 
-            // Generate a new token (expires in 1 hour)
+            // Generate a new token
+            $reset_expiry_hours = (int)getSetting($conn, 'reset_link_expiry', '1');
             $token      = bin2hex(random_bytes(32));
-            $expires_at = date('Y-m-d H:i:s', strtotime('+1 hour'));
+            $expires_at = date('Y-m-d H:i:s', strtotime('+' . $reset_expiry_hours . ' hours'));
 
             $ins = $conn->prepare("INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, ?)");
             $ins->bind_param('iss', $user['user_id'], $token, $expires_at);
@@ -95,7 +97,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </p>
         <div style="background:var(--gold-pale);border:1px solid var(--gold-muted);border-radius:10px;padding:0.85rem 1rem;font-size:0.78rem;color:var(--text-secondary);line-height:1.6;margin-bottom:1.25rem;display:flex;gap:0.6rem;align-items:flex-start;">
           <?= icon('information-circle', 14) ?>
-          <span>The link expires in <strong>1 hour</strong>. If it does not arrive, check your spam folder or try again.</span>
+          <?php $re = (int)getSetting($conn, 'reset_link_expiry', '1'); ?>
+          <span>The link expires in <strong><?= $re ?> hour<?= $re != 1 ? 's' : '' ?></strong>. If it does not arrive, check your spam folder or try again.</span>
         </div>
         <a href="login.php" class="btn-submit">
           <?= icon('arrow-left', 14) ?> Back to Sign In

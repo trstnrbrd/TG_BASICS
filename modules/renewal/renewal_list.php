@@ -1,6 +1,10 @@
 <?php
 session_start();
 require_once '../../config/db.php';
+require_once '../../config/settings.php';
+
+$urg_days = (int)getSetting($conn, 'renewal_urgent_days', '7');
+$exp_days = (int)getSetting($conn, 'renewal_expiring_days', '30');
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
     header("Location: ../../auth/login.php");
@@ -25,13 +29,14 @@ if ($search !== '') {
 
 switch ($filter) {
     case 'urgent':
-        $where_clauses[] = "p.policy_end >= CURDATE() AND DATEDIFF(p.policy_end, CURDATE()) <= 7";
+        $where_clauses[] = "p.policy_end >= CURDATE() AND DATEDIFF(p.policy_end, CURDATE()) <= $urg_days";
         break;
     case 'expiring':
-        $where_clauses[] = "p.policy_end >= CURDATE() AND DATEDIFF(p.policy_end, CURDATE()) BETWEEN 8 AND 30";
+        $exp_start = $urg_days + 1;
+        $where_clauses[] = "p.policy_end >= CURDATE() AND DATEDIFF(p.policy_end, CURDATE()) BETWEEN $exp_start AND $exp_days";
         break;
     case 'stable':
-        $where_clauses[] = "p.policy_end >= CURDATE() AND DATEDIFF(p.policy_end, CURDATE()) > 30";
+        $where_clauses[] = "p.policy_end >= CURDATE() AND DATEDIFF(p.policy_end, CURDATE()) > $exp_days";
         break;
     case 'expired':
         $where_clauses[] = "p.policy_end < CURDATE()";
@@ -62,12 +67,13 @@ $stmt->execute();
 $policies = $stmt->get_result();
 
 // ── SUMMARY COUNTS ──
+$exp_start_count = $urg_days + 1;
 $counts = $conn->query("
     SELECT
         COUNT(*) AS total,
-        SUM(CASE WHEN policy_end >= CURDATE() AND DATEDIFF(policy_end, CURDATE()) <= 7  THEN 1 ELSE 0 END) AS urgent,
-        SUM(CASE WHEN policy_end >= CURDATE() AND DATEDIFF(policy_end, CURDATE()) BETWEEN 8 AND 30 THEN 1 ELSE 0 END) AS expiring,
-        SUM(CASE WHEN policy_end >= CURDATE() AND DATEDIFF(policy_end, CURDATE()) > 30 THEN 1 ELSE 0 END) AS stable,
+        SUM(CASE WHEN policy_end >= CURDATE() AND DATEDIFF(policy_end, CURDATE()) <= $urg_days  THEN 1 ELSE 0 END) AS urgent,
+        SUM(CASE WHEN policy_end >= CURDATE() AND DATEDIFF(policy_end, CURDATE()) BETWEEN $exp_start_count AND $exp_days THEN 1 ELSE 0 END) AS expiring,
+        SUM(CASE WHEN policy_end >= CURDATE() AND DATEDIFF(policy_end, CURDATE()) > $exp_days THEN 1 ELSE 0 END) AS stable,
         SUM(CASE WHEN policy_end < CURDATE() THEN 1 ELSE 0 END) AS expired
     FROM insurance_policies
 ")->fetch_assoc();
@@ -94,8 +100,8 @@ require_once '../../includes/topbar.php';
       <?php
       $summary = [
         ['all',      'Total Policies',    $counts['total'],    'badge-gold',  'document'],
-        ['urgent',   'Urgent (≤7 days)',  $counts['urgent'],   'badge-red',   'exclamation-triangle'],
-        ['expiring', 'Expiring (≤30 days)',$counts['expiring'],'badge-yellow','clock'],
+        ['urgent',   'Urgent (' . $urg_days . 'd)',  $counts['urgent'],   'badge-red',   'exclamation-triangle'],
+        ['expiring', 'Expiring (' . $exp_days . 'd)',$counts['expiring'],'badge-yellow','clock'],
         ['stable',   'Stable',            $counts['stable'],   'badge-green', 'check-circle'],
         ['expired',  'Expired',           $counts['expired'],  'badge-gray',  'x-mark'],
       ];
@@ -182,10 +188,10 @@ require_once '../../includes/topbar.php';
               if ($row['policy_end'] < date('Y-m-d')) {
                 $status_badge = '<span class="badge badge-gray">Expired</span>';
                 $row_style    = '';
-              } elseif ($days <= 7) {
+              } elseif ($days <= $urg_days) {
                 $status_badge = '<span class="badge badge-red">' . icon('exclamation-triangle', 10) . ' Urgent &mdash; ' . $days . 'd left</span>';
                 $row_style    = 'background:rgba(192,57,43,0.03);';
-              } elseif ($days <= 30) {
+              } elseif ($days <= $exp_days) {
                 $status_badge = '<span class="badge badge-yellow">' . icon('clock', 10) . ' Expiring &mdash; ' . $days . 'd left</span>';
                 $row_style    = 'background:rgba(184,134,11,0.03);';
               } else {

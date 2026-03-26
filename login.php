@@ -157,6 +157,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <div class="login-note">
       No self-registration. Contact your administrator for account access.<br/>
+      <a href="forgot_password.php">Forgot your password?</a>
+      &nbsp;&middot;&nbsp;
       <a href="index.php"><?= icon('arrow-left', 12) ?> Back to Home</a>
     </div>
   </div>

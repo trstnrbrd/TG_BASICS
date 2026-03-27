@@ -1,5 +1,16 @@
-# Sensitive config
+# Sensitive config (contains credentials)
+config/db.php
 config/mailer.php
+config/settings.php
+
+# Environment files
+.env
+.env.*
+.env.local
+
+# Uploaded files (user-generated)
+uploads/avatars/*
+!uploads/avatars/.gitkeep
 
 # XAMPP / system files
 .DS_Store

@@ -29,7 +29,7 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title><?= htmlspecialchars($page_title) ?> | TG-BASICS</title>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Big+Shoulders+Text:wght@700;800;900&display=swap" rel="stylesheet"/>
 <style>
   :root {
     --gold: #B8860B;
@@ -337,7 +337,9 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
 
   /* ── BADGES ── */
   .plate-chip { display: inline-flex; background: var(--sidebar-bg); color: var(--gold-bright); padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.72rem; font-weight: 800; letter-spacing: 1.5px; }
-  .badge-dark { display: inline-flex; background: var(--sidebar-bg); color: var(--gold-bright); padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.72rem; font-weight: 800; letter-spacing: 1.5px; }
+  .badge-dark {
+  display: inline-block;background: #FFFFFF;color: #1a7a1a;font-family: 'Big Shoulders Text', 'Courier New', monospace;font-weight: 800;font-size: 0.85rem;padding: 0.25rem 0.75rem;border-radius: 3px;letter-spacing: 3px;border: 1.5px solid #1a7a1a;text-transform: uppercase;
+}
   .badge { display: inline-flex; align-items: center; padding: 0.2rem 0.65rem; border-radius: 100px; font-size: 0.67rem; font-weight: 700; letter-spacing: 0.3px; white-space: nowrap; }
   .badge-green  { background: var(--success-bg); color: var(--success); }
   .badge-yellow { background: var(--warning-bg); color: var(--warning); }

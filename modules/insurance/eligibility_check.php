@@ -158,7 +158,7 @@ require_once '../../includes/topbar.php';
       <input
         type="text"
         id="live-search"
-        placeholder="e.g. Juan dela Cruz or NCH 7952"
+        placeholder="Juan dela Cruz or ABC 123"
         autocomplete="off"
         style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text-primary);padding:0.7rem 0.9rem 0.7rem 2.4rem;border-radius:9px;font-family:'Plus Jakarta Sans',sans-serif;font-size:0.85rem;outline:none;transition:border-color 0.15s,box-shadow 0.15s;"
         onfocus="this.style.borderColor='var(--gold-bright)';this.style.boxShadow='0 0 0 3px rgba(212,160,23,0.1)'"

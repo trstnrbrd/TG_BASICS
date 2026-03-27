@@ -158,10 +158,6 @@ $role        = $_SESSION['role'] ?? '';
        class="nav-item <?= $active_page === 'settings' ? 'active' : '' ?>">
       <span class="nav-icon"><?= icon('cog', 16) ?></span> Settings
     </a>
-    <a href="<?= $base_path ?>auth/logout.php" class="nav-item" id="logout-nav-btn">
-      <span class="nav-icon"><?= icon('lock-closed', 16) ?></span> Logout
-    </a>
-
   </nav>
 
   <div class="sidebar-footer">TG-BASICS &mdash; Internal Use Only</div>

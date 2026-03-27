@@ -52,16 +52,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($user['two_factor_enabled'] && !empty($user['email'])) {
                         // Generate 6-digit code
                         $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-                        $expires = date('Y-m-d H:i:s', strtotime('+10 minutes'));
 
                         // Invalidate old codes
                         $inv = $conn->prepare("UPDATE two_factor_codes SET used = 1 WHERE user_id = ? AND used = 0");
                         $inv->bind_param('i', $user['user_id']);
                         $inv->execute();
 
-                        // Insert new code
-                        $ins = $conn->prepare("INSERT INTO two_factor_codes (user_id, code, expires_at) VALUES (?, ?, ?)");
-                        $ins->bind_param('iss', $user['user_id'], $code, $expires);
+                        // Insert new code (use MySQL NOW() to avoid PHP/MySQL timezone mismatch)
+                        $ins = $conn->prepare("INSERT INTO two_factor_codes (user_id, code, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))");
+                        $ins->bind_param('is', $user['user_id'], $code);
                         $ins->execute();
 
                         // Send the code via email

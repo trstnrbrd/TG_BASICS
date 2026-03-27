@@ -153,8 +153,8 @@ require_once '../../includes/topbar.php';
             <?php
             $titles = [
               'all'      => 'All Policies',
-              'urgent'   => 'Urgent - Expiring Within 7 Days',
-              'expiring' => 'Expiring Within 30 Days',
+              'urgent'   => 'Urgent - Expiring Within ' . $urg_days . ' Days',
+              'expiring' => 'Expiring Within ' . $exp_days . ' Days',
               'stable'   => 'Stable Policies',
               'expired'  => 'Expired Policies',
             ];

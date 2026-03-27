@@ -38,11 +38,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'resend') {
         $inv->bind_param('i', $pending_uid);
         $inv->execute();
 
-        // Generate new code
+        // Generate new code (use MySQL NOW() to avoid timezone mismatch)
         $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-        $expires = date('Y-m-d H:i:s', strtotime('+10 minutes'));
-        $ins = $conn->prepare("INSERT INTO two_factor_codes (user_id, code, expires_at) VALUES (?, ?, ?)");
-        $ins->bind_param('iss', $pending_uid, $code, $expires);
+        $ins = $conn->prepare("INSERT INTO two_factor_codes (user_id, code, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))");
+        $ins->bind_param('is', $pending_uid, $code);
         $ins->execute();
 
         send2FACodeEmail($em_row['email'], $pending_name, $code);

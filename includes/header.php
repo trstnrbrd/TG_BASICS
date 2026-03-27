@@ -9,9 +9,22 @@ $role_label = match($_SESSION['role'] ?? '') {
 };
 
 require_once __DIR__ . '/icons.php';
+
+// Load user theme preference
+$_user_theme = $_SESSION['theme'] ?? 'light';
+if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
+    $__t = $conn->prepare("SELECT theme FROM users WHERE user_id = ?");
+    $__t->bind_param('i', $_SESSION['user_id']);
+    $__t->execute();
+    $__tr = $__t->get_result()->fetch_assoc();
+    if ($__tr) {
+        $_user_theme = $__tr['theme'] ?? 'light';
+        $_SESSION['theme'] = $_user_theme;
+    }
+}
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="<?= htmlspecialchars($_user_theme) ?>">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -51,6 +64,32 @@ require_once __DIR__ . '/icons.php';
     --info-bg: #EFF6FB;
     --info-border: rgba(26,107,154,0.2);
     --sidebar-width: 232px;
+  }
+
+  [data-theme="dark"] {
+    --bg: #141210;
+    --bg-2: #1C1A17;
+    --bg-3: #242220;
+    --sidebar-bg: #0F0E0D;
+    --sidebar-text: #9C9286;
+    --text-primary: #E8E2D8;
+    --text-secondary: #B8B0A4;
+    --text-muted: #7A7268;
+    --border: #2A2724;
+    --shadow: 0 1px 3px rgba(0,0,0,0.25), 0 1px 2px rgba(0,0,0,0.15);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.3), 0 2px 6px rgba(0,0,0,0.2);
+    --shadow-lg: 0 12px 40px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.25);
+    --success-bg: rgba(46,125,82,0.12);
+    --success-border: rgba(46,125,82,0.3);
+    --warning-bg: rgba(184,134,11,0.12);
+    --warning-border: rgba(184,134,11,0.3);
+    --danger-bg: rgba(192,57,43,0.12);
+    --danger-border: rgba(192,57,43,0.3);
+    --info-bg: rgba(26,107,154,0.12);
+    --info-border: rgba(26,107,154,0.3);
+    --gold-pale: rgba(184,134,11,0.08);
+    --gold-light: rgba(184,134,11,0.18);
+    --gold-muted: rgba(212,160,23,0.35);
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -358,6 +397,9 @@ require_once __DIR__ . '/icons.php';
     .user-chip-chevron { display: none; }
   }
 </style>
+<?= $extra_css ?? '' ?>
+</head>
+<body>
 
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
 

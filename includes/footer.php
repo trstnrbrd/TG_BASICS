@@ -100,7 +100,7 @@ $footer_scripts = $footer_scripts ?? '';
   loadExpiryBadge();
 
   // ── USER DROPDOWN ──
-  function UserDropdown({ fullName, initials, role, username, basePath }) {
+  function UserDropdown({ fullName, initials, role, username, basePath, photo }) {
     const [open, setOpen] = useState(false);
     const [closing, setClosing] = useState(false);
     const wrapRef = useRef(null);
@@ -126,7 +126,9 @@ $footer_scripts = $footer_scripts ?? '';
     return (
       <div className="user-dropdown-wrap" ref={wrapRef}>
         <div className="user-chip" onClick={handleToggle}>
-          <div className="user-avatar">{initials}</div>
+          <div className="user-avatar">
+            {photo ? <img src={photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}}/> : initials}
+          </div>
           <span className="user-chip-label">{fullName} &mdash; {role}</span>
           <span className={`user-chip-chevron ${open ? 'open' : ''}`}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
@@ -140,7 +142,9 @@ $footer_scripts = $footer_scripts ?? '';
           <div className="user-dropdown"
             style={{ animation: `${closing ? 'dropdownOut' : 'dropdownIn'} 0.18s ease forwards` }}>
             <div className="user-dropdown-header">
-              <div className="user-dropdown-avatar">{initials}</div>
+              <div className="user-dropdown-avatar">
+                {photo ? <img src={photo} alt="" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}}/> : initials}
+              </div>
               <div>
                 <div className="user-dropdown-name">{fullName}</div>
                 <div className="user-dropdown-meta">@{username} &middot; {role}</div>
@@ -165,7 +169,7 @@ $footer_scripts = $footer_scripts ?? '';
   // Mount user dropdown
   const userDropdownRoot = document.getElementById('user-dropdown-root');
   if (userDropdownRoot) {
-    const { name, initials, role, username, base } = userDropdownRoot.dataset;
+    const { name, initials, role, username, base, photo } = userDropdownRoot.dataset;
     ReactDOM.createRoot(userDropdownRoot).render(
       <UserDropdown
         fullName={name}
@@ -173,6 +177,7 @@ $footer_scripts = $footer_scripts ?? '';
         role={role}
         username={username}
         basePath={base}
+        photo={photo || ''}
       />
     );
   }

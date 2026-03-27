@@ -29,6 +29,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
 
     switch ($section) {
 
+        // ── AVATAR UPLOAD ──
+        case 'avatar_upload':
+            $upload_dir = __DIR__ . '/../uploads/avatars/';
+            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+
+            if (empty($_FILES['avatar']) || $_FILES['avatar']['error'] !== UPLOAD_ERR_OK) {
+                echo json_encode(['ok' => false, 'error' => 'No file uploaded or upload error.']);
+                exit;
+            }
+
+            $file = $_FILES['avatar'];
+            $allowed = ['image/jpeg', 'image/png', 'image/webp'];
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mime = finfo_file($finfo, $file['tmp_name']);
+            finfo_close($finfo);
+
+            if (!in_array($mime, $allowed)) {
+                echo json_encode(['ok' => false, 'error' => 'Only JPG, PNG, and WebP images are allowed.']);
+                exit;
+            }
+            if ($file['size'] > 2 * 1024 * 1024) {
+                echo json_encode(['ok' => false, 'error' => 'Image must be under 2 MB.']);
+                exit;
+            }
+
+            // Delete old photo if exists
+            $old_stmt = $conn->prepare("SELECT profile_photo FROM users WHERE user_id = ?");
+            $old_stmt->bind_param('i', $user_id);
+            $old_stmt->execute();
+            $old_photo = $old_stmt->get_result()->fetch_assoc()['profile_photo'] ?? '';
+            if ($old_photo && file_exists($upload_dir . $old_photo)) {
+                unlink($upload_dir . $old_photo);
+            }
+
+            $ext = match($mime) { 'image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp' };
+            $filename = 'avatar_' . $user_id . '_' . time() . '.' . $ext;
+            move_uploaded_file($file['tmp_name'], $upload_dir . $filename);
+
+            $upd = $conn->prepare("UPDATE users SET profile_photo = ? WHERE user_id = ?");
+            $upd->bind_param('si', $filename, $user_id);
+            $upd->execute();
+
+            echo json_encode(['ok' => true, 'message' => 'Profile photo updated.', 'photo' => $filename]);
+            break;
+
+        // ── REMOVE AVATAR ──
+        case 'avatar_remove':
+            $upload_dir = __DIR__ . '/../uploads/avatars/';
+            $old_stmt = $conn->prepare("SELECT profile_photo FROM users WHERE user_id = ?");
+            $old_stmt->bind_param('i', $user_id);
+            $old_stmt->execute();
+            $old_photo = $old_stmt->get_result()->fetch_assoc()['profile_photo'] ?? '';
+            if ($old_photo && file_exists($upload_dir . $old_photo)) {
+                unlink($upload_dir . $old_photo);
+            }
+
+            $upd = $conn->prepare("UPDATE users SET profile_photo = NULL WHERE user_id = ?");
+            $upd->bind_param('i', $user_id);
+            $upd->execute();
+
+            echo json_encode(['ok' => true, 'message' => 'Profile photo removed.']);
+            break;
+
         // ── MY ACCOUNT ──
         case 'account':
             $name   = trim($_POST['full_name'] ?? '');
@@ -61,15 +124,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
 
                 // Send verification email instead of updating directly
                 $token = bin2hex(random_bytes(32));
-                $expires = date('Y-m-d H:i:s', strtotime('+24 hours'));
 
                 // Invalidate previous pending verifications
                 $inv = $conn->prepare("UPDATE email_verifications SET used = 1 WHERE user_id = ? AND used = 0");
                 $inv->bind_param('i', $user_id);
                 $inv->execute();
 
-                $ins = $conn->prepare("INSERT INTO email_verifications (user_id, new_email, token, expires_at) VALUES (?, ?, ?, ?)");
-                $ins->bind_param('isss', $user_id, $email, $token, $expires);
+                // Use MySQL NOW() to avoid PHP/MySQL timezone mismatch
+                $ins = $conn->prepare("INSERT INTO email_verifications (user_id, new_email, token, expires_at) VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 24 HOUR))");
+                $ins->bind_param('iss', $user_id, $email, $token);
                 $ins->execute();
 
                 $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
@@ -180,6 +243,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             echo json_encode(['ok' => true, 'message' => '2FA ' . ($enabled ? 'enabled' : 'disabled') . ' successfully.']);
             break;
 
+        // ── DESIGN PREFERENCES ──
+        case 'design_prefs':
+            $theme = in_array($_POST['theme'] ?? '', ['light', 'dark']) ? $_POST['theme'] : 'light';
+
+            $upd = $conn->prepare("UPDATE users SET theme = ? WHERE user_id = ?");
+            $upd->bind_param('si', $theme, $user_id);
+            $upd->execute();
+
+            $_SESSION['theme'] = $theme;
+
+            echo json_encode(['ok' => true, 'message' => 'Design preferences saved.']);
+            break;
+
         // ── SYSTEM SETTINGS (Owner only — all in one save) ──
         case 'system_settings':
             // Company
@@ -223,8 +299,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
 $full_name = $_SESSION['full_name'];
 $initials  = substr(implode('', array_map(fn($w) => strtoupper($w[0]), explode(' ', $full_name))), 0, 2);
 
-// Current user record (include 2FA status)
-$u_stmt = $conn->prepare("SELECT full_name, username, email, two_factor_enabled FROM users WHERE user_id = ?");
+// Current user record (include 2FA status, photo, theme)
+$u_stmt = $conn->prepare("SELECT full_name, username, email, two_factor_enabled, profile_photo, theme FROM users WHERE user_id = ?");
 $u_stmt->bind_param('i', $user_id);
 $u_stmt->execute();
 $current_user = $u_stmt->get_result()->fetch_assoc();
@@ -241,11 +317,10 @@ $settings = getAllSettings($conn);
 $page_title  = 'Settings';
 $active_page = 'settings';
 $base_path   = '../';
+$extra_css    = '<link rel="stylesheet" href="' . $base_path . 'assets/css/settings.css?v=' . filemtime(__DIR__ . '/../assets/css/settings.css') . '"/>';
 require_once '../includes/header.php';
 require_once '../includes/navbar.php';
 ?>
-
-<link rel="stylesheet" href="<?= $base_path ?>assets/css/settings.css"/>
 
 <div class="main">
 
@@ -262,10 +337,19 @@ require_once '../includes/topbar.php';
       <div class="page-header-sub">Configure your profile and system preferences for TG-BASICS.</div>
     </div>
 
+    <?php
+    $has_photo   = !empty($current_user['profile_photo']);
+    $photo_url   = $has_photo ? $base_path . 'uploads/avatars/' . htmlspecialchars($current_user['profile_photo']) : '';
+    $user_theme  = $current_user['theme'] ?? 'light';
+    ?>
+
     <!-- ═══ HORIZONTAL TABS ═══ -->
     <div class="settings-tabs-bar">
       <button class="settings-tab-btn active" data-tab="account">
         <?= icon('user', 16) ?> My Account
+      </button>
+      <button class="settings-tab-btn" data-tab="design">
+        <?= icon('swatch', 16) ?> Design Preferences
       </button>
       <?php if ($is_super): ?>
       <button class="settings-tab-btn" data-tab="system_settings">
@@ -279,6 +363,44 @@ require_once '../includes/topbar.php';
 
     <!-- ── MY ACCOUNT ── -->
     <div class="settings-panel active" id="panel-account">
+
+      <!-- Profile Photo -->
+      <div class="card" style="margin-bottom:1.5rem;">
+        <div class="card-header">
+          <div class="card-icon"><?= icon('camera', 16) ?></div>
+          <div>
+            <div class="card-title">Profile Photo</div>
+            <div class="card-sub">Upload a photo to personalize your account</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="avatar-upload-area">
+            <div class="avatar-preview" id="avatar-preview">
+              <?php if ($has_photo): ?>
+              <img src="<?= $photo_url ?>" alt="Profile" id="avatar-img"/>
+              <?php else: ?>
+              <span class="avatar-initials" id="avatar-initials"><?= htmlspecialchars($initials) ?></span>
+              <?php endif; ?>
+            </div>
+            <div class="avatar-actions">
+              <div class="avatar-actions-title"><?= htmlspecialchars($current_user['full_name']) ?></div>
+              <div class="avatar-actions-hint">JPG, PNG, or WebP. Max 2 MB.</div>
+              <div class="avatar-buttons">
+                <label class="btn-secondary btn-sm" id="avatar-upload-label">
+                  <?= icon('camera', 14) ?> Upload Photo
+                  <input type="file" accept="image/jpeg,image/png,image/webp" id="avatar-file-input" hidden/>
+                </label>
+                <?php if ($has_photo): ?>
+                <button type="button" class="btn-outline-danger btn-sm" id="avatar-remove-btn">
+                  <?= icon('x-circle', 14) ?> Remove
+                </button>
+                <?php endif; ?>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <form class="settings-form" data-section="account">
         <input type="hidden" name="section" value="account"/>
 
@@ -348,47 +470,107 @@ require_once '../includes/topbar.php';
               </div>
             </div>
           </div>
-          <div class="form-actions">
-            <button type="submit" class="btn-primary"><?= icon('check', 14) ?> Save Changes</button>
+        </div>
+
+        <!-- 2FA Card -->
+        <div class="card" style="margin-top:1.5rem;">
+          <div class="card-header">
+            <div class="card-icon"><?= icon('shield-check', 16) ?></div>
+            <div>
+              <div class="card-title">Two-Factor Authentication</div>
+              <div class="card-sub">Add an extra layer of security to your account</div>
+            </div>
           </div>
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-info-title">Email-Based Verification</div>
+              <div class="toggle-info-desc">
+                When enabled, a 6-digit code will be sent to your email each time you log in. You must enter this code to complete sign-in.
+              </div>
+              <div class="toggle-status <?= $current_user['two_factor_enabled'] ? 'on' : 'off' ?>" id="tfa-status">
+                <?= icon($current_user['two_factor_enabled'] ? 'check-circle' : 'x-circle', 12) ?>
+                <span><?= $current_user['two_factor_enabled'] ? 'Enabled' : 'Disabled' ?></span>
+              </div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="tfa-toggle"
+                <?= $current_user['two_factor_enabled'] ? 'checked' : '' ?>
+                <?= empty($current_user['email']) ? 'disabled title="Set an email address first"' : '' ?>/>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <?php if (empty($current_user['email'])): ?>
+          <div style="padding:0 1.75rem 1.25rem;">
+            <div class="info-box">
+              <?= icon('information-circle', 14) ?>
+              <span>You need to set an email address before enabling Two-Factor Authentication.</span>
+            </div>
+          </div>
+          <?php endif; ?>
+        </div>
+
+        <!-- Bottom save button -->
+        <div class="panel-save-bar">
+          <button type="submit" class="btn-primary"><?= icon('check', 14) ?> Save Changes</button>
         </div>
       </form>
+    </div>
 
-      <!-- 2FA Card (separate from profile form) -->
-      <div class="card" style="margin-top:1.5rem;">
+    <!-- ── DESIGN PREFERENCES ── -->
+    <div class="settings-panel" id="panel-design">
+      <div class="card">
         <div class="card-header">
-          <div class="card-icon"><?= icon('shield-check', 16) ?></div>
+          <div class="card-icon"><?= icon('swatch', 16) ?></div>
           <div>
-            <div class="card-title">Two-Factor Authentication</div>
-            <div class="card-sub">Add an extra layer of security to your account</div>
+            <div class="card-title">Theme</div>
+            <div class="card-sub">Choose your preferred color scheme</div>
           </div>
         </div>
-        <div class="toggle-row">
-          <div class="toggle-info">
-            <div class="toggle-info-title">Email-Based Verification</div>
-            <div class="toggle-info-desc">
-              When enabled, a 6-digit code will be sent to your email each time you log in. You must enter this code to complete sign-in.
-            </div>
-            <div class="toggle-status <?= $current_user['two_factor_enabled'] ? 'on' : 'off' ?>" id="tfa-status">
-              <?= icon($current_user['two_factor_enabled'] ? 'check-circle' : 'x-circle', 12) ?>
-              <span><?= $current_user['two_factor_enabled'] ? 'Enabled' : 'Disabled' ?></span>
-            </div>
+        <div class="card-body">
+          <div class="theme-picker">
+
+            <label class="theme-option <?= $user_theme === 'light' ? 'active' : '' ?>">
+              <input type="radio" name="theme" value="light" <?= $user_theme === 'light' ? 'checked' : '' ?> hidden/>
+              <div class="theme-preview theme-preview-light">
+                <div class="tp-sidebar"></div>
+                <div class="tp-main">
+                  <div class="tp-topbar"></div>
+                  <div class="tp-content">
+                    <div class="tp-card"></div>
+                    <div class="tp-card short"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="theme-label">
+                <span class="theme-radio"></span>
+                <span class="theme-name">Light</span>
+              </div>
+            </label>
+
+            <label class="theme-option <?= $user_theme === 'dark' ? 'active' : '' ?>">
+              <input type="radio" name="theme" value="dark" <?= $user_theme === 'dark' ? 'checked' : '' ?> hidden/>
+              <div class="theme-preview theme-preview-dark">
+                <div class="tp-sidebar"></div>
+                <div class="tp-main">
+                  <div class="tp-topbar"></div>
+                  <div class="tp-content">
+                    <div class="tp-card"></div>
+                    <div class="tp-card short"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="theme-label">
+                <span class="theme-radio"></span>
+                <span class="theme-name">Dark</span>
+              </div>
+            </label>
+
           </div>
-          <label class="toggle-switch">
-            <input type="checkbox" id="tfa-toggle"
-              <?= $current_user['two_factor_enabled'] ? 'checked' : '' ?>
-              <?= empty($current_user['email']) ? 'disabled title="Set an email address first"' : '' ?>/>
-            <span class="toggle-slider"></span>
-          </label>
         </div>
-        <?php if (empty($current_user['email'])): ?>
-        <div style="padding:0 1.75rem 1.25rem;">
-          <div class="info-box">
-            <?= icon('information-circle', 14) ?>
-            <span>You need to set an email address before enabling Two-Factor Authentication.</span>
-          </div>
-        </div>
-        <?php endif; ?>
+      </div>
+
+      <div class="panel-save-bar">
+        <button type="button" class="btn-primary" id="save-design-btn"><?= icon('check', 14) ?> Save Changes</button>
       </div>
     </div>
 
@@ -600,9 +782,11 @@ require_once '../includes/topbar.php';
               </div>
             </div>
           </div>
-          <div class="form-actions">
-            <button type="submit" class="btn-primary"><?= icon('check', 14) ?> Save All Settings</button>
-          </div>
+        </div>
+
+        <!-- Bottom save button -->
+        <div class="panel-save-bar">
+          <button type="submit" class="btn-primary"><?= icon('check', 14) ?> Save All Settings</button>
         </div>
       </form>
     </div>
@@ -658,6 +842,95 @@ document.querySelectorAll('.settings-form').forEach(form => {
         btn.innerHTML = originalHTML;
     });
 });
+
+// ── Avatar Upload ──
+const avatarInput = document.getElementById('avatar-file-input');
+if (avatarInput) {
+    avatarInput.addEventListener('change', async function() {
+        if (!this.files.length) return;
+        const fd = new FormData();
+        fd.append('section', 'avatar_upload');
+        fd.append('avatar', this.files[0]);
+
+        try {
+            const res = await fetch('settings.php', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (data.ok) {
+                if (window.showToast) window.showToast(data.message, 'success');
+                setTimeout(() => location.reload(), 600);
+            } else {
+                if (window.showToast) window.showToast(data.error, 'danger');
+            }
+        } catch (err) {
+            if (window.showToast) window.showToast('Upload failed. Please try again.', 'danger');
+        }
+        this.value = '';
+    });
+}
+
+// ── Avatar Remove ──
+const avatarRemoveBtn = document.getElementById('avatar-remove-btn');
+if (avatarRemoveBtn) {
+    avatarRemoveBtn.addEventListener('click', async function() {
+        const fd = new FormData();
+        fd.append('section', 'avatar_remove');
+
+        try {
+            const res = await fetch('settings.php', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (data.ok) {
+                if (window.showToast) window.showToast(data.message, 'success');
+                setTimeout(() => location.reload(), 600);
+            } else {
+                if (window.showToast) window.showToast(data.error, 'danger');
+            }
+        } catch (err) {
+            if (window.showToast) window.showToast('Something went wrong.', 'danger');
+        }
+    });
+}
+
+// ── Theme Picker ──
+document.querySelectorAll('.theme-option').forEach(opt => {
+    opt.addEventListener('click', () => {
+        document.querySelectorAll('.theme-option').forEach(o => o.classList.remove('active'));
+        opt.classList.add('active');
+        opt.querySelector('input[type="radio"]').checked = true;
+    });
+});
+
+// ── Save Design Preferences ──
+const saveDesignBtn = document.getElementById('save-design-btn');
+if (saveDesignBtn) {
+    saveDesignBtn.addEventListener('click', async function() {
+        const theme = document.querySelector('input[name="theme"]:checked')?.value || 'light';
+        const originalHTML = this.innerHTML;
+        this.disabled = true;
+        this.style.opacity = '0.6';
+        this.textContent = 'Saving...';
+
+        const fd = new FormData();
+        fd.append('section', 'design_prefs');
+        fd.append('theme', theme);
+
+        try {
+            const res = await fetch('settings.php', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (data.ok) {
+                if (window.showToast) window.showToast(data.message, 'success');
+                document.documentElement.setAttribute('data-theme', theme);
+            } else {
+                if (window.showToast) window.showToast(data.error, 'danger');
+            }
+        } catch (err) {
+            if (window.showToast) window.showToast('Something went wrong.', 'danger');
+        }
+
+        this.disabled = false;
+        this.style.opacity = '';
+        this.innerHTML = originalHTML;
+    });
+}
 
 // ── 2FA Toggle ──
 const tfaToggle = document.getElementById('tfa-toggle');

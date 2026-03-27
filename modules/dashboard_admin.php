@@ -87,11 +87,10 @@ $date_display = date('l, F j, Y');
 $page_title  = 'Dashboard';
 $active_page = 'dashboard';
 $base_path   = '../';
+$extra_css    = '<link rel="stylesheet" href="' . $base_path . 'assets/css/dashboard.css?v=' . filemtime(__DIR__ . '/../assets/css/dashboard.css') . '"/>';
 require_once '../includes/header.php';
 require_once '../includes/navbar.php';
 ?>
-
-<link rel="stylesheet" href="<?= $base_path ?>assets/css/dashboard.css"/>
 
 <div class="main">
 

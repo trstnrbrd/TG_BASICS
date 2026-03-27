@@ -65,6 +65,18 @@ function _initMigrations(mysqli $conn): void {
         $conn->query("ALTER TABLE users ADD COLUMN two_factor_enabled TINYINT(1) NOT NULL DEFAULT 0");
     }
 
+    // Add profile_photo column to users table
+    $result = $conn->query("SHOW COLUMNS FROM users LIKE 'profile_photo'");
+    if ($result && $result->num_rows === 0) {
+        $conn->query("ALTER TABLE users ADD COLUMN profile_photo VARCHAR(255) DEFAULT NULL");
+    }
+
+    // Add theme column to users table
+    $result = $conn->query("SHOW COLUMNS FROM users LIKE 'theme'");
+    if ($result && $result->num_rows === 0) {
+        $conn->query("ALTER TABLE users ADD COLUMN theme VARCHAR(20) NOT NULL DEFAULT 'light'");
+    }
+
     // Create email_verifications table
     $conn->query("
         CREATE TABLE IF NOT EXISTS email_verifications (

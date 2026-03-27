@@ -4,87 +4,6 @@ $base_path   = $base_path   ?? '../';
 $role        = $_SESSION['role'] ?? '';
 ?>
 
-<!-- HAMBURGER BUTTON - visible on mobile only -->
-<button class="hamburger" id="hamburger-btn" onclick="toggleSidebar()" aria-label="Toggle menu">
-  <span></span><span></span><span></span>
-</button>
-
-<aside class="sidebar" id="tg-sidebar">
-  <div class="sidebar-logo">
-    <div class="logo-row">
-      <img src="<?= $base_path ?>assets/img/tg_logo.png" alt="TG" class="logo-img"/>
-      <div>
-        <div class="logo-name">TG<span>-BASICS</span></div>
-        <div class="logo-tagline">Management System</div>
-      </div>
-    </div>
-  </div>
-
-  <nav class="sidebar-nav">
-
-    <div class="nav-group-label">Main</div>
-    <a href="<?= $base_path ?>modules/dashboard_admin.php"
-       class="nav-item <?= $active_page === 'dashboard' ? 'active' : '' ?>">
-      <span class="nav-icon"><?= icon('dashboard', 16) ?></span> Dashboard
-    </a>
-
-    <div class="nav-group-label">Records</div>
-    <a href="<?= $base_path ?>modules/clients/client_list.php"
-       class="nav-item <?= $active_page === 'clients' ? 'active' : '' ?>">
-      <span class="nav-icon"><?= icon('users', 16) ?></span> Client Records
-    </a>
-
-    <div class="nav-group-label">Insurance</div>
-    <a href="<?= $base_path ?>modules/insurance/eligibility_check.php"
-       class="nav-item <?= $active_page === 'insurance' ? 'active' : '' ?>">
-      <span class="nav-icon"><?= icon('shield-check', 16) ?></span> Eligibility &amp; Policy
-    </a>
-    <a href="<?= $base_path ?>modules/renewal/renewal_list.php"
-       class="nav-item <?= $active_page === 'renewal' ? 'active' : '' ?>">
-      <span class="nav-icon"><?= icon('clock', 16) ?></span> Renewal Tracking
-      <span class="nav-badge" id="expiry-badge" style="display:none;"></span>
-    </a>
-    <a href="<?= $base_path ?>modules/claims/claims_list.php"
-       class="nav-item <?= $active_page === 'claims' ? 'active' : '' ?>">
-      <span class="nav-icon"><?= icon('clipboard-list', 16) ?></span> Claims Tracking
-    </a>
-
-    <div class="nav-group-label">Repair Shop</div>
-    <a href="<?= $base_path ?>modules/repair/repair_list.php"
-       class="nav-item <?= $active_page === 'repair' ? 'active' : '' ?>">
-      <span class="nav-icon"><?= icon('wrench', 16) ?></span> Repair Jobs
-    </a>
-    <a href="<?= $base_path ?>modules/repair/quotation_list.php"
-       class="nav-item <?= $active_page === 'quotations' ? 'active' : '' ?>">
-      <span class="nav-icon"><?= icon('receipt', 16) ?></span> Quotations &amp; Receipts
-    </a>
-
-    <?php if ($role === 'super_admin'): ?>
-    <div class="nav-group-label">Administration</div>
-    <a href="<?= $base_path ?>modules/manage_users.php"
-       class="nav-item <?= $active_page === 'manage_users' ? 'active' : '' ?>">
-      <span class="nav-icon"><?= icon('users', 16) ?></span> Manage Users
-    </a>
-    <a href="<?= $base_path ?>modules/activity_log.php"
-       class="nav-item <?= $active_page === 'activity_log' ? 'active' : '' ?>">
-      <span class="nav-icon"><?= icon('clipboard-list', 16) ?></span> Activity Log
-    </a>
-    <?php endif; ?>
-
-    <div class="nav-group-label">System</div>
-    <a href="<?= $base_path ?>modules/settings.php"
-       class="nav-item <?= $active_page === 'settings' ? 'active' : '' ?>">
-      <span class="nav-icon"><?= icon('cog', 16) ?></span> Settings
-    </a>
-    <a href="<?= $base_path ?>auth/logout.php" class="nav-item" id="logout-nav-btn">
-      <span class="nav-icon"><?= icon('lock-closed', 16) ?></span> Logout
-    </a>
-
-  </nav>
-
-  <div class="sidebar-footer">TG-BASICS &mdash; Internal Use Only</div>
-</aside>
-
 <style>
   .sidebar {
     position: fixed; top: 0; left: 0;
@@ -166,3 +85,84 @@ $role        = $_SESSION['role'] ?? '';
     .sidebar.open { transform: translateX(0); }
   }
 </style>
+
+<!-- HAMBURGER BUTTON - visible on mobile only -->
+<button class="hamburger" id="hamburger-btn" onclick="toggleSidebar()" aria-label="Toggle menu">
+  <span></span><span></span><span></span>
+</button>
+
+<aside class="sidebar" id="tg-sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-row">
+      <img src="<?= $base_path ?>assets/img/tg_logo.png" alt="TG" class="logo-img"/>
+      <div>
+        <div class="logo-name">TG<span>-BASICS</span></div>
+        <div class="logo-tagline">Management System</div>
+      </div>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+
+    <div class="nav-group-label">Main</div>
+    <a href="<?= $base_path ?>modules/dashboard_admin.php"
+       class="nav-item <?= $active_page === 'dashboard' ? 'active' : '' ?>">
+      <span class="nav-icon"><?= icon('dashboard', 16) ?></span> Dashboard
+    </a>
+
+    <div class="nav-group-label">Records</div>
+    <a href="<?= $base_path ?>modules/clients/client_list.php"
+       class="nav-item <?= $active_page === 'clients' ? 'active' : '' ?>">
+      <span class="nav-icon"><?= icon('users', 16) ?></span> Client Records
+    </a>
+
+    <div class="nav-group-label">Insurance</div>
+    <a href="<?= $base_path ?>modules/insurance/eligibility_check.php"
+       class="nav-item <?= $active_page === 'insurance' ? 'active' : '' ?>">
+      <span class="nav-icon"><?= icon('shield-check', 16) ?></span> Eligibility &amp; Policy
+    </a>
+    <a href="<?= $base_path ?>modules/renewal/renewal_list.php"
+       class="nav-item <?= $active_page === 'renewal' ? 'active' : '' ?>">
+      <span class="nav-icon"><?= icon('clock', 16) ?></span> Renewal Tracking
+      <span class="nav-badge" id="expiry-badge" style="display:none;"></span>
+    </a>
+    <a href="<?= $base_path ?>modules/claims/claims_list.php"
+       class="nav-item <?= $active_page === 'claims' ? 'active' : '' ?>">
+      <span class="nav-icon"><?= icon('clipboard-list', 16) ?></span> Claims Tracking
+    </a>
+
+    <div class="nav-group-label">Repair Shop</div>
+    <a href="<?= $base_path ?>modules/repair/repair_list.php"
+       class="nav-item <?= $active_page === 'repair' ? 'active' : '' ?>">
+      <span class="nav-icon"><?= icon('wrench', 16) ?></span> Repair Jobs
+    </a>
+    <a href="<?= $base_path ?>modules/repair/quotation_list.php"
+       class="nav-item <?= $active_page === 'quotations' ? 'active' : '' ?>">
+      <span class="nav-icon"><?= icon('receipt', 16) ?></span> Quotations &amp; Receipts
+    </a>
+
+    <?php if ($role === 'super_admin'): ?>
+    <div class="nav-group-label">Administration</div>
+    <a href="<?= $base_path ?>modules/manage_users.php"
+       class="nav-item <?= $active_page === 'manage_users' ? 'active' : '' ?>">
+      <span class="nav-icon"><?= icon('users', 16) ?></span> Manage Users
+    </a>
+    <a href="<?= $base_path ?>modules/activity_log.php"
+       class="nav-item <?= $active_page === 'activity_log' ? 'active' : '' ?>">
+      <span class="nav-icon"><?= icon('clipboard-list', 16) ?></span> Activity Log
+    </a>
+    <?php endif; ?>
+
+    <div class="nav-group-label">System</div>
+    <a href="<?= $base_path ?>modules/settings.php"
+       class="nav-item <?= $active_page === 'settings' ? 'active' : '' ?>">
+      <span class="nav-icon"><?= icon('cog', 16) ?></span> Settings
+    </a>
+    <a href="<?= $base_path ?>auth/logout.php" class="nav-item" id="logout-nav-btn">
+      <span class="nav-icon"><?= icon('lock-closed', 16) ?></span> Logout
+    </a>
+
+  </nav>
+
+  <div class="sidebar-footer">TG-BASICS &mdash; Internal Use Only</div>
+</aside>

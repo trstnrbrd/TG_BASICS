@@ -7,8 +7,8 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-$page_title  = 'Mechanic Dashboard';
-$active_page = 'dashboard';
+$page_title  = 'Repair Jobs';
+$active_page = 'repair';
 $base_path   = '../../';
 require_once '../../includes/header.php';
 require_once '../../includes/navbar.php';
@@ -19,8 +19,8 @@ require_once '../../includes/navbar.php';
   <div class="content">
 
     <div class="page-header">
-      <div class="page-header-title">Mechanic Dashboard</div>
-      <div class="page-header-sub">Overview of assigned repair jobs</div>
+      <div class="page-header-title">Repair Jobs</div>
+      <div class="page-header-sub">Track and manage vehicle repair orders</div>
     </div>
 
     <div class="card">

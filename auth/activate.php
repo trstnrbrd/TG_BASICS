@@ -49,6 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user && !$user['is_active']) {
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="format-detection" content="telephone=no, date=no, email=no, address=no"/>
 <title>Activate Account | TG-BASICS</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="../assets/css/activate.css"/>
@@ -57,8 +58,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user && !$user['is_active']) {
 <div class="wrap">
 
   <div class="brand">
-    <div class="brand-logo-ring">
-      <img src="../assets/img/tg_logo.png" alt="TG Customworks"/>
+    <div class="brand-logos">
+      <div class="brand-logo-ring">
+        <img src="../assets/img/tg_logo.png" alt="TG Customworks"/>
+      </div>
+      <div class="brand-logo-sep"></div>
+      <div class="brand-logo-ring no-ring">
+        <img src="../assets/img/LogoBasicCar.png" alt="Basic Car Insurance"/>
+      </div>
     </div>
     <div class="brand-name">TG<span>-BASICS</span></div>
     <div class="brand-tag">Account Activation</div>
@@ -83,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user && !$user['is_active']) {
         <div class="card-head-icon default"><?= icon('lock-closed', 22) ?></div>
         <div class="card-head-text">
           <div class="card-head-title">Set Your Password</div>
-          <div class="card-head-sub">TG Customworks &amp; Basic Car Insurance Services</div>
+          <div class="card-head-sub">TG Customworks &amp; Basic Car Insurance</div>
         </div>
       <?php endif; ?>
     </div>

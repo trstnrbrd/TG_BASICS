@@ -41,7 +41,15 @@ body {
   align-items: center;
   justify-content: center;
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Prevent mobile auto-linking */
+a[href^="tel"], a[href^="sms"], a[x-apple-data-detectors] {
+  color: inherit !important;
+  text-decoration: none !important;
+  pointer-events: none;
 }
 
 body::before {
@@ -96,22 +104,48 @@ body::after {
   animation: fadeDown 0.5s ease both;
 }
 
+.brand-logos {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.brand-logos .brand-logo-sep {
+  width: 1px;
+  height: 40px;
+  background: var(--gold-muted);
+}
+
 .brand-logo-ring {
-  width: 72px;
-  height: 72px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   border: 2px solid var(--gold-bright);
   overflow: hidden;
-  margin-bottom: 1rem;
   box-shadow:
-    0 0 0 6px var(--gold-light),
+    0 0 0 4px var(--gold-light),
     var(--shadow-md);
+}
+
+.brand-logo-ring.no-ring {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  width: auto;
+  height: 52px;
 }
 
 .brand-logo-ring img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.brand-logo-ring.no-ring img {
+  width: auto;
+  height: 100%;
+  object-fit: contain;
 }
 
 .brand-name {
@@ -528,4 +562,16 @@ body::after {
 ::-webkit-scrollbar-thumb {
   background: var(--gold-muted);
   border-radius: 2px;
+}
+
+@media (max-width: 480px) {
+  body { padding: 1rem 0; align-items: flex-start; padding-top: 2rem; }
+  .wrap { padding: 1rem; max-width: 100%; }
+  .brand { margin-bottom: 1.25rem; }
+  .brand-logo-ring { width: 56px; height: 56px; margin-bottom: 0.7rem; }
+  .brand-name { font-size: 1.2rem; }
+  .card-head { padding: 1.1rem 1.25rem; }
+  .card-body { padding: 1.25rem; }
+  .card-foot { padding: 0.85rem 1.25rem 1rem; }
+  .code-inputs input { width: 40px; height: 48px; font-size: 1.2rem; }
 }

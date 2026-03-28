@@ -15,7 +15,10 @@ $role        = $_SESSION['role'] ?? '';
 
   .sidebar-logo { padding: 1.5rem 1.25rem 1.2rem; border-bottom: 1px solid rgba(255,255,255,0.06); }
   .logo-row { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.25rem; }
-  .logo-img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 1.5px solid var(--gold-bright); flex-shrink: 0; }
+  .logo-imgs { display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0; }
+  .logo-imgs .logo-sep { width: 1px; height: 24px; background: rgba(212,160,23,0.3); }
+  .logo-img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1.5px solid var(--gold-bright); flex-shrink: 0; }
+  .logo-img.no-ring { border: none; border-radius: 0; width: auto; height: 28px; object-fit: contain; }
   .logo-name { font-size: 1rem; font-weight: 800; color: #fff; }
   .logo-name span { color: var(--gold-bright); }
   .logo-tagline { font-size: 0.62rem; color: rgba(200,192,176,0.45); letter-spacing: 1.2px; text-transform: uppercase; }
@@ -94,7 +97,11 @@ $role        = $_SESSION['role'] ?? '';
 <aside class="sidebar" id="tg-sidebar">
   <div class="sidebar-logo">
     <div class="logo-row">
-      <img src="<?= $base_path ?>assets/img/tg_logo.png" alt="TG" class="logo-img"/>
+      <div class="logo-imgs">
+        <img src="<?= $base_path ?>assets/img/tg_logo.png" alt="TG Customworks" class="logo-img"/>
+        <div class="logo-sep"></div>
+        <img src="<?= $base_path ?>assets/img/LogoBasicCar.png" alt="Basic Car Insurance" class="logo-img no-ring"/>
+      </div>
       <div>
         <div class="logo-name">TG<span>-BASICS</span></div>
         <div class="logo-tagline">Management System</div>

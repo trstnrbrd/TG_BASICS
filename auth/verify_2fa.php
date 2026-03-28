@@ -113,6 +113,7 @@ if ($masked_email) {
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="format-detection" content="telephone=no, date=no, email=no, address=no"/>
 <title>Two-Factor Verification | TG-BASICS</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="../assets/css/activate.css"/>
@@ -172,8 +173,14 @@ if ($masked_email) {
 
 <div class="wrap">
   <div class="brand">
-    <div class="brand-logo-ring">
-      <img src="../assets/img/tg_logo.png" alt="TG Logo"/>
+    <div class="brand-logos">
+      <div class="brand-logo-ring">
+        <img src="../assets/img/tg_logo.png" alt="TG Customworks"/>
+      </div>
+      <div class="brand-logo-sep"></div>
+      <div class="brand-logo-ring no-ring">
+        <img src="../assets/img/LogoBasicCar.png" alt="Basic Car Insurance"/>
+      </div>
     </div>
     <div class="brand-name">TG<span>-BASICS</span></div>
     <div class="brand-tag">Two-Factor Authentication</div>

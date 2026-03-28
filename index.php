@@ -4,16 +4,21 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="format-detection" content="telephone=no, date=no, email=no, address=no"/>
 <title>TG-BASICS | Brokerage and Auto Shop Integrated Client System</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="assets/css/index.css"/>
+<link rel="stylesheet" href="assets/css/index.css?v=<?= filemtime('assets/css/index.css') ?>"/>
 </head>
 <body>
 
 <!-- TOPNAV -->
 <nav class="topnav">
   <a href="index.php" class="nav-brand">
-    <img src="assets/img/tg_logo.png" alt="TG" class="nav-logo-img"/>
+    <div class="nav-logos">
+      <img src="assets/img/tg_logo.png" alt="TG Customworks" class="nav-logo-img"/>
+      <div class="nav-logo-sep"></div>
+      <img src="assets/img/LogoBasicCar.png" alt="Basic Car Insurance" class="nav-logo-img no-ring"/>
+    </div>
     <div>
       <div class="nav-brand-name">TG<span>-BASICS</span></div>
       <span class="nav-tagline">Management System</span>
@@ -41,7 +46,7 @@
         <span id="typewriter-root"></span>
       </h1>
       <p class="hero-sub">
-        TG-BASICS centralizes client records, insurance policies, repair workflows, and billing for TG Customworks and Basic Car Insurance Services into a single platform.
+        TG-BASICS centralizes client records, insurance policies, repair workflows, and billing for TG Customworks and Basic Car Insurance into a single platform.
       </p>
       <div class="hero-actions">
         <a href="auth/login.php" class="btn-primary-hero">
@@ -57,7 +62,9 @@
     <div class="hero-right">
       <div class="hero-card-main">
         <div class="hero-card-topbar">
-          <img src="assets/img/tg_logo.png" alt="TG" class="hc-logo-img"/>
+          <img src="assets/img/tg_logo.png" alt="TG Customworks" class="hc-logo-img"/>
+          <div class="hc-logo-sep"></div>
+          <img src="assets/img/LogoBasicCar.png" alt="Basic Car Insurance" class="hc-logo-img no-ring"/>
           <span class="hc-brand">TG<span>-BASICS</span></span>
           <div class="hc-dot"></div>
         </div>
@@ -111,6 +118,8 @@
 <!-- ABOUT STRIP -->
 <div class="about-strip">
   <div class="strip-item"><span class="strip-item-icon"><?= icon('building-office', 14) ?></span> TG Customworks &amp; Basic Car Insurance</div>
+  <div class="strip-divider"></div>
+  <div class="strip-item strip-tagline">&ldquo;Your Journey, Our Care&rdquo;</div>
   <div class="strip-divider"></div>
   <div class="strip-item"><span class="strip-item-icon"><?= icon('map-pin', 14) ?></span> 49 Villa Tierra St., San Roque, Pandi, Bulacan</div>
   <div class="strip-divider"></div>
@@ -181,7 +190,22 @@
     <div class="section-label">Access Levels</div>
     <h2 class="section-title">The right access<br><span>for every role.</span></h2>
     <p class="section-desc">Each user is redirected to their own dashboard after login. No self-registration. Accounts are created by the administrator.</p>
-    <div class="roles-grid">
+    <div class="roles-grid roles-grid-3">
+      <div class="role-card">
+        <div class="role-header">
+          <div class="role-avatar"><?= icon('shield-check', 20) ?></div>
+          <div>
+            <div class="role-title">Super Admin</div>
+          </div>
+        </div>
+        <ul class="role-list">
+          <li>Full access to all modules plus administration</li>
+          <li>Create and manage user accounts</li>
+          <li>View system activity logs and audit trail</li>
+          <li>Configure system settings and SMTP</li>
+          <li>Toggle two-factor authentication</li>
+        </ul>
+      </div>
       <div class="role-card">
         <div class="role-header">
           <div class="role-avatar"><?= icon('users', 20) ?></div>
@@ -195,7 +219,6 @@
           <li>Process insurance policies and track renewals</li>
           <li>Monitor claims and document completeness</li>
           <li>Prepare quotations and confirm billing</li>
-          <li>Oversee repair job stages and expiry dashboards</li>
         </ul>
       </div>
       <div class="role-card">
@@ -216,15 +239,48 @@
   </div>
 </section>
 
+<!-- SECURITY & TECH -->
+<section class="tech-section">
+  <div class="tech-inner">
+    <div class="section-label">Security &amp; Technology</div>
+    <h2 class="section-title">Built secure.<br><span>Built to last.</span></h2>
+    <p class="section-desc">Enterprise-grade security features protecting every transaction and record in the system.</p>
+    <div class="tech-grid">
+      <div class="tech-card">
+        <div class="tech-card-icon"><?= icon('lock-closed', 20) ?></div>
+        <div class="tech-card-name">Two-Factor Authentication</div>
+        <div class="tech-card-desc">Email-based 2FA verification codes on every login for accounts with 2FA enabled.</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-card-icon"><?= icon('shield-check', 20) ?></div>
+        <div class="tech-card-name">Account Lockout Protection</div>
+        <div class="tech-card-desc">Automatic lockout after multiple failed login attempts to prevent brute-force attacks.</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-card-icon"><?= icon('clipboard-list', 20) ?></div>
+        <div class="tech-card-name">Full Audit Trail</div>
+        <div class="tech-card-desc">Every login, record change, and system action is logged with timestamps and user details.</div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-card-icon"><?= icon('cog', 20) ?></div>
+        <div class="tech-card-name">Role-Based Access</div>
+        <div class="tech-card-desc">Three distinct user roles with strict permission boundaries. No unauthorized module access.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- FOOTER -->
 <footer>
   <div class="footer-inner">
     <div>
       <div class="footer-brand-name">
-        <img src="assets/img/tg_logo.png" alt="TG" class="footer-logo-img"/>
+        <img src="assets/img/tg_logo.png" alt="TG Customworks" class="footer-logo-img"/>
+        <div class="footer-logo-sep"></div>
+        <img src="assets/img/LogoBasicCar.png" alt="Basic Car Insurance" class="footer-logo-img no-ring"/>
         TG<span>-BASICS</span>
       </div>
-      <p class="footer-brand-desc">Brokerage and Auto Shop Integrated Client System. Built exclusively for TG Customworks and Basic Car Insurance Services.</p>
+      <p class="footer-brand-desc">Brokerage and Auto Shop Integrated Client System. Built exclusively for TG Customworks and Basic Car Insurance.</p>
     </div>
     <div class="footer-col">
       <h4>Business Address</h4>
@@ -236,7 +292,7 @@
     </div>
   </div>
   <div class="footer-bottom">
-    <p>TG-BASICS &mdash; <span>TG Customworks and Basic Car Insurance Services</span></p>
+    <p>TG-BASICS &mdash; <span>TG Customworks and Basic Car Insurance</span></p>
     <p>Internal use only. Unauthorized access is prohibited.</p>
   </div>
 </footer>

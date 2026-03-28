@@ -28,6 +28,7 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="format-detection" content="telephone=no, date=no, email=no, address=no"/>
 <title><?= htmlspecialchars($page_title) ?> | TG-BASICS</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Big+Shoulders+Text:wght@700;800;900&display=swap" rel="stylesheet"/>
 <style>
@@ -95,6 +96,13 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html { scroll-behavior: smooth; }
 
+  /* Prevent mobile browsers from auto-linking phone numbers, dates, etc. */
+  a[href^="tel"], a[href^="sms"], a[x-apple-data-detectors] {
+    color: inherit !important;
+    text-decoration: none !important;
+    pointer-events: none;
+  }
+
   body {
     background: var(--bg);
     color: var(--text-primary);
@@ -102,6 +110,7 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
     font-weight: 400;
     min-height: 100vh;
     font-size: 14px;
+    -webkit-text-size-adjust: 100%;
   }
 
   /* ── LAYOUT ── */
@@ -372,7 +381,7 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
   @media (max-width: 768px) {
     .main { margin-left: 0; }
     .hamburger { display: flex; }
-    .topbar { padding: 0.75rem 1rem; }
+    .topbar { padding: 0.75rem 1rem; padding-left: 3.25rem; }
     .topbar-breadcrumb { display: none; }
     .user-chip-label { display: none; }
     .content { padding: 1rem; }
@@ -380,23 +389,67 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
     .span-2, .span-3 { grid-column: span 1; }
     .page-header { padding: 1.1rem 1.25rem; }
     .page-header-title { font-size: 0.95rem; }
-    .card-header { padding: 0.85rem 1rem; }
+    .card-header { padding: 0.85rem 1rem; flex-direction: column; align-items: flex-start; }
     .card-body { padding: 1rem; }
     .form-actions { padding: 0.9rem 1rem; }
     .form-actions .btn-ghost,
     .form-actions .btn-primary { flex: 1; justify-content: center; }
     .tg-table thead th,
-    .tg-table tbody td { padding: 0.6rem 0.75rem; }
+    .tg-table tbody td { padding: 0.6rem 0.75rem; font-size: 0.72rem; }
+
+    /* Force inline grids to stack on mobile */
+    .content [style*="grid-template-columns: repeat(3"],
+    .content [style*="grid-template-columns: repeat(4"],
+    .content [style*="grid-template-columns: repeat(5"],
+    .content [style*="grid-template-columns:repeat(3"],
+    .content [style*="grid-template-columns:repeat(4"],
+    .content [style*="grid-template-columns:repeat(5"] {
+      grid-template-columns: 1fr !important;
+    }
+    .content [style*="grid-template-columns: 1fr 1fr"],
+    .content [style*="grid-template-columns:1fr 1fr"] {
+      grid-template-columns: 1fr !important;
+    }
+
+    /* Filter toolbars: stack vertically */
+    .content form[method] > div[style*="display:flex"],
+    .content form[method] > div[style*="display: flex"] {
+      flex-direction: column;
+    }
+    .content form[method] [style*="min-width:200px"],
+    .content form[method] [style*="min-width: 200px"] {
+      min-width: 0 !important;
+      max-width: none !important;
+      width: 100%;
+    }
+
+    /* Table action buttons: stack */
+    .tg-table td [style*="display:flex"][style*="gap"] {
+      flex-wrap: wrap;
+    }
+
+    /* Buttons full width on mobile */
+    .btn-primary, .btn-gold, .btn-ghost, .btn-danger {
+      font-size: 0.78rem;
+      padding: 0.65rem 1rem;
+    }
   }
 
   /* ── RESPONSIVE: SMALL MOBILE ── */
   @media (max-width: 480px) {
     .content { padding: 0.75rem; }
-    .topbar { padding: 0.65rem 0.75rem; }
+    .topbar { padding: 0.65rem 0.75rem; padding-left: 3rem; }
     .page-header { padding: 1rem; border-radius: 10px; }
     .user-chip { padding: 0.3rem 0.5rem 0.3rem 0.35rem; font-size: 0; }
     .user-chip .user-avatar { font-size: 0.62rem; }
     .user-chip-chevron { display: none; }
+
+    /* Smaller text for tight screens */
+    .tg-table thead th { font-size: 0.55rem; padding: 0.5rem 0.5rem; }
+    .tg-table tbody td { font-size: 0.7rem; padding: 0.55rem 0.5rem; }
+    .card-title { font-size: 0.82rem; }
+    .page-header-title { font-size: 0.88rem; }
+    .page-header-sub { font-size: 0.65rem; }
   }
 </style>
 <?= $extra_css ?? '' ?>

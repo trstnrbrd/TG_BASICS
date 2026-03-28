@@ -125,6 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="format-detection" content="telephone=no, date=no, email=no, address=no"/>
 <title>Sign In | TG-BASICS</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="../assets/css/login.css"/>
@@ -140,8 +141,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <div class="login-wrapper">
 
   <div class="login-brand">
-    <div class="brand-logo-wrap">
-      <img src="../assets/img/tg_logo.png" alt="TG Logo"/>
+    <div class="brand-logos">
+      <div class="brand-logo-wrap">
+        <img src="../assets/img/tg_logo.png" alt="TG Customworks"/>
+      </div>
+      <div class="brand-logo-sep"></div>
+      <div class="brand-logo-wrap no-ring">
+        <img src="../assets/img/LogoBasicCar.png" alt="Basic Car Insurance"/>
+      </div>
     </div>
     <div class="brand-name">TG<span>-BASICS</span></div>
     <div class="brand-tagline">Brokerage and Auto Shop Integrated Client System</div>

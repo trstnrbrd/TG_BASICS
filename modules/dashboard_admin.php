@@ -75,14 +75,7 @@ while ($row = $activity->fetch_assoc()) {
     ];
 }
 
-// ── GREETING ──
-$hour = (int)date('G');
-if ($hour < 12)      $greeting = 'Good morning';
-elseif ($hour < 17)  $greeting = 'Good afternoon';
-else                  $greeting = 'Good evening';
-
-// ── DATE ──
-$date_display = date('l, F j, Y');
+// Greeting & date are now handled in real-time by JavaScript (see bottom of file)
 
 $page_title  = 'Dashboard';
 $active_page = 'dashboard';
@@ -108,15 +101,16 @@ require_once '../includes/topbar.php';
       <div class="dash-welcome-left">
         <div class="dash-welcome-eyebrow">
           <div class="dash-welcome-eyebrow-dot"></div>
-          <?= $greeting ?>
+          <span id="js-greeting"></span>
         </div>
         <div class="dash-welcome-title">
           Welcome back, <span><?= htmlspecialchars($first_name) ?></span>
         </div>
-        <div class="dash-welcome-sub">TG Customworks &amp; Basic Car Insurance Services &mdash; Pandi, Bulacan</div>
+        <div class="dash-welcome-sub">TG Customworks &amp; Basic Car Insurance &mdash; Pandi, Bulacan</div>
       </div>
       <div class="dash-welcome-right">
-        <div class="dash-date"><?= $date_display ?></div>
+        <div class="dash-date" id="js-date"></div>
+        <div class="dash-time" id="js-time" style="font-size:0.85rem;color:var(--text-muted);margin-top:2px;"></div>
       </div>
     </div>
 
@@ -346,5 +340,31 @@ require_once '../includes/topbar.php';
 
   </div>
 </div>
+
+<script>
+(function(){
+  var greetEl = document.getElementById('js-greeting');
+  var dateEl  = document.getElementById('js-date');
+  var timeEl  = document.getElementById('js-time');
+
+  function update(){
+    var now  = new Date();
+    var h    = now.getHours();
+    greetEl.textContent = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+
+    var days   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    var months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    dateEl.textContent = days[now.getDay()] + ', ' + months[now.getMonth()] + ' ' + now.getDate() + ', ' + now.getFullYear();
+
+    var hr  = h % 12 || 12;
+    var min = now.getMinutes().toString().padStart(2,'0');
+    var sec = now.getSeconds().toString().padStart(2,'0');
+    timeEl.textContent = hr + ':' + min + ':' + sec + ' ' + (h < 12 ? 'AM' : 'PM');
+  }
+
+  update();
+  setInterval(update, 1000);
+})();
+</script>
 
 <?php require_once '../includes/footer.php'; ?>

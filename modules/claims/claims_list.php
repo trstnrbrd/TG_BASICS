@@ -7,8 +7,8 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-$page_title  = 'Mechanic Dashboard';
-$active_page = 'dashboard';
+$page_title  = 'Claims Tracking';
+$active_page = 'claims';
 $base_path   = '../../';
 require_once '../../includes/header.php';
 require_once '../../includes/navbar.php';
@@ -19,16 +19,16 @@ require_once '../../includes/navbar.php';
   <div class="content">
 
     <div class="page-header">
-      <div class="page-header-title">Mechanic Dashboard</div>
-      <div class="page-header-sub">Overview of assigned repair jobs</div>
+      <div class="page-header-title">Claims Tracking</div>
+      <div class="page-header-sub">Manage and track insurance claims</div>
     </div>
 
     <div class="card">
       <div class="card-body">
         <div class="empty-state">
-          <div class="empty-icon"><?= icon('wrench', 40) ?></div>
-          <div class="empty-title">Test</div>
-          <div class="empty-desc"></div>
+          <div class="empty-icon"><?= icon('clipboard-list', 40) ?></div>
+          <div class="empty-title"></div>
+          <div class="empty-desc">Test</div>
         </div>
       </div>
     </div>

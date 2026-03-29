@@ -61,6 +61,13 @@ require_once '../../includes/topbar.php';
 
     <a href="client_list.php" class="back-link"><?= icon('arrow-left', 14) ?> Back to Client Records</a>
 
+    <?php if (!empty($_GET['success'])): ?>
+    <div class="alert alert-success"><?= icon('check-circle', 14) ?> <?= htmlspecialchars($_GET['success']) ?></div>
+    <?php endif; ?>
+    <?php if (!empty($_GET['error'])): ?>
+    <div class="alert alert-danger"><?= icon('exclamation-triangle', 14) ?> <?= htmlspecialchars($_GET['error']) ?></div>
+    <?php endif; ?>
+
     <!-- CLIENT HEADER BANNER -->
     <div style="background:var(--sidebar-bg);border-radius:12px;padding:1.5rem 1.75rem;margin-bottom:1.25rem;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--gold-bright),var(--gold-muted),transparent);"></div>
@@ -190,9 +197,27 @@ require_once '../../includes/topbar.php';
               <td style="font-size:0.75rem;color:var(--text-muted);"><?= htmlspecialchars($v['motor_number'] ?: 'N/A') ?></td>
               <td style="font-size:0.75rem;color:var(--text-muted);"><?= htmlspecialchars($v['serial_number'] ?: 'N/A') ?></td>
               <td>
-                <a href="../insurance/eligibility_check.php?vehicle_id=<?= $v['vehicle_id'] ?>" class="btn-sm-gold">
-                  <?= icon('shield-check', 12) ?> Check Policy
-                </a>
+                <div style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center;">
+                  <a href="../insurance/eligibility_check.php?vehicle_id=<?= $v['vehicle_id'] ?>" class="btn-sm-gold">
+                    <?= icon('shield-check', 12) ?> Check Policy
+                  </a>
+                  <a href="edit_vehicle.php?id=<?= $v['vehicle_id'] ?>"
+                     style="display:inline-flex;align-items:center;gap:0.3rem;padding:0.28rem 0.65rem;border-radius:7px;font-size:0.72rem;font-weight:700;background:var(--card-bg);color:var(--text-secondary);border:1px solid var(--border);text-decoration:none;transition:all 0.15s;"
+                     onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'"
+                     onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">
+                    <?= icon('pencil', 12) ?> Edit
+                  </a>
+                  <form method="POST" action="delete_vehicle.php" style="display:inline;"
+                        onsubmit="return confirm('Delete vehicle <?= htmlspecialchars(addslashes($v['plate_number'])) ?>?\n\nThis will also permanently delete all associated insurance policies.\nThis cannot be undone.')">
+                    <input type="hidden" name="vehicle_id" value="<?= $v['vehicle_id'] ?>"/>
+                    <button type="submit"
+                            style="display:inline-flex;align-items:center;gap:0.3rem;padding:0.28rem 0.65rem;border-radius:7px;font-size:0.72rem;font-weight:700;background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border);cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all 0.15s;"
+                            onmouseover="this.style.background='var(--danger)';this.style.color='#fff'"
+                            onmouseout="this.style.background='var(--danger-bg)';this.style.color='var(--danger)'">
+                      <?= icon('trash', 12) ?> Delete
+                    </button>
+                  </form>
+                </div>
               </td>
             </tr>
             <?php endwhile; ?>

@@ -61,7 +61,7 @@ $total_pages = max(1, ceil($total / $per_page));
 // Fetch logs
 $sql  = "SELECT a.log_id, a.user_id, a.action, a.description, a.created_at, u.full_name
          FROM audit_logs a
-         INNER JOIN users u ON a.user_id = u.user_id
+         LEFT JOIN users u ON a.user_id = u.user_id
          $where_clause
          ORDER BY a.created_at DESC
          LIMIT ? OFFSET ?";
@@ -222,10 +222,12 @@ require_once '../includes/topbar.php';
               <td style="font-size:0.7rem;color:var(--text-muted);font-weight:600;"><?= $row_num ?></td>
               <td>
                 <div style="display:flex;align-items:center;gap:0.5rem;">
-                  <div style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--gold-bright),var(--gold));display:flex;align-items:center;justify-content:center;font-size:0.58rem;font-weight:800;color:#fff;flex-shrink:0;">
-                    <?= strtoupper(substr($log['full_name'], 0, 1)) ?>
+                  <div style="width:26px;height:26px;border-radius:50%;background:<?= $log['full_name'] ? 'linear-gradient(135deg,var(--gold-bright),var(--gold))' : 'var(--border)' ?>;display:flex;align-items:center;justify-content:center;font-size:0.58rem;font-weight:800;color:#fff;flex-shrink:0;">
+                    <?= $log['full_name'] ? strtoupper(substr($log['full_name'], 0, 1)) : '?' ?>
                   </div>
-                  <span style="font-weight:600;color:var(--text-primary);font-size:0.8rem;"><?= htmlspecialchars($log['full_name']) ?></span>
+                  <span style="font-weight:600;color:<?= $log['full_name'] ? 'var(--text-primary)' : 'var(--text-muted)' ?>;font-size:0.8rem;font-style:<?= $log['full_name'] ? 'normal' : 'italic' ?>;">
+                    <?= $log['full_name'] ? htmlspecialchars($log['full_name']) : 'Deleted User' ?>
+                  </span>
                 </div>
               </td>
               <td>

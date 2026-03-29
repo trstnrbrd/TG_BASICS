@@ -104,7 +104,7 @@ $users = $conn->query("
 $logs = $conn->query("
     SELECT a.log_id, a.action, a.description, a.created_at, u.full_name
     FROM audit_logs a
-    INNER JOIN users u ON a.user_id = u.user_id
+    LEFT JOIN users u ON a.user_id = u.user_id
     ORDER BY a.created_at DESC
     LIMIT 10
 ");
@@ -301,7 +301,9 @@ require_once '../includes/topbar.php';
             $ab = $action_badges[$log['action']] ?? 'badge-gray';
           ?>
           <tr>
-            <td style="font-weight:700;color:var(--text-primary);font-size:0.8rem;"><?= htmlspecialchars($log['full_name']) ?></td>
+            <td style="font-weight:700;color:<?= $log['full_name'] ? 'var(--text-primary)' : 'var(--text-muted)' ?>;font-size:0.8rem;font-style:<?= $log['full_name'] ? 'normal' : 'italic' ?>;">
+              <?= $log['full_name'] ? htmlspecialchars($log['full_name']) : 'Deleted User' ?>
+            </td>
             <td><span class="badge <?= $ab ?>"><?= htmlspecialchars($log['action']) ?></span></td>
             <td style="font-size:0.78rem;color:var(--text-secondary);"><?= htmlspecialchars($log['description']) ?></td>
             <td style="font-size:0.72rem;color:var(--text-muted);white-space:nowrap;"><?= date('M d, Y h:i A', strtotime($log['created_at'])) ?></td>

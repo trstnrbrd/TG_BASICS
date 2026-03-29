@@ -14,24 +14,35 @@
 .dash-welcome::before {
   content: "";
   position: absolute;
-  top: 0; left: 0; right: 0;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 2px;
-  background: linear-gradient(90deg, var(--gold-bright), var(--gold-muted), transparent);
+  background: linear-gradient(
+    90deg,
+    var(--gold-bright),
+    var(--gold-muted),
+    transparent
+  );
 }
 .dash-welcome-watermark {
   position: absolute;
-  right: -10px; bottom: -18px;
+  right: -10px;
+  bottom: -18px;
   font-size: 8rem;
   font-weight: 800;
-  color: rgba(212,160,23,0.04);
+  color: rgba(212, 160, 23, 0.04);
   letter-spacing: -4px;
   pointer-events: none;
   line-height: 1;
 }
-.dash-welcome-left { position: relative; z-index: 1; }
+.dash-welcome-left {
+  position: relative;
+  z-index: 1;
+}
 .dash-welcome-eyebrow {
   font-size: 0.65rem;
-  color: rgba(200,192,176,0.4);
+  color: rgba(200, 192, 176, 0.4);
   letter-spacing: 2px;
   text-transform: uppercase;
   font-weight: 600;
@@ -41,9 +52,11 @@
   gap: 0.5rem;
 }
 .dash-welcome-eyebrow-dot {
-  width: 6px; height: 6px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: var(--gold-bright);
+  background: #00ff00;
+  box-shadow: 0 0 8px #00ff00;
   animation: pulse-dot 2s ease-in-out infinite;
 }
 .dash-welcome-title {
@@ -54,13 +67,16 @@
   margin-bottom: 0.25rem;
   line-height: 1.3;
 }
-.dash-welcome-title span { color: var(--gold-bright); }
+.dash-welcome-title span {
+  color: var(--gold-bright);
+}
 .dash-welcome-sub {
   font-size: 0.73rem;
-  color: rgba(200,192,176,0.4);
+  color: rgba(200, 192, 176, 0.4);
 }
 .dash-welcome-right {
-  position: relative; z-index: 1;
+  position: relative;
+  z-index: 1;
   text-align: right;
   flex-shrink: 0;
 }
@@ -74,7 +90,7 @@
 }
 .dash-date {
   font-size: 0.95rem;
-  color: rgba(255,255,255,0.6);
+  color: rgba(255, 255, 255, 0.6);
   font-weight: 700;
   letter-spacing: 0.5px;
 }
@@ -93,7 +109,9 @@
   padding: 1.2rem 1.25rem;
   position: relative;
   overflow: hidden;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
 }
 .dash-stat:hover {
   transform: translateY(-2px);
@@ -101,7 +119,9 @@
 }
 .dash-stat-accent {
   position: absolute;
-  top: 0; left: 0; right: 0;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 3px;
   border-radius: 12px 12px 0 0;
 }
@@ -112,7 +132,8 @@
   margin-bottom: 0.9rem;
 }
 .dash-stat-icon {
-  width: 40px; height: 40px;
+  width: 40px;
+  height: 40px;
   border-radius: 10px;
   display: flex;
   align-items: center;
@@ -162,10 +183,15 @@
   text-decoration: none;
   color: inherit;
 }
-.renewal-row:last-child { border-bottom: none; }
-.renewal-row:hover { background: var(--gold-pale); }
+.renewal-row:last-child {
+  border-bottom: none;
+}
+.renewal-row:hover {
+  background: var(--gold-pale);
+}
 .renewal-dot {
-  width: 8px; height: 8px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -173,8 +199,13 @@
   background: var(--danger);
   animation: pulse-dot 1.5s ease-in-out infinite;
 }
-.renewal-dot.expiring { background: var(--warning); }
-.renewal-info { flex: 1; min-width: 0; }
+.renewal-dot.expiring {
+  background: var(--warning);
+}
+.renewal-info {
+  flex: 1;
+  min-width: 0;
+}
 .renewal-name {
   font-size: 0.8rem;
   font-weight: 700;
@@ -213,8 +244,12 @@
   border-bottom: 1px solid var(--border);
   transition: background 0.12s;
 }
-.activity-item:last-child { border-bottom: none; }
-.activity-item:hover { background: var(--bg-2); }
+.activity-item:last-child {
+  border-bottom: none;
+}
+.activity-item:hover {
+  background: var(--bg-2);
+}
 .activity-line {
   display: flex;
   flex-direction: column;
@@ -224,7 +259,8 @@
   width: 24px;
 }
 .activity-dot {
-  width: 8px; height: 8px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
   margin-top: 4px;
@@ -235,13 +271,19 @@
   background: var(--border);
   margin-top: 4px;
 }
-.activity-body { flex: 1; min-width: 0; }
+.activity-body {
+  flex: 1;
+  min-width: 0;
+}
 .activity-text {
   font-size: 0.78rem;
   color: var(--text-secondary);
   line-height: 1.5;
 }
-.activity-text strong { color: var(--text-primary); font-weight: 700; }
+.activity-text strong {
+  color: var(--text-primary);
+  font-weight: 700;
+}
 .activity-time {
   font-size: 0.65rem;
   color: var(--text-muted);
@@ -266,7 +308,8 @@
   transform: translateX(2px);
 }
 .quick-action-icon {
-  width: 36px; height: 36px;
+  width: 36px;
+  height: 36px;
   border-radius: 9px;
   background: var(--gold-light);
   display: flex;
@@ -287,31 +330,72 @@
 
 /* ── ANIMATIONS ── */
 @keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(0.85); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.85);
+  }
 }
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
-.dash-stat { animation: fadeInUp 0.4s ease both; }
-.dash-stat:nth-child(1) { animation-delay: 0.05s; }
-.dash-stat:nth-child(2) { animation-delay: 0.1s; }
-.dash-stat:nth-child(3) { animation-delay: 0.15s; }
-.dash-stat:nth-child(4) { animation-delay: 0.2s; }
+.dash-stat {
+  animation: fadeInUp 0.4s ease both;
+}
+.dash-stat:nth-child(1) {
+  animation-delay: 0.05s;
+}
+.dash-stat:nth-child(2) {
+  animation-delay: 0.1s;
+}
+.dash-stat:nth-child(3) {
+  animation-delay: 0.15s;
+}
+.dash-stat:nth-child(4) {
+  animation-delay: 0.2s;
+}
 
 /* ── RESPONSIVE ── */
 @media (max-width: 1024px) {
-  .dash-stats { grid-template-columns: repeat(2, 1fr); }
-  .dash-grid { grid-template-columns: 1fr; }
+  .dash-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .dash-grid {
+    grid-template-columns: 1fr;
+  }
 }
 @media (max-width: 768px) {
-  .dash-welcome { flex-direction: column; text-align: center; padding: 1.25rem; }
-  .dash-welcome-right { text-align: center; }
-  .dash-welcome-eyebrow { justify-content: center; }
-  .dash-stats { grid-template-columns: 1fr 1fr; }
-  .dash-stat-value { font-size: 1.5rem; }
+  .dash-welcome {
+    flex-direction: column;
+    text-align: center;
+    padding: 1.25rem;
+  }
+  .dash-welcome-right {
+    text-align: center;
+  }
+  .dash-welcome-eyebrow {
+    justify-content: center;
+  }
+  .dash-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+  .dash-stat-value {
+    font-size: 1.5rem;
+  }
 }
 @media (max-width: 480px) {
-  .dash-stats { grid-template-columns: 1fr; }
+  .dash-stats {
+    grid-template-columns: 1fr;
+  }
 }

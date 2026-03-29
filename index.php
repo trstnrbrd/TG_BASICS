@@ -290,6 +290,40 @@
       <h4>System Info</h4>
       <p>Built with PHP + MySQL<br/>Web-based internal system<br/>STI College Sta. Maria Capstone</p>
     </div>
+    <div class="footer-col">
+      <h4>Contact Us</h4>
+      <p>
+        <a href="tel:09171453448" class="footer-contact-link">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.15 12 19.79 19.79 0 0 1 1.07 3.38 2 2 0 0 1 3.05 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21 16.92z"/>
+          </svg>
+          0917 145 3448
+        </a>
+      </p>
+      <p>
+        <a href="mailto:tgcustomworksbulacan@gmail.com" class="footer-contact-link">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+            <rect x="2" y="4" width="20" height="16" rx="2"/>
+            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+          </svg>
+          tgcustomworksbulacan@gmail.com
+        </a>
+      </p>
+      <div style="display:flex;flex-direction:column;gap:0.45rem;margin-top:0.25rem;">
+        <a href="https://www.facebook.com/TGCustomWorks" target="_blank" rel="noopener noreferrer" class="footer-fb-link">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="flex-shrink:0;">
+            <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
+          </svg>
+          TG Customworks
+        </a>
+        <a href="https://www.facebook.com/basiccarinsurance" target="_blank" rel="noopener noreferrer" class="footer-fb-link">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="flex-shrink:0;">
+            <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
+          </svg>
+          Basic Car Insurance
+        </a>
+      </div>
+    </div>
   </div>
   <div class="footer-bottom">
     <p>TG-BASICS &mdash; <span>TG Customworks and Basic Car Insurance</span></p>

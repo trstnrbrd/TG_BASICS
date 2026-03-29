@@ -974,6 +974,28 @@ footer {
   line-height: 1.8;
 }
 
+.footer-contact-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: rgba(200, 192, 176, 0.4);
+  text-decoration: none;
+  font-size: 0.73rem;
+  transition: color 0.15s;
+}
+.footer-contact-link:hover { color: var(--gold); }
+
+.footer-fb-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: rgba(200, 192, 176, 0.4);
+  text-decoration: none;
+  font-size: 0.73rem;
+  transition: color 0.15s;
+}
+.footer-fb-link:hover { color: #1877F2; }
+
 .footer-bottom {
   max-width: 1200px;
   margin: 0 auto;

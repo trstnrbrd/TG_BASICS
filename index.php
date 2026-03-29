@@ -26,6 +26,10 @@
   </a>
   <div class="nav-right">
     <span class="nav-label">Internal system &mdash; authorized users only</span>
+    <button class="theme-toggle" id="theme-toggle" title="Toggle light/dark mode" aria-label="Toggle theme">
+      <span id="toggle-moon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span>
+      <span id="toggle-sun" style="display:none"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></span>
+    </button>
     <a href="auth/login.php" class="btn-login-nav"><?= icon('lock-closed', 14) ?> Sign In</a>
   </div>
 </nav>
@@ -117,17 +121,25 @@
 
 <!-- ABOUT STRIP -->
 <div class="about-strip">
-  <div class="strip-item"><span class="strip-item-icon"><?= icon('building-office', 14) ?></span> TG Customworks &amp; Basic Car Insurance</div>
-  <div class="strip-divider"></div>
-  <div class="strip-item strip-tagline">&ldquo;Your Journey, Our Care&rdquo;</div>
-  <div class="strip-divider"></div>
-  <div class="strip-item"><span class="strip-item-icon"><?= icon('map-pin', 14) ?></span> 49 Villa Tierra St., San Roque, Pandi, Bulacan</div>
-  <div class="strip-divider"></div>
-  <div class="strip-item"><span class="strip-item-icon"><?= icon('cpu-chip', 14) ?></span> PHP + MySQL</div>
-  <div class="strip-divider"></div>
-  <div class="strip-item"><span class="strip-item-icon"><?= icon('academic-cap', 14) ?></span> STI College Sta. Maria Capstone</div>
-  <div class="strip-divider"></div>
-  <div class="strip-item"><span class="strip-item-icon"><?= icon('calendar', 14) ?></span> Operating Since 2016</div>
+  <div class="strip-inner">
+    <div class="strip-tagline">&ldquo;Your Journey, Our Care&rdquo;</div>
+    <div class="strip-rule">
+      <span class="strip-rule-line"></span>
+      <span class="strip-rule-diamond">&#9670;</span>
+      <span class="strip-rule-line"></span>
+    </div>
+    <div class="strip-details">
+      <span class="strip-detail-item">
+        <span class="strip-item-icon"><?= icon('building-office', 13) ?></span>
+        49 Villa Tierra St., San Roque, Pandi, Bulacan
+      </span>
+      <span class="strip-dot">&middot;</span>
+      <span class="strip-detail-item">
+        <span class="strip-item-icon"><?= icon('calendar', 13) ?></span>
+        Operating Since 2016
+      </span>
+    </div>
+  </div>
 </div>
 
 <!-- MODULES -->
@@ -280,7 +292,7 @@
         <img src="assets/img/LogoBasicCar.png" alt="Basic Car Insurance" class="footer-logo-img no-ring"/>
         TG<span>-BASICS</span>
       </div>
-      <p class="footer-brand-desc">Brokerage and Auto Shop Integrated Client System. Built exclusively for TG Customworks and Basic Car Insurance.</p>
+      <p class="footer-brand-desc">Brokerage and Auto Shop Integrated Control System. Built exclusively for TG Customworks and Basic Car Insurance.</p>
     </div>
     <div class="footer-col">
       <h4>Business Address</h4>
@@ -327,7 +339,7 @@
   </div>
   <div class="footer-bottom">
     <p>TG-BASICS &mdash; <span>TG Customworks and Basic Car Insurance</span></p>
-    <p>Internal use only. Unauthorized access is prohibited.</p>
+    <p>&copy; <?= date('Y') ?> TG Customworks &amp; Basic Car Insurance. All rights reserved. &nbsp;&middot;&nbsp; Internal use only. Unauthorized access is prohibited.</p>
   </div>
 </footer>
 
@@ -336,6 +348,37 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 <script type="text/babel" src="assets/js/index.js"></script>
+
+<script>
+(function () {
+  var btn  = document.getElementById('theme-toggle');
+  var moon = document.getElementById('toggle-moon');
+  var sun  = document.getElementById('toggle-sun');
+
+  function applyTheme(mode) {
+    if (mode === 'light') {
+      document.body.classList.add('light-mode');
+      moon.style.display = 'none';
+      sun.style.display  = '';
+    } else {
+      document.body.classList.remove('light-mode');
+      moon.style.display = '';
+      sun.style.display  = 'none';
+    }
+    try { localStorage.setItem('tg-theme', mode); } catch(e) {}
+  }
+
+  // Apply saved or default (dark) on load
+  var saved = 'dark';
+  try { saved = localStorage.getItem('tg-theme') || 'dark'; } catch(e) {}
+  applyTheme(saved);
+
+  btn.addEventListener('click', function () {
+    var isDark = !document.body.classList.contains('light-mode');
+    applyTheme(isDark ? 'light' : 'dark');
+  });
+})();
+</script>
 
 </body>
 </html>

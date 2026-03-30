@@ -468,18 +468,19 @@ body {
 }
 
 .hc-policy-plate {
-  background: #e8e3d4;
-  color: #1a1a1a;
-  padding: 0.18rem 0.55rem;
+  background: #ffffff;
+  color: #1b5e20;
+  padding: 0.2rem 0.6rem;
   border-radius: 3px;
-  font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 2px;
-  border: 1.5px solid #bbb89a;
+  font-size: 0.63rem;
+  font-weight: 900;
+  letter-spacing: 2.5px;
+  border: 2px solid #2e7d32;
   text-transform: uppercase;
   font-family: "Plus Jakarta Sans", monospace;
-  min-width: 68px;
+  min-width: 72px;
   text-align: center;
+  box-shadow: inset 0 0 0 1px rgba(46, 125, 50, 0.1);
 }
 
 .hc-policy-name {
@@ -1277,6 +1278,33 @@ body.light-mode .tech-card-name {
 body.light-mode .tech-card-desc {
   color: #9c9286;
 }
+
+/* Light mode hero card (topbar stays dark — matches actual system's dark sidebar) */
+body.light-mode .hero-card-main {
+  background: #fafaf8;
+  border-color: #e2d9cc;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.1), 0 0 0 1px rgba(212,160,23,0.1);
+}
+body.light-mode .hero-card-body { background: #fafaf8; }
+body.light-mode .hc-stat {
+  background: #ffffff;
+  border-color: #e2d9cc;
+}
+body.light-mode .hc-stat-num { color: #1a1814; }
+body.light-mode .hc-stat-label { color: #9c9286; }
+body.light-mode .hc-policy-item {
+  background: #ffffff;
+  border-color: #e2d9cc;
+}
+body.light-mode .hc-policy-name { color: #1a1814; }
+body.light-mode .hc-policy-sub { color: #9c9286; }
+body.light-mode .hero-card-float {
+  background: #ffffff;
+  border-color: #e2d9cc;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+}
+body.light-mode .float-label { color: #9c9286; }
+body.light-mode .float-val { color: #1a1814; }
 
 /* ── ANIMATIONS ── */
 @keyframes fadeUp {

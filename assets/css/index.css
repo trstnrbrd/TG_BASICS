@@ -1283,28 +1283,44 @@ body.light-mode .tech-card-desc {
 body.light-mode .hero-card-main {
   background: #fafaf8;
   border-color: #e2d9cc;
-  box-shadow: 0 24px 60px rgba(0,0,0,0.1), 0 0 0 1px rgba(212,160,23,0.1);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.1),
+    0 0 0 1px rgba(212, 160, 23, 0.1);
 }
-body.light-mode .hero-card-body { background: #fafaf8; }
+body.light-mode .hero-card-body {
+  background: #fafaf8;
+}
 body.light-mode .hc-stat {
   background: #ffffff;
   border-color: #e2d9cc;
 }
-body.light-mode .hc-stat-num { color: #1a1814; }
-body.light-mode .hc-stat-label { color: #9c9286; }
+body.light-mode .hc-stat-num {
+  color: #1a1814;
+}
+body.light-mode .hc-stat-label {
+  color: #9c9286;
+}
 body.light-mode .hc-policy-item {
   background: #ffffff;
   border-color: #e2d9cc;
 }
-body.light-mode .hc-policy-name { color: #1a1814; }
-body.light-mode .hc-policy-sub { color: #9c9286; }
+body.light-mode .hc-policy-name {
+  color: #1a1814;
+}
+body.light-mode .hc-policy-sub {
+  color: #9c9286;
+}
 body.light-mode .hero-card-float {
   background: #ffffff;
   border-color: #e2d9cc;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 }
-body.light-mode .float-label { color: #9c9286; }
-body.light-mode .float-val { color: #1a1814; }
+body.light-mode .float-label {
+  color: #9c9286;
+}
+body.light-mode .float-val {
+  color: #1a1814;
+}
 
 /* ── ANIMATIONS ── */
 @keyframes fadeUp {

@@ -265,7 +265,7 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
   /* ── CARDS ── */
   .card { background: var(--bg-3); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); margin-bottom: 1.25rem; }
   .card-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); background: var(--bg-2); display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
-  .card-icon { width: 34px; height: 34px; background: var(--gold-light); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0; }
+  .card-icon { width: 34px; height: 34px; background: var(--gold); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0; color: #fff; }
   .card-title { font-size: 0.88rem; font-weight: 700; color: var(--text-primary); }
   .card-sub   { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.1rem; }
   .card-body  { padding: 1.5rem; }
@@ -283,8 +283,8 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
   .btn-danger { background: var(--danger); color: #fff; border: none; padding: 0.7rem 1.5rem; border-radius: 9px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.83rem; font-weight: 700; cursor: pointer; text-decoration: none; transition: all 0.15s; display: inline-flex; align-items: center; gap: 0.5rem; box-shadow: 0 4px 12px rgba(192,57,43,0.25); white-space: nowrap; }
   .btn-danger:hover { background: #A93226; }
 
-  .btn-sm-gold { background: var(--gold-light); color: var(--gold); border: 1px solid var(--gold-muted); padding: 0.35rem 0.85rem; border-radius: 7px; font-size: 0.75rem; font-weight: 700; text-decoration: none; transition: all 0.15s; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.35rem; font-family: 'Plus Jakarta Sans', sans-serif; cursor: pointer; }
-  .btn-sm-gold:hover { background: var(--gold-muted); color: var(--gold); }
+  .btn-sm-gold { background: var(--gold); color: #fff; border: none; padding: 0.35rem 0.85rem; border-radius: 7px; font-size: 0.75rem; font-weight: 700; text-decoration: none; transition: all 0.15s; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.35rem; font-family: 'Plus Jakarta Sans', sans-serif; cursor: pointer; }
+  .btn-sm-gold:hover { background: var(--gold-bright); color: #fff; }
 
   /* ── FORM FIELDS ── */
   .field { display: flex; flex-direction: column; gap: 0.4rem; }

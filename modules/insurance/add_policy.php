@@ -302,10 +302,10 @@ require_once '../../includes/topbar.php';
               <span class="field-hint">This is the final amount the client owes.</span>
             </div>
             <div class="field">
-              <label class="field-label">Participation Fee / Deductible (PHP)</label>
+              <label class="field-label">Participation Fee (PHP)</label>
               <input type="number" step="0.01" min="0" name="participation_fee" class="field-input" placeholder="0.00"
                 value="<?= htmlspecialchars($_POST['participation_fee'] ?? '0') ?>"/>
-              <span class="field-hint">Amount the client pays before insurance kicks in (deductible).</span>
+              <span class="field-hint">Sedan: ₱2,000 &nbsp;|&nbsp; SUV/Van/Pickup: ₱3,000. Client pays this on every claim.</span>
             </div>
           </div>
 

@@ -53,7 +53,7 @@ $recent_list = $conn->query("
 $activity = $conn->query("
     SELECT a.action, a.description, a.created_at, u.full_name as actor
     FROM audit_logs a
-    INNER JOIN users u ON a.user_id = u.user_id
+    LEFT JOIN users u ON a.user_id = u.user_id
     ORDER BY a.created_at DESC
     LIMIT 8
 ");
@@ -256,8 +256,37 @@ require_once '../includes/topbar.php';
       <!-- RIGHT COLUMN -->
       <div>
 
-        <!-- RECENT ACTIVITY -->
+        <!-- QUICK ACTIONS -->
         <div class="card" style="margin-bottom:1.25rem;">
+          <div class="card-header">
+            <div class="card-icon"><?= icon('arrow-right', 16) ?></div>
+            <div>
+              <div class="card-title">Quick Actions</div>
+              <div class="card-sub">Common tasks</div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:0.5rem;padding:1rem;">
+            <?php
+            $actions = [
+              ['clients/add_client.php',          'user-plus',         'Add New Client',       'Client and vehicle registration'],
+              ['insurance/eligibility_check.php',  'shield-check',     'New Insurance Policy',  'Check eligibility and encode'],
+              ['clients/client_list.php',          'magnifying-glass',  'Search Records',        'Find client, vehicle, or policy'],
+              ['renewal/renewal_list.php',         'clock',            'Renewal Tracking',      'View policy expiry status'],
+            ];
+            foreach ($actions as $a): ?>
+            <a href="<?= $a[0] ?>" class="quick-action">
+              <div class="quick-action-icon"><?= icon($a[1], 16) ?></div>
+              <div>
+                <div class="quick-action-label"><?= $a[2] ?></div>
+                <div class="quick-action-hint"><?= $a[3] ?></div>
+              </div>
+            </a>
+            <?php endforeach; ?>
+          </div>
+        </div>
+
+        <!-- RECENT ACTIVITY -->
+        <div class="card">
           <div class="card-header" style="justify-content:space-between;">
             <div style="display:flex;align-items:center;gap:0.75rem;">
               <div class="card-icon"><?= icon('clipboard-list', 16) ?></div>
@@ -303,35 +332,6 @@ require_once '../includes/topbar.php';
             </div>
             <?php endforeach; ?>
           <?php endif; ?>
-        </div>
-
-        <!-- QUICK ACTIONS -->
-        <div class="card">
-          <div class="card-header">
-            <div class="card-icon"><?= icon('arrow-right', 16) ?></div>
-            <div>
-              <div class="card-title">Quick Actions</div>
-              <div class="card-sub">Common tasks</div>
-            </div>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:0.5rem;padding:1rem;">
-            <?php
-            $actions = [
-              ['clients/add_client.php',          'user-plus',         'Add New Client',       'Client and vehicle registration'],
-              ['insurance/eligibility_check.php',  'shield-check',     'New Insurance Policy',  'Check eligibility and encode'],
-              ['clients/client_list.php',          'magnifying-glass',  'Search Records',        'Find client, vehicle, or policy'],
-              ['renewal/renewal_list.php',         'clock',            'Renewal Tracking',      'View policy expiry status'],
-            ];
-            foreach ($actions as $a): ?>
-            <a href="<?= $a[0] ?>" class="quick-action">
-              <div class="quick-action-icon"><?= icon($a[1], 16) ?></div>
-              <div>
-                <div class="quick-action-label"><?= $a[2] ?></div>
-                <div class="quick-action-hint"><?= $a[3] ?></div>
-              </div>
-            </a>
-            <?php endforeach; ?>
-          </div>
         </div>
 
       </div>

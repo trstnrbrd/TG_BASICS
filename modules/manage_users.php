@@ -132,18 +132,31 @@ require_once '../includes/topbar.php';
     </div>
 
     <?php if ($success): ?>
-    <div class="alert alert-success"><?= icon('check-circle', 14) ?> <?= htmlspecialchars($success) ?></div>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: <?= json_encode($success) ?>,
+        confirmButtonColor: '#B8860B',
+        timer: 3500,
+        timerProgressBar: true
+      });
+    });
+    </script>
     <?php endif; ?>
 
     <?php if (!empty($errors)): ?>
-    <div class="alert alert-danger">
-      <div>
-        <div style="font-weight:700;margin-bottom:0.3rem;">Please fix the following:</div>
-        <?php foreach ($errors as $e): ?>
-        <div style="font-size:0.78rem;">&#8226; <?= htmlspecialchars($e) ?></div>
-        <?php endforeach; ?>
-      </div>
-    </div>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      Swal.fire({
+        icon: 'error',
+        title: 'Something went wrong',
+        html: <?= json_encode('<ul style="text-align:left;margin:0;padding-left:1.2rem;">' . implode('', array_map(fn($e) => '<li>' . htmlspecialchars($e) . '</li>', $errors)) . '</ul>') ?>,
+        confirmButtonColor: '#B8860B'
+      });
+    });
+    </script>
     <?php endif; ?>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;">
@@ -190,10 +203,13 @@ require_once '../includes/topbar.php';
               </td>
               <td>
                 <?php if ($u['role'] !== 'super_admin'): ?>
-                <form method="POST" action="" onsubmit="return confirm('Delete account of <?= htmlspecialchars(addslashes($u['full_name'])) ?>? This cannot be undone.');">
+                <form method="POST" action="">
                   <input type="hidden" name="action" value="delete"/>
                   <input type="hidden" name="user_id" value="<?= $u['user_id'] ?>"/>
-                  <button type="submit" style="background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border);padding:0.3rem 0.7rem;border-radius:7px;font-size:0.72rem;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all 0.15s;" onmouseover="this.style.background='var(--danger)';this.style.color='#fff'" onmouseout="this.style.background='var(--danger-bg)';this.style.color='var(--danger)'">
+                  <button type="button"
+                    class="js-delete-user"
+                    data-name="<?= htmlspecialchars($u['full_name'], ENT_QUOTES) ?>"
+                    style="background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border);padding:0.3rem 0.7rem;border-radius:7px;font-size:0.72rem;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all 0.15s;" onmouseover="this.style.background='var(--danger)';this.style.color='#fff'" onmouseout="this.style.background='var(--danger-bg)';this.style.color='var(--danger)'">
                     <?= icon('trash', 14) ?> Delete
                   </button>
                 </form>
@@ -253,7 +269,7 @@ require_once '../includes/topbar.php';
 
           </div>
           <div class="form-actions">
-            <button type="submit" class="btn-primary"><?= icon('envelope', 14) ?> Create &amp; Send Activation</button>
+            <button type="button" class="btn-primary" id="js-create-btn"><?= icon('envelope', 14) ?> Create &amp; Send Activation</button>
           </div>
         </form>
       </div>
@@ -322,5 +338,57 @@ require_once '../includes/topbar.php';
 
   </div>
 </div>
+
+<script>
+// ── DELETE USER ──
+document.querySelectorAll('.js-delete-user').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var name = this.dataset.name;
+    var form = this.closest('form');
+    Swal.fire({
+      title: 'Delete account?',
+      text: 'Delete the account of "' + name + '"? This cannot be undone.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#C0392B',
+      cancelButtonColor: '#6c757d',
+      confirmButtonText: 'Yes, delete',
+      cancelButtonText: 'Cancel'
+    }).then(function(result) {
+      if (result.isConfirmed) form.submit();
+    });
+  });
+});
+
+// ── CREATE & SEND ACTIVATION ──
+document.getElementById('js-create-btn').addEventListener('click', function() {
+  var name  = document.querySelector('[name="new_full_name"]').value.trim();
+  var email = document.querySelector('[name="new_email"]').value.trim();
+  var role  = document.querySelector('[name="new_role"]').value;
+
+  if (!name || !email || !role) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'Incomplete Fields',
+      text: 'Please fill in all required fields before creating an account.',
+      confirmButtonColor: '#B8860B'
+    });
+    return;
+  }
+
+  Swal.fire({
+    title: 'Create account?',
+    html: 'Create an account for <b>' + name + '</b> as <b>' + role.charAt(0).toUpperCase() + role.slice(1) + '</b>?<br><small style="color:#888;">An activation email will be sent to ' + email + '.</small>',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonColor: '#B8860B',
+    cancelButtonColor: '#6c757d',
+    confirmButtonText: 'Yes, create & send',
+    cancelButtonText: 'Cancel'
+  }).then(function(result) {
+    if (result.isConfirmed) document.getElementById('js-create-btn').closest('form').submit();
+  });
+});
+</script>
 
 <?php require_once '../includes/footer.php'; ?>

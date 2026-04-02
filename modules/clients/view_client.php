@@ -13,6 +13,26 @@ if ($client_id === 0) {
     exit;
 }
 
+// Handle delete
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) {
+    $del_id = (int)$_POST['delete_client_id'];
+    $cstmt  = $conn->prepare("SELECT full_name FROM clients WHERE client_id = ?");
+    $cstmt->bind_param('i', $del_id);
+    $cstmt->execute();
+    $cdata = $cstmt->get_result()->fetch_assoc();
+    if ($cdata) {
+        $dstmt = $conn->prepare("DELETE FROM clients WHERE client_id = ?");
+        $dstmt->bind_param('i', $del_id);
+        $dstmt->execute();
+        $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'CLIENT_DELETED', ?)");
+        $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' deleted client "' . $cdata['full_name'] . '" and all associated records.';
+        $log->bind_param('is', $_SESSION['user_id'], $desc);
+        $log->execute();
+        header("Location: client_list.php?success=" . urlencode('"' . $cdata['full_name'] . '" has been deleted.'));
+        exit;
+    }
+}
+
 // Load client
 $stmt = $conn->prepare("SELECT * FROM clients WHERE client_id = ?");
 $stmt->bind_param('i', $client_id);
@@ -49,6 +69,10 @@ require_once '../../includes/header.php';
 require_once '../../includes/navbar.php';
 ?>
 
+<style>
+  .tg-table tbody tr:hover { background: var(--gold-light) !important; }
+</style>
+
 <div class="main">
 
 <?php
@@ -62,10 +86,30 @@ require_once '../../includes/topbar.php';
     <a href="client_list.php" class="back-link"><?= icon('arrow-left', 14) ?> Back to Client Records</a>
 
     <?php if (!empty($_GET['success'])): ?>
-    <div class="alert alert-success"><?= icon('check-circle', 14) ?> <?= htmlspecialchars($_GET['success']) ?></div>
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        Swal.fire({
+          icon: 'success',
+          title: 'Success',
+          text: <?= json_encode($_GET['success']) ?>,
+          confirmButtonColor: '#B8860B',
+          timer: 3000,
+          timerProgressBar: true
+        });
+      });
+    </script>
     <?php endif; ?>
     <?php if (!empty($_GET['error'])): ?>
-    <div class="alert alert-danger"><?= icon('exclamation-triangle', 14) ?> <?= htmlspecialchars($_GET['error']) ?></div>
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: <?= json_encode($_GET['error']) ?>,
+          confirmButtonColor: '#B8860B'
+        });
+      });
+    </script>
     <?php endif; ?>
 
     <!-- CLIENT HEADER BANNER -->
@@ -86,12 +130,15 @@ require_once '../../includes/topbar.php';
         <a href="edit_client.php?id=<?= $client_id ?>" class="btn-ghost" style="background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.1);color:rgba(200,192,176,0.7);">
           <?= icon('pencil', 14) ?> Edit Client
         </a>
-        <a href="delete_client.php?id=<?= $client_id ?>"
-           class="btn-ghost"
-           style="background:rgba(192,57,43,0.1);border-color:rgba(192,57,43,0.3);color:#E74C3C;"
-           onclick="return confirm('Delete <?= htmlspecialchars(addslashes($client['full_name'])) ?> and all their records? This cannot be undone.')">
-          <?= icon('trash', 14) ?> Delete
-        </a>
+        <form method="POST" action="" style="display:inline;">
+          <input type="hidden" name="delete_client_id" value="<?= $client_id ?>"/>
+          <button type="button"
+             class="btn-ghost js-delete-client-profile"
+             style="background:rgba(192,57,43,0.1);border-color:rgba(192,57,43,0.3);color:#E74C3C;"
+             data-name="<?= htmlspecialchars($client['full_name'], ENT_QUOTES) ?>">
+            <?= icon('trash', 14) ?> Delete
+          </button>
+        </form>
       </div>
     </div>
 
@@ -178,43 +225,39 @@ require_once '../../includes/topbar.php';
         <table class="tg-table">
           <thead>
             <tr>
-              <th>Plate Number</th>
-              <th>Make &amp; Model</th>
-              <th>Year</th>
-              <th>Color</th>
-              <th>Motor No.</th>
-              <th>Serial No.</th>
-              <th>Action</th>
+              <th style="text-align:center;">Plate Number</th>
+              <th style="text-align:center;">Make &amp; Model</th>
+              <th style="text-align:center;">Year</th>
+              <th style="text-align:center;">Color</th>
+              <th style="text-align:center;">Motor No.</th>
+              <th style="text-align:center;">Serial No.</th>
+              <th style="text-align:center;">Action</th>
             </tr>
           </thead>
           <tbody>
             <?php while ($v = $vehicles->fetch_assoc()): ?>
             <tr>
-              <td><span class="badge-dark"><?= htmlspecialchars($v['plate_number']) ?></span></td>
-              <td style="font-weight:700;color:var(--text-primary);"><?= htmlspecialchars($v['make'] . ' ' . $v['model']) ?></td>
-              <td><?= htmlspecialchars($v['year_model']) ?></td>
-              <td><?= htmlspecialchars($v['color'] ?: 'N/A') ?></td>
-              <td style="font-size:0.75rem;color:var(--text-muted);"><?= htmlspecialchars($v['motor_number'] ?: 'N/A') ?></td>
-              <td style="font-size:0.75rem;color:var(--text-muted);"><?= htmlspecialchars($v['serial_number'] ?: 'N/A') ?></td>
-              <td>
-                <div style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center;">
-                  <a href="../insurance/eligibility_check.php?vehicle_id=<?= $v['vehicle_id'] ?>" class="btn-sm-gold">
-                    <?= icon('shield-check', 12) ?> Check Policy
+              <td style="text-align:center;"><span class="badge-dark"><?= htmlspecialchars($v['plate_number']) ?></span></td>
+              <td style="font-weight:700;color:var(--text-primary);text-align:center;"><?= htmlspecialchars($v['make'] . ' ' . $v['model']) ?></td>
+              <td style="text-align:center;"><?= htmlspecialchars($v['year_model']) ?></td>
+              <td style="text-align:center;"><?= htmlspecialchars($v['color'] ?: 'N/A') ?></td>
+              <td style="font-size:0.75rem;color:var(--text-muted);text-align:center;"><?= htmlspecialchars($v['motor_number'] ?: 'N/A') ?></td>
+              <td style="font-size:0.75rem;color:var(--text-muted);text-align:center;"><?= htmlspecialchars($v['serial_number'] ?: 'N/A') ?></td>
+              <td style="text-align:center;">
+                <div style="display:inline-flex;gap:0.4rem;align-items:center;">
+                  <a href="../insurance/eligibility_check.php?vehicle_id=<?= $v['vehicle_id'] ?>" class="btn-sm-gold" title="Check Policy" style="padding:0.35rem 0.55rem;">
+                    <?= icon('shield-check', 14) ?>
                   </a>
-                  <a href="edit_vehicle.php?id=<?= $v['vehicle_id'] ?>"
-                     style="display:inline-flex;align-items:center;gap:0.3rem;padding:0.28rem 0.65rem;border-radius:7px;font-size:0.72rem;font-weight:700;background:var(--card-bg);color:var(--text-secondary);border:1px solid var(--border);text-decoration:none;transition:all 0.15s;"
-                     onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'"
-                     onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">
-                    <?= icon('pencil', 12) ?> Edit
+                  <a href="edit_vehicle.php?id=<?= $v['vehicle_id'] ?>" class="btn-sm-gold" title="Edit" style="padding:0.35rem 0.55rem;">
+                    <?= icon('pencil', 14) ?>
                   </a>
                   <form method="POST" action="delete_vehicle.php" style="display:inline;"
-                        onsubmit="return confirm('Delete vehicle <?= htmlspecialchars(addslashes($v['plate_number'])) ?>?\n\nThis will also permanently delete all associated insurance policies.\nThis cannot be undone.')">
+                        class="js-delete-vehicle-form"
+                        data-plate="<?= htmlspecialchars($v['plate_number'], ENT_QUOTES) ?>">
                     <input type="hidden" name="vehicle_id" value="<?= $v['vehicle_id'] ?>"/>
-                    <button type="submit"
-                            style="display:inline-flex;align-items:center;gap:0.3rem;padding:0.28rem 0.65rem;border-radius:7px;font-size:0.72rem;font-weight:700;background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border);cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all 0.15s;"
-                            onmouseover="this.style.background='var(--danger)';this.style.color='#fff'"
-                            onmouseout="this.style.background='var(--danger-bg)';this.style.color='var(--danger)'">
-                      <?= icon('trash', 12) ?> Delete
+                    <button type="submit" class="btn-sm-gold" title="Delete"
+                            style="background:var(--danger);border:none;padding:0.35rem 0.55rem;">
+                      <?= icon('trash', 14) ?>
                     </button>
                   </form>
                 </div>
@@ -248,13 +291,13 @@ require_once '../../includes/topbar.php';
         <table class="tg-table">
           <thead>
             <tr>
-              <th>Policy Number</th>
-              <th>Vehicle</th>
-              <th>Coverage</th>
-              <th>Period</th>
-              <th>Total Premium</th>
-              <th>Balance</th>
-              <th>Status</th>
+              <th style="text-align:center;">Policy Number</th>
+              <th style="text-align:center;">Vehicle</th>
+              <th style="text-align:center;">Coverage</th>
+              <th style="text-align:center;">Period</th>
+              <th style="text-align:right;">Total Premium</th>
+              <th style="text-align:right;">Balance</th>
+              <th style="text-align:center;">Status</th>
             </tr>
           </thead>
           <tbody>
@@ -280,25 +323,25 @@ require_once '../../includes/topbar.php';
               };
             ?>
             <tr>
-              <td style="font-weight:700;color:var(--text-primary);font-size:0.78rem;"><?= htmlspecialchars($p['policy_number']) ?></td>
-              <td>
+              <td style="font-weight:700;color:var(--text-primary);font-size:0.78rem;text-align:center;"><?= htmlspecialchars($p['policy_number']) ?></td>
+              <td style="text-align:center;">
                 <span class="badge-dark"><?= htmlspecialchars($p['plate_number']) ?></span>
                 <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.2rem;"><?= htmlspecialchars($p['make'] . ' ' . $p['model'] . ' ' . $p['year_model']) ?></div>
               </td>
-              <td style="font-size:0.78rem;"><?= htmlspecialchars($p['coverage_type']) ?></td>
-              <td style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap;">
+              <td style="font-size:0.78rem;text-align:center;"><?= htmlspecialchars($p['coverage_type']) ?></td>
+              <td style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap;text-align:center;">
                 <?= date('M d, Y', strtotime($p['policy_start'])) ?><br/>
                 <?= date('M d, Y', strtotime($p['policy_end'])) ?>
               </td>
-              <td style="font-weight:700;color:var(--text-primary);">PHP <?= number_format($p['total_premium'], 2) ?></td>
-              <td>
+              <td style="font-weight:700;color:var(--text-primary);text-align:right;">PHP <?= number_format($p['total_premium'], 2) ?></td>
+              <td style="text-align:right;">
                 <?php if ($p['balance'] > 0): ?>
                 <span style="color:var(--warning);font-weight:700;font-size:0.82rem;">PHP <?= number_format($p['balance'], 2) ?></span>
                 <?php else: ?>
                 <span style="color:var(--success);font-weight:700;font-size:0.82rem;"><?= icon('check', 14) ?> Cleared</span>
                 <?php endif; ?>
               </td>
-              <td><?= $status_badge ?></td>
+              <td style="text-align:center;"><?= $status_badge ?></td>
             </tr>
             <?php endwhile; ?>
           </tbody>
@@ -332,5 +375,48 @@ require_once '../../includes/topbar.php';
 
   </div>
 </div>
+
+<script>
+// Delete client
+document.querySelectorAll('.js-delete-client-profile').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var name = this.dataset.name;
+    var form = this.closest('form');
+    Swal.fire({
+      title: 'Delete client?',
+      text: 'Delete "' + name + '" and all their records? This cannot be undone.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#C0392B',
+      cancelButtonColor: '#6c757d',
+      confirmButtonText: 'Yes, delete',
+      cancelButtonText: 'Cancel'
+    }).then(function(result) {
+      if (result.isConfirmed) form.submit();
+    });
+  });
+});
+
+// Delete vehicle
+document.querySelectorAll('.js-delete-vehicle-form').forEach(function(form) {
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    var plate = this.dataset.plate;
+    var self  = this;
+    Swal.fire({
+      title: 'Delete vehicle?',
+      text: 'Delete ' + plate + '? This will also permanently delete all associated insurance policies. This cannot be undone.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#C0392B',
+      cancelButtonColor: '#6c757d',
+      confirmButtonText: 'Yes, delete',
+      cancelButtonText: 'Cancel'
+    }).then(function(result) {
+      if (result.isConfirmed) self.submit();
+    });
+  });
+});
+</script>
 
 <?php require_once '../../includes/footer.php'; ?>

@@ -129,6 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <title>Sign In | TG-BASICS</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="../assets/css/login.css"/>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body>
 
@@ -140,6 +141,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <div class="login-wrapper">
 
+  <a href="../index.php" style="text-decoration:none;color:inherit;">
   <div class="login-brand">
     <div class="brand-logos">
       <div class="brand-logo-wrap">
@@ -153,6 +155,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="brand-name">TG<span>-BASICS</span></div>
     <div class="brand-tagline">Brokerage and Auto Shop Integrated Client System</div>
   </div>
+  </a>
 
   <div class="login-card">
     <div class="login-card-header">
@@ -188,7 +191,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <input type="password" name="password" id="password" class="field-input"
               placeholder="Enter your password"
               autocomplete="current-password" required/>
-            <button type="button" class="pw-toggle" id="pw-toggle">&#128065;</button>
+            <button type="button" class="pw-toggle" id="pw-toggle" aria-label="Toggle password visibility">
+              <svg id="pw-icon-show" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              <svg id="pw-icon-hide" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16" style="display:none;"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"/></svg>
+            </button>
           </div>
         </div>
 
@@ -199,8 +205,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="login-note">
       No self-registration. Contact your administrator for account access.<br/>
       <a href="forgot_password.php">Forgot your password?</a>
-      &nbsp;&middot;&nbsp;
-      <a href="../index.php"><?= icon('arrow-left', 12) ?> Back to Home</a>
     </div>
   </div>
 
@@ -212,10 +216,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <script type="text/babel" src="../assets/js/login.js"></script>
 
 <script>
+  // Autofocus username on page load
+  window.addEventListener('load', function() {
+    var u = document.getElementById('username');
+    if (u) u.focus();
+  });
+
+  // Password toggle
   document.getElementById('pw-toggle').addEventListener('click', function () {
-    const pw = document.getElementById('password');
-    pw.type = pw.type === 'password' ? 'text' : 'password';
-    this.textContent = pw.type === 'password' ? '👁' : '🙈';
+    var pw       = document.getElementById('password');
+    var iconShow = document.getElementById('pw-icon-show');
+    var iconHide = document.getElementById('pw-icon-hide');
+    var visible  = pw.type === 'password';
+    pw.type                = visible ? 'text'  : 'password';
+    iconShow.style.display = visible ? 'none'  : '';
+    iconHide.style.display = visible ? ''      : 'none';
+  });
+
+  // Validate before form submits — intercept at form level so it always fires
+  document.getElementById('login-form').addEventListener('submit', function(e) {
+    var username = document.getElementById('username').value.trim();
+    var password = document.getElementById('password').value.trim();
+
+    if (!username || !password) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+
+      var title, text, focusId;
+      if (!username && !password) {
+        title = 'Fields Required';
+        text  = 'Please enter your username and password to sign in.';
+        focusId = 'username';
+      } else if (!username) {
+        title = 'Username Required';
+        text  = 'Please enter your username.';
+        focusId = 'username';
+      } else {
+        title = 'Password Required';
+        text  = 'Please enter your password.';
+        focusId = 'password';
+      }
+
+      Swal.fire({
+        icon: 'warning',
+        title: title,
+        text: text,
+        confirmButtonColor: '#B8860B'
+      }).then(function() {
+        document.getElementById(focusId).focus();
+      });
+    }
   });
 </script>
 

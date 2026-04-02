@@ -85,6 +85,10 @@ require_once '../../includes/header.php';
 require_once '../../includes/navbar.php';
 ?>
 
+<style>
+  .tg-table tbody tr:hover { background: var(--gold-light) !important; }
+</style>
+
 <div class="main">
 
 <?php
@@ -170,15 +174,15 @@ require_once '../../includes/topbar.php';
         <table class="tg-table">
           <thead>
             <tr>
-              <th>Client</th>
-              <th>Plate</th>
-              <th>Policy Number</th>
-              <th>Coverage</th>
-              <th>Expiry Date</th>
-              <th>Status</th>
-              <th>Balance</th>
-              <th>Payment</th>
-              <th>Action</th>
+              <th style="text-align:center;">Client</th>
+              <th style="text-align:center;">Plate</th>
+              <th style="text-align:center;">Policy Number</th>
+              <th style="text-align:center;">Coverage</th>
+              <th style="text-align:center;">Expiry Date</th>
+              <th style="text-align:center;">Status</th>
+              <th style="text-align:right;">Balance</th>
+              <th style="text-align:center;">Payment</th>
+              <th style="text-align:center;">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -206,29 +210,29 @@ require_once '../../includes/topbar.php';
               };
             ?>
             <tr style="<?= $row_style ?>">
-              <td>
+              <td style="text-align:center;">
                 <div style="font-weight:700;color:var(--text-primary);font-size:0.82rem;"><?= htmlspecialchars($row['full_name']) ?></div>
                 <div style="font-size:0.7rem;color:var(--text-muted);"><?= htmlspecialchars($row['contact_number']) ?></div>
               </td>
-              <td><span class="badge-dark"><?= htmlspecialchars($row['plate_number']) ?></span></td>
-              <td style="font-size:0.75rem;color:var(--text-secondary);font-weight:600;"><?= htmlspecialchars($row['policy_number']) ?></td>
-              <td style="font-size:0.75rem;color:var(--text-muted);"><?= htmlspecialchars($row['coverage_type']) ?></td>
-              <td>
+              <td style="text-align:center;"><span class="badge-dark"><?= htmlspecialchars($row['plate_number']) ?></span></td>
+              <td style="font-size:0.75rem;color:var(--text-secondary);font-weight:600;text-align:center;"><?= htmlspecialchars($row['policy_number']) ?></td>
+              <td style="font-size:0.75rem;color:var(--text-muted);text-align:center;"><?= htmlspecialchars($row['coverage_type']) ?></td>
+              <td style="text-align:center;">
                 <div style="font-size:0.82rem;font-weight:700;color:var(--text-primary);"><?= date('M d, Y', strtotime($row['policy_end'])) ?></div>
                 <div style="font-size:0.68rem;color:var(--text-muted);"><?= date('M d, Y', strtotime($row['policy_start'])) ?> &mdash; start</div>
               </td>
-              <td><?= $status_badge ?></td>
-              <td>
+              <td style="text-align:center;"><?= $status_badge ?></td>
+              <td style="text-align:right;">
                 <?php if ($row['balance'] > 0): ?>
                   <span style="color:var(--warning);font-weight:700;font-size:0.82rem;">PHP <?= number_format($row['balance'], 2) ?></span>
                 <?php else: ?>
                   <span style="color:var(--success);font-weight:700;font-size:0.82rem;"><?= icon('check', 12) ?> Cleared</span>
                 <?php endif; ?>
               </td>
-              <td><?= $pay_badge ?></td>
-              <td>
-                <a href="view_policy.php?id=<?= $row['policy_id'] ?>" class="btn-sm-gold">
-                  <?= icon('eye', 12) ?> View
+              <td style="text-align:center;"><?= $pay_badge ?></td>
+              <td style="text-align:center;">
+                <a href="view_policy.php?id=<?= $row['policy_id'] ?>" class="btn-sm-gold" title="View" style="padding:0.35rem 0.55rem;">
+                  <?= icon('eye', 14) ?>
                 </a>
               </td>
             </tr>

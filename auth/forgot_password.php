@@ -149,7 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 
     <div class="card-foot">
-      <span>Need help? Contact <strong>Gerald Peterson Carpio</strong> &mdash; TG Customworks</span>
+      <span>Need help? Contact <strong>Gerald Peterson Carpio</strong> &mdash; TG Customworks<br/><a href="mailto:tgcustomworks@gmail.com" style="color:var(--gold);font-size:0.75rem;">tgcustomworks@gmail.com</a></span>
     </div>
 
   </div>

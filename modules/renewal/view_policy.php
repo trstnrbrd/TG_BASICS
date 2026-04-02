@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../../config/db.php';
+require_once '../../config/settings.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
     header("Location: ../../auth/login.php");
@@ -8,6 +9,9 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'supe
 }
 
 require_once '../../includes/icons.php';
+
+$urg_days = (int)getSetting($conn, 'renewal_urgent_days', '7');
+$exp_days = (int)getSetting($conn, 'renewal_expiring_days', '30');
 
 $policy_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if ($policy_id === 0) {
@@ -90,13 +94,13 @@ if ($expired) {
     $status_bg    = 'var(--bg-2)';
     $status_border= 'var(--border)';
     $status_icon  = icon('x-mark', 16);
-} elseif ($days <= 7) {
+} elseif ($days <= $urg_days) {
     $status_label = 'Urgent - ' . $days . ' day' . ($days !== 1 ? 's' : '') . ' left';
     $status_color = 'var(--danger)';
     $status_bg    = 'var(--danger-bg)';
     $status_border= 'var(--danger-border)';
     $status_icon  = icon('exclamation-triangle', 16);
-} elseif ($days <= 30) {
+} elseif ($days <= $exp_days) {
     $status_label = 'Expiring - ' . $days . ' days left';
     $status_color = 'var(--warning)';
     $status_bg    = 'var(--warning-bg)';

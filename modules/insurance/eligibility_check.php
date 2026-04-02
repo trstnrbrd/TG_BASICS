@@ -13,11 +13,13 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === '1') {
                v.vehicle_id, v.plate_number, v.make, v.model, v.year_model
         FROM clients c
         INNER JOIN vehicles v ON c.client_id = v.client_id
-        WHERE c.full_name LIKE ? OR v.plate_number LIKE ?
+        WHERE c.full_name LIKE ? OR v.plate_number LIKE ? OR v.make LIKE ?
+           OR v.model LIKE ? OR c.contact_number LIKE ? OR v.motor_number LIKE ?
+           OR v.serial_number LIKE ? OR CONCAT(v.make,' ',v.model) LIKE ?
         ORDER BY c.full_name ASC
         LIMIT 8
     ");
-    $stmt->bind_param('ss', $like, $like);
+    $stmt->bind_param('ssssssss', $like, $like, $like, $like, $like, $like, $like, $like);
     $stmt->execute();
     $rows = $stmt->get_result();
     if ($rows->num_rows === 0) {
@@ -60,10 +62,12 @@ if ($search !== '') {
                v.vehicle_id, v.plate_number, v.make, v.model, v.year_model, v.color
         FROM clients c
         INNER JOIN vehicles v ON c.client_id = v.client_id
-        WHERE c.full_name LIKE ? OR v.plate_number LIKE ?
+        WHERE c.full_name LIKE ? OR v.plate_number LIKE ? OR v.make LIKE ?
+           OR v.model LIKE ? OR c.contact_number LIKE ? OR v.motor_number LIKE ?
+           OR v.serial_number LIKE ? OR CONCAT(v.make,' ',v.model) LIKE ?
         ORDER BY c.full_name ASC
     ");
-    $stmt->bind_param('ss', $like, $like);
+    $stmt->bind_param('ssssssss', $like, $like, $like, $like, $like, $like, $like, $like);
     $stmt->execute();
     $search_results = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 }
@@ -147,7 +151,7 @@ require_once '../../includes/topbar.php';
         <div class="card-icon"><?= icon('magnifying-glass', 16) ?></div>
         <div>
           <div class="card-title">Search Client or Vehicle</div>
-          <div class="card-sub">Search by client name or plate number</div>
+          <div class="card-sub">Search by name, plate, make, model, contact, motor no., or serial no.</div>
         </div>
       </div>
       <div style="padding:1.5rem;overflow:visible;position:relative;">
@@ -158,8 +162,9 @@ require_once '../../includes/topbar.php';
       <input
         type="text"
         id="live-search"
-        placeholder="Juan dela Cruz or ABC 123"
+        placeholder="Search by name, plate, make, model, contact, engine no., chassis no..."
         autocomplete="off"
+        autofocus
         style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text-primary);padding:0.7rem 0.9rem 0.7rem 2.4rem;border-radius:9px;font-family:'Plus Jakarta Sans',sans-serif;font-size:0.85rem;outline:none;transition:border-color 0.15s,box-shadow 0.15s;"
         onfocus="this.style.borderColor='var(--gold-bright)';this.style.boxShadow='0 0 0 3px rgba(212,160,23,0.1)'"
         onblur="setTimeout(()=>{document.getElementById('live-dropdown').style.display='none'},200)"
@@ -178,26 +183,27 @@ require_once '../../includes/topbar.php';
 
         <?php elseif (count($search_results) > 0 && $selected_vid === 0): ?>
           <div style="margin-top:1.25rem;">
+<style>.tg-table tbody tr:hover { background: var(--gold-light) !important; }</style>
             <table class="tg-table">
               <thead>
                 <tr>
-                  <th>Client Name</th>
-                  <th>Plate Number</th>
-                  <th>Vehicle</th>
-                  <th>Year Model</th>
-                  <th>Action</th>
+                  <th style="text-align:center;">Client Name</th>
+                  <th style="text-align:center;">Plate Number</th>
+                  <th style="text-align:center;">Vehicle</th>
+                  <th style="text-align:center;">Year Model</th>
+                  <th style="text-align:center;">Action</th>
                 </tr>
               </thead>
               <tbody>
                 <?php foreach ($search_results as $r): ?>
                 <tr>
-                  <td style="font-weight:700;color:var(--text-primary);"><?= htmlspecialchars($r['full_name']) ?></td>
-                  <td><span class="badge badge-dark"><?= htmlspecialchars($r['plate_number']) ?></span></td>
-                  <td><?= htmlspecialchars($r['make'] . ' ' . $r['model']) ?></td>
-                  <td><?= htmlspecialchars($r['year_model']) ?></td>
-                  <td>
-                    <a href="?search=<?= urlencode($search) ?>&vehicle_id=<?= $r['vehicle_id'] ?>" class="btn-sm-gold">
-                      <?= icon('shield-check', 12) ?> Check
+                  <td style="font-weight:700;color:var(--text-primary);text-align:center;"><?= htmlspecialchars($r['full_name']) ?></td>
+                  <td style="text-align:center;"><span class="badge-dark"><?= htmlspecialchars($r['plate_number']) ?></span></td>
+                  <td style="text-align:center;"><?= htmlspecialchars($r['make'] . ' ' . $r['model']) ?></td>
+                  <td style="text-align:center;"><?= htmlspecialchars($r['year_model']) ?></td>
+                  <td style="text-align:center;">
+                    <a href="?search=<?= urlencode($search) ?>&vehicle_id=<?= $r['vehicle_id'] ?>" class="btn-sm-gold" title="Check Eligibility" style="padding:0.35rem 0.55rem;">
+                      <?= icon('shield-check', 14) ?>
                     </a>
                   </td>
                 </tr>

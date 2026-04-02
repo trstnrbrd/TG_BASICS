@@ -65,17 +65,21 @@ function ToastManager({ initialToast }) {
 
 function SubmitButton() {
   const [loading, setLoading] = useState(false);
+
   const handleClick = () => {
-    const username = document.getElementById("username").value.trim();
-    const password = document.getElementById("password").value.trim();
-    if (!username || !password) return;
+    var form = document.getElementById("login-form");
+    var event = new Event("submit", { bubbles: true, cancelable: true });
+    var allowed = form.dispatchEvent(event);
+    if (!allowed) return;
     setLoading(true);
-    setTimeout(() => document.getElementById("login-form").submit(), 400);
+    setTimeout(() => form.submit(), 400);
   };
+
   return (
     <button
       type="button"
       className="btn-submit"
+      id="react-submit-btn"
       onClick={handleClick}
       disabled={loading}
     >

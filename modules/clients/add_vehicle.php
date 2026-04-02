@@ -41,6 +41,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($year_model === '')    $errors[] = 'Year model is required.';
     if ($year_model !== '' && (!is_numeric($year_model) || $year_model < 1990 || $year_model > (int)date('Y') + 1))
         $errors[] = 'Year model must be a valid year.';
+    if ($motor_number === '')  $errors[] = 'Engine number is required.';
+    if ($serial_number === '') $errors[] = 'Chassis number is required.';
 
     if ($plate_number !== '') {
         $check = $conn->prepare("SELECT vehicle_id FROM vehicles WHERE plate_number = ?");
@@ -125,49 +127,64 @@ require_once '../../includes/topbar.php';
           </div>
         </div>
         <div style="padding:1.5rem;">
-          <div class="form-grid">
+          <div class="form-grid-3">
+
+            <!-- Row 1: Plate | Make | Model -->
             <div class="field">
               <label class="field-label">Plate Number <span class="req">*</span></label>
               <input type="text" name="plate_number" class="field-input"
-                placeholder="ABC 1234"
+                placeholder="e.g. ABC 1234"
                 value="<?= htmlspecialchars($_POST['plate_number'] ?? '') ?>"
-                style="text-transform:uppercase;"/>
+                style="text-transform:uppercase;" autofocus/>
             </div>
             <div class="field">
               <label class="field-label">Make <span class="req">*</span></label>
               <input type="text" name="make" class="field-input"
-                placeholder="Toyota"
+                placeholder="e.g. Toyota"
                 value="<?= htmlspecialchars($_POST['make'] ?? '') ?>"/>
             </div>
             <div class="field">
               <label class="field-label">Model <span class="req">*</span></label>
               <input type="text" name="model" class="field-input"
-                placeholder="Innova"
+                placeholder="e.g. Innova"
                 value="<?= htmlspecialchars($_POST['model'] ?? '') ?>"/>
             </div>
+
+            <!-- Row 2: Year | Color (2-col) -->
             <div class="field">
               <label class="field-label">Year Model <span class="req">*</span></label>
               <input type="number" name="year_model" class="field-input"
-                 min="1990" max="<?= date('Y') + 1 ?>"
+                min="1990" max="<?= date('Y') + 1 ?>"
+                placeholder="e.g. 2020"
                 value="<?= htmlspecialchars($_POST['year_model'] ?? '') ?>"/>
             </div>
-            <div class="field">
+            <div class="field span-2">
               <label class="field-label">Color</label>
               <input type="text" name="color" class="field-input"
-                placeholder="Pearl White"
+                placeholder="e.g. Pearl White"
                 value="<?= htmlspecialchars($_POST['color'] ?? '') ?>"/>
             </div>
-            <div class="field">
-              <label class="field-label">Engine Number</label>
+
+            <!-- Row 3: Engine Number (full width) -->
+            <div class="field span-3">
+              <label class="field-label">Engine Number <span class="req">*</span></label>
               <input type="text" name="motor_number" class="field-input"
-                "
-                value="<?= htmlspecialchars($_POST['motor_number'] ?? '') ?>"/>
+                placeholder="e.g. 2TR1234567"
+                value="<?= htmlspecialchars($_POST['motor_number'] ?? '') ?>"
+                style="text-transform:uppercase;"/>
+              <div class="field-hint">Found on the vehicle registration / OR-CR. Required for insurance eligibility.</div>
             </div>
-            <div class="field span-2">
-              <label class="field-label">Chassis Number</label>
+
+            <!-- Row 4: Chassis Number (full width) -->
+            <div class="field span-3">
+              <label class="field-label">Chassis Number <span class="req">*</span></label>
               <input type="text" name="serial_number" class="field-input"
-                value="<?= htmlspecialchars($_POST['serial_number'] ?? '') ?>"/>
+                placeholder="e.g. MHF11KH40P0123456"
+                value="<?= htmlspecialchars($_POST['serial_number'] ?? '') ?>"
+                style="text-transform:uppercase;"/>
+              <div class="field-hint">17-character VIN / chassis number from the OR-CR. Required for policy creation.</div>
             </div>
+
           </div>
         </div>
         <div class="form-actions">

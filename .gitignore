@@ -4,6 +4,7 @@ config/mailer.php
 config/settings.php
 tests/run_tests.php
 tests/TEST_CASES.md
+MANUSCRIPT.txt
 
 # Environment files
 .env

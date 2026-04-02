@@ -7,6 +7,26 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'supe
     exit;
 }
 
+// Handle delete
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) {
+    $del_id = (int)$_POST['delete_client_id'];
+    $cstmt  = $conn->prepare("SELECT full_name FROM clients WHERE client_id = ?");
+    $cstmt->bind_param('i', $del_id);
+    $cstmt->execute();
+    $cdata = $cstmt->get_result()->fetch_assoc();
+    if ($cdata) {
+        $dstmt = $conn->prepare("DELETE FROM clients WHERE client_id = ?");
+        $dstmt->bind_param('i', $del_id);
+        $dstmt->execute();
+        $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'CLIENT_DELETED', ?)");
+        $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' deleted client "' . $cdata['full_name'] . '" and all associated records.';
+        $log->bind_param('is', $_SESSION['user_id'], $desc);
+        $log->execute();
+        header("Location: client_list.php?success=" . urlencode('"' . $cdata['full_name'] . '" has been deleted.'));
+        exit;
+    }
+}
+
 $full_name = $_SESSION['full_name'];
 $initials  = substr(implode('', array_map(fn($w) => strtoupper($w[0]), explode(' ', $full_name))), 0, 2);
 
@@ -81,6 +101,10 @@ require_once '../../includes/header.php';
 require_once '../../includes/navbar.php';
 ?>
 
+<style>
+  .tg-table tbody tr:hover { background: var(--gold-light) !important; }
+</style>
+
 <div class="main">
 
   <?php
@@ -92,11 +116,31 @@ require_once '../../includes/topbar.php';
   <div class="content">
 
     <?php if (isset($_GET['success'])): ?>
-    <div class="alert alert-success"><?= htmlspecialchars($_GET['success']) ?></div>
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        Swal.fire({
+          icon: 'success',
+          title: 'Success',
+          text: <?= json_encode($_GET['success']) ?>,
+          confirmButtonColor: '#B8860B',
+          timer: 3000,
+          timerProgressBar: true
+        });
+      });
+    </script>
     <?php endif; ?>
 
     <?php if (isset($_GET['error'])): ?>
-    <div class="alert alert-danger"><?= htmlspecialchars($_GET['error']) ?></div>
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: <?= json_encode($_GET['error']) ?>,
+          confirmButtonColor: '#B8860B'
+        });
+      });
+    </script>
     <?php endif; ?>
 
     <!-- STATS -->
@@ -173,32 +217,41 @@ require_once '../../includes/topbar.php';
         <table class="tg-table">
           <thead>
             <tr>
-              <th>#</th>
-              <th>Full Name</th>
-              <th>Contact</th>
-              <th>Email</th>
-              <th>Vehicles</th>
-              <th>Date Added</th>
-              <th></th>
+              <th style="text-align:center;">#</th>
+              <th style="text-align:center;">Full Name</th>
+              <th style="text-align:center;">Contact</th>
+              <th style="text-align:center;">Email</th>
+              <th style="text-align:center;">Date Added</th>
+              <th style="text-align:center;">Vehicles</th>
+              <th style="text-align:center;">Action</th>
             </tr>
           </thead>
           <tbody>
             <?php $i = 1; while ($row = $result->fetch_assoc()): ?>
-            <tr style="cursor:pointer;" onclick="window.location='view_client.php?id=<?= $row['client_id'] ?>'">
-              <td style="color:var(--text-muted);font-size:0.72rem;"><?= $i++ ?></td>
-              <td style="font-weight:700;color:var(--text-primary);font-size:0.85rem;"><?= htmlspecialchars($row['full_name']) ?></td>
-              <td><?= htmlspecialchars($row['contact_number']) ?></td>
-              <td style="color:var(--text-muted);font-size:0.78rem;"><?= htmlspecialchars($row['email'] ?? '-') ?></td>
-              <td>
-                <span class="badge badge-gold"><?= icon('vehicle', 12) ?> <?= $row['vehicle_count'] ?> vehicle<?= $row['vehicle_count'] != 1 ? 's' : '' ?></span>
+            <tr>
+              <td style="color:var(--text-muted);font-size:0.72rem;text-align:center;"><?= $i++ ?></td>
+              <td style="font-weight:700;color:var(--text-primary);font-size:0.85rem;text-align:center;"><?= htmlspecialchars($row['full_name']) ?></td>
+              <td style="text-align:center;"><?= htmlspecialchars($row['contact_number']) ?></td>
+              <td style="color:var(--text-muted);font-size:0.78rem;text-align:center;"><?= htmlspecialchars($row['email'] ?? '-') ?></td>
+              <td style="font-size:0.75rem;color:var(--text-muted);text-align:center;"><?= date('M d, Y', strtotime($row['created_at'])) ?></td>
+              <td style="text-align:center;">
+                <span class="badge badge-gold"><?= $row['vehicle_count'] ?> vehicle<?= $row['vehicle_count'] != 1 ? 's' : '' ?></span>
               </td>
-              <td style="font-size:0.75rem;color:var(--text-muted);"><?= date('M d, Y', strtotime($row['created_at'])) ?></td>
-              <td>
-                <div style="display:flex;gap:0.4rem;">
-                  <a href="delete_client.php?id=<?= $row['client_id'] ?>"
-                     class="btn-sm-gold"
-                     style="background:var(--danger-bg);color:var(--danger);border-color:var(--danger-border);"
-                     onclick="return confirm('Delete <?= htmlspecialchars(addslashes($row['full_name'])) ?> and all their records?')">Delete</a>
+              <td style="text-align:center;">
+                <div style="display:inline-flex;gap:0.4rem;align-items:center;">
+                  <a href="view_client.php?id=<?= $row['client_id'] ?>" class="btn-sm-gold" title="View" style="padding:0.35rem 0.55rem;">
+                    <?= icon('eye', 14) ?>
+                  </a>
+                  <form method="POST" action="" style="display:inline;">
+                    <input type="hidden" name="delete_client_id" value="<?= $row['client_id'] ?>"/>
+                    <button type="button"
+                       class="btn-sm-gold js-delete-client"
+                       style="background:var(--danger);border:none;padding:0.35rem 0.55rem;"
+                       title="Delete"
+                       data-name="<?= htmlspecialchars($row['full_name'], ENT_QUOTES) ?>">
+                      <?= icon('trash', 14) ?>
+                    </button>
+                  </form>
                 </div>
               </td>
             </tr>
@@ -220,5 +273,26 @@ require_once '../../includes/topbar.php';
 
   </div>
 </div>
+
+<script>
+document.querySelectorAll('.js-delete-client').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var name = this.dataset.name;
+    var form = this.closest('form');
+    Swal.fire({
+      title: 'Delete client?',
+      text: 'Delete "' + name + '" and all their records? This cannot be undone.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#C0392B',
+      cancelButtonColor: '#6c757d',
+      confirmButtonText: 'Yes, delete',
+      cancelButtonText: 'Cancel'
+    }).then(function(result) {
+      if (result.isConfirmed) form.submit();
+    });
+  });
+});
+</script>
 
 <?php require_once '../../includes/footer.php'; ?>

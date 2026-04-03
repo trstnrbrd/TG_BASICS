@@ -186,7 +186,6 @@ Manual test cases are documented in `tests/TEST_CASES.md` (114 test cases across
 | **School** | STI College Sta. Maria |
 | **Course** | Bachelor of Science in Information Technology |
 | **Type** | Capstone Project |
-
 | **Developer** | Me- Tristan Reboredo :D |
 
 ---

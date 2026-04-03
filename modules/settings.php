@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once __DIR__ . "/../config/session.php";
 require_once '../config/db.php';
 require_once '../config/settings.php';
 require_once '../config/mailer.php';
@@ -826,15 +826,15 @@ document.querySelectorAll('.settings-form').forEach(form => {
             });
             const data = await res.json();
             if (data.ok) {
-                if (window.showToast) window.showToast(data.message, 'success');
+                Swal.fire({ icon: 'success', title: 'Saved!', text: data.message, confirmButtonColor: '#B8860B', timer: 2000, timerProgressBar: true });
                 if (form.querySelector('[name="section"]').value === 'account') {
                     form.querySelectorAll('input[type="password"]').forEach(p => p.value = '');
                 }
             } else {
-                if (window.showToast) window.showToast(data.error, 'danger');
+                Swal.fire({ icon: 'error', title: 'Error', text: data.error, confirmButtonColor: '#B8860B' });
             }
         } catch (err) {
-            if (window.showToast) window.showToast('Something went wrong. Please try again.', 'danger');
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Something went wrong. Please try again.', confirmButtonColor: '#B8860B' });
         }
 
         btn.disabled = false;
@@ -856,13 +856,13 @@ if (avatarInput) {
             const res = await fetch('settings.php', { method: 'POST', body: fd });
             const data = await res.json();
             if (data.ok) {
-                if (window.showToast) window.showToast(data.message, 'success');
+                Swal.fire({ icon: 'success', title: 'Saved!', text: data.message, confirmButtonColor: '#B8860B', timer: 2000, timerProgressBar: true });
                 setTimeout(() => location.reload(), 600);
             } else {
-                if (window.showToast) window.showToast(data.error, 'danger');
+                Swal.fire({ icon: 'error', title: 'Error', text: data.error, confirmButtonColor: '#B8860B' });
             }
         } catch (err) {
-            if (window.showToast) window.showToast('Upload failed. Please try again.', 'danger');
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Upload failed. Please try again.', confirmButtonColor: '#B8860B' });
         }
         this.value = '';
     });
@@ -879,13 +879,13 @@ if (avatarRemoveBtn) {
             const res = await fetch('settings.php', { method: 'POST', body: fd });
             const data = await res.json();
             if (data.ok) {
-                if (window.showToast) window.showToast(data.message, 'success');
+                Swal.fire({ icon: 'success', title: 'Saved!', text: data.message, confirmButtonColor: '#B8860B', timer: 2000, timerProgressBar: true });
                 setTimeout(() => location.reload(), 600);
             } else {
-                if (window.showToast) window.showToast(data.error, 'danger');
+                Swal.fire({ icon: 'error', title: 'Error', text: data.error, confirmButtonColor: '#B8860B' });
             }
         } catch (err) {
-            if (window.showToast) window.showToast('Something went wrong.', 'danger');
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Something went wrong.', confirmButtonColor: '#B8860B' });
         }
     });
 }
@@ -917,13 +917,13 @@ if (saveDesignBtn) {
             const res = await fetch('settings.php', { method: 'POST', body: fd });
             const data = await res.json();
             if (data.ok) {
-                if (window.showToast) window.showToast(data.message, 'success');
+                Swal.fire({ icon: 'success', title: 'Saved!', text: data.message, confirmButtonColor: '#B8860B', timer: 2000, timerProgressBar: true });
                 document.documentElement.setAttribute('data-theme', theme);
             } else {
-                if (window.showToast) window.showToast(data.error, 'danger');
+                Swal.fire({ icon: 'error', title: 'Error', text: data.error, confirmButtonColor: '#B8860B' });
             }
         } catch (err) {
-            if (window.showToast) window.showToast('Something went wrong.', 'danger');
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Something went wrong.', confirmButtonColor: '#B8860B' });
         }
 
         this.disabled = false;
@@ -945,7 +945,7 @@ if (tfaToggle) {
             const res = await fetch('settings.php', { method: 'POST', body: fd });
             const data = await res.json();
             if (data.ok) {
-                if (window.showToast) window.showToast(data.message, 'success');
+                Swal.fire({ icon: 'success', title: 'Saved!', text: data.message, confirmButtonColor: '#B8860B', timer: 2000, timerProgressBar: true });
                 const status = document.getElementById('tfa-status');
                 if (status) {
                     status.className = 'toggle-status ' + (enabled ? 'on' : 'off');
@@ -956,11 +956,11 @@ if (tfaToggle) {
                 }
             } else {
                 this.checked = !this.checked;
-                if (window.showToast) window.showToast(data.error, 'danger');
+                Swal.fire({ icon: 'error', title: 'Error', text: data.error, confirmButtonColor: '#B8860B' });
             }
         } catch (err) {
             this.checked = !this.checked;
-            if (window.showToast) window.showToast('Something went wrong.', 'danger');
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Something went wrong.', confirmButtonColor: '#B8860B' });
         }
     });
 }

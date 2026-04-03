@@ -2,9 +2,11 @@
 config/db.php
 config/mailer.php
 config/settings.php
+config/session.php
 tests/run_tests.php
 tests/TEST_CASES.md
-MANUSCRIPT.txt
+data_gathering (documentation)/Full interview transcript.txt
+data_gathering (documentation)/MANUSCRIPT.txt
 
 # Environment files
 .env

@@ -14,7 +14,7 @@ TG-BASICS consolidates every part of their workflow into one platform — from f
 
 ---
 
-## Features at a Glance
+## Features
 
 - Role-based access with three user levels (Super Admin, Admin, Mechanic)
 - Searchable client and vehicle records by name, plate number, or policy number
@@ -63,7 +63,7 @@ No self-registration. All accounts are created by the Super Admin or Admin.
 | Backend | PHP 8 |
 | Database | MySQL (via XAMPP) |
 | Frontend | HTML5, CSS3, JavaScript |
-| UI Components | React 18 (CDN), Babel Standalone |
+| UI Components | React 18 (CDN), Babel Standalone, Swal2 |
 | Icons | Heroicons (inline SVG via PHP helper) |
 | Email | PHPMailer + Gmail SMTP |
 | Environment | XAMPP (local deployment) |
@@ -180,12 +180,14 @@ Manual test cases are documented in `tests/TEST_CASES.md` (114 test cases across
 
 | | |
 |-|-|
-| **Client** | TG Customworks and Basic Car Insurance Services |
+| **Client** | TG Customworks and Basic Car Insurance |
 | **Address** | 49 Villa Tierra St., San Roque, Pandi, Bulacan, Philippines |
 | **Owner** | Gerald Peterson V. Carpio |
 | **School** | STI College Sta. Maria |
 | **Course** | Bachelor of Science in Information Technology |
 | **Type** | Capstone Project |
+
+| **Developer** | Me- Tristan Reboredo :D |
 
 ---
 

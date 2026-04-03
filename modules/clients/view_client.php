@@ -229,8 +229,8 @@ require_once '../../includes/topbar.php';
               <th style="text-align:center;">Make &amp; Model</th>
               <th style="text-align:center;">Year</th>
               <th style="text-align:center;">Color</th>
-              <th style="text-align:center;">Motor No.</th>
-              <th style="text-align:center;">Serial No.</th>
+              <th style="text-align:center;">Engine No.</th>
+              <th style="text-align:center;">Chassis No.</th>
               <th style="text-align:center;">Action</th>
             </tr>
           </thead>

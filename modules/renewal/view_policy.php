@@ -196,8 +196,8 @@ require_once '../../includes/topbar.php';
             ['Plate Number',   $policy['plate_number']],
             ['Make & Model',   $policy['make'] . ' ' . $policy['model'] . ' ' . $policy['year_model']],
             ['Color',          $policy['color'] ?: 'N/A'],
-            ['Motor Number',   $policy['motor_number'] ?: 'N/A'],
-            ['Serial Number',  $policy['serial_number'] ?: 'N/A'],
+            ['Engine Number',  $policy['motor_number'] ?: 'N/A'],
+            ['Chassis Number', $policy['serial_number'] ?: 'N/A'],
           ];
           foreach ($vehicle_info as [$label, $val]): ?>
           <div>

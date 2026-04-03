@@ -30,6 +30,8 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <meta name="format-detection" content="telephone=no, date=no, email=no, address=no"/>
 <title><?= htmlspecialchars($page_title) ?> | TG-BASICS</title>
+<link rel="icon" type="image/png" href="<?= $base_path ?>assets/img/tg_logo.png"/>
+<link rel="apple-touch-icon" href="<?= $base_path ?>assets/img/tg_logo.png"/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Big+Shoulders+Text:wght@700;800;900&display=swap" rel="stylesheet"/>
 <style>
   :root {

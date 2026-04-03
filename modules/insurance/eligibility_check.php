@@ -151,7 +151,7 @@ require_once '../../includes/topbar.php';
         <div class="card-icon"><?= icon('magnifying-glass', 16) ?></div>
         <div>
           <div class="card-title">Search Client or Vehicle</div>
-          <div class="card-sub">Search by name, plate, make, model, contact, motor no., or serial no.</div>
+          <div class="card-sub">Search by name, plate, make, model, contact, engine no., or chassis no.</div>
         </div>
       </div>
       <div style="padding:1.5rem;overflow:visible;position:relative;">

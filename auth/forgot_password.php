@@ -56,6 +56,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <meta name="format-detection" content="telephone=no, date=no, email=no, address=no"/>
 <title>Forgot Password | TG-BASICS</title>
+<link rel="icon" type="image/png" href="../assets/img/tg_logo.png"/>
+<link rel="apple-touch-icon" href="../assets/img/tg_logo.png"/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="../assets/css/activate.css"/>
 </head>

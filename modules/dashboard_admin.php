@@ -268,14 +268,14 @@ require_once '../includes/topbar.php';
           <div style="display:flex;flex-direction:column;gap:0.5rem;padding:1rem;">
             <?php
             $actions = [
-              ['clients/add_client.php',          'user-plus',         'Add New Client',       'Client and vehicle registration'],
-              ['insurance/eligibility_check.php',  'shield-check',     'New Insurance Policy',  'Check eligibility and encode'],
-              ['clients/client_list.php',          'magnifying-glass',  'Search Records',        'Find client, vehicle, or policy'],
-              ['renewal/renewal_list.php',         'clock',            'Renewal Tracking',      'View policy expiry status'],
+              ['clients/add_client.php',          'user-plus',        'Add New Client',       'Client and vehicle registration',  '#2E7D52', '#F0FAF4'],
+              ['insurance/eligibility_check.php', 'shield-check',     'New Insurance Policy', 'Check eligibility and encode',     '#1A6B9A', '#EBF5FB'],
+              ['clients/client_list.php',         'magnifying-glass', 'Search Records',       'Find client, vehicle, or policy',  '#7B3FA0', '#F5EEF8'],
+              ['renewal/renewal_list.php',        'clock',            'Renewal Tracking',     'View policy expiry status',        '#B8860B', '#FDF8EE'],
             ];
             foreach ($actions as $a): ?>
             <a href="<?= $a[0] ?>" class="quick-action">
-              <div class="quick-action-icon"><?= icon($a[1], 16) ?></div>
+              <div class="quick-action-icon" style="background:<?= $a[5] ?>;color:<?= $a[4] ?>;"><?= icon($a[1], 16) ?></div>
               <div>
                 <div class="quick-action-label"><?= $a[2] ?></div>
                 <div class="quick-action-hint"><?= $a[3] ?></div>
@@ -343,6 +343,25 @@ require_once '../includes/topbar.php';
 
 <script>
 (function(){
+  // ── Count-up animation for stat values ──
+  document.querySelectorAll('.dash-stat-value').forEach(function(el) {
+    var target = parseInt(el.textContent, 10);
+    if (isNaN(target) || target === 0) return;
+    var duration = 900;
+    var start = null;
+    el.textContent = '0';
+    function step(ts) {
+      if (!start) start = ts;
+      var progress = Math.min((ts - start) / duration, 1);
+      var ease = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+      el.textContent = Math.floor(ease * target);
+      if (progress < 1) requestAnimationFrame(step);
+      else el.textContent = target;
+    }
+    requestAnimationFrame(step);
+  });
+
+  // ── Greeting & clock ──
   var greetEl = document.getElementById('js-greeting');
   var dateEl  = document.getElementById('js-date');
   var timeEl  = document.getElementById('js-time');

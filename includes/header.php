@@ -51,9 +51,9 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
     --text-muted: #9C9286;
     --border: #E2D9CC;
     --border-focus: #D4A017;
-    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
-    --shadow-md: 0 4px 16px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
-    --shadow-lg: 0 12px 40px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06);
+    --shadow: 0 2px 8px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05);
+    --shadow-md: 0 6px 20px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.06);
+    --shadow-lg: 0 12px 40px rgba(0,0,0,0.14), 0 4px 12px rgba(0,0,0,0.08);
     --success: #2E7D52;
     --success-bg: #F0FAF4;
     --success-border: rgba(46,125,82,0.2);

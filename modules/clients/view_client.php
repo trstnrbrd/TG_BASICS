@@ -224,7 +224,7 @@ require_once '../../includes/topbar.php';
       <div class="tg-table-wrap">
         <table class="tg-table">
           <thead>
-            <tr>n
+            <tr>
               <th style="text-align:center;">Plate Number</th>
               <th style="text-align:center;">Make &amp; Model</th>
               <th style="text-align:center;">Year</th>

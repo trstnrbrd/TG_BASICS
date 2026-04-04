@@ -13,9 +13,11 @@ data_gathering (documentation)/MANUSCRIPT.txt
 .env.*
 .env.local
 
-# Uploaded files (user-generated)
+# Uploaded files (user-generated, confidential)
 uploads/avatars/*
 !uploads/avatars/.gitkeep
+uploads/claims/*
+!uploads/claims/.gitkeep
 
 # XAMPP / system files
 .DS_Store

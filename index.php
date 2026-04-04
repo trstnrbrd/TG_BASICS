@@ -152,44 +152,44 @@
     <p class="section-desc">Every feature built around the actual workflow of the business, from the first inspection to the final e-receipt.</p>
 
     <div class="modules-grid">
-      <div class="module-card">
+      <div class="module-card" data-mod="1">
         <div class="module-num">01</div>
-        <div class="module-icon"><?= icon('users', 18) ?></div>
+        <div class="module-icon"><?= icon('users', 20) ?></div>
         <div class="module-name">Client and Vehicle Records</div>
         <div class="module-desc">Centralized client profiles and vehicle details in one searchable database. Find any record by name, plate number, or policy number instantly.</div>
         <div class="module-tag">Records</div>
       </div>
-      <div class="module-card">
+      <div class="module-card" data-mod="2">
         <div class="module-num">02</div>
-        <div class="module-icon"><?= icon('shield-check', 18) ?></div>
+        <div class="module-icon"><?= icon('shield-check', 20) ?></div>
         <div class="module-name">Insurance Eligibility and Policy Processing</div>
         <div class="module-desc">Automatic 10-year eligibility check for PhilBritish coverage. Encode full policy details including premium, participation fee, and coverage type.</div>
         <div class="module-tag">Insurance</div>
       </div>
-      <div class="module-card">
+      <div class="module-card" data-mod="3">
         <div class="module-num">03</div>
-        <div class="module-icon"><?= icon('clock', 18) ?></div>
+        <div class="module-icon"><?= icon('clock', 20) ?></div>
         <div class="module-name">Policy Status and Renewal Tracker</div>
         <div class="module-desc">Color-coded expiry dashboard. Green for stable, Yellow for expiring within 30 days, Red for urgent within 7 days. Full payment balance tracking.</div>
         <div class="module-tag">Renewal</div>
       </div>
-      <div class="module-card">
+      <div class="module-card" data-mod="4">
         <div class="module-num">04</div>
-        <div class="module-icon"><?= icon('clipboard-list', 18) ?></div>
+        <div class="module-icon"><?= icon('clipboard-list', 20) ?></div>
         <div class="module-name">Claims Document Tracker</div>
         <div class="module-desc">Log every claim and track document completeness including OR/CR, driver's license, and damage photos. Admin manually updates status from collection to resolution.</div>
         <div class="module-tag">Claims</div>
       </div>
-      <div class="module-card">
+      <div class="module-card" data-mod="5">
         <div class="module-num">05</div>
-        <div class="module-icon"><?= icon('wrench', 18) ?></div>
+        <div class="module-icon"><?= icon('wrench', 20) ?></div>
         <div class="module-name">Repair Job Management</div>
         <div class="module-desc">Mechanic submits digital inspection checklist on arrival. Admin monitors job stages from Inspection through Repair, Paint, Curing, and Final Release.</div>
         <div class="module-tag">Repair Shop</div>
       </div>
-      <div class="module-card">
+      <div class="module-card" data-mod="6">
         <div class="module-num">06</div>
-        <div class="module-icon"><?= icon('receipt', 18) ?></div>
+        <div class="module-icon"><?= icon('receipt', 20) ?></div>
         <div class="module-name">Quotation and E-Receipt Generator</div>
         <div class="module-desc">Build quotations from the digital service catalog. Once payment is confirmed, the system converts the quotation directly into a formatted e-receipt. No double encoding.</div>
         <div class="module-tag">Billing</div>

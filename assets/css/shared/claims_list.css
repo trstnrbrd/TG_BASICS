@@ -1,0 +1,8 @@
+.badge-orange { background: rgba(230,126,34,0.15); color: #e67e22; border: 1px solid rgba(230,126,34,0.3); }
+.badge-info   { background: rgba(26,107,154,0.15); color: #1a6b9a; border: 1px solid rgba(26,107,154,0.3); }
+.badge-muted  { background: var(--bg-2); color: var(--text-muted); border: 1px solid var(--border); }
+.doc-progress { display: flex; gap: 3px; align-items: center; }
+.doc-pip { width: 8px; height: 8px; border-radius: 50%; }
+.doc-pip.filled { background: var(--success); }
+.doc-pip.empty  { background: var(--border); }
+.tg-table tbody tr:hover { background: var(--gold-light) !important; }

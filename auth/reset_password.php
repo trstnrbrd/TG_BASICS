@@ -83,7 +83,7 @@ $invalid = !$record || $record['used'] || strtotime($record['expires_at']) < tim
 <link rel="icon" type="image/png" href="../assets/img/tg_logo.png"/>
 <link rel="apple-touch-icon" href="../assets/img/tg_logo.png"/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="../assets/css/activate.css"/>
+<link rel="stylesheet" href="../assets/css/auth/activate.css"/>
 </head>
 <body>
 <div class="wrap">
@@ -209,7 +209,7 @@ $invalid = !$record || $record['used'] || strtotime($record['expires_at']) < tim
 
 </div>
 
-<script src="../assets/js/activate.js"></script>
+<script src="../assets/js/auth/activate.js"></script>
 
 </body>
 </html>

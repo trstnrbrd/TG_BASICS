@@ -101,9 +101,7 @@ require_once '../../includes/header.php';
 require_once '../../includes/navbar.php';
 ?>
 
-<style>
-  .tg-table tbody tr:hover { background: var(--gold-light) !important; }
-</style>
+<link rel="stylesheet" href="../../assets/css/shared/clients.css"/>
 
 <div class="main">
 
@@ -246,7 +244,7 @@ require_once '../../includes/topbar.php';
                     <input type="hidden" name="delete_client_id" value="<?= $row['client_id'] ?>"/>
                     <button type="button"
                        class="btn-sm-gold js-delete-client"
-                       style="background:var(--danger);border:none;padding:0.35rem 0.55rem;"
+                       style="padding:0.35rem 0.55rem;background:var(--danger);color:#fff;border-color:var(--danger);"
                        title="Delete"
                        data-name="<?= htmlspecialchars($row['full_name'], ENT_QUOTES) ?>">
                       <?= icon('trash', 14) ?>
@@ -274,25 +272,6 @@ require_once '../../includes/topbar.php';
   </div>
 </div>
 
-<script>
-document.querySelectorAll('.js-delete-client').forEach(function(btn) {
-  btn.addEventListener('click', function() {
-    var name = this.dataset.name;
-    var form = this.closest('form');
-    Swal.fire({
-      title: 'Delete client?',
-      text: 'Delete "' + name + '" and all their records? This cannot be undone.',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#C0392B',
-      cancelButtonColor: '#6c757d',
-      confirmButtonText: 'Yes, delete',
-      cancelButtonText: 'Cancel'
-    }).then(function(result) {
-      if (result.isConfirmed) form.submit();
-    });
-  });
-});
-</script>
+<script src="../../assets/js/shared/client_list.js"></script>
 
 <?php require_once '../../includes/footer.php'; ?>

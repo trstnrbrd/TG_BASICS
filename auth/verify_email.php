@@ -71,7 +71,7 @@ $sub        = $status === 'success' ? 'Your email has been updated successfully'
 <link rel="icon" type="image/png" href="../assets/img/tg_logo.png"/>
 <link rel="apple-touch-icon" href="../assets/img/tg_logo.png"/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="../assets/css/activate.css"/>
+<link rel="stylesheet" href="../assets/css/auth/activate.css"/>
 </head>
 <body>
 

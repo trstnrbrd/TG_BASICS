@@ -1,0 +1,89 @@
+.badge-orange { background: rgba(230,126,34,0.15); color: #e67e22; border: 1px solid rgba(230,126,34,0.3); }
+.badge-info   { background: rgba(26,107,154,0.15); color: #1a6b9a; border: 1px solid rgba(26,107,154,0.3); }
+.badge-muted  { background: var(--bg-2); color: var(--text-muted); border: 1px solid var(--border); }
+
+/* Document checklist */
+.doc-item {
+  display: flex; align-items: flex-start; gap: 0.9rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: background 0.15s, border-color 0.15s;
+}
+.doc-item.received { background: var(--success-bg); border-color: var(--success-border); }
+.doc-item.locked   { opacity: 0.85; }
+.doc-checkbox {
+  width: 22px; height: 22px; border-radius: 6px;
+  border: 2px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: all 0.15s;
+  background: var(--bg-3); margin-top: 0.1rem;
+}
+.doc-item.received .doc-checkbox { background: var(--success); border-color: var(--success); color: #fff; }
+.doc-label { font-size: 0.85rem; font-weight: 600; color: var(--text-primary); }
+.doc-item.received .doc-label { color: var(--success); }
+.doc-sub { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.1rem; }
+
+/* Upload buttons */
+.doc-upload-btn {
+  display: flex; align-items: center; justify-content: center;
+  height: 36px; border-radius: 8px; flex-shrink: 0;
+  background: var(--bg-2); border: 1px solid var(--border);
+  color: var(--text-muted); cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.doc-upload-btn:hover { background: var(--gold-light); border-color: var(--gold-muted); color: var(--gold); }
+
+/* Thumbnail preview */
+.doc-thumb {
+  width: 100%; max-width: 220px; height: 110px; object-fit: cover;
+  border-radius: 8px; border: 1px solid var(--border);
+  display: block; cursor: pointer;
+}
+.doc-file-link {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  font-size: 0.75rem; font-weight: 600; color: var(--gold);
+  padding: 0.35rem 0.75rem; border-radius: 6px;
+  background: var(--gold-light); border: 1px solid var(--gold-muted);
+  text-decoration: none;
+}
+.doc-remove-btn {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  margin-top: 0.4rem; font-size: 0.7rem; font-weight: 600;
+  color: var(--danger); background: none; border: none;
+  cursor: pointer; padding: 0; opacity: 0.8;
+}
+.doc-remove-btn:hover { opacity: 1; }
+.doc-uploading { opacity: 0.6; pointer-events: none; }
+
+/* ── MOBILE RESPONSIVE ── */
+@media (max-width: 768px) {
+  .claim-top-grid    { grid-template-columns: 1fr !important; }
+  .claim-bottom-grid { grid-template-columns: 1fr !important; }
+  .status-flow { gap: 0.25rem; }
+  .status-step { font-size: 0.62rem; padding: 0.3rem 0.55rem; }
+  .claim-page-header { flex-direction: column !important; align-items: flex-start !important; }
+  .doc-label { font-size: 0.82rem; }
+  .doc-btn-label { display: none; }
+  .doc-upload-btn { width: 44px; height: 44px; padding: 0 !important; justify-content: center; }
+  .doc-thumb { max-width: 100%; height: 160px; }
+  .card-body { padding: 0.85rem !important; }
+}
+
+@media (max-width: 480px) {
+  .status-step { font-size: 0.58rem; padding: 0.25rem 0.45rem; }
+  .doc-item { padding: 0.75rem 0.85rem; }
+}
+
+/* Status flow */
+.status-flow { display: flex; align-items: center; gap: 0; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.35rem; }
+.status-step {
+  display: flex; align-items: center; gap: 0.4rem;
+  padding: 0.35rem 0.75rem; border-radius: 100px;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.3px;
+  border: 1px solid var(--border); color: var(--text-muted); background: var(--bg-2);
+}
+.status-step.active { background: var(--gold-light); border-color: var(--gold-muted); color: var(--gold); }
+.status-step.done   { background: var(--success-bg); border-color: var(--success-border); color: var(--success); }
+.status-step.denied-step { background: var(--danger-bg); border-color: rgba(192,57,43,0.3); color: var(--danger); }
+.status-arrow { color: var(--text-muted); font-size: 0.7rem; }

@@ -207,10 +207,11 @@ require_once '../includes/topbar.php';
                   <input type="hidden" name="action" value="delete"/>
                   <input type="hidden" name="user_id" value="<?= $u['user_id'] ?>"/>
                   <button type="button"
-                    class="js-delete-user"
+                    class="btn-sm-gold js-delete-user"
                     data-name="<?= htmlspecialchars($u['full_name'], ENT_QUOTES) ?>"
-                    style="background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border);padding:0.3rem 0.7rem;border-radius:7px;font-size:0.72rem;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all 0.15s;" onmouseover="this.style.background='var(--danger)';this.style.color='#fff'" onmouseout="this.style.background='var(--danger-bg)';this.style.color='var(--danger)'">
-                    <?= icon('trash', 14) ?> Delete
+                    style="padding:0.35rem 0.55rem;background:var(--danger);color:#fff;border-color:var(--danger);"
+                    title="Delete">
+                    <?= icon('trash', 14) ?>
                   </button>
                 </form>
                 <?php else: ?>
@@ -339,56 +340,6 @@ require_once '../includes/topbar.php';
   </div>
 </div>
 
-<script>
-// ── DELETE USER ──
-document.querySelectorAll('.js-delete-user').forEach(function(btn) {
-  btn.addEventListener('click', function() {
-    var name = this.dataset.name;
-    var form = this.closest('form');
-    Swal.fire({
-      title: 'Delete account?',
-      text: 'Delete the account of "' + name + '"? This cannot be undone.',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#C0392B',
-      cancelButtonColor: '#6c757d',
-      confirmButtonText: 'Yes, delete',
-      cancelButtonText: 'Cancel'
-    }).then(function(result) {
-      if (result.isConfirmed) form.submit();
-    });
-  });
-});
-
-// ── CREATE & SEND ACTIVATION ──
-document.getElementById('js-create-btn').addEventListener('click', function() {
-  var name  = document.querySelector('[name="new_full_name"]').value.trim();
-  var email = document.querySelector('[name="new_email"]').value.trim();
-  var role  = document.querySelector('[name="new_role"]').value;
-
-  if (!name || !email || !role) {
-    Swal.fire({
-      icon: 'warning',
-      title: 'Incomplete Fields',
-      text: 'Please fill in all required fields before creating an account.',
-      confirmButtonColor: '#B8860B'
-    });
-    return;
-  }
-
-  Swal.fire({
-    title: 'Create account?',
-    html: 'Create an account for <b>' + name + '</b> as <b>' + role.charAt(0).toUpperCase() + role.slice(1) + '</b>?<br><small style="color:#888;">An activation email will be sent to ' + email + '.</small>',
-    icon: 'question',
-    showCancelButton: true,
-    confirmButtonColor: '#B8860B',
-    cancelButtonColor: '#6c757d',
-    confirmButtonText: 'Yes, create & send',
-    cancelButtonText: 'Cancel'
-  }).then(function(result) {
-    if (result.isConfirmed) document.getElementById('js-create-btn').closest('form').submit();
-  });
-});
-</script>
+<script src="../assets/js/super_admin/manage_users.js"></script>
 
 <?php require_once '../includes/footer.php'; ?>

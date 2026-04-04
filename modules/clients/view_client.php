@@ -50,6 +50,20 @@ $vstmt->bind_param('i', $client_id);
 $vstmt->execute();
 $vehicles = $vstmt->get_result();
 
+// Load claims
+$clstmt = $conn->prepare("
+    SELECT cl.claim_id, cl.claim_type, cl.status, cl.incident_date, cl.created_at, cl.denial_reason,
+           ip.policy_number, v.plate_number, v.make, v.model
+    FROM claims cl
+    INNER JOIN insurance_policies ip ON cl.policy_id = ip.policy_id
+    LEFT  JOIN vehicles v ON ip.vehicle_id = v.vehicle_id
+    WHERE cl.client_id = ?
+    ORDER BY cl.created_at DESC
+");
+$clstmt->bind_param('i', $client_id);
+$clstmt->execute();
+$claims = $clstmt->get_result();
+
 // Load policies
 $pstmt = $conn->prepare("
     SELECT p.*, v.plate_number, v.make, v.model, v.year_model
@@ -69,9 +83,7 @@ require_once '../../includes/header.php';
 require_once '../../includes/navbar.php';
 ?>
 
-<style>
-  .tg-table tbody tr:hover { background: var(--gold-light) !important; }
-</style>
+<link rel="stylesheet" href="../../assets/css/shared/clients.css"/>
 
 <div class="main">
 
@@ -190,10 +202,16 @@ require_once '../../includes/topbar.php';
         $active_policy->execute();
         $apc = $active_policy->get_result()->fetch_assoc()['c'];
 
+        $claim_count = $conn->prepare("SELECT COUNT(*) as c FROM claims WHERE client_id = ?");
+        $claim_count->bind_param('i', $client_id);
+        $claim_count->execute();
+        $clc = $claim_count->get_result()->fetch_assoc()['c'];
+
         $quick_stats = [
-          [icon('vehicle', 16), $vc,  'Registered Vehicles', 'badge-gold'],
-          [icon('document', 16), $pc,  'Total Policies',      'badge-green'],
+          [icon('vehicle', 16),        $vc,  'Registered Vehicles', 'badge-gold'],
+          [icon('document', 16),       $pc,  'Total Policies',      'badge-green'],
           [icon('check-circle', 16),   $apc, 'Active Policies',     'badge-green'],
+          [icon('clipboard-list', 16), $clc, 'Total Claims',        'badge-gold'],
         ];
         foreach ($quick_stats as $qs): ?>
         <div class="card" style="margin-bottom:0;display:flex;align-items:center;gap:1rem;padding:1rem 1.25rem;">
@@ -256,7 +274,7 @@ require_once '../../includes/topbar.php';
                         data-plate="<?= htmlspecialchars($v['plate_number'], ENT_QUOTES) ?>">
                     <input type="hidden" name="vehicle_id" value="<?= $v['vehicle_id'] ?>"/>
                     <button type="submit" class="btn-sm-gold" title="Delete"
-                            style="background:var(--danger);border:none;padding:0.35rem 0.55rem;">
+                            style="padding:0.35rem 0.55rem;background:var(--danger);color:#fff;border-color:var(--danger);">
                       <?= icon('trash', 14) ?>
                     </button>
                   </form>
@@ -357,6 +375,84 @@ require_once '../../includes/topbar.php';
       <?php endif; ?>
     </div>
 
+    <!-- CLAIMS HISTORY -->
+    <?php
+    $claim_status_map = [
+        'document_collection' => ['label' => 'Document Collection', 'class' => 'badge-yellow'],
+        'submitted'           => ['label' => 'Submitted to Head Office', 'class' => 'badge-info'],
+        'under_review'        => ['label' => 'Under Adjuster Review', 'class' => 'badge-orange'],
+        'approved'            => ['label' => 'Approved', 'class' => 'badge-green'],
+        'denied'              => ['label' => 'Denied', 'class' => 'badge-red'],
+        'resolved'            => ['label' => 'Resolved', 'class' => 'badge-gray'],
+    ];
+    ?>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon"><?= icon('clipboard-list', 16) ?></div>
+        <div>
+          <div class="card-title">Claims History</div>
+          <div class="card-sub"><?= $claims->num_rows ?> claim<?= $claims->num_rows !== 1 ? 's' : '' ?> on record</div>
+        </div>
+        <a href="../claims/add_claim.php" class="btn-primary" style="margin-left:auto;padding:0.5rem 1rem;font-size:0.78rem;">
+          <?= icon('plus', 14) ?> File New Claim
+        </a>
+      </div>
+      <?php if ($claims->num_rows > 0): ?>
+      <div class="tg-table-wrap">
+        <table class="tg-table">
+          <thead>
+            <tr>
+              <th>Policy / Vehicle</th>
+              <th>Incident Date</th>
+              <th>Filed</th>
+              <th>Type / Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php while ($cl = $claims->fetch_assoc()):
+              $cs = $claim_status_map[$cl['status']] ?? ['label' => $cl['status'], 'class' => 'badge-gray'];
+            ?>
+            <tr>
+              <td>
+                <div style="font-weight:700;font-size:0.82rem;color:var(--text-primary);"><?= htmlspecialchars($cl['policy_number']) ?></div>
+                <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.1rem;">
+                  <?= htmlspecialchars($cl['plate_number'] ?: '—') ?>
+                  <?php if ($cl['make']): ?> &middot; <?= htmlspecialchars($cl['make'] . ' ' . $cl['model']) ?><?php endif; ?>
+                </div>
+              </td>
+              <td style="font-size:0.78rem;color:var(--text-muted);white-space:nowrap;"><?= date('M d, Y', strtotime($cl['incident_date'])) ?></td>
+              <td style="font-size:0.72rem;color:var(--text-muted);white-space:nowrap;"><?= date('M d, Y', strtotime($cl['created_at'])) ?></td>
+              <td>
+                <div style="display:flex;flex-direction:column;align-items:center;gap:0.3rem;">
+                  <?php if ($cl['claim_type'] === 'major'): ?>
+                    <span class="badge badge-red">Major / 3rd Party</span>
+                  <?php else: ?>
+                    <span class="badge badge-info">Minor</span>
+                  <?php endif; ?>
+                  <span class="badge <?= $cs['class'] ?>"><?= $cs['label'] ?></span>
+                </div>
+              </td>
+              <td>
+                <a href="../claims/view_claim.php?id=<?= $cl['claim_id'] ?>" class="btn-sm-gold" title="View Claim" style="padding:0.35rem 0.55rem;">
+                  <?= icon('eye', 14) ?>
+                </a>
+              </td>
+            </tr>
+            <?php endwhile; ?>
+          </tbody>
+        </table>
+      </div>
+      <?php else: ?>
+      <div class="empty-state">
+        <div class="empty-icon"><?= icon('clipboard-list', 28) ?></div>
+        <div class="empty-title">No claims filed</div>
+        <div class="empty-desc">No insurance claims have been filed for this client yet.</div>
+        <a href="../claims/add_claim.php" class="btn-primary"><?= icon('plus', 14) ?> File New Claim</a>
+      </div>
+      <?php endif; ?>
+    </div>
+
     <!-- REPAIR JOBS PLACEHOLDER -->
     <div class="card">
       <div class="card-header">
@@ -376,47 +472,6 @@ require_once '../../includes/topbar.php';
   </div>
 </div>
 
-<script>
-// Delete client
-document.querySelectorAll('.js-delete-client-profile').forEach(function(btn) {
-  btn.addEventListener('click', function() {
-    var name = this.dataset.name;
-    var form = this.closest('form');
-    Swal.fire({
-      title: 'Delete client?',
-      text: 'Delete "' + name + '" and all their records? This cannot be undone.',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#C0392B',
-      cancelButtonColor: '#6c757d',
-      confirmButtonText: 'Yes, delete',
-      cancelButtonText: 'Cancel'
-    }).then(function(result) {
-      if (result.isConfirmed) form.submit();
-    });
-  });
-});
-
-// Delete vehicle
-document.querySelectorAll('.js-delete-vehicle-form').forEach(function(form) {
-  form.addEventListener('submit', function(e) {
-    e.preventDefault();
-    var plate = this.dataset.plate;
-    var self  = this;
-    Swal.fire({
-      title: 'Delete vehicle?',
-      text: 'Delete ' + plate + '? This will also permanently delete all associated insurance policies. This cannot be undone.',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#C0392B',
-      cancelButtonColor: '#6c757d',
-      confirmButtonText: 'Yes, delete',
-      cancelButtonText: 'Cancel'
-    }).then(function(result) {
-      if (result.isConfirmed) self.submit();
-    });
-  });
-});
-</script>
+<script src="../../assets/js/shared/view_client.js"></script>
 
 <?php require_once '../../includes/footer.php'; ?>

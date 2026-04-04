@@ -340,11 +340,11 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
   .tg-table { width: 100%; border-collapse: collapse; }
   .tg-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .tg-table thead tr { background: var(--bg-2); border-bottom: 1px solid var(--border); }
-  .tg-table thead th { padding: 0.65rem 1rem; text-align: left; font-size: 0.62rem; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; white-space: nowrap; }
+  .tg-table thead th { padding: 0.65rem 1rem; text-align: center; font-size: 0.62rem; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; white-space: nowrap; }
   .tg-table tbody tr { border-bottom: 1px solid var(--border); transition: background 0.12s; }
   .tg-table tbody tr:last-child { border-bottom: none; }
   .tg-table tbody tr:hover { background: var(--gold-pale); }
-  .tg-table tbody td { padding: 0.8rem 1rem; font-size: 0.8rem; color: var(--text-secondary); vertical-align: middle; }
+  .tg-table tbody td { padding: 0.8rem 1rem; font-size: 0.8rem; color: var(--text-secondary); vertical-align: middle; text-align: center; }
 
   /* ── BADGES ── */
   .plate-chip { display: inline-flex; background: var(--sidebar-bg); color: var(--gold-bright); padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.72rem; font-weight: 800; letter-spacing: 1.5px; }
@@ -453,6 +453,8 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
     .page-header-title { font-size: 0.88rem; }
     .page-header-sub { font-size: 0.65rem; }
   }
+  /* Page loading cursor */
+  html.tg-loading, html.tg-loading * { cursor: wait !important; }
 </style>
 <?= $extra_css ?? '' ?>
 </head>
@@ -475,4 +477,22 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
     const overlay = document.getElementById('sidebar-overlay');
     if (overlay) overlay.addEventListener('click', toggleSidebar);
   });
+
+  // Loading cursor — show on navigation, hide when page is fully ready
+  (function () {
+    document.documentElement.classList.add('tg-loading');
+    window.addEventListener('load', function () {
+      document.documentElement.classList.remove('tg-loading');
+    });
+    // Also trigger on link/form navigation
+    document.addEventListener('click', function (e) {
+      const a = e.target.closest('a[href]');
+      if (a && !a.target && !a.href.startsWith('#') && !a.href.startsWith('javascript')) {
+        document.documentElement.classList.add('tg-loading');
+      }
+    });
+    document.addEventListener('submit', function () {
+      document.documentElement.classList.add('tg-loading');
+    });
+  })();
 </script>

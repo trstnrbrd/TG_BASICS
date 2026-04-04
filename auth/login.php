@@ -130,7 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <link rel="icon" type="image/png" href="../assets/img/tg_logo.png"/>
 <link rel="apple-touch-icon" href="../assets/img/tg_logo.png"/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="../assets/css/login.css"/>
+<link rel="stylesheet" href="../assets/css/auth/login.css"/>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body>
@@ -138,7 +138,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <!-- Toast root - data attributes pass PHP state to JS -->
 <div id="toast-root"
   data-lockout="<?= $lockout ? '1' : '0' ?>"
-  data-message="<?= htmlspecialchars($error) ?>">
+  data-message="<?= htmlspecialchars($error) ?>"
+  data-icon-lockout="<?= htmlspecialchars(icon('lock-closed', 14)) ?>"
+  data-icon-warning="<?= htmlspecialchars(icon('exclamation-triangle', 14)) ?>">
 </div>
 
 <div class="login-wrapper">
@@ -215,61 +217,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
-<script type="text/babel" src="../assets/js/login.js"></script>
+<script type="text/babel" src="../assets/js/auth/login.react.js"></script>
 
-<script>
-  // Autofocus username on page load
-  window.addEventListener('load', function() {
-    var u = document.getElementById('username');
-    if (u) u.focus();
-  });
-
-  // Password toggle
-  document.getElementById('pw-toggle').addEventListener('click', function () {
-    var pw       = document.getElementById('password');
-    var iconShow = document.getElementById('pw-icon-show');
-    var iconHide = document.getElementById('pw-icon-hide');
-    var visible  = pw.type === 'password';
-    pw.type                = visible ? 'text'  : 'password';
-    iconShow.style.display = visible ? 'none'  : '';
-    iconHide.style.display = visible ? ''      : 'none';
-  });
-
-  // Validate before form submits — intercept at form level so it always fires
-  document.getElementById('login-form').addEventListener('submit', function(e) {
-    var username = document.getElementById('username').value.trim();
-    var password = document.getElementById('password').value.trim();
-
-    if (!username || !password) {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-
-      var title, text, focusId;
-      if (!username && !password) {
-        title = 'Fields Required';
-        text  = 'Please enter your username and password to sign in.';
-        focusId = 'username';
-      } else if (!username) {
-        title = 'Username Required';
-        text  = 'Please enter your username.';
-        focusId = 'username';
-      } else {
-        title = 'Password Required';
-        text  = 'Please enter your password.';
-        focusId = 'password';
-      }
-
-      Swal.fire({
-        icon: 'warning',
-        title: title,
-        text: text,
-        confirmButtonColor: '#B8860B'
-      }).then(function() {
-        document.getElementById(focusId).focus();
-      });
-    }
-  });
-</script>
+<script src="../assets/js/auth/login.js"></script>
 
 </body>
 </html>

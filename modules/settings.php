@@ -797,7 +797,8 @@ require_once '../includes/topbar.php';
 </div>
 
 <?php
-$footer_scripts = <<<'SCRIPT'
+$footer_scripts = ''; // JS moved to assets/js/shared/settings.js
+/* REMOVED HEREDOC START
 // ── Tab switching ──
 document.querySelectorAll('.settings-tab-btn').forEach(tab => {
     tab.addEventListener('click', () => {
@@ -964,7 +965,9 @@ if (tfaToggle) {
         }
     });
 }
-SCRIPT;
+REMOVED HEREDOC END */
+
+echo '<script src="../assets/js/shared/settings.js"></script>';
 
 require_once '../includes/footer.php';
 ?>

@@ -85,9 +85,7 @@ require_once '../../includes/header.php';
 require_once '../../includes/navbar.php';
 ?>
 
-<style>
-  .tg-table tbody tr:hover { background: var(--gold-light) !important; }
-</style>
+<link rel="stylesheet" href="../../assets/css/shared/clients.css"/>
 
 <div class="main">
 

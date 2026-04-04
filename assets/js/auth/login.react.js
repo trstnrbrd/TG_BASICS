@@ -36,9 +36,9 @@ function Toast({ message, type, onDone }) {
         lineHeight: "1.4",
       }}
     >
-      <span style={{ fontSize: "1rem", flexShrink: 0 }}>
-        {type === "lockout" ? "🔒" : "⚠️"}
-      </span>
+      <span style={{ flexShrink: 0, display: "flex", alignItems: "center" }}
+        dangerouslySetInnerHTML={{ __html: type === "lockout" ? iconLockout : iconWarning }}
+      />
       <span>{message}</span>
     </div>
   );
@@ -98,10 +98,13 @@ ReactDOM.createRoot(document.getElementById("submit-root")).render(
   <SubmitButton />,
 );
 
-// Toast for lockout - injected via PHP data attribute
-const toastRoot = document.getElementById("toast-root");
-const lockoutData = toastRoot ? toastRoot.dataset.lockout : null;
-const lockoutMsg = toastRoot ? toastRoot.dataset.message : null;
+// Toast for lockout - injected via PHP data attributes
+const toastRoot    = document.getElementById("toast-root");
+const lockoutData  = toastRoot ? toastRoot.dataset.lockout : null;
+const lockoutMsg   = toastRoot ? toastRoot.dataset.message : null;
+const iconLockout  = toastRoot ? toastRoot.dataset.iconLockout : '';
+const iconWarning  = toastRoot ? toastRoot.dataset.iconWarning : '';
+
 if (lockoutData === "1" && lockoutMsg) {
   ReactDOM.createRoot(toastRoot).render(
     <ToastManager initialToast={{ message: lockoutMsg, type: "lockout" }} />,

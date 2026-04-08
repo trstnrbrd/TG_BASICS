@@ -111,6 +111,26 @@ $role        = $_SESSION['role'] ?? '';
 
   <nav class="sidebar-nav">
 
+    <?php if ($role === 'mechanic'): ?>
+
+    <div class="nav-group-label">Main</div>
+    <a href="<?= $base_path ?>modules/repair/dashboard_mechanic.php"
+       class="nav-item <?= $active_page === 'dashboard' ? 'active' : '' ?>">
+      <span class="nav-icon"><?= icon('dashboard', 16) ?></span> Dashboard
+    </a>
+
+    <div class="nav-group-label">Repair Shop</div>
+    <a href="<?= $base_path ?>modules/repair/repair_list.php"
+       class="nav-item <?= $active_page === 'repair' ? 'active' : '' ?>">
+      <span class="nav-icon"><?= icon('wrench', 16) ?></span> Repair Jobs
+    </a>
+    <a href="<?= $base_path ?>modules/repair/quotation_list.php"
+       class="nav-item <?= $active_page === 'quotations' ? 'active' : '' ?>">
+      <span class="nav-icon"><?= icon('receipt', 16) ?></span> Quotations &amp; Receipts
+    </a>
+
+    <?php else: ?>
+
     <div class="nav-group-label">Main</div>
     <a href="<?= $base_path ?>modules/dashboard_admin.php"
        class="nav-item <?= $active_page === 'dashboard' ? 'active' : '' ?>">
@@ -165,6 +185,9 @@ $role        = $_SESSION['role'] ?? '';
        class="nav-item <?= $active_page === 'settings' ? 'active' : '' ?>">
       <span class="nav-icon"><?= icon('cog', 16) ?></span> Settings
     </a>
+
+    <?php endif; ?>
+
   </nav>
 
   <div class="sidebar-footer">TG-BASICS &mdash; Internal Use Only</div>

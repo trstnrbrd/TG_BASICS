@@ -12,13 +12,19 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'supe
 }
 
 // ── FILTERS ──
-$filter = trim($_GET['filter'] ?? 'all');   // all | urgent | expiring | stable | expired
-$search = trim($_GET['search'] ?? '');
+$filter       = trim($_GET['filter'] ?? 'all');   // all | urgent | expiring | stable | expired
+$search       = trim($_GET['search'] ?? '');
+$show_renewed = isset($_GET['show_renewed']) && $_GET['show_renewed'] === '1';
 
 // ── BUILD QUERY ──
 $where_clauses = [];
 $params        = [];
 $types         = '';
+
+// Hide renewed policies by default
+if (!$show_renewed) {
+    $where_clauses[] = "p.is_renewed = 0";
+}
 
 if ($search !== '') {
     $like = "%$search%";
@@ -41,6 +47,10 @@ switch ($filter) {
     case 'expired':
         $where_clauses[] = "p.policy_end < CURDATE()";
         break;
+    case 'renewed':
+        $where_clauses = array_filter($where_clauses, fn($w) => $w !== "p.is_renewed = 0");
+        $where_clauses[] = "p.is_renewed = 1";
+        break;
 }
 
 $where_sql = count($where_clauses) ? 'WHERE ' . implode(' AND ', $where_clauses) : '';
@@ -48,7 +58,7 @@ $where_sql = count($where_clauses) ? 'WHERE ' . implode(' AND ', $where_clauses)
 $sql = "
     SELECT
         p.policy_id, p.policy_number, p.coverage_type,
-        p.policy_start, p.policy_end,
+        p.policy_start, p.policy_end, p.is_renewed,
         p.total_premium, p.amount_paid, p.balance,
         p.payment_status,
         DATEDIFF(p.policy_end, CURDATE()) AS days_left,
@@ -71,10 +81,11 @@ $exp_start_count = $urg_days + 1;
 $counts = $conn->query("
     SELECT
         COUNT(*) AS total,
-        SUM(CASE WHEN policy_end >= CURDATE() AND DATEDIFF(policy_end, CURDATE()) <= $urg_days  THEN 1 ELSE 0 END) AS urgent,
-        SUM(CASE WHEN policy_end >= CURDATE() AND DATEDIFF(policy_end, CURDATE()) BETWEEN $exp_start_count AND $exp_days THEN 1 ELSE 0 END) AS expiring,
-        SUM(CASE WHEN policy_end >= CURDATE() AND DATEDIFF(policy_end, CURDATE()) > $exp_days THEN 1 ELSE 0 END) AS stable,
-        SUM(CASE WHEN policy_end < CURDATE() THEN 1 ELSE 0 END) AS expired
+        SUM(CASE WHEN policy_end >= CURDATE() AND DATEDIFF(policy_end, CURDATE()) <= $urg_days AND is_renewed = 0 THEN 1 ELSE 0 END) AS urgent,
+        SUM(CASE WHEN policy_end >= CURDATE() AND DATEDIFF(policy_end, CURDATE()) BETWEEN $exp_start_count AND $exp_days AND is_renewed = 0 THEN 1 ELSE 0 END) AS expiring,
+        SUM(CASE WHEN policy_end >= CURDATE() AND DATEDIFF(policy_end, CURDATE()) > $exp_days AND is_renewed = 0 THEN 1 ELSE 0 END) AS stable,
+        SUM(CASE WHEN policy_end < CURDATE() AND is_renewed = 0 THEN 1 ELSE 0 END) AS expired,
+        SUM(CASE WHEN is_renewed = 1 THEN 1 ELSE 0 END) AS renewed
     FROM insurance_policies
 ")->fetch_assoc();
 
@@ -98,7 +109,7 @@ require_once '../../includes/topbar.php';
   <div class="content">
 
     <!-- SUMMARY CARDS -->
-    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:1rem;margin-bottom:1.5rem;">
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:1rem;margin-bottom:1.5rem;">
       <?php
       $summary = [
         ['all',      'Total Policies',    $counts['total'],    'badge-gold',  'document'],
@@ -106,11 +117,12 @@ require_once '../../includes/topbar.php';
         ['expiring', 'Expiring (' . $exp_days . 'd)',$counts['expiring'],'badge-yellow','clock'],
         ['stable',   'Stable',            $counts['stable'],   'badge-green', 'check-circle'],
         ['expired',  'Expired',           $counts['expired'],  'badge-gray',  'x-mark'],
+        ['renewed',  'Renewed',           $counts['renewed'],  'badge-info',  'arrow-path'],
       ];
       foreach ($summary as [$key, $label, $count, $badge, $ico]):
         $active_card = ($filter === $key) ? 'border-color:var(--gold-bright);background:var(--gold-pale);' : '';
       ?>
-      <a href="?filter=<?= $key ?><?= $search ? '&search='.urlencode($search) : '' ?>"
+      <a href="?filter=<?= $key ?><?= $search ? '&search='.urlencode($search) : '' ?><?= $key === 'renewed' ? '&show_renewed=1' : '' ?>"
          style="text-decoration:none;">
         <div class="card" style="margin-bottom:0;padding:1rem 1.25rem;display:flex;align-items:center;gap:0.75rem;transition:all 0.15s;<?= $active_card ?>">
           <div class="card-icon" style="width:38px;height:38px;border-radius:9px;flex-shrink:0;">
@@ -187,7 +199,10 @@ require_once '../../includes/topbar.php';
             <?php while ($row = $policies->fetch_assoc()):
               $days = (int)$row['days_left'];
 
-              if ($row['policy_end'] < date('Y-m-d')) {
+              if ($row['is_renewed']) {
+                $status_badge = '<span class="badge badge-info">' . icon('arrow-path', 10) . ' Renewed</span>';
+                $row_style    = 'opacity:0.65;';
+              } elseif ($row['policy_end'] < date('Y-m-d')) {
                 $status_badge = '<span class="badge badge-gray">Expired</span>';
                 $row_style    = '';
               } elseif ($days <= $urg_days) {

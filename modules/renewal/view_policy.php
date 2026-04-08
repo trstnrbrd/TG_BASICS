@@ -255,7 +255,13 @@ $claims_count_res->bind_param('i', $policy_id);
 $claims_count_res->execute();
 $claims_count = (int)$claims_count_res->get_result()->fetch_assoc()['cnt'];
 
-if ($expired) {
+if ($policy['is_renewed']) {
+    $status_label = 'Renewed';
+    $status_color = 'var(--info)';
+    $status_bg    = 'var(--info-bg, rgba(59,130,246,0.1))';
+    $status_border= 'var(--info-border, rgba(59,130,246,0.3))';
+    $status_icon  = icon('arrow-path', 16);
+} elseif ($expired) {
     $status_label = 'Expired';
     $status_color = 'var(--text-muted)';
     $status_bg    = 'var(--bg-2)';
@@ -300,10 +306,18 @@ require_once '../../includes/topbar.php';
 
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
       <a href="renewal_list.php" class="back-link" style="margin-bottom:0;"><?= icon('arrow-left', 14) ?> Back to Renewal Tracking</a>
-      <button type="button" id="delete-policy-btn"
-        style="display:inline-flex;align-items:center;gap:0.4rem;background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border);padding:0.45rem 1rem;border-radius:8px;font-size:0.78rem;font-weight:700;cursor:pointer;">
-        <?= icon('trash', 14) ?> Delete Policy
-      </button>
+      <div style="display:flex;gap:0.5rem;align-items:center;">
+        <?php if (!$policy['is_renewed'] && ($expired || $days <= $exp_days)): ?>
+        <a href="../insurance/add_policy.php?renew_from=<?= $policy_id ?>"
+          style="display:inline-flex;align-items:center;gap:0.4rem;background:var(--gold-pale);color:var(--gold-bright);border:1px solid var(--gold-bright);padding:0.45rem 1rem;border-radius:8px;font-size:0.78rem;font-weight:700;cursor:pointer;text-decoration:none;">
+          <?= icon('arrow-path', 14) ?> Renew Policy
+        </a>
+        <?php endif; ?>
+        <button type="button" id="delete-policy-btn"
+          style="display:inline-flex;align-items:center;gap:0.4rem;background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border);padding:0.45rem 1rem;border-radius:8px;font-size:0.78rem;font-weight:700;cursor:pointer;">
+          <?= icon('trash', 14) ?> Delete Policy
+        </button>
+      </div>
     </div>
 
     <?php if (isset($_GET['success'])): ?>

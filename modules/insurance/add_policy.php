@@ -10,8 +10,23 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'supe
 $full_name = $_SESSION['full_name'];
 $initials  = substr(implode('', array_map(fn($w) => strtoupper($w[0]), explode(' ', $full_name))), 0, 2);
 
-// Get vehicle_id from URL
+// Renewal pre-fill: load existing policy data
+$renew_from   = isset($_GET['renew_from']) ? (int)$_GET['renew_from'] : (isset($_POST['renew_from']) ? (int)$_POST['renew_from'] : 0);
+$renew_policy = null;
+
+if ($renew_from > 0) {
+    $rs = $conn->prepare("SELECT * FROM insurance_policies WHERE policy_id = ?");
+    $rs->bind_param('i', $renew_from);
+    $rs->execute();
+    $renew_policy = $rs->get_result()->fetch_assoc();
+}
+
+// Get vehicle_id from URL (or from renew_from policy)
 $vehicle_id = isset($_GET['vehicle_id']) ? (int)$_GET['vehicle_id'] : 0;
+
+if ($vehicle_id === 0 && $renew_policy) {
+    $vehicle_id = (int)$renew_policy['vehicle_id'];
+}
 
 if ($vehicle_id === 0) {
     header("Location: eligibility_check.php");
@@ -75,10 +90,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($policy_start !== '' && $policy_end !== '' && $policy_end <= $policy_start)
         $errors[] = 'Inception date must be after the starting date.';
 
-    // Check for duplicate policy number
+    // Check for duplicate policy number (exclude the old policy being renewed)
     if ($policy_number !== '') {
-        $dup = $conn->prepare("SELECT policy_id FROM insurance_policies WHERE policy_number = ?");
-        $dup->bind_param('s', $policy_number);
+        if ($renew_from > 0) {
+            $dup = $conn->prepare("SELECT policy_id FROM insurance_policies WHERE policy_number = ? AND policy_id != ?");
+            $dup->bind_param('si', $policy_number, $renew_from);
+        } else {
+            $dup = $conn->prepare("SELECT policy_id FROM insurance_policies WHERE policy_number = ?");
+            $dup->bind_param('s', $policy_number);
+        }
         $dup->execute();
         if ($dup->get_result()->num_rows > 0) {
             $errors[] = 'A policy with this policy number already exists.';
@@ -178,11 +198,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pp->execute();
             }
 
+            // Delete old policy when renewed (new policy is the active record)
+            if ($renew_from > 0) {
+                $del_pp = $conn->prepare("DELETE FROM policy_payments WHERE policy_id = ?");
+                $del_pp->bind_param('i', $renew_from);
+                $del_pp->execute();
+                $del_old = $conn->prepare("DELETE FROM insurance_policies WHERE policy_id = ?");
+                $del_old->bind_param('i', $renew_from);
+                $del_old->execute();
+            }
+
             // Audit log
             $uid  = $_SESSION['user_id'];
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'POLICY_CREATED', ?)");
-            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' created policy ' . $policy_number . ' (' . $coverage_type . ') for vehicle ' . ($vehicle['plate_number'] ?? '') . ' — Premium: ₱' . number_format((float)$total_premium, 2) . '.';
-            $log->bind_param('is', $uid, $desc);
+            $action = $renew_from > 0 ? 'POLICY_RENEWED' : 'POLICY_CREATED';
+            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, ?, ?)");
+            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ($renew_from > 0 ? ' renewed policy as ' : ' created policy ') . $policy_number . ' (' . $coverage_type . ') for vehicle ' . ($vehicle['plate_number'] ?? '') . ' — Premium: ₱' . number_format((float)$total_premium, 2) . '.';
+            $log->bind_param('iss', $uid, $action, $desc);
             $log->execute();
 
             header("Location: ../renewal/renewal_list.php?success=" . urlencode("Policy " . $policy_number . " saved successfully for " . ($vehicle['full_name'] ?? '') . "."));
@@ -209,11 +240,20 @@ require_once '../../includes/topbar.php';
 ?>
   <div class="content">
 
+    <?php if ($renew_policy): ?>
+    <a href="../renewal/view_policy.php?id=<?= $renew_from ?>" class="back-link"><?= icon('arrow-left', 14) ?> Back to Policy</a>
+    <?php else: ?>
     <a href="eligibility_check.php" class="back-link"><?= icon('arrow-left', 14) ?> Back to Eligibility Check</a>
+    <?php endif; ?>
 
     <div class="page-header">
+      <?php if ($renew_policy): ?>
+      <div class="page-header-title"><?= icon('arrow-path', 18) ?> Renew Insurance Policy</div>
+      <div class="page-header-sub">Pre-filled from previous policy. Enter the new policy number and updated dates.</div>
+      <?php else: ?>
       <div class="page-header-title"><?= icon('document', 18) ?> Insurance Policy Encoding</div>
       <div class="page-header-sub">Manually encode all policy details from the PhilBritish renewal notice or new policy document.</div>
+      <?php endif; ?>
     </div>
 
 
@@ -273,6 +313,7 @@ require_once '../../includes/topbar.php';
               <label class="field-label">Policy Number <span class="req">*</span></label>
               <input type="text" name="policy_number" class="field-input" placeholder="e.g. P-BLC-24-1-10-1002-000823"
                 value="<?= htmlspecialchars($_POST['policy_number'] ?? '') ?>"/>
+              <?php if ($renew_policy): ?><span class="field-hint">Enter the new policy number from the PhilBritish renewal notice.</span><?php endif; ?>
             </div>
             <div class="field">
               <label class="field-label">Coverage Type <span class="req">*</span></label>
@@ -284,7 +325,8 @@ require_once '../../includes/topbar.php';
                   'Comprehensive w/o AON/AOG',
                 ];
                 foreach ($coverage_options as $co):
-                  $sel = (($_POST['coverage_type'] ?? '') === $co) ? 'selected' : '';
+                  $prefill_cov = $_POST['coverage_type'] ?? ($renew_policy['coverage_type'] ?? '');
+                  $sel = ($prefill_cov === $co) ? 'selected' : '';
                 ?>
                 <option value="<?= $co ?>" <?= $sel ?>><?= $co ?></option>
                 <?php endforeach; ?>
@@ -318,23 +360,23 @@ require_once '../../includes/topbar.php';
             <div class="field">
               <label class="field-label">Sum Insured (PHP) <span class="req">*</span></label>
               <input type="number" step="0.01" min="0" name="sum_insured" class="field-input" placeholder="0.00"
-                value="<?= htmlspecialchars($_POST['sum_insured'] ?? '') ?>"/>
+                value="<?= htmlspecialchars($_POST['sum_insured'] ?? ($renew_policy['sum_insured'] ?? '')) ?>"/>
             </div>
             <div class="field">
               <label class="field-label">Basic Premium (PHP) <span class="req">*</span></label>
               <input type="number" step="0.01" min="0" name="basic_premium" class="field-input" placeholder="0.00"
-                value="<?= htmlspecialchars($_POST['basic_premium'] ?? '') ?>"/>
+                value="<?= htmlspecialchars($_POST['basic_premium'] ?? ($renew_policy['basic_premium'] ?? '')) ?>"/>
             </div>
             <div class="field">
               <label class="field-label">Total Premium (PHP) <span class="req">*</span></label>
               <input type="number" step="0.01" min="0" name="total_premium" id="total_premium" class="field-input" placeholder="0.00"
-                value="<?= htmlspecialchars($_POST['total_premium'] ?? '') ?>"/>
+                value="<?= htmlspecialchars($_POST['total_premium'] ?? ($renew_policy['total_premium'] ?? '')) ?>"/>
               <span class="field-hint">Final amount the client owes.</span>
             </div>
             <div class="field">
               <label class="field-label">Participation Fee (PHP)</label>
               <input type="number" step="0.01" min="0" name="participation_fee" class="field-input" placeholder="0.00"
-                value="<?= htmlspecialchars($_POST['participation_fee'] ?? '0') ?>"/>
+                value="<?= htmlspecialchars($_POST['participation_fee'] ?? ($renew_policy['participation_fee'] ?? '0')) ?>"/>
               <span class="field-hint">Sedan: ₱2,000 &nbsp;|&nbsp; SUV/Van/Pickup: ₱3,000.</span>
             </div>
           </div>
@@ -348,8 +390,10 @@ require_once '../../includes/topbar.php';
             <div class="field">
               <label class="field-label">Payment Terms <span class="req">*</span></label>
               <select name="payment_terms" id="payment_terms" class="field-select">
-                <?php foreach (['1 time', '3 months', '4 months', '6 months'] as $pt): ?>
-                <option value="<?= $pt ?>" <?= (($_POST['payment_terms'] ?? '1 time') === $pt) ? 'selected' : '' ?>><?= $pt ?></option>
+                <?php
+                $prefill_terms = $_POST['payment_terms'] ?? ($renew_policy['payment_terms'] ?? '1 time');
+                foreach (['1 time', '3 months', '4 months', '6 months'] as $pt): ?>
+                <option value="<?= $pt ?>" <?= ($prefill_terms === $pt) ? 'selected' : '' ?>><?= $pt ?></option>
                 <?php endforeach; ?>
               </select>
             </div>
@@ -357,8 +401,10 @@ require_once '../../includes/topbar.php';
               <label class="field-label">Mortgagee / Financed By</label>
               <select name="mortgagee" class="field-select">
                 <option value="">— None / Cash —</option>
-                <?php foreach ($ph_banks as $b): ?>
-                <option value="<?= $b ?>" <?= (($_POST['mortgagee'] ?? '') === $b) ? 'selected' : '' ?>><?= $b ?></option>
+                <?php
+                $prefill_mort = $_POST['mortgagee'] ?? ($renew_policy['mortgagee'] ?? '');
+                foreach ($ph_banks as $b): ?>
+                <option value="<?= $b ?>" <?= ($prefill_mort === $b) ? 'selected' : '' ?>><?= $b ?></option>
                 <?php endforeach; ?>
               </select>
               <span class="field-hint">Bank that financed this vehicle, if any.</span>
@@ -395,12 +441,19 @@ require_once '../../includes/topbar.php';
             <label class="field-label">Notes (Optional)</label>
             <textarea name="notes" class="field-textarea" placeholder="Any remarks about this policy..."><?= htmlspecialchars($_POST['notes'] ?? '') ?></textarea>
           </div>
+          <?php if ($renew_from > 0): ?>
+          <input type="hidden" name="renew_from" value="<?= $renew_from ?>"/>
+          <?php endif; ?>
 
         </div>
 
         <div class="form-actions">
+          <?php if ($renew_policy): ?>
+          <a href="../renewal/view_policy.php?id=<?= $renew_from ?>" class="btn-ghost"><?= icon('arrow-left', 14) ?> Cancel</a>
+          <?php else: ?>
           <a href="eligibility_check.php" class="btn-ghost"><?= icon('arrow-left', 14) ?> Cancel</a>
-          <button type="submit" class="btn-primary"><?= icon('floppy-disk', 14) ?> Save Policy</button>
+          <?php endif; ?>
+          <button type="submit" class="btn-primary"><?= icon('floppy-disk', 14) ?> <?= $renew_policy ? 'Save Renewed Policy' : 'Save Policy' ?></button>
         </div>
       </div>
     </form>

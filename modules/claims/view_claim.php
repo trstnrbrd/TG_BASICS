@@ -42,9 +42,11 @@ $damage_photos = $dp_res->fetch_all(MYSQLI_ASSOC);
 
 // Helper: re-fetch doc counts
 function fetchDocCounts($conn, $claim_id) {
-    $chk = $conn->query("SELECT claim_type, doc_or_cr, doc_drivers_license, doc_insurance_policy, doc_damage_photos, doc_police_report FROM claims WHERE claim_id = $claim_id")->fetch_assoc();
-    $req  = $chk['claim_type'] === 'major' ? 5 : 4;
-    $done = (int)$chk['doc_or_cr'] + (int)$chk['doc_drivers_license'] + (int)$chk['doc_insurance_policy'] + (int)$chk['doc_damage_photos'] + ($chk['claim_type'] === 'major' ? (int)$chk['doc_police_report'] : 0);
+    $chk = $conn->query("SELECT claim_type, doc_insurance_policy, doc_or, doc_cr, doc_drivers_license, doc_affidavit, doc_estimate, doc_damage_photos FROM claims WHERE claim_id = $claim_id")->fetch_assoc();
+    $req  = 7; // policy, OR, CR, license, affidavit, estimate, photos
+    $done = (int)$chk['doc_insurance_policy'] + (int)$chk['doc_or'] + (int)$chk['doc_cr']
+          + (int)$chk['doc_drivers_license'] + (int)$chk['doc_affidavit']
+          + (int)$chk['doc_estimate'] + (int)$chk['doc_damage_photos'];
     return ['req' => $req, 'done' => $done, 'all_done' => $done === $req];
 }
 
@@ -52,9 +54,10 @@ function fetchDocCounts($conn, $claim_id) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_upload'])) {
     header('Content-Type: application/json');
     $doc_field = $_POST['doc_field'] ?? '';
-    $allowed   = ['doc_or_cr', 'doc_drivers_license', 'doc_insurance_policy', 'doc_damage_photos', 'doc_police_report'];
+    $allowed   = ['doc_insurance_policy', 'doc_or', 'doc_cr', 'doc_drivers_license', 'doc_affidavit', 'doc_estimate', 'doc_damage_photos'];
     $policy_expired_ajax = strtotime($claim['policy_end']) < strtotime(date('Y-m-d'));
-    if (!in_array($doc_field, $allowed) || $claim['status'] !== 'document_collection' || $policy_expired_ajax) {
+    $docs_open_statuses = ['document_collection', 'submitted'];
+    if (!in_array($doc_field, $allowed) || !in_array($claim['status'], $docs_open_statuses) || $policy_expired_ajax) {
         echo json_encode(['ok' => false, 'msg' => 'Not allowed.']); exit;
     }
 
@@ -105,8 +108,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_upload'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_remove_doc'])) {
     header('Content-Type: application/json');
     $doc_field = $_POST['doc_field'] ?? '';
-    $allowed   = ['doc_or_cr', 'doc_drivers_license', 'doc_insurance_policy', 'doc_damage_photos', 'doc_police_report'];
-    if (!in_array($doc_field, $allowed) || $claim['status'] !== 'document_collection') {
+    $allowed   = ['doc_insurance_policy', 'doc_or', 'doc_cr', 'doc_drivers_license', 'doc_affidavit', 'doc_estimate', 'doc_damage_photos'];
+    if (!in_array($doc_field, $allowed) || !in_array($claim['status'], ['document_collection', 'submitted'])) {
         echo json_encode(['ok' => false]); exit;
     }
 
@@ -129,7 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_remove_doc'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_damage_upload'])) {
     header('Content-Type: application/json');
     $policy_expired_ajax = strtotime($claim['policy_end']) < strtotime(date('Y-m-d'));
-    if ($claim['status'] !== 'document_collection' || $policy_expired_ajax) { echo json_encode(['ok' => false, 'msg' => 'Not allowed.']); exit; }
+    if (!in_array($claim['status'], ['document_collection', 'submitted']) || $policy_expired_ajax) { echo json_encode(['ok' => false, 'msg' => 'Not allowed.']); exit; }
     if (!isset($_FILES['damage_file']) || $_FILES['damage_file']['error'] !== UPLOAD_ERR_OK) { echo json_encode(['ok' => false, 'msg' => 'Upload failed.']); exit; }
 
     $file  = $_FILES['damage_file'];
@@ -165,7 +168,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_damage_upload'])
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_damage_remove'])) {
     header('Content-Type: application/json');
     $policy_expired_ajax = strtotime($claim['policy_end']) < strtotime(date('Y-m-d'));
-    if ($claim['status'] !== 'document_collection' || $policy_expired_ajax) { echo json_encode(['ok' => false]); exit; }
+    if (!in_array($claim['status'], ['document_collection', 'submitted']) || $policy_expired_ajax) { echo json_encode(['ok' => false]); exit; }
 
     $photo_id = (int)($_POST['photo_id'] ?? 0);
     $row = $conn->query("SELECT filename FROM claim_damage_photos WHERE photo_id = $photo_id AND claim_id = $claim_id")->fetch_assoc();
@@ -186,12 +189,85 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_damage_remove'])
     exit;
 }
 
+// Handle AJAX: Send requirements email to admin
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_send_admin_email'])) {
+    header('Content-Type: application/json');
+
+    $notify_email = getSetting($conn, 'claim_notify_email', '');
+    if (!$notify_email) {
+        echo json_encode(['ok' => false, 'msg' => 'No admin email configured. Please set it in Settings.']);
+        exit;
+    }
+
+    // Reload fresh claim data
+    $fresh = $conn->query("SELECT * FROM claims WHERE claim_id = $claim_id")->fetch_assoc();
+
+    $upload_dir = __DIR__ . '/../../uploads/claims/';
+
+    // Build doc status + collect file paths for attachment
+    $docFields = [
+        ['field' => 'doc_insurance_policy', 'label' => 'Policy'],
+        ['field' => 'doc_or',               'label' => 'OR — Official Receipt'],
+        ['field' => 'doc_cr',               'label' => 'CR — Certificate of Registration'],
+        ['field' => 'doc_drivers_license',  'label' => "Driver's License"],
+        ['field' => 'doc_affidavit',        'label' => 'Affidavit of Accident'],
+        ['field' => 'doc_estimate',         'label' => 'Estimate'],
+        ['field' => 'doc_damage_photos',    'label' => 'Proof / Pictures'],
+    ];
+
+    $docStatus     = [];
+    $attachments   = []; // [ ['path' => ..., 'name' => ...] ]
+
+    foreach ($docFields as $d) {
+        $received  = (bool)$fresh[$d['field']];
+        $file_col  = $d['field'] . '_file';
+        $file_name = $fresh[$file_col] ?? '';
+        $file_path = $file_name ? $upload_dir . $file_name : '';
+
+        $docStatus[] = ['label' => $d['label'], 'received' => $received];
+
+        if ($received && $file_path && file_exists($file_path)) {
+            $attachments[] = ['path' => $file_path, 'name' => $d['label'] . '.' . pathinfo($file_name, PATHINFO_EXTENSION)];
+        }
+    }
+
+    // Also attach damage photos (stored in separate table)
+    $photos = $conn->query("SELECT filename FROM claim_damage_photos WHERE claim_id = $claim_id ORDER BY uploaded_at ASC");
+    $photo_idx = 1;
+    while ($ph = $photos->fetch_assoc()) {
+        $ph_path = $upload_dir . $ph['filename'];
+        if (file_exists($ph_path)) {
+            $attachments[] = ['path' => $ph_path, 'name' => 'Photo_' . $photo_idx . '.' . pathinfo($ph['filename'], PATHINFO_EXTENSION)];
+            $photo_idx++;
+        }
+    }
+
+    $ok = sendClaimRequirementsEmail(
+        $notify_email,
+        $claim['full_name'],
+        $claim['policy_number'],
+        $claim['plate_number'],
+        $fresh['claim_type'],
+        date('F d, Y', strtotime($fresh['incident_date'])),
+        $docStatus,
+        $fresh['notes'] ?? null,
+        $attachments
+    );
+
+    echo json_encode(['ok' => $ok, 'msg' => $ok ? 'Email sent successfully.' : 'Failed to send email. Check SMTP settings.']);
+    exit;
+}
+
 // Shared delete routine — cleans up all files then removes DB row
 function deleteClaim($conn, $claim_id, $display_num, $user_id, $actor_name) {
     $upload_dir = __DIR__ . '/../../uploads/claims/';
 
-    // Delete individual doc files
-    $doc_cols = ['doc_or_cr_file', 'doc_drivers_license_file', 'doc_insurance_policy_file', 'doc_damage_photos_file', 'doc_police_report_file'];
+    // Delete all individual doc files (all file columns)
+    $doc_cols = [
+        'doc_insurance_policy_file', 'doc_or_file', 'doc_cr_file',
+        'doc_drivers_license_file', 'doc_affidavit_file', 'doc_estimate_file',
+        'doc_damage_photos_file', 'doc_or_cr_file', 'doc_police_report_file',
+    ];
     $row = $conn->query("SELECT " . implode(',', $doc_cols) . " FROM claims WHERE claim_id = $claim_id")->fetch_assoc();
     if ($row) {
         foreach ($doc_cols as $col) {
@@ -250,10 +326,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
         exit;
     }
 
+    // Guard: block forward status changes if no documents uploaded yet (deny always allowed)
+    if ($new_status !== 'denied' && $docs_done === 0) {
+        header("Location: view_claim.php?id=$claim_id&error=" . urlencode('Upload at least one requirement before updating the status.'));
+        exit;
+    }
+
     // Guard: new status must be a valid next step for this claim
     $next_statuses = match($claim['status']) {
         'document_collection' => ['submitted'],
-        'submitted'           => $claim['claim_type'] === 'major' ? ['under_review', 'denied'] : ['approved', 'denied'],
+        'submitted'           => $claim['claim_type'] === 'repair' ? ['under_review', 'denied'] : ['approved', 'denied'],
         'under_review'        => ['approved', 'denied'],
         'approved'            => ['resolved'],
         default               => [],
@@ -261,16 +343,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
     if (!in_array($new_status, $next_statuses)) {
         header("Location: view_claim.php?id=$claim_id&error=" . urlencode('Invalid status transition.'));
         exit;
-    }
-
-    // Guard: docs must be complete before submitting
-    if ($new_status === 'submitted') {
-        $req_d  = $claim['claim_type'] === 'major' ? 5 : 4;
-        $done_d = (int)$claim['doc_or_cr'] + (int)$claim['doc_drivers_license'] + (int)$claim['doc_insurance_policy'] + (int)$claim['doc_damage_photos'] + ($claim['claim_type'] === 'major' ? (int)$claim['doc_police_report'] : 0);
-        if ($done_d < $req_d) {
-            header("Location: view_claim.php?id=$claim_id&error=" . urlencode('All documents must be received before submitting to Head Office.'));
-            exit;
-        }
     }
 
     if (in_array($new_status, $allowed_statuses)) {
@@ -307,15 +379,17 @@ $policy_expired = strtotime($claim['policy_end']) < strtotime(date('Y-m-d'));
 
 $status_map = [
     'document_collection' => ['label' => 'Document Collection', 'class' => 'badge-warning'],
-    'submitted'           => ['label' => 'Submitted to Head Office', 'class' => 'badge-info'],
+    'submitted'           => ['label' => 'Forwarded to Head Office', 'class' => 'badge-info'],
     'under_review'        => ['label' => 'Under Adjuster Review', 'class' => 'badge-orange'],
     'approved'            => ['label' => 'Approved', 'class' => 'badge-success'],
     'denied'              => ['label' => 'Denied', 'class' => 'badge-danger'],
     'resolved'            => ['label' => 'Resolved', 'class' => 'badge-muted'],
 ];
 
-$required_docs = $claim['claim_type'] === 'major' ? 5 : 4;
-$docs_done = (int)$claim['doc_or_cr'] + (int)$claim['doc_drivers_license'] + (int)$claim['doc_insurance_policy'] + (int)$claim['doc_damage_photos'] + ($claim['claim_type'] === 'major' ? (int)$claim['doc_police_report'] : 0);
+$required_docs = 7; // policy, OR, CR, license, affidavit, estimate, photos
+$docs_done = (int)$claim['doc_insurance_policy'] + (int)$claim['doc_or'] + (int)$claim['doc_cr']
+           + (int)$claim['doc_drivers_license'] + (int)$claim['doc_affidavit']
+           + (int)$claim['doc_estimate'] + (int)$claim['doc_damage_photos'];
 $all_docs_complete = $docs_done === $required_docs;
 
 $s = $status_map[$claim['status']] ?? ['label' => $claim['status'], 'class' => 'badge-muted'];
@@ -342,14 +416,14 @@ require_once '../../includes/topbar.php';
     <?php if (isset($_GET['success'])): ?>
     <script>
       document.addEventListener('DOMContentLoaded', function() {
-        Swal.fire({ icon:'success', title:'Success', text:<?= json_encode($_GET['success']) ?>, confirmButtonColor:'#B8860B', timer:3000, timerProgressBar:true });
+        Swal.fire({ toast:true, position:'top-end', icon:'success', title:<?= json_encode($_GET['success']) ?>, showConfirmButton:false, timer:3000, timerProgressBar:true });
       });
     </script>
     <?php endif; ?>
     <?php if (isset($_GET['error'])): ?>
     <script>
       document.addEventListener('DOMContentLoaded', function() {
-        Swal.fire({ icon:'error', title:'Cannot Submit', text:<?= json_encode($_GET['error']) ?>, confirmButtonColor:'#B8860B' });
+        Swal.fire({ icon:'error', title:'Cannot Submit', text:<?= json_encode($_GET['error']) ?>, confirmButtonColor:'#B8860B', customClass:{confirmButton:'swal-btn'} });
       });
     </script>
     <?php endif; ?>
@@ -361,10 +435,10 @@ require_once '../../includes/topbar.php';
           <a href="claims_list.php" class="btn-ghost" style="padding:0.4rem 0.75rem;"><?= icon('arrow-left',14) ?> Back</a>
           <h2 style="font-size:1.1rem;font-weight:800;color:var(--text-primary);">Claim #<?= $display_num ?></h2>
           <span class="badge <?= $s['class'] ?>"><?= $s['label'] ?></span>
-          <?php if ($claim['claim_type'] === 'major'): ?>
-          <span class="badge badge-danger">Major / 3rd Party</span>
+          <?php if ($claim['claim_type'] === 'repair'): ?>
+          <span class="badge badge-danger">Repair</span>
           <?php else: ?>
-          <span class="badge badge-info">Minor</span>
+          <span class="badge badge-info">Claims</span>
           <?php endif; ?>
         </div>
         <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.35rem;padding-left:0.2rem;">
@@ -400,7 +474,7 @@ require_once '../../includes/topbar.php';
 
     <!-- STATUS FLOW -->
     <?php
-    $flow_statuses = $claim['claim_type'] === 'major'
+    $flow_statuses = $claim['claim_type'] === 'repair'
         ? ['document_collection','submitted','under_review','approved','resolved']
         : ['document_collection','submitted','approved','resolved'];
     $current = $claim['status'];
@@ -501,7 +575,7 @@ require_once '../../includes/topbar.php';
         <div class="card-header">
           <div class="card-icon"><?= icon('document',16) ?></div>
           <div>
-            <div class="card-title">Document Checklist</div>
+            <div class="card-title">Insurance Claim Requirements</div>
             <div class="card-sub" id="doc-count-sub"><?= $docs_done ?>/<?= $required_docs ?> documents received</div>
           </div>
           <div style="margin-left:auto;">
@@ -513,15 +587,15 @@ require_once '../../includes/topbar.php';
         <div style="padding:1rem;display:flex;flex-direction:column;gap:0.6rem;">
           <?php
           $docs = [
-            ['doc_or_cr',            'OR / CR',          'Official Receipt & Certificate of Registration'],
-            ['doc_drivers_license',  "Driver's License", "Valid driver's license of the insured"],
-            ['doc_insurance_policy', 'Insurance Policy', 'Copy of the insurance policy document'],
-            // damage photos handled separately below
+            ['doc_insurance_policy', 'Policy',                   'Copy of the insurance policy document'],
+            ['doc_or',               'OR — Official Receipt',    'LTO Official Receipt of the vehicle'],
+            ['doc_cr',               'CR — Certificate of Registration', 'LTO Certificate of Registration of the vehicle'],
+            ['doc_drivers_license',  "Driver's License",         "Valid driver's license of the insured"],
+            ['doc_affidavit',        'Affidavit of Accident',    'Notarized sworn statement describing the accident (date, location, how it occurred)'],
+            ['doc_estimate',         'Estimate',                 'Written cost estimate from the repair shop for the damage'],
+            // proof/pictures handled separately below as damage photos
           ];
-          if ($claim['claim_type'] === 'major') {
-            $docs[] = ['doc_police_report', 'Police Report', 'Required for major / 3rd party claims'];
-          }
-          $docs_locked = $claim['status'] !== 'document_collection';
+          $docs_locked = !in_array($claim['status'], ['document_collection', 'submitted']);
           foreach ($docs as $d):
             $checked   = (bool)$claim[$d[0]];
             $file_col  = $d[0] . '_file';
@@ -630,31 +704,25 @@ require_once '../../includes/topbar.php';
 
         </div>
 
-        <?php if ($docs_locked): ?>
+        <!-- ACTION BUTTONS — always shown while in document_collection, locked after submitted -->
+        <?php if (in_array($claim['status'], ['document_collection', 'submitted']) && !$policy_expired): ?>
+        <div style="padding:0 1rem 1rem;display:flex;flex-direction:column;gap:0.5rem;" id="doc-action-btns">
+          <button type="button" id="btn-send-admin-email" class="btn-primary" style="width:100%;<?= $docs_done === 0 ? 'opacity:0.45;cursor:not-allowed;' : '' ?>" <?= $docs_done === 0 ? 'disabled' : '' ?>>
+            <?= icon('envelope',14) ?> Send Requirements to Admin
+          </button>
+          <div id="send-btn-hint" style="font-size:0.65rem;color:var(--text-muted);text-align:center;padding:0 0.5rem;"><?= $docs_done === 0 ? 'Upload at least one requirement before sending.' : 'Sends the current requirements checklist to the admin email for review and follow-up.' ?></div>
+        </div>
+        <?php elseif ($policy_expired && in_array($claim['status'], ['document_collection', 'submitted'])): ?>
+        <div style="padding:0 1rem 1rem;">
+          <button class="btn-primary" style="width:100%;opacity:0.45;cursor:not-allowed;background:var(--danger);border-color:var(--danger);" disabled>
+            <?= icon('lock-closed',14) ?> Policy Expired — Cannot Process
+          </button>
+        </div>
+        <?php elseif ($claim['status'] !== 'document_collection'): ?>
         <div style="padding:0 1rem 1rem;">
           <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:0.65rem 1rem;font-size:0.75rem;color:var(--text-muted);display:flex;align-items:center;gap:0.5rem;">
-            <?= icon('lock-closed',13) ?> Documents locked — claim already submitted.
+            <?= icon('lock-closed',13) ?> Documents locked — claim already forwarded.
           </div>
-        </div>
-        <?php elseif ($claim['status'] === 'document_collection'): ?>
-        <div style="padding:0 1rem 1rem;" id="submit-btn-wrap">
-          <form method="POST" id="submit-form">
-            <input type="hidden" name="update_status" value="1"/>
-            <input type="hidden" name="new_status" value="submitted"/>
-            <input type="hidden" name="notes" value=""/>
-            <button type="submit" id="submit-btn" class="btn-primary" style="width:100%;<?= ($all_docs_complete && !$policy_expired) ? '' : 'display:none;' ?>">
-              <?= icon('arrow-right',14) ?> Submit to Head Office
-            </button>
-          </form>
-          <?php if ($policy_expired): ?>
-          <button class="btn-primary" style="width:100%;opacity:0.45;cursor:not-allowed;background:var(--danger);border-color:var(--danger);" disabled>
-            <?= icon('lock-closed',14) ?> Policy Expired — Cannot Submit
-          </button>
-          <?php else: ?>
-          <button id="submit-btn-disabled" class="btn-primary" style="width:100%;opacity:0.45;cursor:not-allowed;<?= $all_docs_complete ? 'display:none;' : '' ?>" disabled>
-            <?= icon('lock-closed',14) ?> Complete all documents first
-          </button>
-          <?php endif; ?>
         </div>
         <?php endif; ?>
       </div>
@@ -676,7 +744,7 @@ require_once '../../includes/topbar.php';
               </div>
               <div>
                 <div style="font-size:0.65rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:0.2rem;">Claim Type</div>
-                <div style="font-size:0.88rem;font-weight:600;color:var(--text-primary);"><?= $claim['claim_type'] === 'major' ? 'Major / 3rd Party' : 'Minor' ?></div>
+                <div style="font-size:0.88rem;font-weight:600;color:var(--text-primary);"><?= $claim['claim_type'] === 'repair' ? 'Repair' : 'Claims' ?></div>
               </div>
             </div>
             <div>
@@ -709,7 +777,7 @@ require_once '../../includes/topbar.php';
             <?php
             $next_statuses = match($claim['status']) {
                 'document_collection' => ['submitted'],
-                'submitted'           => $claim['claim_type'] === 'major' ? ['under_review', 'denied'] : ['approved', 'denied'],
+                'submitted'           => $claim['claim_type'] === 'repair' ? ['under_review', 'denied'] : ['approved', 'denied'],
                 'under_review'        => ['approved', 'denied'],
                 'approved'            => ['resolved'],
                 default               => [],
@@ -757,7 +825,10 @@ require_once '../../includes/topbar.php';
                 <label class="field-label">Notes <span style="color:var(--text-muted);font-weight:400;">(optional)</span></label>
                 <textarea name="notes" class="field-input" rows="2" placeholder="Add a note..."><?= htmlspecialchars($claim['notes'] ?? '') ?></textarea>
               </div>
-              <button type="submit" class="btn-primary" style="width:100%;"><?= icon('check-circle',14) ?> Update Status</button>
+              <button type="submit" id="btn-update-status" class="btn-primary" style="width:100%;<?= $docs_done === 0 ? 'opacity:0.45;cursor:not-allowed;' : '' ?>" <?= $docs_done === 0 ? 'disabled' : '' ?>>
+                <?= icon('check-circle',14) ?> Update Status
+              </button>
+              <div id="status-btn-hint" style="font-size:0.65rem;color:var(--text-muted);text-align:center;margin-top:0.4rem;<?= $docs_done === 0 ? '' : 'display:none;' ?>">Upload at least one requirement first.</div>
             </form>
             <?php endif; ?>
           </div>
@@ -772,12 +843,57 @@ require_once '../../includes/topbar.php';
 
 <script>
 // PHP-injected constants for view_claim.js
-const REQ_DOCS  = <?= $required_docs ?>;
-const CLAIM_URL = 'view_claim.php?id=<?= $claim_id ?>';
-const checkIcon = `<?= icon('check', 12) ?>`;
-const docIcon   = `<?= icon('document', 13) ?>`;
-const xIcon     = `<?= icon('x-mark', 10) ?>`;
+const REQ_DOCS   = <?= $required_docs ?>;
+const DOCS_DONE  = <?= $docs_done ?>;
+const CLAIM_URL  = 'view_claim.php?id=<?= $claim_id ?>';
+const checkIcon  = `<?= icon('check', 12) ?>`;
+const docIcon    = `<?= icon('document', 13) ?>`;
+const xIcon      = `<?= icon('x-mark', 10) ?>`;
 </script>
 <script src="../../assets/js/shared/view_claim.js"></script>
 
 <?php require_once '../../includes/footer.php'; ?>
+
+<script>
+(function() {
+  var btn = document.getElementById('btn-send-admin-email');
+  if (!btn) return;
+
+  btn.addEventListener('click', function() {
+    Swal.fire({
+      title: 'Send to Admin?',
+      html: 'This will email the current requirements checklist to the admin for review.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, Send Email',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#D4A017',
+    }).then(function(result) {
+      if (!result.isConfirmed) return;
+
+      btn.disabled = true;
+      btn.innerHTML = '<?= icon("clock", 14) ?> Sending...';
+
+      var fd = new FormData();
+      fd.append('ajax_send_admin_email', '1');
+
+      fetch('view_claim.php?id=<?= $claim_id ?>', { method: 'POST', body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          btn.disabled = false;
+          btn.innerHTML = '<?= icon("envelope", 14) ?> Send Requirements to Admin';
+          if (data.ok) {
+            Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Email sent to admin.', showConfirmButton: false, timer: 3000, timerProgressBar: true });
+          } else {
+            Swal.fire({ icon: 'error', title: 'Failed to Send', text: data.msg || 'Could not send email. Check SMTP settings.' });
+          }
+        })
+        .catch(function() {
+          btn.disabled = false;
+          btn.innerHTML = '<?= icon("envelope", 14) ?> Send Requirements to Admin';
+          Swal.fire({ icon: 'error', title: 'Error', text: 'An unexpected error occurred.' });
+        });
+    });
+  });
+})();
+</script>

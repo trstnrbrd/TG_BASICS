@@ -135,7 +135,7 @@ $role        = $_SESSION['role'] ?? '';
     </a>
     <a href="<?= $base_path ?>modules/claims/claims_list.php"
        class="nav-item <?= $active_page === 'claims' ? 'active' : '' ?>">
-      <span class="nav-icon"><?= icon('clipboard-list', 16) ?></span> Claims Tracking
+      <span class="nav-icon"><?= icon('clipboard-list', 16) ?></span> Claims
     </a>
 
     <div class="nav-group-label">Repair Shop</div>

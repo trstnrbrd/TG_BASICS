@@ -100,14 +100,7 @@ require_once '../../includes/topbar.php';
     <?php if (!empty($_GET['success'])): ?>
     <script>
       document.addEventListener('DOMContentLoaded', function() {
-        Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: <?= json_encode($_GET['success']) ?>,
-          confirmButtonColor: '#B8860B',
-          timer: 3000,
-          timerProgressBar: true
-        });
+        Swal.fire({ toast:true, position:'top-end', icon:'success', title:<?= json_encode($_GET['success']) ?>, showConfirmButton:false, timer:3000, timerProgressBar:true });
       });
     </script>
     <?php endif; ?>
@@ -312,6 +305,7 @@ require_once '../../includes/topbar.php';
               <th style="text-align:center;">Policy Number</th>
               <th style="text-align:center;">Vehicle</th>
               <th style="text-align:center;">Coverage</th>
+              <th style="text-align:center;">Mortgagee</th>
               <th style="text-align:center;">Period</th>
               <th style="text-align:right;">Total Premium</th>
               <th style="text-align:right;">Balance</th>
@@ -337,29 +331,38 @@ require_once '../../includes/topbar.php';
               $pay_badge = match($p['payment_status']) {
                 'Paid'    => '<span class="badge badge-green">Paid</span>',
                 'Partial' => '<span class="badge badge-yellow">Partial</span>',
+                'Overdue' => '<span class="badge badge-orange">Overdue</span>',
                 default   => '<span class="badge badge-red">Unpaid</span>',
               };
+              $view_url = '../../modules/renewal/view_policy.php?id=' . $p['policy_id'];
             ?>
-            <tr>
+            <tr style="cursor:pointer;" onclick="window.location='<?= $view_url ?>'">
               <td style="font-weight:700;color:var(--text-primary);font-size:0.78rem;text-align:center;"><?= htmlspecialchars($p['policy_number']) ?></td>
               <td style="text-align:center;">
                 <span class="badge-dark"><?= htmlspecialchars($p['plate_number']) ?></span>
                 <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.2rem;"><?= htmlspecialchars($p['make'] . ' ' . $p['model'] . ' ' . $p['year_model']) ?></div>
               </td>
               <td style="font-size:0.78rem;text-align:center;"><?= htmlspecialchars($p['coverage_type']) ?></td>
+              <td style="text-align:center;font-size:0.78rem;">
+                <?php if (!empty($p['mortgagee'])): ?>
+                  <span style="font-weight:600;color:var(--text-primary);"><?= htmlspecialchars($p['mortgagee']) ?></span>
+                <?php else: ?>
+                  <span style="color:var(--text-muted);">None / Cash</span>
+                <?php endif; ?>
+              </td>
               <td style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap;text-align:center;">
                 <?= date('M d, Y', strtotime($p['policy_start'])) ?><br/>
                 <?= date('M d, Y', strtotime($p['policy_end'])) ?>
               </td>
-              <td style="font-weight:700;color:var(--text-primary);text-align:right;">PHP <?= number_format($p['total_premium'], 2) ?></td>
+              <td style="font-weight:700;color:var(--text-primary);text-align:right;">&#8369;<?= number_format($p['total_premium'], 2) ?></td>
               <td style="text-align:right;">
                 <?php if ($p['balance'] > 0): ?>
-                <span style="color:var(--warning);font-weight:700;font-size:0.82rem;">PHP <?= number_format($p['balance'], 2) ?></span>
+                <span style="color:var(--warning);font-weight:700;font-size:0.82rem;">&#8369;<?= number_format($p['balance'], 2) ?></span>
                 <?php else: ?>
                 <span style="color:var(--success);font-weight:700;font-size:0.82rem;"><?= icon('check', 14) ?> Cleared</span>
                 <?php endif; ?>
               </td>
-              <td style="text-align:center;"><?= $status_badge ?></td>
+              <td style="text-align:center;"><?= $status_badge ?> <?= $pay_badge ?></td>
             </tr>
             <?php endwhile; ?>
           </tbody>

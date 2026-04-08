@@ -25,6 +25,34 @@ function updateDocUI(data) {
       if (disabledBtn) disabledBtn.style.display = '';
     }
   }
+
+  const hasDocs = data.done > 0;
+
+  // Enable/disable Send to Admin button
+  const sendBtn  = document.getElementById('btn-send-admin-email');
+  const sendHint = document.getElementById('send-btn-hint');
+  if (sendBtn) {
+    sendBtn.disabled      = !hasDocs;
+    sendBtn.style.opacity = hasDocs ? '1' : '0.45';
+    sendBtn.style.cursor  = hasDocs ? '' : 'not-allowed';
+  }
+  if (sendHint) {
+    sendHint.textContent = hasDocs
+      ? 'Sends the current requirements checklist to the admin email for review and follow-up.'
+      : 'Upload at least one requirement before sending.';
+  }
+
+  // Enable/disable Update Status button
+  const statusBtn  = document.getElementById('btn-update-status');
+  const statusHint = document.getElementById('status-btn-hint');
+  if (statusBtn) {
+    statusBtn.disabled      = !hasDocs;
+    statusBtn.style.opacity = hasDocs ? '1' : '0.45';
+    statusBtn.style.cursor  = hasDocs ? '' : 'not-allowed';
+  }
+  if (statusHint) {
+    statusHint.style.display = hasDocs ? 'none' : '';
+  }
 }
 
 // ── File upload ──
@@ -210,3 +238,4 @@ document.querySelectorAll('.js-delete-claim').forEach(function(btn) {
     });
   });
 });
+

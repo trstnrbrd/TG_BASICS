@@ -49,10 +49,10 @@ $order = match($sort_by) {
 
 $sql = "
     SELECT cl.claim_id, cl.claim_type, cl.status, cl.incident_date, cl.created_at,
-           cl.doc_or_cr, cl.doc_drivers_license, cl.doc_insurance_policy, cl.doc_damage_photos, cl.doc_police_report,
+           cl.doc_insurance_policy, cl.doc_or, cl.doc_cr, cl.doc_drivers_license, cl.doc_affidavit, cl.doc_estimate, cl.doc_damage_photos,
            c.full_name, c.client_id,
            v.plate_number, v.make, v.model,
-           ip.policy_number
+           ip.policy_number, ip.coverage_type
     FROM claims cl
     INNER JOIN clients c  ON cl.client_id = c.client_id
     INNER JOIN insurance_policies ip ON cl.policy_id = ip.policy_id
@@ -75,7 +75,7 @@ $status_map = [
     'resolved'            => ['label' => 'Resolved', 'class' => 'badge-muted'],
 ];
 
-$page_title  = 'Claims Tracking';
+$page_title  = 'Claims';
 $active_page = 'claims';
 $base_path   = '../../';
 require_once '../../includes/header.php';
@@ -87,7 +87,7 @@ require_once '../../includes/navbar.php';
 <div class="main">
 
 <?php
-$topbar_title      = 'Claims Tracking';
+$topbar_title      = 'Claims';
 $topbar_breadcrumb = ['Insurance', 'Claims'];
 require_once '../../includes/topbar.php';
 ?>
@@ -97,7 +97,7 @@ require_once '../../includes/topbar.php';
     <?php if (isset($_GET['success'])): ?>
     <script>
       document.addEventListener('DOMContentLoaded', function() {
-        Swal.fire({ icon:'success', title:'Success', text:<?= json_encode($_GET['success']) ?>, confirmButtonColor:'#B8860B', timer:3000, timerProgressBar:true });
+        Swal.fire({ toast:true, position:'top-end', icon:'success', title:<?= json_encode($_GET['success']) ?>, showConfirmButton:false, timer:3000, timerProgressBar:true });
       });
     </script>
     <?php endif; ?>
@@ -141,8 +141,8 @@ require_once '../../includes/topbar.php';
         </select>
         <select name="type" class="filter-input" style="min-width:160px;">
           <option value="all"   <?= $filter_type==='all'?'selected':'' ?>>All Types</option>
-          <option value="minor" <?= $filter_type==='minor'?'selected':'' ?>>Minor</option>
-          <option value="major" <?= $filter_type==='major'?'selected':'' ?>>Major / 3rd Party</option>
+          <option value="claims" <?= $filter_type==='claims'?'selected':'' ?>>Claims</option>
+          <option value="repair" <?= $filter_type==='repair'?'selected':'' ?>>Repair</option>
         </select>
         <select name="sort" class="filter-input" style="min-width:140px;">
           <option value="newest" <?= $sort_by==='newest'?'selected':'' ?>>Newest First</option>
@@ -172,7 +172,7 @@ require_once '../../includes/topbar.php';
           <thead>
             <tr>
               <th style="text-align:left;">Client / Vehicle</th>
-              <th style="text-align:left;">Policy No.</th>
+              <th style="text-align:center;">Policy No.</th>
               <th>Docs</th>
               <th>Incident Date</th>
               <th>Filed</th>
@@ -182,8 +182,10 @@ require_once '../../includes/topbar.php';
           </thead>
           <tbody>
             <?php while ($row = $result->fetch_assoc()):
-              $req_docs  = $row['claim_type'] === 'major' ? 5 : 4;
-              $docs_done = (int)$row['doc_or_cr'] + (int)$row['doc_drivers_license'] + (int)$row['doc_insurance_policy'] + (int)$row['doc_damage_photos'] + ($row['claim_type'] === 'major' ? (int)$row['doc_police_report'] : 0);
+              $req_docs  = 7;
+              $docs_done = (int)$row['doc_insurance_policy'] + (int)$row['doc_or'] + (int)$row['doc_cr']
+                         + (int)$row['doc_drivers_license'] + (int)$row['doc_affidavit']
+                         + (int)$row['doc_estimate'] + (int)$row['doc_damage_photos'];
               $s = $status_map[$row['status']] ?? ['label' => $row['status'], 'class' => 'badge-muted'];
               $is_finished = in_array($row['status'], ['resolved', 'denied']);
             ?>
@@ -195,17 +197,17 @@ require_once '../../includes/topbar.php';
                   <?php if ($row['make']): ?> &middot; <?= htmlspecialchars($row['make'] . ' ' . $row['model']) ?><?php endif; ?>
                 </div>
               </td>
-              <td style="font-size:0.78rem;color:var(--text-muted);text-align:left;"><?= htmlspecialchars($row['policy_number']) ?></td>
+              <td style="font-size:0.78rem;color:var(--text-muted);text-align:center;"><?= htmlspecialchars($row['policy_number']) ?></td>
               <td>
                 <div style="display:flex;justify-content:center;">
                   <div class="doc-progress" title="<?= $docs_done ?>/<?= $req_docs ?> documents received">
-                    <div class="doc-pip <?= $row['doc_or_cr'] ? 'filled' : 'empty' ?>"></div>
-                    <div class="doc-pip <?= $row['doc_drivers_license'] ? 'filled' : 'empty' ?>"></div>
-                    <div class="doc-pip <?= $row['doc_insurance_policy'] ? 'filled' : 'empty' ?>"></div>
-                    <div class="doc-pip <?= $row['doc_damage_photos'] ? 'filled' : 'empty' ?>"></div>
-                    <?php if ($row['claim_type'] === 'major'): ?>
-                    <div class="doc-pip <?= $row['doc_police_report'] ? 'filled' : 'empty' ?>"></div>
-                    <?php endif; ?>
+                    <div class="doc-pip <?= $row['doc_insurance_policy'] ? 'filled' : 'empty' ?>" title="Policy"></div>
+                    <div class="doc-pip <?= $row['doc_or'] ? 'filled' : 'empty' ?>" title="OR"></div>
+                    <div class="doc-pip <?= $row['doc_cr'] ? 'filled' : 'empty' ?>" title="CR"></div>
+                    <div class="doc-pip <?= $row['doc_drivers_license'] ? 'filled' : 'empty' ?>" title="Driver's License"></div>
+                    <div class="doc-pip <?= $row['doc_affidavit'] ? 'filled' : 'empty' ?>" title="Affidavit"></div>
+                    <div class="doc-pip <?= $row['doc_estimate'] ? 'filled' : 'empty' ?>" title="Estimate"></div>
+                    <div class="doc-pip <?= $row['doc_damage_photos'] ? 'filled' : 'empty' ?>" title="Photos"></div>
                     <span style="font-size:0.7rem;color:var(--text-muted);margin-left:0.35rem;"><?= $docs_done ?>/<?= $req_docs ?></span>
                   </div>
                 </div>
@@ -214,11 +216,12 @@ require_once '../../includes/topbar.php';
               <td style="font-size:0.72rem;color:var(--text-muted);white-space:nowrap;"><?= date('M d, Y', strtotime($row['created_at'])) ?></td>
               <td>
                 <div style="display:flex;flex-direction:column;align-items:center;gap:0.3rem;">
-                  <?php if ($row['claim_type'] === 'major'): ?>
-                    <span class="badge badge-danger" style="width:fit-content;">Major / 3rd Party</span>
+                  <?php if ($row['claim_type'] === 'repair'): ?>
+                    <span class="badge badge-danger" style="width:fit-content;">Repair</span>
                   <?php else: ?>
-                    <span class="badge badge-info" style="width:fit-content;">Minor</span>
+                    <span class="badge badge-info" style="width:fit-content;">Claims</span>
                   <?php endif; ?>
+                  <span class="badge badge-muted" style="width:fit-content;font-size:0.6rem;"><?= htmlspecialchars($row['coverage_type']) ?></span>
                   <span class="badge <?= $s['class'] ?>" style="width:fit-content;"><?= $s['label'] ?></span>
                 </div>
               </td>

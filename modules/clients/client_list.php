@@ -7,6 +7,26 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'supe
     exit;
 }
 
+// AJAX autocomplete
+if (isset($_GET['ajax_ac']) && isset($_GET['q'])) {
+    header('Content-Type: application/json');
+    $q    = '%' . trim($_GET['q']) . '%';
+    $stmt = $conn->prepare("
+        SELECT c.client_id, c.full_name, c.contact_number,
+               v.plate_number, v.make, v.model
+        FROM clients c
+        LEFT JOIN vehicles v ON c.client_id = v.client_id
+        WHERE c.full_name LIKE ? OR c.contact_number LIKE ? OR v.plate_number LIKE ? OR v.make LIKE ? OR v.model LIKE ?
+        GROUP BY c.client_id, v.vehicle_id
+        ORDER BY c.full_name ASC
+        LIMIT 8
+    ");
+    $stmt->bind_param('sssss', $q, $q, $q, $q, $q);
+    $stmt->execute();
+    echo json_encode($stmt->get_result()->fetch_all(MYSQLI_ASSOC));
+    exit;
+}
+
 // Handle delete
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) {
     $del_id = (int)$_POST['delete_client_id'];
@@ -116,14 +136,7 @@ require_once '../../includes/topbar.php';
     <?php if (isset($_GET['success'])): ?>
     <script>
       document.addEventListener('DOMContentLoaded', function() {
-        Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: <?= json_encode($_GET['success']) ?>,
-          confirmButtonColor: '#B8860B',
-          timer: 3000,
-          timerProgressBar: true
-        });
+        Swal.fire({ toast:true, position:'top-end', icon:'success', title:<?= json_encode($_GET['success']) ?>, showConfirmButton:false, timer:3000, timerProgressBar:true });
       });
     </script>
     <?php endif; ?>
@@ -164,13 +177,15 @@ require_once '../../includes/topbar.php';
     <form method="GET" action="" style="margin-bottom:1rem;">
       <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
 
-        <!-- SEARCH INPUT -->
+        <!-- SEARCH INPUT with autocomplete -->
         <div style="position:relative;flex:1;min-width:200px;max-width:400px;">
-          <span style="position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;"><?= icon('magnifying-glass', 14) ?></span>
-          <input type="text" name="search"
+          <span style="position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;z-index:1;"><?= icon('magnifying-glass', 14) ?></span>
+          <input type="text" name="search" id="client-search-input"
             placeholder="Search clients..."
             value="<?= htmlspecialchars($search) ?>"
-            class="filter-input" style="padding-left:2.4rem;width:100%;"/>
+            class="filter-input" style="padding-left:2.4rem;width:100%;"
+            autocomplete="off"/>
+          <div id="client-ac-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:200;background:var(--bg-3);border:1px solid var(--gold-bright);border-radius:9px;box-shadow:var(--shadow-md);max-height:220px;overflow-y:auto;margin-top:2px;"></div>
         </div>
 
         <!-- FILTER BY -->
@@ -273,5 +288,56 @@ require_once '../../includes/topbar.php';
 </div>
 
 <script src="../../assets/js/shared/client_list.js"></script>
+<script>
+(function() {
+  var input    = document.getElementById('client-search-input');
+  var dropdown = document.getElementById('client-ac-dropdown');
+  if (!input || !dropdown) return;
+
+  var timer = null;
+
+  input.addEventListener('input', function() {
+    var q = this.value.trim();
+    clearTimeout(timer);
+    if (q.length < 1) { dropdown.style.display = 'none'; return; }
+
+    timer = setTimeout(function() {
+      fetch('client_list.php?ajax_ac=1&q=' + encodeURIComponent(q))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data.length) { dropdown.style.display = 'none'; return; }
+          dropdown.innerHTML = data.map(function(c) {
+            var vehicle = (c.plate_number || c.make || c.model)
+              ? '<span style="font-size:0.68rem;color:var(--gold-bright);margin-top:0.1rem;display:block;">' +
+                [c.plate_number, c.make, c.model].filter(Boolean).join(' · ') + '</span>'
+              : '';
+            return '<div class="cl-ac-item" data-id="' + c.client_id + '"' +
+              ' style="padding:0.6rem 1rem;cursor:pointer;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;"' +
+              ' onmouseover="this.style.background=\'var(--gold-pale)\'" onmouseout="this.style.background=\'\'">' +
+              '<div><span style="font-size:0.82rem;font-weight:600;color:var(--text-primary);">' + c.full_name + '</span>' + vehicle + '</div>' +
+              '<span style="font-size:0.7rem;color:var(--text-muted);flex-shrink:0;margin-left:0.5rem;">' + (c.contact_number || '') + '</span>' +
+              '</div>';
+          }).join('');
+          dropdown.style.display = 'block';
+
+          dropdown.querySelectorAll('.cl-ac-item').forEach(function(el) {
+            el.addEventListener('mousedown', function(e) {
+              e.preventDefault();
+              window.location.href = 'view_client.php?id=' + this.dataset.id;
+            });
+          });
+        });
+    }, 200);
+  });
+
+  input.addEventListener('blur', function() {
+    setTimeout(function() { dropdown.style.display = 'none'; }, 150);
+  });
+
+  input.addEventListener('focus', function() {
+    if (this.value.trim().length >= 1) this.dispatchEvent(new Event('input'));
+  });
+})();
+</script>
 
 <?php require_once '../../includes/footer.php'; ?>

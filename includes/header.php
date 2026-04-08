@@ -355,6 +355,7 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
   .badge-green  { background: var(--success-bg); color: var(--success); }
   .badge-yellow { background: var(--warning-bg); color: var(--warning); }
   .badge-red    { background: var(--danger-bg);  color: var(--danger); }
+  .badge-orange { background: rgba(230,126,34,0.15); color: #e67e22; border: 1px solid rgba(230,126,34,0.3); }
   .badge-gold   { background: var(--gold-light); color: var(--gold); }
   .badge-gray   { background: var(--bg-2); color: var(--text-muted); border: 1px solid var(--border); }
 

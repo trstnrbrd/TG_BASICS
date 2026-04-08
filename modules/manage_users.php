@@ -134,14 +134,7 @@ require_once '../includes/topbar.php';
     <?php if ($success): ?>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-      Swal.fire({
-        icon: 'success',
-        title: 'Success',
-        text: <?= json_encode($success) ?>,
-        confirmButtonColor: '#B8860B',
-        timer: 3500,
-        timerProgressBar: true
-      });
+      Swal.fire({ toast:true, position:'top-end', icon:'success', title:<?= json_encode($success) ?>, showConfirmButton:false, timer:3000, timerProgressBar:true });
     });
     </script>
     <?php endif; ?>

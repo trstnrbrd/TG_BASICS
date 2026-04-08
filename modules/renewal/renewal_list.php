@@ -204,6 +204,7 @@ require_once '../../includes/topbar.php';
               $pay_badge = match($row['payment_status']) {
                 'Paid'    => '<span class="badge badge-green">Paid</span>',
                 'Partial' => '<span class="badge badge-yellow">Partial</span>',
+                'Overdue' => '<span class="badge badge-orange">Overdue</span>',
                 default   => '<span class="badge badge-red">Unpaid</span>',
               };
             ?>
@@ -253,4 +254,12 @@ require_once '../../includes/topbar.php';
   </div>
 </div>
 
-<?php require_once '../../includes/footer.php'; ?>
+<?php
+$footer_scripts = '';
+if (!empty($_GET['success'])) {
+    $footer_scripts = 'Swal.fire({ toast:true, position:"top-end", icon:"success", title:' . json_encode($_GET['success']) . ', showConfirmButton:false, timer:3000, timerProgressBar:true });';
+} elseif (!empty($_GET['msg'])) {
+    $footer_scripts = 'Swal.fire({ toast:true, position:"top-end", icon:"info", title:' . json_encode($_GET['msg']) . ', showConfirmButton:false, timer:3000, timerProgressBar:true });';
+}
+require_once '../../includes/footer.php';
+?>

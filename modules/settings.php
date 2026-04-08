@@ -263,7 +263,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                 setSetting($conn, $k, trim($_POST[$k] ?? ''));
             }
             // Email (simplified — no host/port/encryption)
-            foreach (['smtp_username', 'smtp_password', 'smtp_sender_name', 'smtp_sender_email'] as $k) {
+            foreach (['smtp_username', 'smtp_password', 'smtp_sender_name', 'smtp_sender_email', 'claim_notify_email'] as $k) {
                 setSetting($conn, $k, trim($_POST[$k] ?? ''));
             }
             // Insurance
@@ -658,6 +658,12 @@ require_once '../includes/topbar.php';
                   value="<?= htmlspecialchars($settings['smtp_sender_email']) ?>"/>
                 <span class="field-hint">Email address shown in the "From" field.</span>
               </div>
+              <div class="field">
+                <label class="field-label">Claims Notify Email</label>
+                <input type="email" name="claim_notify_email" class="field-input"
+                  value="<?= htmlspecialchars($settings['claim_notify_email'] ?? '') ?>"/>
+                <span class="field-hint">Email where claim requirements updates are sent (admin / Jean Paolo).</span>
+              </div>
             </div>
           </div>
         </div>
@@ -827,7 +833,7 @@ document.querySelectorAll('.settings-form').forEach(form => {
             });
             const data = await res.json();
             if (data.ok) {
-                Swal.fire({ icon: 'success', title: 'Saved!', text: data.message, confirmButtonColor: '#B8860B', timer: 2000, timerProgressBar: true });
+                Swal.fire({ toast:true, position:'top-end', icon:'success', title:'Saved!', text:data.message, showConfirmButton:false, timer:3000, timerProgressBar:true });
                 if (form.querySelector('[name="section"]').value === 'account') {
                     form.querySelectorAll('input[type="password"]').forEach(p => p.value = '');
                 }
@@ -857,7 +863,7 @@ if (avatarInput) {
             const res = await fetch('settings.php', { method: 'POST', body: fd });
             const data = await res.json();
             if (data.ok) {
-                Swal.fire({ icon: 'success', title: 'Saved!', text: data.message, confirmButtonColor: '#B8860B', timer: 2000, timerProgressBar: true });
+                Swal.fire({ toast:true, position:'top-end', icon:'success', title:'Saved!', text:data.message, showConfirmButton:false, timer:3000, timerProgressBar:true });
                 setTimeout(() => location.reload(), 600);
             } else {
                 Swal.fire({ icon: 'error', title: 'Error', text: data.error, confirmButtonColor: '#B8860B' });
@@ -880,7 +886,7 @@ if (avatarRemoveBtn) {
             const res = await fetch('settings.php', { method: 'POST', body: fd });
             const data = await res.json();
             if (data.ok) {
-                Swal.fire({ icon: 'success', title: 'Saved!', text: data.message, confirmButtonColor: '#B8860B', timer: 2000, timerProgressBar: true });
+                Swal.fire({ toast:true, position:'top-end', icon:'success', title:'Saved!', text:data.message, showConfirmButton:false, timer:3000, timerProgressBar:true });
                 setTimeout(() => location.reload(), 600);
             } else {
                 Swal.fire({ icon: 'error', title: 'Error', text: data.error, confirmButtonColor: '#B8860B' });
@@ -918,7 +924,7 @@ if (saveDesignBtn) {
             const res = await fetch('settings.php', { method: 'POST', body: fd });
             const data = await res.json();
             if (data.ok) {
-                Swal.fire({ icon: 'success', title: 'Saved!', text: data.message, confirmButtonColor: '#B8860B', timer: 2000, timerProgressBar: true });
+                Swal.fire({ toast:true, position:'top-end', icon:'success', title:'Saved!', text:data.message, showConfirmButton:false, timer:3000, timerProgressBar:true });
                 document.documentElement.setAttribute('data-theme', theme);
             } else {
                 Swal.fire({ icon: 'error', title: 'Error', text: data.error, confirmButtonColor: '#B8860B' });
@@ -946,7 +952,7 @@ if (tfaToggle) {
             const res = await fetch('settings.php', { method: 'POST', body: fd });
             const data = await res.json();
             if (data.ok) {
-                Swal.fire({ icon: 'success', title: 'Saved!', text: data.message, confirmButtonColor: '#B8860B', timer: 2000, timerProgressBar: true });
+                Swal.fire({ toast:true, position:'top-end', icon:'success', title:'Saved!', text:data.message, showConfirmButton:false, timer:3000, timerProgressBar:true });
                 const status = document.getElementById('tfa-status');
                 if (status) {
                     status.className = 'toggle-status ' + (enabled ? 'on' : 'off');

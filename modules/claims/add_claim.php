@@ -11,10 +11,16 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'supe
 $errors  = [];
 $success = false;
 
-// Load all clients for dropdown
-$clients_res = $conn->query("SELECT client_id, full_name FROM clients ORDER BY full_name ASC");
-$clients = [];
-while ($c = $clients_res->fetch_assoc()) $clients[] = $c;
+// AJAX: search clients by name
+if (isset($_GET['ajax_clients']) && isset($_GET['q'])) {
+    header('Content-Type: application/json');
+    $q    = '%' . trim($_GET['q']) . '%';
+    $stmt = $conn->prepare("SELECT client_id, full_name FROM clients WHERE full_name LIKE ? ORDER BY full_name ASC LIMIT 20");
+    $stmt->bind_param('s', $q);
+    $stmt->execute();
+    echo json_encode($stmt->get_result()->fetch_all(MYSQLI_ASSOC));
+    exit;
+}
 
 // AJAX: load policies for a selected client
 if (isset($_GET['ajax_policies']) && isset($_GET['client_id'])) {
@@ -94,7 +100,7 @@ require_once '../../includes/topbar.php';
       <?php endif; ?>
 
       <form method="POST" action="">
-        <div class="card" style="margin-bottom:1.25rem;">
+        <div class="card" style="margin-bottom:1.25rem;overflow:visible;">
           <div class="card-header">
             <div class="card-icon"><?= icon('user', 16) ?></div>
             <div>
@@ -102,19 +108,17 @@ require_once '../../includes/topbar.php';
               <div class="card-sub">Select the client and the policy to file against</div>
             </div>
           </div>
-          <div class="card-body">
-            <div class="form-grid" style="gap:1rem;">
+          <div class="card-body" style="overflow:visible;">
+            <div class="form-grid" style="gap:1rem;overflow:visible;">
 
-              <div class="field">
+              <div class="field" style="position:relative;">
                 <label class="field-label">Client <span style="color:var(--danger);">*</span></label>
-                <select name="client_id" id="client_id" class="field-input" required>
-                  <option value="">— Select Client —</option>
-                  <?php foreach ($clients as $c): ?>
-                  <option value="<?= $c['client_id'] ?>" <?= (($_POST['client_id'] ?? '') == $c['client_id']) ? 'selected' : '' ?>>
-                    <?= htmlspecialchars($c['full_name']) ?>
-                  </option>
-                  <?php endforeach; ?>
-                </select>
+                <input type="text" id="client_search" class="field-input" autocomplete="off"
+                  placeholder="Type to search client..."
+                  value="<?= htmlspecialchars($_POST['client_name_display'] ?? '') ?>"/>
+                <input type="hidden" name="client_id" id="client_id" value="<?= (int)($_POST['client_id'] ?? 0) ?>"/>
+                <input type="hidden" name="client_name_display" id="client_name_display" value="<?= htmlspecialchars($_POST['client_name_display'] ?? '') ?>"/>
+                <div id="client_dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:var(--bg-3);border:1px solid var(--gold-bright);border-radius:9px;box-shadow:var(--shadow-md);max-height:220px;overflow-y:auto;margin-top:2px;"></div>
               </div>
 
               <div class="field">
@@ -144,8 +148,8 @@ require_once '../../includes/topbar.php';
                 <label class="field-label">Claim Type <span style="color:var(--danger);">*</span></label>
                 <select name="claim_type" class="field-input" required>
                   <option value="">— Select Type —</option>
-                  <option value="minor" <?= (($_POST['claim_type'] ?? '') === 'minor') ? 'selected' : '' ?>>Minor</option>
-                  <option value="major" <?= (($_POST['claim_type'] ?? '') === 'major') ? 'selected' : '' ?>>Major / 3rd Party</option>
+                  <option value="claims" <?= (($_POST['claim_type'] ?? '') === 'claims') ? 'selected' : '' ?>>Claims</option>
+                  <option value="repair" <?= (($_POST['claim_type'] ?? '') === 'repair') ? 'selected' : '' ?>>Repair</option>
                 </select>
               </div>
 

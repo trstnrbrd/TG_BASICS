@@ -47,17 +47,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $coverage_type     = trim($_POST['coverage_type'] ?? '');
     $sum_insured       = trim($_POST['sum_insured'] ?? '');
     $basic_premium     = trim($_POST['basic_premium'] ?? '');
-    $doc_stamps        = trim($_POST['doc_stamps'] ?? '0');
-    $lgt               = trim($_POST['lgt'] ?? '0');
-    $vat               = trim($_POST['vat'] ?? '0');
-    $other_charges     = trim($_POST['other_charges'] ?? '0');
     $total_premium     = trim($_POST['total_premium'] ?? '');
     $participation_fee = trim($_POST['participation_fee'] ?? '0');
     $policy_start      = trim($_POST['policy_start'] ?? '');
     $policy_end        = trim($_POST['policy_end'] ?? '');
-    $payment_status    = trim($_POST['payment_status'] ?? 'Unpaid');
-    $amount_paid       = trim($_POST['amount_paid'] ?? '0');
+    $payment_terms     = trim($_POST['payment_terms'] ?? '1 time');
+    $mortgagee         = trim($_POST['mortgagee'] ?? '');
     $notes             = trim($_POST['notes'] ?? '');
+
+    // Payment terms → months count
+    $terms_map  = ['1 time' => 1, '3 months' => 3, '4 months' => 4, '6 months' => 6];
+    $num_months = $terms_map[$payment_terms] ?? 1;
+
+    // Installment amounts + payment details from POST
+    $installment_amounts = $_POST['installment_amount'] ?? [];
+    $installment_modes   = $_POST['installment_mode']   ?? [];
+    $installment_ctrls   = $_POST['installment_ctrl']   ?? [];
 
     // Validation
     if ($policy_number === '')  $errors[] = 'Policy number is required.';
@@ -65,10 +70,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($sum_insured === '' || !is_numeric($sum_insured)) $errors[] = 'Sum insured must be a valid number.';
     if ($basic_premium === '' || !is_numeric($basic_premium)) $errors[] = 'Basic premium must be a valid number.';
     if ($total_premium === '' || !is_numeric($total_premium)) $errors[] = 'Total premium must be a valid number.';
-    if ($policy_start === '') $errors[] = 'Policy start date is required.';
-    if ($policy_end === '')   $errors[] = 'Policy end date is required.';
+    if ($policy_start === '') $errors[] = 'Starting date is required.';
+    if ($policy_end === '')   $errors[] = 'Inception date is required.';
     if ($policy_start !== '' && $policy_end !== '' && $policy_end <= $policy_start)
-        $errors[] = 'Policy end date must be after the start date.';
+        $errors[] = 'Inception date must be after the starting date.';
 
     // Check for duplicate policy number
     if ($policy_number !== '') {
@@ -80,34 +85,74 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // Compute balance
-    $balance = (float)$total_premium - (float)$amount_paid;
+    // Compute total paid and balance from installments
+    $amount_paid = 0;
+    foreach ($installment_amounts as $amt) {
+        $amount_paid += (float)$amt;
+    }
+    $balance = (float)$total_premium - $amount_paid;
+
+    // Validate: total paid cannot exceed total premium
+    if (empty($errors) && is_numeric($total_premium)) {
+        if ($amount_paid > (float)$total_premium) {
+            $errors[] = 'Total amount paid (₱' . number_format($amount_paid, 2) . ') cannot exceed the total premium (₱' . number_format((float)$total_premium, 2) . ').';
+        }
+    }
+
+    // Validate: mode of payment required for any installment with amount > 0
+    if (empty($errors)) {
+        foreach ($installment_amounts as $k => $amt) {
+            if ((float)$amt > 0 && empty(trim($installment_modes[$k] ?? ''))) {
+                $errors[] = 'Payment ' . ($k + 1) . ' requires a mode of payment.';
+            }
+        }
+    }
+
+    // Determine payment_status — check if any installment is overdue
+    $today_str   = date('Y-m-d');
+    $has_overdue = false;
+    for ($i = 0; $i < $num_months; $i++) {
+        $due = date('Y-m-d', strtotime($policy_start . ' +' . $i . ' months'));
+        $amt_paid_i = (float)($installment_amounts[$i] ?? 0);
+        $per = round((float)$total_premium / $num_months, 2);
+        if ($due < $today_str && $amt_paid_i < $per) {
+            $has_overdue = true;
+            break;
+        }
+    }
+    if ($balance <= 0) {
+        $payment_status = 'Paid';
+    } elseif ($has_overdue) {
+        $payment_status = 'Overdue';
+    } elseif ($amount_paid > 0) {
+        $payment_status = 'Partial';
+    } else {
+        $payment_status = 'Unpaid';
+    }
 
     if (empty($errors)) {
         $ins = $conn->prepare("
             INSERT INTO insurance_policies (
                 client_id, vehicle_id, policy_number, coverage_type,
-                sum_insured, basic_premium, doc_stamps, lgt, vat, other_charges,
-                total_premium, participation_fee, policy_start, policy_end,
-                payment_status, amount_paid, balance, notes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                sum_insured, basic_premium, total_premium, participation_fee,
+                policy_start, policy_end, payment_terms, mortgagee, payment_status,
+                amount_paid, balance, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $ins->bind_param(
-            'iissddddddddsssdds',
+            'iissddddsssssdds',
             $vehicle['client_id'],
             $vehicle_id,
             $policy_number,
             $coverage_type,
             $sum_insured,
             $basic_premium,
-            $doc_stamps,
-            $lgt,
-            $vat,
-            $other_charges,
             $total_premium,
             $participation_fee,
             $policy_start,
             $policy_end,
+            $payment_terms,
+            $mortgagee,
             $payment_status,
             $amount_paid,
             $balance,
@@ -115,14 +160,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
 
         if ($ins->execute()) {
+            $new_policy_id = $conn->insert_id;
+
+            // Insert installment schedule into policy_payments
+            $per_installment = round((float)$total_premium / $num_months, 2);
+            for ($i = 0; $i < $num_months; $i++) {
+                $due_date   = date('Y-m-d', strtotime($policy_start . ' +' . $i . ' months'));
+                $amt_due    = $per_installment;
+                $amt_paid_i = (float)($installment_amounts[$i] ?? 0);
+                $paid_at    = $amt_paid_i > 0 ? date('Y-m-d H:i:s') : null;
+                $inst_mode  = !empty($installment_modes[$i])  ? trim($installment_modes[$i])  : null;
+                $inst_ctrl  = !empty($installment_ctrls[$i])  ? trim($installment_ctrls[$i])  : null;
+
+                $pp = $conn->prepare("INSERT INTO policy_payments (policy_id, installment_no, due_date, amount_due, amount_paid, paid_at, payment_mode, control_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                $inst_no = $i + 1;
+                $pp->bind_param('iisddsss', $new_policy_id, $inst_no, $due_date, $amt_due, $amt_paid_i, $paid_at, $inst_mode, $inst_ctrl);
+                $pp->execute();
+            }
+
             // Audit log
-            $uid = $_SESSION['user_id'];
-            $log = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'POLICY_CREATED', ?)");
-            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' created policy ' . $policy_number . ' (' . $coverage_type . ') for vehicle ' . ($vehicle['plate_number'] ?? '') . ' — Premium: ₱' . number_format($total_premium, 2) . '.';
+            $uid  = $_SESSION['user_id'];
+            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'POLICY_CREATED', ?)");
+            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' created policy ' . $policy_number . ' (' . $coverage_type . ') for vehicle ' . ($vehicle['plate_number'] ?? '') . ' — Premium: ₱' . number_format((float)$total_premium, 2) . '.';
             $log->bind_param('is', $uid, $desc);
             $log->execute();
 
-            $success = true;
+            header("Location: ../renewal/renewal_list.php?success=" . urlencode("Policy " . $policy_number . " saved successfully for " . ($vehicle['full_name'] ?? '') . "."));
+            exit;
         } else {
             $errors[] = 'Database error. Please try again.';
         }
@@ -152,12 +216,6 @@ require_once '../../includes/topbar.php';
       <div class="page-header-sub">Manually encode all policy details from the PhilBritish renewal notice or new policy document.</div>
     </div>
 
-    <?php if ($success): ?>
-      <div class="alert alert-success">
-        <?= icon('check-circle', 14) ?> Policy successfully saved for <strong><?= htmlspecialchars($vehicle['full_name']) ?></strong> &mdash; <?= htmlspecialchars($vehicle['plate_number']) ?>.
-        <a href="eligibility_check.php" style="margin-left:0.5rem;color:var(--success);font-weight:700;">Back to Search &rarr;</a>
-      </div>
-    <?php endif; ?>
 
     <?php if (!empty($errors)): ?>
       <div class="alert alert-danger">
@@ -223,12 +281,7 @@ require_once '../../includes/topbar.php';
                 <?php
                 $coverage_options = [
                   'Comprehensive',
-                  'Loss and/or Damage',
-                  'Auto Personal Accident',
-                  'Excess Third Party Bodily Injury',
-                  'Excess Third Party Liability Property Damage',
-                  'Third Party Liability Only',
-                  'Compulsory Third Party Liability (CTPL)',
+                  'Comprehensive w/o AON/AOG',
                 ];
                 foreach ($coverage_options as $co):
                   $sel = (($_POST['coverage_type'] ?? '') === $co) ? 'selected' : '';
@@ -243,12 +296,12 @@ require_once '../../includes/topbar.php';
           <div class="field-section">Policy Period</div>
           <div class="form-grid" style="margin-bottom:1rem;">
             <div class="field">
-              <label class="field-label">Policy Start Date <span class="req">*</span></label>
+              <label class="field-label">Starting Date <span class="req">*</span></label>
               <input type="date" name="policy_start" class="field-input"
                 value="<?= htmlspecialchars($_POST['policy_start'] ?? '') ?>"/>
             </div>
             <div class="field">
-              <label class="field-label">Policy End Date <span class="req">*</span></label>
+              <label class="field-label">Inception Date <span class="req">*</span></label>
               <input type="date" name="policy_end" class="field-input"
                 value="<?= htmlspecialchars($_POST['policy_end'] ?? '') ?>"/>
             </div>
@@ -273,59 +326,67 @@ require_once '../../includes/topbar.php';
                 value="<?= htmlspecialchars($_POST['basic_premium'] ?? '') ?>"/>
             </div>
             <div class="field">
-              <label class="field-label">Doc Stamps (PHP)</label>
-              <input type="number" step="0.01" min="0" name="doc_stamps" class="field-input" placeholder="0.00"
-                value="<?= htmlspecialchars($_POST['doc_stamps'] ?? '0') ?>"/>
-            </div>
-            <div class="field">
-              <label class="field-label">LGT (PHP)</label>
-              <input type="number" step="0.01" min="0" name="lgt" class="field-input" placeholder="0.00"
-                value="<?= htmlspecialchars($_POST['lgt'] ?? '0') ?>"/>
-            </div>
-            <div class="field">
-              <label class="field-label">VAT (PHP)</label>
-              <input type="number" step="0.01" min="0" name="vat" class="field-input" placeholder="0.00"
-                value="<?= htmlspecialchars($_POST['vat'] ?? '0') ?>"/>
-            </div>
-            <div class="field">
-              <label class="field-label">Other Charges (PHP)</label>
-              <input type="number" step="0.01" min="0" name="other_charges" class="field-input" placeholder="0.00"
-                value="<?= htmlspecialchars($_POST['other_charges'] ?? '0') ?>"/>
-            </div>
-          </div>
-
-          <div class="form-grid" style="margin-bottom:1rem;">
-            <div class="field">
               <label class="field-label">Total Premium (PHP) <span class="req">*</span></label>
               <input type="number" step="0.01" min="0" name="total_premium" id="total_premium" class="field-input" placeholder="0.00"
                 value="<?= htmlspecialchars($_POST['total_premium'] ?? '') ?>"/>
-              <span class="field-hint">This is the final amount the client owes.</span>
+              <span class="field-hint">Final amount the client owes.</span>
             </div>
             <div class="field">
               <label class="field-label">Participation Fee (PHP)</label>
               <input type="number" step="0.01" min="0" name="participation_fee" class="field-input" placeholder="0.00"
                 value="<?= htmlspecialchars($_POST['participation_fee'] ?? '0') ?>"/>
-              <span class="field-hint">Sedan: ₱2,000 &nbsp;|&nbsp; SUV/Van/Pickup: ₱3,000. Client pays this on every claim.</span>
+              <span class="field-hint">Sedan: ₱2,000 &nbsp;|&nbsp; SUV/Van/Pickup: ₱3,000.</span>
             </div>
           </div>
 
-          <!-- PAYMENT -->
-          <div class="field-section">Payment Status</div>
+          <!-- PAYMENT SCHEDULE -->
+          <div class="field-section">Payment Schedule</div>
+          <?php
+          $ph_banks = ['BDO Unibank','BPI (Bank of the Philippine Islands)','Metrobank','PNB (Philippine National Bank)','Land Bank of the Philippines','DBP (Development Bank of the Philippines)','China Bank','Security Bank','UnionBank','RCBC','EastWest Bank','PSBank','AUB (Asia United Bank)','CTBC Bank Philippines','PBCOM','Maybank Philippines','Bank of Commerce','UCPB','Sterling Bank of Asia','Philippine Savings Bank (PSBank)','GCash (GSave)','Maya Bank','Tonik Bank','GoTyme Bank','UNObank','Other'];
+          ?>
           <div class="form-grid" style="margin-bottom:1rem;">
             <div class="field">
-              <label class="field-label">Payment Status <span class="req">*</span></label>
-              <select name="payment_status" class="field-select" id="payment_status_select">
-                <?php foreach (['Unpaid','Partial','Paid'] as $ps): ?>
-                <option value="<?= $ps ?>" <?= (($_POST['payment_status'] ?? 'Unpaid') === $ps) ? 'selected' : '' ?>><?= $ps ?></option>
+              <label class="field-label">Payment Terms <span class="req">*</span></label>
+              <select name="payment_terms" id="payment_terms" class="field-select">
+                <?php foreach (['1 time', '3 months', '4 months', '6 months'] as $pt): ?>
+                <option value="<?= $pt ?>" <?= (($_POST['payment_terms'] ?? '1 time') === $pt) ? 'selected' : '' ?>><?= $pt ?></option>
                 <?php endforeach; ?>
               </select>
             </div>
             <div class="field">
-              <label class="field-label">Amount Paid (PHP)</label>
-              <input type="number" step="0.01" min="0" name="amount_paid" id="amount_paid" class="field-input" placeholder="0.00"
-                value="<?= htmlspecialchars($_POST['amount_paid'] ?? '0') ?>"/>
-              <span class="field-hint" id="balance-display" style="color:var(--text-primary);font-weight:600;"></span>
+              <label class="field-label">Mortgagee / Financed By</label>
+              <select name="mortgagee" class="field-select">
+                <option value="">— None / Cash —</option>
+                <?php foreach ($ph_banks as $b): ?>
+                <option value="<?= $b ?>" <?= (($_POST['mortgagee'] ?? '') === $b) ? 'selected' : '' ?>><?= $b ?></option>
+                <?php endforeach; ?>
+              </select>
+              <span class="field-hint">Bank that financed this vehicle, if any.</span>
             </div>
+          </div>
+
+          <!-- INSTALLMENT TABLE -->
+          <div id="installment-wrap" style="margin-bottom:1rem;">
+            <table class="tg-table" id="installment-table">
+              <thead>
+                <tr>
+                  <th>Payment</th>
+                  <th>Due Date</th>
+                  <th>Mode</th>
+                  <th>Control No.</th>
+                  <th>Amount Due</th>
+                  <th>Amount Paid</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="installment-body"></tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="3" style="text-align:right;font-weight:700;padding:0.6rem 1rem;">Balance:</td>
+                  <td colspan="2" id="balance-display" style="font-weight:800;font-size:0.95rem;padding:0.6rem 1rem;"></td>
+                </tr>
+              </tfoot>
+            </table>
           </div>
 
           <!-- NOTES -->
@@ -349,23 +410,135 @@ require_once '../../includes/topbar.php';
 
 <?php
 $footer_scripts = '
-  // Live balance computation
-  function updateBalance() {
-    const total   = parseFloat(document.getElementById("total_premium").value) || 0;
-    const paid    = parseFloat(document.getElementById("amount_paid").value) || 0;
-    const balance = total - paid;
-    const el      = document.getElementById("balance-display");
-    if (total > 0) {
-      el.textContent = "Balance: PHP " + balance.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      el.style.color = balance <= 0 ? "var(--success)" : "var(--warning)";
-    } else {
-      el.textContent = "";
-    }
-  }
+  (function () {
+    const termsEl    = document.getElementById("payment_terms");
+    const totalEl    = document.getElementById("total_premium");
+    const startEl    = document.querySelector("[name=\'policy_start\']");
+    const tbody      = document.getElementById("installment-body");
+    const balanceEl  = document.getElementById("balance-display");
 
-  document.getElementById("total_premium").addEventListener("input", updateBalance);
-  document.getElementById("amount_paid").addEventListener("input", updateBalance);
-  updateBalance();
+    const termsMap = { "1 time": 1, "3 months": 3, "4 months": 4, "6 months": 6 };
+
+    function addMonths(dateStr, months) {
+      if (!dateStr) return "";
+      const d = new Date(dateStr);
+      d.setMonth(d.getMonth() + months);
+      return d.toISOString().split("T")[0];
+    }
+
+    function fmt(n) {
+      return "₱" + n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function buildTable() {
+      const terms     = termsEl.value;
+      const numMonths = termsMap[terms] || 1;
+      const total     = parseFloat(totalEl.value) || 0;
+      const start     = startEl ? startEl.value : "";
+
+      tbody.innerHTML = "";
+
+      const perInstallment = total > 0 ? Math.round((total / numMonths) * 100) / 100 : 0;
+
+      const ordinals = ["1st","2nd","3rd","4th","5th","6th"];
+
+      for (let i = 0; i < numMonths; i++) {
+        const dueDate = addMonths(start, i);
+        const amtDue  = perInstallment;
+        const tr      = document.createElement("tr");
+        tr.dataset.idx = i;
+
+        const label = numMonths === 1
+          ? "Full Payment"
+          : (ordinals[i] || (i + 1) + "th") + " Payment";
+
+        const modeOpts = ["Cash","GCash","Maya","Bank Transfer","Check","E-Wallet","Other"];
+        const modeSelect = "<select name=\"installment_mode[]\" class=\"field-select\" style=\"width:120px;\">" +
+          "<option value=\"\">— Select —</option>" +
+          modeOpts.map(function(m){ return "<option value=\"" + m + "\">" + m + "</option>"; }).join("") +
+          "</select>";
+
+        tr.innerHTML =
+          "<td style=\"text-align:center;font-weight:600;white-space:nowrap;\">" + label + "</td>" +
+          "<td style=\"text-align:center;\">" + (dueDate || "—") + "</td>" +
+          "<td style=\"text-align:center;\">" + modeSelect + "</td>" +
+          "<td style=\"text-align:center;\"><input type=\"text\" name=\"installment_ctrl[]\" class=\"field-input\" style=\"width:120px;\" placeholder=\"Ref / OR No.\"/></td>" +
+          "<td style=\"text-align:center;\">" + (amtDue > 0 ? fmt(amtDue) : "—") + "</td>" +
+          "<td style=\"text-align:center;\"><input type=\"number\" step=\"0.01\" min=\"0\" " +
+            "name=\"installment_amount[]\" class=\"field-input inst-amount-input\" " +
+            "style=\"width:110px;text-align:right;\" placeholder=\"0.00\" value=\"0\" " +
+            "data-due=\"" + amtDue + "\"/></td>" +
+          "<td style=\"text-align:center;\" class=\"status-cell\"><span class=\"badge badge-red\">Unpaid</span></td>";
+
+        tbody.appendChild(tr);
+
+        tr.querySelector("input.inst-amount-input").addEventListener("input", updateBalance);
+      }
+
+      updateBalance();
+    }
+
+    function updateBalance() {
+      const total    = parseFloat(totalEl.value) || 0;
+      let totalPaid  = 0;
+
+      tbody.querySelectorAll("tr").forEach(function (tr) {
+        const input    = tr.querySelector("input.inst-amount-input");
+        const statusEl = tr.querySelector(".status-cell");
+        const amtDue   = parseFloat(input.dataset.due) || 0;
+        const amtPaid  = parseFloat(input.value) || 0;
+        totalPaid += amtPaid;
+
+        if (amtPaid >= amtDue && amtDue > 0) {
+          tr.style.background = "rgba(34,197,94,0.08)";
+          statusEl.innerHTML = "<span class=\"badge badge-green\">Paid</span>";
+        } else if (amtPaid > 0) {
+          tr.style.background = "rgba(234,179,8,0.06)";
+          statusEl.innerHTML = "<span class=\"badge badge-yellow\">Partial</span>";
+        } else {
+          tr.style.background = "";
+          statusEl.innerHTML = "<span class=\"badge badge-red\">Unpaid</span>";
+        }
+      });
+
+      const balance = total - totalPaid;
+      if (total > 0) {
+        if (totalPaid > total) {
+          balanceEl.textContent = "Exceeds total premium!";
+          balanceEl.style.color = "var(--danger)";
+        } else {
+          balanceEl.textContent = fmt(balance);
+          balanceEl.style.color = balance <= 0 ? "var(--success)" : "var(--warning)";
+        }
+      } else {
+        balanceEl.textContent = "—";
+        balanceEl.style.color = "var(--text-muted)";
+      }
+    }
+
+    termsEl.addEventListener("change", buildTable);
+    totalEl.addEventListener("input", buildTable);
+    if (startEl) startEl.addEventListener("change", buildTable);
+
+    buildTable();
+
+    // Form submit validation
+    document.querySelector("form").addEventListener("submit", function(e) {
+      const rows = tbody.querySelectorAll("tr");
+      for (let i = 0; i < rows.length; i++) {
+        const input    = rows[i].querySelector("input.inst-amount-input");
+        const modeEl   = rows[i].querySelector("select[name=\"installment_mode[]\"]");
+        if (!input || !modeEl) continue;
+        const amt = parseFloat(input.value) || 0;
+        if (amt > 0 && !modeEl.value) {
+          e.preventDefault();
+          Swal.fire({ icon: "warning", title: "Mode of Payment Required", text: "Please select a mode of payment for every installment that has an amount entered.", confirmButtonColor: "#B8860B" });
+          modeEl.focus();
+          return;
+        }
+      }
+    });
+  })();
 ';
 require_once '../../includes/footer.php';
 ?>

@@ -12,6 +12,7 @@ $full_name = $_SESSION['full_name'] ?? 'Mechanic';
 $page_title  = 'Mechanic Dashboard';
 $active_page = 'dashboard';
 $base_path   = '../../';
+$extra_css   = '<link rel="stylesheet" href="../../assets/css/dashboard.css?v=' . filemtime(__DIR__ . '/../../assets/css/dashboard.css') . '"/>';
 require_once '../../includes/header.php';
 require_once '../../includes/navbar.php';
 ?>
@@ -21,52 +22,42 @@ require_once '../../includes/navbar.php';
 <?php
 $topbar_title      = 'Mechanic Dashboard';
 $topbar_breadcrumb = ['Repair Shop', 'Dashboard'];
+$topbar_show_clock = true;
 require_once '../../includes/topbar.php';
 ?>
 
   <div class="content">
 
-    <div class="page-header">
-      <div class="page-header-title"><?= icon('wrench', 18) ?> Welcome, <?= htmlspecialchars($full_name) ?></div>
-      <div class="page-header-sub">Overview of repair shop activity</div>
-    </div>
-
     <!-- STAT CARDS -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1.25rem;margin-bottom:1.5rem;">
-
-      <!-- Active Repair Jobs -->
-      <div class="card" style="margin-bottom:0;padding:1.25rem 1.5rem;display:flex;align-items:center;gap:1rem;">
-        <div class="card-icon" style="width:44px;height:44px;border-radius:12px;flex-shrink:0;">
-          <?= icon('wrench', 20) ?>
+    <?php
+    $mech_stats = [
+        ['icon' => 'wrench',       'theme' => 'gold',  'label' => 'Active Repair Jobs',  'value' => 0, 'trend' => 'In progress'],
+        ['icon' => 'check-circle', 'theme' => 'green', 'label' => 'Completed Today',      'value' => 0, 'trend' => 'Today'],
+        ['icon' => 'receipt',      'theme' => 'blue',  'label' => 'Pending Quotations',   'value' => 0, 'trend' => 'Awaiting approval'],
+    ];
+    $theme_map = [
+        'gold'  => ['accent' => 'linear-gradient(90deg,#D4A017,#E8D5A3)', 'icon_bg' => 'var(--gold-light)',  'icon_color' => 'var(--gold)'],
+        'green' => ['accent' => 'linear-gradient(90deg,#2E7D52,#52B788)', 'icon_bg' => 'var(--success-bg)', 'icon_color' => 'var(--success)'],
+        'blue'  => ['accent' => 'linear-gradient(90deg,#1A6B9A,#3498DB)', 'icon_bg' => 'var(--info-bg)',    'icon_color' => 'var(--info)'],
+    ];
+    ?>
+    <div class="dash-stats">
+      <?php foreach ($mech_stats as $s):
+          $t = $theme_map[$s['theme']]; ?>
+      <div class="dash-stat">
+        <div class="dash-stat-accent" style="background:<?= $t['accent'] ?>;"></div>
+        <div class="dash-stat-top">
+          <div class="dash-stat-icon" style="background:<?= $t['icon_bg'] ?>;color:<?= $t['icon_color'] ?>;">
+            <?= icon($s['icon'], 18) ?>
+          </div>
+          <span class="dash-stat-badge" style="background:var(--bg);color:var(--text-muted);border:1px solid var(--border);">
+            <?= $s['trend'] ?>
+          </span>
         </div>
-        <div>
-          <div style="font-size:2rem;font-weight:800;color:var(--text-primary);line-height:1;letter-spacing:-1px;">0</div>
-          <div style="font-size:0.7rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-top:0.2rem;">Active Repair Jobs</div>
-        </div>
+        <div class="dash-stat-value"><?= $s['value'] ?></div>
+        <div class="dash-stat-label"><?= $s['label'] ?></div>
       </div>
-
-      <!-- Completed Today -->
-      <div class="card" style="margin-bottom:0;padding:1.25rem 1.5rem;display:flex;align-items:center;gap:1rem;">
-        <div class="card-icon" style="width:44px;height:44px;border-radius:12px;flex-shrink:0;">
-          <?= icon('check-circle', 20) ?>
-        </div>
-        <div>
-          <div style="font-size:2rem;font-weight:800;color:var(--text-primary);line-height:1;letter-spacing:-1px;">0</div>
-          <div style="font-size:0.7rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-top:0.2rem;">Completed Today</div>
-        </div>
-      </div>
-
-      <!-- Pending Quotations -->
-      <div class="card" style="margin-bottom:0;padding:1.25rem 1.5rem;display:flex;align-items:center;gap:1rem;">
-        <div class="card-icon" style="width:44px;height:44px;border-radius:12px;flex-shrink:0;">
-          <?= icon('receipt', 20) ?>
-        </div>
-        <div>
-          <div style="font-size:2rem;font-weight:800;color:var(--text-primary);line-height:1;letter-spacing:-1px;">0</div>
-          <div style="font-size:0.7rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-top:0.2rem;">Pending Quotations</div>
-        </div>
-      </div>
-
+      <?php endforeach; ?>
     </div>
 
     <!-- QUICK LINKS -->

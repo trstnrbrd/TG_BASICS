@@ -176,13 +176,13 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
   /* ── USER CHIP ── */
   .user-chip {
     display: flex; align-items: center; gap: 0.5rem;
-    background: var(--bg); border: 1px solid var(--border);
+    background: #fff; border: 1px solid rgba(0,0,0,0.1);
     padding: 0.35rem 0.75rem 0.35rem 0.45rem;
     border-radius: 100px; font-size: 0.75rem;
-    color: var(--text-secondary); font-weight: 500; white-space: nowrap;
+    color: #1a1a1a; font-weight: 500; white-space: nowrap;
     cursor: pointer; transition: all 0.15s; user-select: none;
   }
-  .user-chip:hover { border-color: var(--gold-muted); background: var(--gold-pale); }
+  .user-chip:hover { border-color: var(--gold-muted); background: #f9f6f0; }
   .user-avatar {
     width: 24px; height: 24px; border-radius: 50%;
     background: linear-gradient(135deg, var(--gold-bright), var(--gold));
@@ -358,6 +358,8 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
   .badge-orange { background: rgba(230,126,34,0.15); color: #e67e22; border: 1px solid rgba(230,126,34,0.3); }
   .badge-gold   { background: var(--gold-light); color: var(--gold); }
   .badge-gray   { background: var(--bg-2); color: var(--text-muted); border: 1px solid var(--border); }
+  .badge-blue   { background: var(--info-bg, rgba(59,130,246,0.1)); color: var(--info, #3b82f6); }
+  .badge-info   { background: var(--info-bg, rgba(59,130,246,0.1)); color: var(--info, #3b82f6); }
 
   /* ── EMPTY STATE ── */
   .empty-state { padding: 3rem 2rem; text-align: center; }

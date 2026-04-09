@@ -95,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 // ── LOAD USERS ──
 $users = $conn->query("
-    SELECT user_id, full_name, username, role, email, is_active, created_at
+    SELECT user_id, full_name, username, role, email, is_active, created_at, last_active
     FROM users
     ORDER BY FIELD(role, 'super_admin', 'admin', 'mechanic'), full_name ASC
 ");
@@ -177,13 +177,23 @@ require_once '../includes/topbar.php';
               $role_labels = [
                 'super_admin' => ['Super Admin', 'badge-gold'],
                 'admin'       => ['Admin',       'badge-green'],
-                'mechanic'    => ['Mechanic',    'badge-gray'],
+                'mechanic'    => ['Mechanic',    'badge-blue'],
               ];
               $rl = $role_labels[$u['role']] ?? ['Unknown', 'badge-gray'];
             ?>
+            <?php
+              $is_online = !empty($u['last_active']) && (time() - strtotime($u['last_active'])) < 300;
+            ?>
             <tr>
-              <td>
-                <div style="font-weight:700;color:var(--text-primary);font-size:0.82rem;"><?= htmlspecialchars($u['full_name']) ?></div>
+              <td style="text-align:center;">
+                <div style="display:inline-flex;align-items:center;gap:0.45rem;">
+                  <?php if ($is_online): ?>
+                  <span title="Online" style="width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0;display:inline-block;box-shadow:0 0 0 2px rgba(34,197,94,0.25);"></span>
+                  <?php else: ?>
+                  <span title="Offline" style="width:8px;height:8px;border-radius:50%;background:var(--border);flex-shrink:0;display:inline-block;"></span>
+                  <?php endif; ?>
+                  <div style="font-weight:700;color:var(--text-primary);font-size:0.82rem;"><?= htmlspecialchars($u['full_name']) ?></div>
+                </div>
                 <div style="font-size:0.7rem;color:var(--text-muted);">@<?= htmlspecialchars($u['username']) ?></div>
               </td>
               <td><span class="badge <?= $rl[1] ?>"><?= $rl[0] ?></span></td>

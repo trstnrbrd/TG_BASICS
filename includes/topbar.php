@@ -32,6 +32,13 @@ if (isset($_SESSION['user_id'], $conn)) {
           <span>/</span> <?= htmlspecialchars($crumb) ?>
         <?php endforeach; ?>
       </div>
+      <?php if (!empty($topbar_show_clock)): ?>
+      <div style="display:flex;align-items:center;gap:0.4rem;margin-top:0.1rem;line-height:1;">
+        <span id="topbar-time" style="font-size:0.65rem;font-weight:700;color:var(--text-primary);"></span>
+        <span style="color:var(--border);font-size:0.6rem;">|</span>
+        <span id="topbar-date" style="font-size:0.65rem;color:var(--text-muted);font-weight:500;"></span>
+      </div>
+      <?php endif; ?>
     </div>
   </div>
   <div class="topbar-right">

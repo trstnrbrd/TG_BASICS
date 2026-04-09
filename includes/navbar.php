@@ -129,6 +129,12 @@ $role        = $_SESSION['role'] ?? '';
       <span class="nav-icon"><?= icon('receipt', 16) ?></span> Quotations &amp; Receipts
     </a>
 
+    <div class="nav-group-label">System</div>
+    <a href="<?= $base_path ?>modules/settings.php"
+       class="nav-item <?= $active_page === 'settings' ? 'active' : '' ?>">
+      <span class="nav-icon"><?= icon('cog', 16) ?></span> Settings
+    </a>
+
     <?php else: ?>
 
     <div class="nav-group-label">Main</div>

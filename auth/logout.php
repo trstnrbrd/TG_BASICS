@@ -5,9 +5,11 @@ require_once '../includes/icons.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_logout'])) {
     if (isset($_SESSION['user_id'])) {
+        $uid  = $_SESSION['user_id'];
+        // Clear last_active immediately on logout
+        $conn->query("UPDATE users SET last_active = NULL WHERE user_id = " . (int)$uid);
         $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'LOGOUT', ?)");
         $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' logged out.';
-        $uid  = $_SESSION['user_id'];
         $log->bind_param('is', $uid, $desc);
         $log->execute();
     }

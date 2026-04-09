@@ -90,29 +90,11 @@ require_once '../includes/navbar.php';
 <?php
 $topbar_title      = 'Dashboard';
 $topbar_breadcrumb = ['Admin Dashboard'];
+$topbar_show_clock = true;
 require_once '../includes/topbar.php';
 ?>
 
   <div class="content">
-
-    <!-- WELCOME -->
-    <div class="dash-welcome">
-      <div class="dash-welcome-watermark">TG-BASICS</div>
-      <div class="dash-welcome-left">
-        <div class="dash-welcome-eyebrow">
-          <div class="dash-welcome-eyebrow-dot"></div>
-          <span id="js-greeting"></span>
-        </div>
-        <div class="dash-welcome-title">
-          Welcome back, <span><?= htmlspecialchars($first_name) ?></span>
-        </div>
-        <div class="dash-welcome-sub">TG Customworks &amp; Basic Car Insurance &mdash; Pandi, Bulacan</div>
-      </div>
-      <div class="dash-welcome-right">
-        <div class="dash-date" id="js-date"></div>
-        <div class="dash-time" id="js-time" style="font-size:0.85rem;color:var(--text-muted);margin-top:2px;"></div>
-      </div>
-    </div>
 
     <!-- STAT CARDS -->
     <div class="dash-stats">

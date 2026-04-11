@@ -258,8 +258,7 @@ require_once '../../includes/topbar.php';
                   <form method="POST" action="" style="display:inline;">
                     <input type="hidden" name="delete_client_id" value="<?= $row['client_id'] ?>"/>
                     <button type="button"
-                       class="btn-sm-gold js-delete-client"
-                       style="padding:0.35rem 0.55rem;background:var(--danger);color:#fff;border-color:var(--danger);"
+                       class="btn-sm-danger js-delete-client"
                        title="Delete"
                        data-name="<?= htmlspecialchars($row['full_name'], ENT_QUOTES) ?>">
                       <?= icon('trash', 14) ?>

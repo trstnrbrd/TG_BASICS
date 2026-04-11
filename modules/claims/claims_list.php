@@ -231,8 +231,7 @@ require_once '../../includes/topbar.php';
                     <?= icon('eye',14) ?>
                   </a>
                   <?php if ($is_finished): ?>
-                  <button type="button" class="btn-sm-gold js-delete-list"
-                    style="padding:0.35rem 0.55rem;background:var(--danger);color:#fff;border-color:var(--danger);"
+                  <button type="button" class="btn-sm-danger js-delete-list"
                     title="Delete" data-id="<?= $row['claim_id'] ?>">
                     <?= icon('trash',14) ?>
                   </button>

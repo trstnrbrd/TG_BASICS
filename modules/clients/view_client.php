@@ -266,8 +266,7 @@ require_once '../../includes/topbar.php';
                         class="js-delete-vehicle-form"
                         data-plate="<?= htmlspecialchars($v['plate_number'], ENT_QUOTES) ?>">
                     <input type="hidden" name="vehicle_id" value="<?= $v['vehicle_id'] ?>"/>
-                    <button type="submit" class="btn-sm-gold" title="Delete"
-                            style="padding:0.35rem 0.55rem;background:var(--danger);color:#fff;border-color:var(--danger);">
+                    <button type="submit" class="btn-sm-danger" title="Delete">
                       <?= icon('trash', 14) ?>
                     </button>
                   </form>
@@ -296,6 +295,7 @@ require_once '../../includes/topbar.php';
           <div class="card-title">Insurance Policies</div>
           <div class="card-sub"><?= $pc ?> polic<?= $pc !== 1 ? 'ies' : 'y' ?> on record</div>
         </div>
+        <a href="../insurance/eligibility_check.php" class="btn-primary" style="margin-left:auto;padding:0.5rem 1rem;font-size:0.78rem;"><?= icon('shield-check', 14) ?> Check Eligibility</a>
       </div>
       <?php if ($policies->num_rows > 0): ?>
       <div class="tg-table-wrap">
@@ -373,7 +373,6 @@ require_once '../../includes/topbar.php';
         <div class="empty-icon"><?= icon('document', 28) ?></div>
         <div class="empty-title">No policies yet</div>
         <div class="empty-desc">Check vehicle eligibility first before encoding a policy.</div>
-        <a href="../insurance/eligibility_check.php" class="btn-primary"><?= icon('shield-check', 14) ?> Check Eligibility</a>
       </div>
       <?php endif; ?>
     </div>
@@ -451,7 +450,6 @@ require_once '../../includes/topbar.php';
         <div class="empty-icon"><?= icon('clipboard-list', 28) ?></div>
         <div class="empty-title">No claims filed</div>
         <div class="empty-desc">No insurance claims have been filed for this client yet.</div>
-        <a href="../claims/add_claim.php" class="btn-primary"><?= icon('plus', 14) ?> File New Claim</a>
       </div>
       <?php endif; ?>
     </div>

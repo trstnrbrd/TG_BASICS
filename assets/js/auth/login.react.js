@@ -65,15 +65,28 @@ function ToastManager({ initialToast }) {
 
 function SubmitButton() {
   const [loading, setLoading] = useState(false);
+  const loadingRef = React.useRef(false);
 
-  const handleClick = () => {
+  const handleSubmit = () => {
+    if (loadingRef.current) return;
     var form = document.getElementById("login-form");
-    var event = new Event("submit", { bubbles: true, cancelable: true });
-    var allowed = form.dispatchEvent(event);
-    if (!allowed) return;
+    loadingRef.current = true;
     setLoading(true);
     setTimeout(() => form.submit(), 400);
   };
+
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handleSubmit();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  const handleClick = handleSubmit;
 
   return (
     <button

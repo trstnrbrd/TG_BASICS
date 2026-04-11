@@ -1068,7 +1068,7 @@ footer {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 3rem;
+  gap: 2rem;
   flex-wrap: wrap;
   margin-bottom: 2rem;
 }

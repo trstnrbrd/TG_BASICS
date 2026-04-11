@@ -196,5 +196,12 @@ $role        = $_SESSION['role'] ?? '';
 
   </nav>
 
-  <div class="sidebar-footer">TG-BASICS &mdash; Internal Use Only</div>
+  <div class="sidebar-footer">
+    TG-BASICS &mdash; Internal Use Only<br/>
+    <a href="<?= $base_path ?>modules/privacy_notice.php"
+       style="font-size:0.6rem;color:var(--sidebar-text);opacity:0.5;text-decoration:none;transition:opacity 0.15s;"
+       onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.5'">
+      Privacy Notice &bull; RA 10173
+    </a>
+  </div>
 </aside>

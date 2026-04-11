@@ -176,13 +176,13 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
   /* ── USER CHIP ── */
   .user-chip {
     display: flex; align-items: center; gap: 0.5rem;
-    background: #fff; border: 1px solid rgba(0,0,0,0.1);
+    background: var(--bg-3); border: 1px solid var(--border);
     padding: 0.35rem 0.75rem 0.35rem 0.45rem;
     border-radius: 100px; font-size: 0.75rem;
-    color: #1a1a1a; font-weight: 500; white-space: nowrap;
+    color: var(--text-primary); font-weight: 500; white-space: nowrap;
     cursor: pointer; transition: all 0.15s; user-select: none;
   }
-  .user-chip:hover { border-color: var(--gold-muted); background: #f9f6f0; }
+  .user-chip:hover { border-color: var(--gold-muted); background: var(--gold-pale); }
   .user-avatar {
     width: 24px; height: 24px; border-radius: 50%;
     background: linear-gradient(135deg, var(--gold-bright), var(--gold));
@@ -287,6 +287,8 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
 
   .btn-sm-gold { background: var(--gold); color: #fff; border: none; padding: 0.35rem 0.85rem; border-radius: 7px; font-size: 0.75rem; font-weight: 700; text-decoration: none; transition: all 0.15s; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.35rem; font-family: 'Plus Jakarta Sans', sans-serif; cursor: pointer; }
   .btn-sm-gold:hover { background: var(--gold-bright); color: #fff; }
+  .btn-sm-danger { background: var(--danger); color: #fff; border: none; padding: 0.35rem 0.55rem; border-radius: 7px; font-size: 0.75rem; font-weight: 700; text-decoration: none; transition: all 0.15s; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.35rem; font-family: 'Plus Jakarta Sans', sans-serif; cursor: pointer; }
+  .btn-sm-danger:hover { background: #a93226; color: #fff; }
 
   /* ── FORM FIELDS ── */
   .field { display: flex; flex-direction: column; gap: 0.4rem; }

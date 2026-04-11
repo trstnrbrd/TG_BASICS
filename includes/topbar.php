@@ -7,6 +7,7 @@
  *   $base_path         - string, path back to root e.g. '../' or '../../'
  *   $role_label        - auto-available from header.php
  */
+$topbar_show_clock = true; // show on all pages
 $full_name_display = $_SESSION['full_name'] ?? 'User';
 $initials_display  = substr(implode('', array_map(fn($w) => strtoupper($w[0]), explode(' ', $full_name_display))), 0, 2);
 

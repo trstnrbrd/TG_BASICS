@@ -210,9 +210,8 @@ require_once '../includes/topbar.php';
                   <input type="hidden" name="action" value="delete"/>
                   <input type="hidden" name="user_id" value="<?= $u['user_id'] ?>"/>
                   <button type="button"
-                    class="btn-sm-gold js-delete-user"
+                    class="btn-sm-danger js-delete-user"
                     data-name="<?= htmlspecialchars($u['full_name'], ENT_QUOTES) ?>"
-                    style="padding:0.35rem 0.55rem;background:var(--danger);color:#fff;border-color:var(--danger);"
                     title="Delete">
                     <?= icon('trash', 14) ?>
                   </button>

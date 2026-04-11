@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_logout'])) {
 $full_name = $_SESSION['full_name'] ?? 'User';
 $role      = $_SESSION['role'] ?? 'admin';
 $first     = explode(' ', $full_name)[0];
-$back      = ($role === 'mechanic') ? '../modules/repair/dashboard_mechanic.php' : '../modules/dashboard_admin.php';
+$back      = ($role === 'mechanic') ? '../modules/repair/dashboard_mechanic.php' : '../modules/admin/dashboard_admin.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">

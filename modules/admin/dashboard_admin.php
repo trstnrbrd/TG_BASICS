@@ -1,13 +1,13 @@
 <?php
-require_once __DIR__ . "/../config/session.php";
-require_once '../config/db.php';
-require_once '../config/settings.php';
+require_once __DIR__ . '/../../config/session.php';
+require_once '../../config/db.php';
+require_once '../../config/settings.php';
 
 $urg_days = (int)getSetting($conn, 'renewal_urgent_days', '7');
 $exp_days = (int)getSetting($conn, 'renewal_expiring_days', '30');
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
-    header("Location: ../auth/login.php");
+    header("Location: ../../auth/login.php");
     exit;
 }
 
@@ -79,10 +79,10 @@ while ($row = $activity->fetch_assoc()) {
 
 $page_title  = 'Dashboard';
 $active_page = 'dashboard';
-$base_path   = '../';
-$extra_css    = '<link rel="stylesheet" href="' . $base_path . 'assets/css/dashboard.css?v=' . filemtime(__DIR__ . '/../assets/css/dashboard.css') . '"/>';
-require_once '../includes/header.php';
-require_once '../includes/navbar.php';
+$base_path   = '../../';
+$extra_css    = '<link rel="stylesheet" href="' . $base_path . 'assets/css/dashboard.css?v=' . filemtime(__DIR__ . '/../../assets/css/dashboard.css') . '"/>';
+require_once '../../includes/header.php';
+require_once '../../includes/navbar.php';
 ?>
 
 <div class="main">
@@ -91,7 +91,7 @@ require_once '../includes/navbar.php';
 $topbar_title      = 'Dashboard';
 $topbar_breadcrumb = ['Admin Dashboard'];
 $topbar_show_clock = true;
-require_once '../includes/topbar.php';
+require_once '../../includes/topbar.php';
 ?>
 
   <div class="content">
@@ -148,7 +148,7 @@ require_once '../includes/topbar.php';
               </div>
             </div>
             <?php if ($expiring_soon > 0): ?>
-            <a href="renewal/renewal_list.php?filter=expiring" class="btn-sm-gold">
+            <a href="../renewal/renewal_list.php?filter=expiring" class="btn-sm-gold">
               View All <?= icon('chevron-right', 12) ?>
             </a>
             <?php endif; ?>
@@ -157,7 +157,7 @@ require_once '../includes/topbar.php';
             <?php while ($r = $renewals->fetch_assoc()):
               $is_urgent = $r['days_left'] <= $urg_days;
             ?>
-            <a href="renewal/view_policy.php?id=<?= $r['policy_id'] ?>" class="renewal-row">
+            <a href="../renewal/view_policy.php?id=<?= $r['policy_id'] ?>" class="renewal-row">
               <div class="renewal-dot <?= $is_urgent ? 'urgent' : 'expiring' ?>"></div>
               <div class="renewal-info">
                 <div class="renewal-name"><?= htmlspecialchars($r['full_name']) ?></div>
@@ -197,7 +197,7 @@ require_once '../includes/topbar.php';
                 <div class="card-sub">Last 5 added</div>
               </div>
             </div>
-            <a href="clients/client_list.php" class="btn-sm-gold">
+            <a href="../clients/client_list.php" class="btn-sm-gold">
               View All <?= icon('chevron-right', 12) ?>
             </a>
           </div>
@@ -208,7 +208,7 @@ require_once '../includes/topbar.php';
             </thead>
             <tbody>
               <?php while ($row = $recent_list->fetch_assoc()): ?>
-              <tr style="cursor:pointer;" onclick="window.location='clients/view_client.php?id=<?= $row['client_id'] ?>'">
+              <tr style="cursor:pointer;" onclick="window.location='../clients/view_client.php?id=<?= $row['client_id'] ?>'">
                 <td>
                   <div style="display:flex;align-items:center;gap:0.5rem;">
                     <div style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--gold-bright),var(--gold));display:flex;align-items:center;justify-content:center;font-size:0.58rem;font-weight:800;color:#fff;flex-shrink:0;">
@@ -250,10 +250,10 @@ require_once '../includes/topbar.php';
           <div style="display:flex;flex-direction:column;gap:0.5rem;padding:1rem;">
             <?php
             $actions = [
-              ['clients/add_client.php',          'user-plus',        'Add New Client',       'Client and vehicle registration',  '#2E7D52', '#F0FAF4'],
-              ['insurance/eligibility_check.php', 'shield-check',     'New Insurance Policy', 'Check eligibility and encode',     '#1A6B9A', '#EBF5FB'],
-              ['clients/client_list.php',         'magnifying-glass', 'Search Records',       'Find client, vehicle, or policy',  '#7B3FA0', '#F5EEF8'],
-              ['renewal/renewal_list.php',        'clock',            'Renewal Tracking',     'View policy expiry status',        '#B8860B', '#FDF8EE'],
+              ['../clients/add_client.php',          'user-plus',        'Add New Client',       'Client and vehicle registration',  '#2E7D52', '#F0FAF4'],
+              ['../insurance/eligibility_check.php', 'shield-check',     'New Insurance Policy', 'Check eligibility and encode',     '#1A6B9A', '#EBF5FB'],
+              ['../clients/client_list.php',         'magnifying-glass', 'Search Records',       'Find client, vehicle, or policy',  '#7B3FA0', '#F5EEF8'],
+              ['../renewal/renewal_list.php',        'clock',            'Renewal Tracking',     'View policy expiry status',        '#B8860B', '#FDF8EE'],
             ];
             foreach ($actions as $a): ?>
             <a href="<?= $a[0] ?>" class="quick-action">
@@ -323,6 +323,6 @@ require_once '../includes/topbar.php';
   </div>
 </div>
 
-<script src="../assets/js/shared/dashboard.js"></script>
+<script src="../../assets/js/shared/dashboard.js"></script>
 
-<?php require_once '../includes/footer.php'; ?>
+<?php require_once '../../includes/footer.php'; ?>

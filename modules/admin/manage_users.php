@@ -1,10 +1,10 @@
 <?php
-require_once __DIR__ . "/../config/session.php";
-require_once '../config/db.php';
-require_once '../config/mailer.php';
+require_once __DIR__ . '/../../config/session.php';
+require_once '../../config/db.php';
+require_once '../../config/mailer.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'super_admin') {
-    header("Location: ../auth/login.php");
+    header("Location: ../../auth/login.php");
     exit;
 }
 
@@ -111,9 +111,9 @@ $logs = $conn->query("
 
 $page_title  = 'Manage Users';
 $active_page = 'manage_users';
-$base_path   = '../';
-require_once '../includes/header.php';
-require_once '../includes/navbar.php';
+$base_path   = '../../';
+require_once '../../includes/header.php';
+require_once '../../includes/navbar.php';
 ?>
 
 <div class="main">
@@ -121,7 +121,7 @@ require_once '../includes/navbar.php';
   <?php
 $topbar_title      = 'Manage Users';
 $topbar_breadcrumb = ['Administration', 'Manage Users'];
-require_once '../includes/topbar.php';
+require_once '../../includes/topbar.php';
 ?>
 
   <div class="content">
@@ -342,6 +342,6 @@ require_once '../includes/topbar.php';
   </div>
 </div>
 
-<script src="../assets/js/super_admin/manage_users.js"></script>
+<script src="../../assets/js/super_admin/manage_users.js"></script>
 
-<?php require_once '../includes/footer.php'; ?>
+<?php require_once '../../includes/footer.php'; ?>

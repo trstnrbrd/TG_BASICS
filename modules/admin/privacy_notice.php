@@ -1,17 +1,17 @@
 <?php
-require_once __DIR__ . "/../config/session.php";
-require_once '../config/db.php';
+require_once __DIR__ . '/../../config/session.php';
+require_once '../../config/db.php';
 
 if (!isset($_SESSION['user_id'])) {
-    header("Location: ../auth/login.php");
+    header("Location: ../../auth/login.php");
     exit;
 }
 
 $page_title  = 'Privacy Notice';
 $active_page = '';
-$base_path   = '../';
-require_once '../includes/header.php';
-require_once '../includes/navbar.php';
+$base_path   = '../../';
+require_once '../../includes/header.php';
+require_once '../../includes/navbar.php';
 ?>
 
 <div class="main">
@@ -19,7 +19,7 @@ require_once '../includes/navbar.php';
 <?php
 $topbar_title      = 'Privacy Notice';
 $topbar_breadcrumb = ['System', 'Privacy Notice'];
-require_once '../includes/topbar.php';
+require_once '../../includes/topbar.php';
 ?>
 
   <div class="content" style="max-width:820px;margin:0 auto;">
@@ -128,4 +128,4 @@ require_once '../includes/topbar.php';
   </div>
 </div>
 
-<?php require_once '../includes/footer.php'; ?>
+<?php require_once '../../includes/footer.php'; ?>

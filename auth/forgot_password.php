@@ -6,7 +6,7 @@ require_once '../config/mailer.php';
 require_once '../includes/icons.php';
 
 if (isset($_SESSION['user_id'])) {
-    header("Location: ../modules/dashboard_admin.php");
+    header("Location: ../modules/admin/dashboard_admin.php");
     exit;
 }
 

@@ -9,7 +9,7 @@ if (isset($_SESSION['user_id'])) {
     if ($_SESSION['role'] === 'mechanic') {
         header("Location: ../modules/repair/dashboard_mechanic.php");
     } else {
-        header("Location: ../modules/dashboard_admin.php");
+        header("Location: ../modules/admin/dashboard_admin.php");
     }
     exit;
 }
@@ -91,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($user['role'] === 'mechanic') {
                         header("Location: ../modules/repair/dashboard_mechanic.php");
                     } else {
-                        header("Location: ../modules/dashboard_admin.php");
+                        header("Location: ../modules/admin/dashboard_admin.php");
                     }
                     exit;
                 }

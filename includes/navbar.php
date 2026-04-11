@@ -130,7 +130,7 @@ $role        = $_SESSION['role'] ?? '';
     </a>
 
     <div class="nav-group-label">System</div>
-    <a href="<?= $base_path ?>modules/settings.php"
+    <a href="<?= $base_path ?>modules/admin/settings.php"
        class="nav-item <?= $active_page === 'settings' ? 'active' : '' ?>">
       <span class="nav-icon"><?= icon('cog', 16) ?></span> Settings
     </a>
@@ -138,7 +138,7 @@ $role        = $_SESSION['role'] ?? '';
     <?php else: ?>
 
     <div class="nav-group-label">Main</div>
-    <a href="<?= $base_path ?>modules/dashboard_admin.php"
+    <a href="<?= $base_path ?>modules/admin/dashboard_admin.php"
        class="nav-item <?= $active_page === 'dashboard' ? 'active' : '' ?>">
       <span class="nav-icon"><?= icon('dashboard', 16) ?></span> Dashboard
     </a>
@@ -176,18 +176,18 @@ $role        = $_SESSION['role'] ?? '';
 
     <?php if ($role === 'super_admin'): ?>
     <div class="nav-group-label">Administration</div>
-    <a href="<?= $base_path ?>modules/manage_users.php"
+    <a href="<?= $base_path ?>modules/admin/manage_users.php"
        class="nav-item <?= $active_page === 'manage_users' ? 'active' : '' ?>">
       <span class="nav-icon"><?= icon('users', 16) ?></span> Manage Users
     </a>
-    <a href="<?= $base_path ?>modules/activity_log.php"
+    <a href="<?= $base_path ?>modules/admin/activity_log.php"
        class="nav-item <?= $active_page === 'activity_log' ? 'active' : '' ?>">
       <span class="nav-icon"><?= icon('clipboard-list', 16) ?></span> Activity Log
     </a>
     <?php endif; ?>
 
     <div class="nav-group-label">System</div>
-    <a href="<?= $base_path ?>modules/settings.php"
+    <a href="<?= $base_path ?>modules/admin/settings.php"
        class="nav-item <?= $active_page === 'settings' ? 'active' : '' ?>">
       <span class="nav-icon"><?= icon('cog', 16) ?></span> Settings
     </a>
@@ -198,7 +198,7 @@ $role        = $_SESSION['role'] ?? '';
 
   <div class="sidebar-footer">
     TG-BASICS &mdash; Internal Use Only<br/>
-    <a href="<?= $base_path ?>modules/privacy_notice.php"
+    <a href="<?= $base_path ?>modules/admin/privacy_notice.php"
        style="font-size:0.6rem;color:var(--sidebar-text);opacity:0.5;text-decoration:none;transition:opacity 0.15s;"
        onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.5'">
       Privacy Notice &bull; RA 10173

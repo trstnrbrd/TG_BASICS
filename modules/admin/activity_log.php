@@ -1,9 +1,9 @@
 <?php
-require_once __DIR__ . "/../config/session.php";
-require_once '../config/db.php';
+require_once __DIR__ . '/../../config/session.php';
+require_once '../../config/db.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'super_admin') {
-    header("Location: ../auth/login.php");
+    header("Location: ../../auth/login.php");
     exit;
 }
 
@@ -181,16 +181,16 @@ $all_actions = $conn->query("SELECT DISTINCT action FROM audit_logs ORDER BY act
 
 $page_title  = 'Activity Log';
 $active_page = 'activity_log';
-$base_path   = '../';
-require_once '../includes/header.php';
-require_once '../includes/navbar.php';
+$base_path   = '../../';
+require_once '../../includes/header.php';
+require_once '../../includes/navbar.php';
 ?>
 
 <div class="main">
 <?php
 $topbar_title      = 'Activity Log';
 $topbar_breadcrumb = ['Administration', 'Activity Log'];
-require_once '../includes/topbar.php';
+require_once '../../includes/topbar.php';
 ?>
 
   <div class="content">
@@ -425,4 +425,4 @@ require_once '../includes/topbar.php';
   </div>
 </div>
 
-<?php require_once '../includes/footer.php'; ?>
+<?php require_once '../../includes/footer.php'; ?>

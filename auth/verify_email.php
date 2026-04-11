@@ -118,7 +118,7 @@ $sub        = $status === 'success' ? 'Your email has been updated successfully'
       <?php endif; ?>
 
       <?php if (isset($_SESSION['user_id'])): ?>
-      <a href="../modules/settings.php" class="btn-submit">
+      <a href="../modules/admin/settings.php" class="btn-submit">
         <?= icon('cog', 14) ?> Go to Settings
       </a>
       <?php else: ?>

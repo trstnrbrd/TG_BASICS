@@ -1,11 +1,11 @@
 <?php
-require_once __DIR__ . "/../config/session.php";
-require_once '../config/db.php';
-require_once '../config/settings.php';
-require_once '../config/mailer.php';
+require_once __DIR__ . '/../../config/session.php';
+require_once '../../config/db.php';
+require_once '../../config/settings.php';
+require_once '../../config/mailer.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin', 'mechanic'])) {
-    header("Location: ../auth/login.php");
+    header("Location: ../../auth/login.php");
     exit;
 }
 
@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
 
         // ── AVATAR UPLOAD ──
         case 'avatar_upload':
-            $upload_dir = __DIR__ . '/../uploads/avatars/';
+            $upload_dir = __DIR__ . '/../../uploads/avatars/';
             if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
 
             if (empty($_FILES['avatar']) || $_FILES['avatar']['error'] !== UPLOAD_ERR_OK) {
@@ -76,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
 
         // ── REMOVE AVATAR ──
         case 'avatar_remove':
-            $upload_dir = __DIR__ . '/../uploads/avatars/';
+            $upload_dir = __DIR__ . '/../../uploads/avatars/';
             $old_stmt = $conn->prepare("SELECT profile_photo FROM users WHERE user_id = ?");
             $old_stmt->bind_param('i', $user_id);
             $old_stmt->execute();
@@ -316,10 +316,10 @@ $settings = getAllSettings($conn);
 
 $page_title  = 'Settings';
 $active_page = 'settings';
-$base_path   = '../';
-$extra_css    = '<link rel="stylesheet" href="' . $base_path . 'assets/css/settings.css?v=' . filemtime(__DIR__ . '/../assets/css/settings.css') . '"/>';
-require_once '../includes/header.php';
-require_once '../includes/navbar.php';
+$base_path   = '../../';
+$extra_css    = '<link rel="stylesheet" href="' . $base_path . 'assets/css/settings.css?v=' . filemtime(__DIR__ . '/../../assets/css/settings.css') . '"/>';
+require_once '../../includes/header.php';
+require_once '../../includes/navbar.php';
 ?>
 
 <div class="main">
@@ -327,7 +327,7 @@ require_once '../includes/navbar.php';
 <?php
 $topbar_title      = 'Settings';
 $topbar_breadcrumb = ['System', 'Settings'];
-require_once '../includes/topbar.php';
+require_once '../../includes/topbar.php';
 ?>
 
   <div class="content">
@@ -973,7 +973,7 @@ if (tfaToggle) {
 }
 REMOVED HEREDOC END */
 
-echo '<script src="../assets/js/shared/settings.js"></script>';
+echo '<script src="../../assets/js/shared/settings.js"></script>';
 
-require_once '../includes/footer.php';
+require_once '../../includes/footer.php';
 ?>

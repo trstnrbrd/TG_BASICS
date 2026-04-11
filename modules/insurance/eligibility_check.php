@@ -132,7 +132,7 @@ require_once '../../includes/topbar.php';
 
   <div class="content">
 
-    <a href="../dashboard_admin.php" class="back-link"><?= icon('arrow-left', 14) ?> Back to Dashboard</a>
+    <a href="../admin/dashboard_admin.php" class="back-link"><?= icon('arrow-left', 14) ?> Back to Dashboard</a>
 
     <div class="page-header">
       <div class="page-header-title"><?= icon('shield-check', 18) ?> Insurance Eligibility and Policy Processing</div>

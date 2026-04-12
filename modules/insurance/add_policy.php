@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
+require_once '../../config/validators.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
     header("Location: ../../auth/login.php");
@@ -57,36 +58,40 @@ $success = false;
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    // Required fields
-    $policy_number     = trim($_POST['policy_number'] ?? '');
-    $coverage_type     = trim($_POST['coverage_type'] ?? '');
-    $sum_insured       = trim($_POST['sum_insured'] ?? '');
-    $basic_premium     = trim($_POST['basic_premium'] ?? '');
-    $total_premium     = trim($_POST['total_premium'] ?? '');
-    $participation_fee = trim($_POST['participation_fee'] ?? '0');
-    $policy_start      = trim($_POST['policy_start'] ?? '');
-    $policy_end        = trim($_POST['policy_end'] ?? '');
-    $payment_terms     = trim($_POST['payment_terms'] ?? '1 time');
-    $mortgagee         = trim($_POST['mortgagee'] ?? '');
-    $notes             = trim($_POST['notes'] ?? '');
+    // Required fields — sanitized
+    $policy_number     = san_str($_POST['policy_number'] ?? '', MAX_POLICY_NUM);
+    $coverage_type     = san_enum($_POST['coverage_type'] ?? '', ALLOWED_COVERAGE_TYPES);
+    $sum_insured       = san_float($_POST['sum_insured'] ?? '');
+    $basic_premium     = san_float($_POST['basic_premium'] ?? '');
+    $total_premium     = san_float($_POST['total_premium'] ?? '');
+    $participation_fee = san_float($_POST['participation_fee'] ?? '0');
+    $policy_start      = san_str($_POST['policy_start'] ?? '', 10);
+    $policy_end        = san_str($_POST['policy_end'] ?? '', 10);
+    $payment_terms     = san_enum($_POST['payment_terms'] ?? '1 time', ALLOWED_PAYMENT_TERMS);
+    $mortgagee         = san_str($_POST['mortgagee'] ?? '', MAX_MORTGAGEE);
+    $notes             = san_str($_POST['notes'] ?? '', MAX_TEXT);
 
     // Payment terms → months count
-    $terms_map  = ['1 time' => 1, '3 months' => 3, '4 months' => 4, '6 months' => 6];
+    $terms_map  = ['1 time' => 1, '2 months' => 2, '3 months' => 3, '4 months' => 4, '6 months' => 6, '12 months' => 12];
     $num_months = $terms_map[$payment_terms] ?? 1;
 
-    // Installment amounts + payment details from POST
-    $installment_amounts = $_POST['installment_amount'] ?? [];
-    $installment_modes   = $_POST['installment_mode']   ?? [];
-    $installment_ctrls   = $_POST['installment_ctrl']   ?? [];
+    // Installment amounts + payment details from POST — sanitized
+    $raw_amounts = $_POST['installment_amount'] ?? [];
+    $raw_modes   = $_POST['installment_mode']   ?? [];
+    $raw_ctrls   = $_POST['installment_ctrl']   ?? [];
+    $installment_amounts = array_map(fn($v) => san_float($v), is_array($raw_amounts) ? $raw_amounts : []);
+    $installment_modes   = array_map(fn($v) => san_enum($v, ALLOWED_PAYMENT_MODES), is_array($raw_modes) ? $raw_modes : []);
+    $installment_ctrls   = array_map(fn($v) => san_str($v, 50), is_array($raw_ctrls) ? $raw_ctrls : []);
 
     // Validation
-    if ($policy_number === '')  $errors[] = 'Policy number is required.';
-    if ($coverage_type === '')  $errors[] = 'Coverage type is required.';
-    if ($sum_insured === '' || !is_numeric($sum_insured)) $errors[] = 'Sum insured must be a valid number.';
-    if ($basic_premium === '' || !is_numeric($basic_premium)) $errors[] = 'Basic premium must be a valid number.';
-    if ($total_premium === '' || !is_numeric($total_premium)) $errors[] = 'Total premium must be a valid number.';
-    if ($policy_start === '') $errors[] = 'Starting date is required.';
-    if ($policy_end === '')   $errors[] = 'Inception date is required.';
+    if ($policy_number === '')   $errors[] = 'Policy number is required.';
+    elseif (!validate_policy_number($policy_number)) $errors[] = 'Policy number contains invalid characters.';
+    if ($coverage_type === '')   $errors[] = 'Coverage type is required or invalid.';
+    if ($sum_insured <= 0)       $errors[] = 'Sum insured must be a valid positive number.';
+    if ($basic_premium <= 0)     $errors[] = 'Basic premium must be a valid positive number.';
+    if ($total_premium <= 0)     $errors[] = 'Total premium must be a valid positive number.';
+    if ($policy_start === '' || !validate_date($policy_start)) $errors[] = 'Starting date is required and must be a valid date.';
+    if ($policy_end === '' || !validate_date($policy_end))     $errors[] = 'Inception date is required and must be a valid date.';
     if ($policy_start !== '' && $policy_end !== '' && $policy_end <= $policy_start)
         $errors[] = 'Inception date must be after the starting date.';
 

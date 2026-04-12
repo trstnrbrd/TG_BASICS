@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
+require_once '../../config/validators.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
     header("Location: ../../auth/login.php");
@@ -28,14 +29,17 @@ $errors  = [];
 $success = false;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $full_name      = trim($_POST['full_name'] ?? '');
-    $contact_number = trim($_POST['contact_number'] ?? '');
-    $email          = trim($_POST['email'] ?? '');
-    $address        = trim($_POST['address'] ?? '');
+    $full_name      = san_str($_POST['full_name'] ?? '', MAX_NAME);
+    $contact_number = san_str($_POST['contact_number'] ?? '', MAX_PHONE);
+    $email          = san_str($_POST['email'] ?? '', MAX_EMAIL);
+    $address        = san_str($_POST['address'] ?? '', MAX_ADDRESS);
 
-    if ($full_name === '')      $errors[] = 'Full name is required.';
-    if ($contact_number === '') $errors[] = 'Contact number is required.';
-    if ($address === '')        $errors[] = 'Address is required.';
+    if ($full_name === '')                          $errors[] = 'Full name is required.';
+    elseif (!validate_name($full_name))             $errors[] = 'Full name contains invalid characters.';
+    if ($contact_number === '')                     $errors[] = 'Contact number is required.';
+    elseif (!validate_phone($contact_number))       $errors[] = 'Contact number must be a valid PH mobile number (09XXXXXXXXX).';
+    if ($email !== '' && !validate_email($email))   $errors[] = 'Please enter a valid email address.';
+    if ($address === '')                            $errors[] = 'Address is required.';
 
     if (empty($errors)) {
         $upd = $conn->prepare("UPDATE clients SET full_name = ?, contact_number = ?, email = ?, address = ? WHERE client_id = ?");

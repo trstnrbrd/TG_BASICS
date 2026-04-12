@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
+require_once '../../config/validators.php';
 require_once '../../includes/icons.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
@@ -14,7 +15,7 @@ $success = false;
 // AJAX: search clients by name
 if (isset($_GET['ajax_clients']) && isset($_GET['q'])) {
     header('Content-Type: application/json');
-    $q    = '%' . trim($_GET['q']) . '%';
+    $q    = '%' . san_str($_GET['q'], 100) . '%';
     $stmt = $conn->prepare("SELECT client_id, full_name FROM clients WHERE full_name LIKE ? ORDER BY full_name ASC LIMIT 20");
     $stmt->bind_param('s', $q);
     $stmt->execute();
@@ -45,15 +46,17 @@ if (isset($_GET['ajax_policies']) && isset($_GET['client_id'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $client_id    = (int)($_POST['client_id'] ?? 0);
     $policy_id    = (int)($_POST['policy_id'] ?? 0);
-    $claim_type   = trim($_POST['claim_type'] ?? '');
-    $incident_date = trim($_POST['incident_date'] ?? '');
-    $description  = trim($_POST['description'] ?? '');
+    $claim_type   = san_enum($_POST['claim_type'] ?? '', ALLOWED_CLAIM_TYPES);
+    $incident_date = san_str($_POST['incident_date'] ?? '', 10);
+    $description  = san_str($_POST['description'] ?? '', MAX_TEXT);
 
-    if (!$client_id)      $errors[] = 'Please select a client.';
-    if (!$policy_id)      $errors[] = 'Please select a policy.';
-    if (!$claim_type)     $errors[] = 'Please select a claim type.';
-    if (!$incident_date)  $errors[] = 'Incident date is required.';
-    if (!$description)    $errors[] = 'Incident description is required.';
+    if (!$client_id)            $errors[] = 'Please select a client.';
+    if (!$policy_id)            $errors[] = 'Please select a policy.';
+    if ($claim_type === '')     $errors[] = 'Please select a valid claim type.';
+    if ($incident_date === '')  $errors[] = 'Incident date is required.';
+    elseif (!validate_date($incident_date) || $incident_date > date('Y-m-d'))
+                                $errors[] = 'Incident date must be a valid past date.';
+    if ($description === '')    $errors[] = 'Incident description is required.';
 
     if (empty($errors)) {
         $stmt = $conn->prepare("

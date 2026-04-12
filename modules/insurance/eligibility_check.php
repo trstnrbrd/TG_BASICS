@@ -1,11 +1,12 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
+require_once '../../config/validators.php';
 require_once '../../config/settings.php';
 
 // AJAX handler
 if (isset($_GET['ajax']) && $_GET['ajax'] === '1') {
-    $q = trim($_GET['search'] ?? '');
+    $q = san_str($_GET['search'] ?? '', 100);
     if ($q === '') { echo ''; exit; }
     $like = "%$q%";
     $stmt = $conn->prepare("
@@ -47,7 +48,7 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'supe
 $full_name = $_SESSION['full_name'];
 $initials  = substr(implode('', array_map(fn($w) => strtoupper($w[0]), explode(' ', $full_name))), 0, 2);
 
-$search         = trim($_GET['search'] ?? '');
+$search         = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
 $selected_vid   = isset($_GET['vehicle_id']) ? (int)$_GET['vehicle_id'] : 0;
 $search_results = [];
 $vehicle        = null;

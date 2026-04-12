@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config/session.php';
 require_once '../../config/db.php';
+require_once '../../config/validators.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'super_admin') {
     header("Location: ../../auth/login.php");
@@ -8,11 +9,14 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'super_admin') {
 }
 
 // ── FILTERS ──
-$filter_user   = trim($_GET['user'] ?? '');
-$filter_action = trim($_GET['action'] ?? '');
-$filter_search = trim($_GET['q'] ?? '');
-$filter_from   = trim($_GET['from'] ?? '');
-$filter_to     = trim($_GET['to'] ?? '');
+$filter_user   = san_int($_GET['user'] ?? 0, 0);
+$filter_action = san_str($_GET['action'] ?? '', 60);
+$filter_search = validate_search(san_str($_GET['q'] ?? '', MAX_SEARCH));
+$filter_from   = san_str($_GET['from'] ?? '', 10);
+$filter_to     = san_str($_GET['to'] ?? '', 10);
+// Sanitize dates — clear if invalid format
+if ($filter_from !== '' && !validate_date($filter_from)) $filter_from = '';
+if ($filter_to   !== '' && !validate_date($filter_to))   $filter_to   = '';
 $page          = max(1, (int)($_GET['page'] ?? 1));
 $per_page      = 50;
 $offset        = ($page - 1) * $per_page;
@@ -23,9 +27,9 @@ $where   = ["a.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)"];
 $params  = [];
 $types   = '';
 
-if ($filter_user !== '') {
+if ($filter_user > 0) {
     $where[]  = 'a.user_id = ?';
-    $params[] = (int)$filter_user;
+    $params[] = $filter_user;
     $types   .= 'i';
 }
 if ($filter_action !== '') {
@@ -86,7 +90,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     $exp_rows = $exp_stmt->get_result();
 
     $filter_labels = [];
-    if ($filter_user !== '')   $filter_labels[] = 'User ID: ' . $filter_user;
+    if ($filter_user > 0)      $filter_labels[] = 'User ID: ' . $filter_user;
     if ($filter_action !== '') $filter_labels[] = 'Action: ' . $filter_action;
     if ($filter_search !== '') $filter_labels[] = 'Search: "' . $filter_search . '"';
     if ($filter_from !== '')   $filter_labels[] = 'From: ' . date('M d, Y', strtotime($filter_from));

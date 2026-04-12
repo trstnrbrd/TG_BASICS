@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
+require_once '../../config/validators.php';
 require_once '../../config/settings.php';
 
 $urg_days = (int)getSetting($conn, 'renewal_urgent_days', '7');
@@ -12,8 +13,8 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'supe
 }
 
 // ── FILTERS ──
-$filter       = trim($_GET['filter'] ?? 'all');   // all | urgent | expiring | stable | expired
-$search       = trim($_GET['search'] ?? '');
+$filter       = san_enum($_GET['filter'] ?? 'all', ['all', 'urgent', 'expiring', 'stable', 'expired']);
+$search       = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
 $show_renewed = isset($_GET['show_renewed']) && $_GET['show_renewed'] === '1';
 
 // ── BUILD QUERY ──

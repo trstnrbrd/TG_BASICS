@@ -1,12 +1,13 @@
 <?php
 require_once __DIR__ . "/../config/session.php";
 require_once '../config/db.php';
+require_once '../config/validators.php';
 require_once '../config/settings.php';
 require_once '../includes/icons.php';
 
 $status  = 'invalid';
 $message = '';
-$token   = $_GET['token'] ?? '';
+$token   = san_str($_GET['token'] ?? '', MAX_TOKEN);
 
 if ($token !== '') {
     $stmt = $conn->prepare("

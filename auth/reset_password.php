@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . "/../config/session.php";
 require_once '../config/db.php';
+require_once '../config/validators.php';
 require_once '../includes/icons.php';
 
 if (isset($_SESSION['user_id'])) {
@@ -8,7 +9,7 @@ if (isset($_SESSION['user_id'])) {
     exit;
 }
 
-$token   = trim($_GET['token'] ?? '');
+$token   = san_str($_GET['token'] ?? '', MAX_TOKEN);
 $error   = '';
 $success = false;
 $record  = null;
@@ -39,11 +40,11 @@ if (!$record) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $record && !$record['used'] && strtotime($record['expires_at']) >= time()) {
-    $new_password = trim($_POST['new_password'] ?? '');
-    $confirm_pw   = trim($_POST['confirm_password'] ?? '');
+    $new_password = san_str($_POST['new_password'] ?? '', MAX_PASSWORD);
+    $confirm_pw   = san_str($_POST['confirm_password'] ?? '', MAX_PASSWORD);
 
-    if (strlen($new_password) < 8) {
-        $error = 'Password must be at least 8 characters.';
+    if (!validate_password($new_password)) {
+        $error = 'Password must be 8–128 characters and include an uppercase letter, a number, and a special character.';
     } elseif ($new_password !== $confirm_pw) {
         $error = 'Passwords do not match.';
     } else {

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config/session.php';
 require_once '../../config/db.php';
+require_once '../../config/validators.php';
 require_once '../../config/settings.php';
 require_once '../../config/mailer.php';
 
@@ -19,7 +20,7 @@ $is_super = $role === 'super_admin';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
     header('Content-Type: application/json');
 
-    $section    = $_POST['section'];
+    $section    = san_str($_POST['section'] ?? '', 30);
     $admin_only = ['system_settings'];
 
     if (in_array($section, $admin_only) && !$is_super) {
@@ -94,14 +95,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
 
         // ── MY ACCOUNT ──
         case 'account':
-            $name   = trim($_POST['full_name'] ?? '');
-            $email  = trim($_POST['email'] ?? '');
-            $cur_pw = $_POST['current_password'] ?? '';
-            $new_pw = $_POST['new_password'] ?? '';
-            $cfm_pw = $_POST['confirm_password'] ?? '';
+            $name   = san_str($_POST['full_name'] ?? '', MAX_NAME);
+            $email  = san_str($_POST['email'] ?? '', MAX_EMAIL);
+            $cur_pw = san_str($_POST['current_password'] ?? '', MAX_PASSWORD);
+            $new_pw = san_str($_POST['new_password'] ?? '', MAX_PASSWORD);
+            $cfm_pw = san_str($_POST['confirm_password'] ?? '', MAX_PASSWORD);
 
             if ($name === '') {
                 echo json_encode(['ok' => false, 'error' => 'Full name is required.']);
+                exit;
+            }
+            if (!validate_name($name)) {
+                echo json_encode(['ok' => false, 'error' => 'Full name contains invalid characters.']);
                 exit;
             }
 
@@ -174,8 +179,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                     echo json_encode(['ok' => false, 'error' => 'Current password is required to change password.']);
                     exit;
                 }
-                if (strlen($new_pw) < 8) {
-                    echo json_encode(['ok' => false, 'error' => 'New password must be at least 8 characters.']);
+                if (!validate_password($new_pw)) {
+                    echo json_encode(['ok' => false, 'error' => 'Password must be 8–128 characters and include an uppercase letter, a number, and a special character.']);
                     exit;
                 }
                 if ($new_pw !== $cfm_pw) {

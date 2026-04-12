@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
+require_once '../../config/validators.php';
 require_once '../../includes/icons.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
@@ -15,9 +16,9 @@ $approved_claims = $conn->query("SELECT COUNT(*) as c FROM claims WHERE status =
 $denied_claims   = $conn->query("SELECT COUNT(*) as c FROM claims WHERE status = 'denied'")->fetch_assoc()['c'];
 
 // ── FILTERS ──
-$search        = trim($_GET['search'] ?? '');
-$filter_status = $_GET['status'] ?? 'all';
-$filter_type   = $_GET['type'] ?? 'all';
+$search        = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
+$filter_status = san_enum($_GET['status'] ?? 'all', ['all', 'document_collection', 'submitted', 'under_review', 'approved', 'denied', 'resolved']);
+$filter_type   = san_enum($_GET['type'] ?? 'all', array_merge(['all'], ALLOWED_CLAIM_TYPES));
 $sort_by       = $_GET['sort'] ?? 'newest';
 
 $where   = ["1=1"];

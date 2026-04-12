@@ -4,6 +4,7 @@ require_once '../config/db.php';
 require_once '../config/settings.php';
 require_once '../config/mailer.php';
 require_once '../config/rate_limit.php';
+require_once '../config/validators.php';
 require_once '../includes/icons.php';
 
 if (isset($_SESSION['user_id'])) {
@@ -29,11 +30,14 @@ $_lockout_mins = (int)getSetting($conn, 'lockout_duration', '15');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     rate_limit_check($conn, 'login');
-    $username = trim($_POST['username'] ?? '');
-    $password = trim($_POST['password'] ?? '');
+    $username = san_str($_POST['username'] ?? '', MAX_USERNAME);
+    $password = san_str($_POST['password'] ?? '', MAX_PASSWORD);
 
     if ($username === '' || $password === '') {
         $error = 'Please fill in all fields.';
+    } elseif (!validate_username($username)) {
+        $error = 'Invalid username format.';
+        rate_limit_record($conn, 'login');
     } else {
         $lock_check = $conn->prepare("SELECT failed_attempts, locked_until FROM users WHERE username = ?");
         $lock_check->bind_param('s', $username);

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
+require_once '../../config/validators.php';
 require_once '../../config/settings.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
@@ -114,12 +115,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
 
     if ($has_installments) {
         // Installment-based update
-        $amounts      = $_POST['installment_amount'] ?? [];
-        $pay_modes    = $_POST['payment_mode']       ?? [];
-        $ctrl_numbers = $_POST['control_number']     ?? [];
+        $raw_amounts  = $_POST['installment_amount'] ?? [];
+        $raw_modes    = $_POST['payment_mode']       ?? [];
+        $raw_ctrls    = $_POST['control_number']     ?? [];
+
+        // Sanitize arrays
+        $amounts      = array_map(fn($v) => san_float($v, 0.0), is_array($raw_amounts) ? $raw_amounts : []);
+        $pay_modes    = array_map(fn($v) => san_enum(is_string($v) ? $v : '', ALLOWED_PAYMENT_MODES), is_array($raw_modes) ? $raw_modes : []);
+        $ctrl_numbers = array_map(fn($v) => san_str(is_string($v) ? $v : '', 60), is_array($raw_ctrls) ? $raw_ctrls : []);
 
         $valid = true;
-        foreach ($amounts as $k => $v) {
+        foreach ($raw_amounts as $k => $v) {
             if (!is_numeric($v) || (float)$v < 0) {
                 $pay_errors[] = 'Installment #' . ($k + 1) . ' amount must be a valid non-negative number.';
                 $valid = false;
@@ -129,8 +135,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
         if ($valid) {
             foreach ($installments as $row) {
                 $idx      = $row['installment_no'] - 1;
-                $amt_paid = (float)($amounts[$idx] ?? 0);
-                $mode     = trim($pay_modes[$idx] ?? '');
+                $amt_paid = $amounts[$idx] ?? 0.0;
+                $mode     = $pay_modes[$idx] ?? '';
                 if ($amt_paid > 0 && $mode === '') {
                     $pay_errors[] = 'Payment ' . $row['installment_no'] . ' requires a mode of payment.';
                     $valid = false;
@@ -155,10 +161,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
             foreach ($installments as $row) {
                 $inst_no  = $row['installment_no'];
                 $idx      = $inst_no - 1;
-                $amt_paid = (float)($amounts[$idx] ?? 0);
+                $amt_paid = $amounts[$idx] ?? 0.0;
                 $paid_at  = $amt_paid > 0 ? date('Y-m-d H:i:s') : null;
-                $pay_mode = !empty($pay_modes[$idx])    ? trim($pay_modes[$idx])    : null;
-                $ctrl_num = !empty($ctrl_numbers[$idx]) ? trim($ctrl_numbers[$idx]) : null;
+                $pay_mode = !empty($pay_modes[$idx])    ? $pay_modes[$idx]    : null;
+                $ctrl_num = !empty($ctrl_numbers[$idx]) ? $ctrl_numbers[$idx] : null;
                 $total_paid += $amt_paid;
 
                 $upd_pp = $conn->prepare("UPDATE policy_payments SET amount_paid = ?, paid_at = ?, payment_mode = ?, control_number = ? WHERE payment_id = ?");
@@ -206,18 +212,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
 
     } else {
         // Legacy single-amount update (policies without installment rows)
-        $payment_amount = trim($_POST['payment_amount'] ?? '');
-        $payment_notes  = trim($_POST['payment_notes'] ?? '');
+        $payment_amount = san_float($_POST['payment_amount'] ?? '', 0.0);
+        $payment_notes  = san_str($_POST['payment_notes'] ?? '', MAX_TEXT);
 
-        if ($payment_amount === '' || !is_numeric($payment_amount))
-            $pay_errors[] = 'Payment amount must be a valid number.';
-        elseif ((float)$payment_amount <= 0)
+        if ($payment_amount <= 0)
             $pay_errors[] = 'Payment amount must be greater than zero.';
-        elseif ((float)$payment_amount > (float)$policy['balance'])
+        elseif ($payment_amount > (float)$policy['balance'])
             $pay_errors[] = 'Payment amount cannot exceed the remaining balance of PHP ' . number_format($policy['balance'], 2) . '.';
 
         if (empty($pay_errors)) {
-            $new_amount_paid = (float)$policy['amount_paid'] + (float)$payment_amount;
+            $new_amount_paid = (float)$policy['amount_paid'] + $payment_amount;
             $new_balance     = (float)$policy['total_premium'] - $new_amount_paid;
             $new_status      = ($new_balance <= 0) ? 'Paid' : 'Partial';
 
@@ -233,7 +237,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
             if ($upd->execute()) {
                 $uid  = $_SESSION['user_id'];
                 $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'PAYMENT_RECORDED', ?)");
-                $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' recorded payment of PHP ' . number_format((float)$payment_amount, 2) . ' for policy ' . $policy['policy_number'] . '. New balance: PHP ' . number_format($new_balance, 2) . '. Status: ' . $new_status . '.';
+                $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' recorded payment of PHP ' . number_format($payment_amount, 2) . ' for policy ' . $policy['policy_number'] . '. New balance: PHP ' . number_format($new_balance, 2) . '. Status: ' . $new_status . '.';
                 $log->bind_param('is', $uid, $desc);
                 $log->execute();
 

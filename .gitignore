@@ -1,27 +1,42 @@
-# Sensitive config (contains credentials)
+# ── CREDENTIALS / SENSITIVE CONFIG ──────────────────────────────────────────
+# These files contain DB passwords, SMTP credentials, etc.
+# Copy the .example versions and fill in real values locally.
 config/db.php
 config/mailer.php
-config/settings.php
-config/session.php
-tests/run_tests.php
-tests/TEST_CASES.md
-data_gathering (documentation)/Full interview transcript.txt
-data_gathering (documentation)/MANUSCRIPT.txt
 
-# Environment files
+# ── ENVIRONMENT FILES ─────────────────────────────────────────────────────────
 .env
 .env.*
 .env.local
 
-# Uploaded files (user-generated, confidential)
+# ── UPLOADED FILES (user-generated, confidential) ────────────────────────────
 uploads/avatars/*
 !uploads/avatars/.gitkeep
 uploads/claims/*
 !uploads/claims/.gitkeep
 
-# XAMPP / system files
+# ── VENDOR / DEPENDENCIES ────────────────────────────────────────────────────
+# PHPMailer is in vendor/src/ — keep it tracked since there's no composer.json.
+# If you add Composer later, uncomment the line below and delete vendor/ from git.
+# vendor/
+
+# ── XAMPP / OS FILES ─────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# PHP logs
+# ── PHP / SERVER LOGS ─────────────────────────────────────────────────────────
 *.log
+error_log
+
+# ── EDITOR / IDE ──────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── TESTS / DOCUMENTATION (internal only) ────────────────────────────────────
+tests/run_tests.php
+tests/TEST_CASES.md
+data_gathering (documentation)/Full interview transcript.txt
+data_gathering (documentation)/MANUSCRIPT.txt

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
+require_once '../../config/validators.php';
 require_once '../../includes/icons.php';
 require_once '../../config/mailer.php';
 
@@ -53,11 +54,11 @@ function fetchDocCounts($conn, $claim_id) {
 // Handle AJAX file upload
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_upload'])) {
     header('Content-Type: application/json');
-    $doc_field = $_POST['doc_field'] ?? '';
+    $doc_field = san_str($_POST['doc_field'] ?? '', 40);
     $allowed   = ['doc_insurance_policy', 'doc_or', 'doc_cr', 'doc_drivers_license', 'doc_affidavit', 'doc_estimate', 'doc_damage_photos'];
     $policy_expired_ajax = strtotime($claim['policy_end']) < strtotime(date('Y-m-d'));
     $docs_open_statuses = ['document_collection', 'submitted'];
-    if (!in_array($doc_field, $allowed) || !in_array($claim['status'], $docs_open_statuses) || $policy_expired_ajax) {
+    if (!in_array($doc_field, $allowed, true) || !in_array($claim['status'], $docs_open_statuses) || $policy_expired_ajax) {
         echo json_encode(['ok' => false, 'msg' => 'Not allowed.']); exit;
     }
 
@@ -314,11 +315,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_claim'])) {
 
 // Handle status update
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
-    $new_status    = trim($_POST['new_status'] ?? '');
-    $denial_reason = trim($_POST['denial_reason'] ?? '');
-    $notes         = trim($_POST['notes'] ?? '');
-
     $allowed_statuses = ['document_collection', 'submitted', 'under_review', 'approved', 'denied', 'resolved'];
+    $new_status    = san_enum($_POST['new_status'] ?? '', $allowed_statuses);
+    $denial_reason = san_str($_POST['denial_reason'] ?? '', MAX_TEXT);
+    $notes         = san_str($_POST['notes'] ?? '', MAX_TEXT);
 
     // Guard: block all status changes if policy is expired (except deny/resolve by admin)
     if ($policy_expired && !in_array($new_status, ['denied', 'resolved'])) {

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . "/../config/session.php";
 require_once '../config/db.php';
+require_once '../config/validators.php';
 require_once '../config/settings.php';
 require_once '../config/mailer.php';
 require_once '../config/rate_limit.php';
@@ -55,7 +56,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'resend') {
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     rate_limit_check($conn, 'verify_2fa');
-    $code = trim($_POST['code'] ?? '');
+    $code = san_str($_POST['code'] ?? '', 10);
 
     if (strlen($code) !== 6 || !ctype_digit($code)) {
         $error = 'Please enter a valid 6-digit code.';

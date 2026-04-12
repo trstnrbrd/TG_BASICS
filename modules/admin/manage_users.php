@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config/session.php';
 require_once '../../config/db.php';
+require_once '../../config/validators.php';
 require_once '../../config/mailer.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'super_admin') {
@@ -40,16 +41,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 // ── HANDLE CREATE ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'create') {
-    $new_name     = trim($_POST['new_full_name'] ?? '');
-    $new_email    = trim($_POST['new_email'] ?? '');
-    $new_username = trim($_POST['new_username'] ?? '');
-    $new_role     = trim($_POST['new_role'] ?? '');
+    $new_name     = san_str($_POST['new_full_name'] ?? '', MAX_NAME);
+    $new_email    = san_str($_POST['new_email'] ?? '', MAX_EMAIL);
+    $new_username = san_str($_POST['new_username'] ?? '', MAX_USERNAME);
+    $new_role     = san_enum($_POST['new_role'] ?? '', ['admin', 'mechanic']);
 
-    if ($new_name === '')     $errors[] = 'Full name is required.';
-    if ($new_email === '')    $errors[] = 'Email is required.';
-    if (!filter_var($new_email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Invalid email format.';
-    if ($new_username === '') $errors[] = 'Username is required.';
-    if (!in_array($new_role, ['admin', 'mechanic'])) $errors[] = 'Invalid role selected.';
+    if ($new_name === '')                    $errors[] = 'Full name is required.';
+    elseif (!validate_name($new_name))       $errors[] = 'Full name contains invalid characters.';
+    if ($new_email === '')                   $errors[] = 'Email is required.';
+    elseif (!validate_email($new_email))     $errors[] = 'Invalid email format.';
+    if ($new_username === '')                $errors[] = 'Username is required.';
+    elseif (!validate_username($new_username)) $errors[] = 'Username must be 3–50 alphanumeric characters or underscores.';
+    if ($new_role === '')                    $errors[] = 'Invalid role selected.';
 
     // Check duplicate username or email
     if (empty($errors)) {

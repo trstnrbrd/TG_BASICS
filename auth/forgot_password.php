@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . "/../config/session.php";
 require_once '../config/db.php';
+require_once '../config/validators.php';
 require_once '../config/settings.php';
 require_once '../config/mailer.php';
 require_once '../config/rate_limit.php';
@@ -16,7 +17,7 @@ $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     rate_limit_check($conn, 'forgot_password');
-    $email = trim($_POST['email'] ?? '');
+    $email = san_str($_POST['email'] ?? '', MAX_EMAIL);
 
     if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Please enter a valid email address.';

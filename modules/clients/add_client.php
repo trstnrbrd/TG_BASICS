@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
+require_once '../../config/validators.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
     header("Location: ../../auth/login.php");
@@ -14,29 +15,31 @@ $errors  = [];
 $success = false;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $full_name      = trim($_POST['full_name'] ?? '');
-    $contact_number = trim($_POST['contact_number'] ?? '');
-    $email          = trim($_POST['email'] ?? '');
-    $address        = trim($_POST['address'] ?? '');
-    $plate_number   = strtoupper(trim($_POST['plate_number'] ?? ''));
-    $make           = trim($_POST['make'] ?? '');
-    $model          = trim($_POST['model'] ?? '');
-    $year_model     = trim($_POST['year_model'] ?? '');
-    $color          = trim($_POST['color'] ?? '');
-    $motor_number   = trim($_POST['motor_number'] ?? '');
-    $serial_number  = trim($_POST['serial_number'] ?? '');
+    $full_name      = san_str($_POST['full_name'] ?? '', MAX_NAME);
+    $contact_number = san_str($_POST['contact_number'] ?? '', MAX_PHONE);
+    $email          = san_str($_POST['email'] ?? '', MAX_EMAIL);
+    $address        = san_str($_POST['address'] ?? '', MAX_ADDRESS);
+    $plate_number   = strtoupper(san_str($_POST['plate_number'] ?? '', MAX_PLATE));
+    $make           = san_str($_POST['make'] ?? '', MAX_MAKE_MODEL);
+    $model          = san_str($_POST['model'] ?? '', MAX_MAKE_MODEL);
+    $year_model     = san_int($_POST['year_model'] ?? 0, 1960, (int)date('Y') + 1);
+    $color          = san_str($_POST['color'] ?? '', MAX_COLOR);
+    $motor_number   = san_str($_POST['motor_number'] ?? '', MAX_MOTOR_SN);
+    $serial_number  = san_str($_POST['serial_number'] ?? '', MAX_MOTOR_SN);
 
-    if ($full_name === '')      $errors[] = 'Full name is required.';
-    if ($contact_number === '') $errors[] = 'Contact number is required.';
-    if ($address === '')        $errors[] = 'Address is required.';
-    if ($plate_number === '')   $errors[] = 'Plate number is required.';
-    if ($make === '')           $errors[] = 'Vehicle make is required.';
-    if ($model === '')          $errors[] = 'Vehicle model is required.';
-    if ($year_model === '')     $errors[] = 'Year model is required.';
-    if ($year_model !== '' && (!is_numeric($year_model) || $year_model < 1990 || $year_model > (int)date('Y') + 1))
-        $errors[] = 'Year model must be a valid year.';
-    if ($motor_number === '')   $errors[] = 'Engine number is required.';
-    if ($serial_number === '')  $errors[] = 'Chassis number is required.';
+    if ($full_name === '')                          $errors[] = 'Full name is required.';
+    elseif (!validate_name($full_name))             $errors[] = 'Full name contains invalid characters.';
+    if ($contact_number === '')                     $errors[] = 'Contact number is required.';
+    elseif (!validate_phone($contact_number))       $errors[] = 'Contact number must be a valid PH mobile number (09XXXXXXXXX).';
+    if ($email !== '' && !validate_email($email))   $errors[] = 'Please enter a valid email address.';
+    if ($address === '')                            $errors[] = 'Address is required.';
+    if ($plate_number === '')                       $errors[] = 'Plate number is required.';
+    elseif (!validate_plate($plate_number))         $errors[] = 'Plate number contains invalid characters.';
+    if ($make === '')                               $errors[] = 'Vehicle make is required.';
+    if ($model === '')                              $errors[] = 'Vehicle model is required.';
+    if ($year_model === 0)                          $errors[] = 'Year model must be a valid year (1960–' . ((int)date('Y') + 1) . ').';
+    if ($motor_number === '')                       $errors[] = 'Engine number is required.';
+    if ($serial_number === '')                      $errors[] = 'Chassis number is required.';
 
     if ($plate_number !== '') {
         $check = $conn->prepare("SELECT vehicle_id FROM vehicles WHERE plate_number = ?");

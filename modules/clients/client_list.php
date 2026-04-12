@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
+require_once '../../config/validators.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
     header("Location: ../../auth/login.php");
@@ -10,7 +11,7 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'supe
 // AJAX autocomplete
 if (isset($_GET['ajax_ac']) && isset($_GET['q'])) {
     header('Content-Type: application/json');
-    $q    = '%' . trim($_GET['q']) . '%';
+    $q    = '%' . san_str($_GET['q'], 100) . '%';
     $stmt = $conn->prepare("
         SELECT c.client_id, c.full_name, c.contact_number,
                v.plate_number, v.make, v.model
@@ -50,8 +51,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) 
 $full_name = $_SESSION['full_name'];
 $initials  = substr(implode('', array_map(fn($w) => strtoupper($w[0]), explode(' ', $full_name))), 0, 2);
 
-$search    = trim($_GET['search'] ?? '');
-$filter_by = $_GET['filter_by'] ?? 'all';
+$search    = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
+$filter_by = san_enum($_GET['filter_by'] ?? 'all', ['all', 'name', 'plate', 'contact', 'email']);
 $sort_by   = $_GET['sort'] ?? 'newest';
 $where     = '';
 $params    = [];

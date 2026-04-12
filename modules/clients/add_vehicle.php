@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
+require_once '../../config/validators.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
     header("Location: ../../auth/login.php");
@@ -27,20 +28,19 @@ if (!$client) {
 $errors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $plate_number  = strtoupper(trim($_POST['plate_number'] ?? ''));
-    $make          = trim($_POST['make'] ?? '');
-    $model         = trim($_POST['model'] ?? '');
-    $year_model    = trim($_POST['year_model'] ?? '');
-    $color         = trim($_POST['color'] ?? '');
-    $motor_number  = trim($_POST['motor_number'] ?? '');
-    $serial_number = trim($_POST['serial_number'] ?? '');
+    $plate_number  = strtoupper(san_str($_POST['plate_number'] ?? '', MAX_PLATE));
+    $make          = san_str($_POST['make'] ?? '', MAX_MAKE_MODEL);
+    $model         = san_str($_POST['model'] ?? '', MAX_MAKE_MODEL);
+    $year_model    = san_int($_POST['year_model'] ?? 0, 1960, (int)date('Y') + 1);
+    $color         = san_str($_POST['color'] ?? '', MAX_COLOR);
+    $motor_number  = strtoupper(san_str($_POST['motor_number'] ?? '', MAX_MOTOR_SN));
+    $serial_number = strtoupper(san_str($_POST['serial_number'] ?? '', MAX_MOTOR_SN));
 
     if ($plate_number === '')  $errors[] = 'Plate number is required.';
+    elseif (!validate_plate($plate_number)) $errors[] = 'Plate number contains invalid characters.';
     if ($make === '')          $errors[] = 'Vehicle make is required.';
     if ($model === '')         $errors[] = 'Vehicle model is required.';
-    if ($year_model === '')    $errors[] = 'Year model is required.';
-    if ($year_model !== '' && (!is_numeric($year_model) || $year_model < 1990 || $year_model > (int)date('Y') + 1))
-        $errors[] = 'Year model must be a valid year.';
+    if ($year_model === 0)     $errors[] = 'Year model must be a valid year (1960–' . ((int)date('Y') + 1) . ').';
     if ($motor_number === '')  $errors[] = 'Engine number is required.';
     if ($serial_number === '') $errors[] = 'Chassis number is required.';
 

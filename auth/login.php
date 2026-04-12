@@ -3,6 +3,7 @@ require_once __DIR__ . "/../config/session.php";
 require_once '../config/db.php';
 require_once '../config/settings.php';
 require_once '../config/mailer.php';
+require_once '../config/rate_limit.php';
 require_once '../includes/icons.php';
 
 if (isset($_SESSION['user_id'])) {
@@ -16,10 +17,18 @@ if (isset($_SESSION['user_id'])) {
 
 $error   = '';
 $lockout = false;
+
+// Show IP rate limit error from redirect
+if (!empty($_SESSION['rate_limit_error'])) {
+    $error = $_SESSION['rate_limit_error'];
+    $lockout = true;
+    unset($_SESSION['rate_limit_error']);
+}
 $_max_attempts = (int)getSetting($conn, 'max_login_attempts', '5');
 $_lockout_mins = (int)getSetting($conn, 'lockout_duration', '15');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    rate_limit_check($conn, 'login');
     $username = trim($_POST['username'] ?? '');
     $password = trim($_POST['password'] ?? '');
 
@@ -78,6 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
 
                     // No 2FA — normal login
+                    rate_limit_clear($conn, 'login');
                     $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'LOGIN', ?)");
                     $desc = $user['full_name'] . ' logged in.';
                     $log->bind_param('is', $user['user_id'], $desc);
@@ -115,6 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } else {
                     $error = 'Invalid username or password.';
                 }
+                rate_limit_record($conn, 'login');
             }
         }
     }

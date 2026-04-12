@@ -3,6 +3,7 @@ require_once __DIR__ . "/../config/session.php";
 require_once '../config/db.php';
 require_once '../config/settings.php';
 require_once '../config/mailer.php';
+require_once '../config/rate_limit.php';
 require_once '../includes/icons.php';
 
 // Must have a pending 2FA session
@@ -53,6 +54,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'resend') {
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    rate_limit_check($conn, 'verify_2fa');
     $code = trim($_POST['code'] ?? '');
 
     if (strlen($code) !== 6 || !ctype_digit($code)) {
@@ -80,6 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $log->execute();
 
             // Set full session
+            rate_limit_clear($conn, 'verify_2fa');
             $_SESSION['user_id']   = $pending_uid;
             $_SESSION['username']  = $pending_user;
             $_SESSION['role']      = $pending_role;
@@ -96,6 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         } else {
             $error = 'Invalid or expired code. Please try again or request a new one.';
+            rate_limit_record($conn, 'verify_2fa');
         }
     }
 }

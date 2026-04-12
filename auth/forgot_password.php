@@ -3,6 +3,7 @@ require_once __DIR__ . "/../config/session.php";
 require_once '../config/db.php';
 require_once '../config/settings.php';
 require_once '../config/mailer.php';
+require_once '../config/rate_limit.php';
 require_once '../includes/icons.php';
 
 if (isset($_SESSION['user_id'])) {
@@ -14,6 +15,7 @@ $sent  = false;
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    rate_limit_check($conn, 'forgot_password');
     $email = trim($_POST['email'] ?? '');
 
     if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -45,6 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         // Always show success — do not reveal whether the email exists
+        rate_limit_record($conn, 'forgot_password');
         $sent = true;
     }
 }

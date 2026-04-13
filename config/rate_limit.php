@@ -57,7 +57,10 @@ function rl_count(mysqli $conn, string $endpoint): int {
 function rate_limit_check(mysqli $conn, string $endpoint): void {
     // Prune old records first (keep table small)
     $cutoff = date('Y-m-d H:i:s', time() - RL_WINDOW_SECS);
-    $conn->query("DELETE FROM rate_limit_attempts WHERE attempted_at < '$cutoff'");
+    $prune = $conn->prepare("DELETE FROM rate_limit_attempts WHERE attempted_at < ?");
+    $prune->bind_param('s', $cutoff);
+    $prune->execute();
+    $prune->close();
 
     if (rl_count($conn, $endpoint) >= RL_MAX_ATTEMPTS) {
         http_response_code(429);
@@ -69,8 +72,14 @@ function rate_limit_check(mysqli $conn, string $endpoint): void {
             // Store error in session so the page can display it
             if (session_status() === PHP_SESSION_NONE) session_start();
             $_SESSION['rate_limit_error'] = 'Too many attempts from your IP address. Please wait 15 minutes before trying again.';
-            // Redirect back to the same page
-            $redirect = $_SERVER['HTTP_REFERER'] ?? '../auth/login.php';
+            // Validate referer is same host before redirecting — prevent open redirect
+            $redirect = '../auth/login.php';
+            if (!empty($_SERVER['HTTP_REFERER'])) {
+                $ref_host = parse_url($_SERVER['HTTP_REFERER'], PHP_URL_HOST);
+                if ($ref_host !== '' && $ref_host === ($_SERVER['HTTP_HOST'] ?? '')) {
+                    $redirect = $_SERVER['HTTP_REFERER'];
+                }
+            }
             header("Location: $redirect");
         }
         exit;

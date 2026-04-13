@@ -1,0 +1,146 @@
+/* ── repair_list.css ── */
+
+/* Page title row */
+.rl-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+.rl-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.rl-sub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+}
+
+/* Stat cards row */
+.rl-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.rl-stat {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  transition: box-shadow 0.15s, transform 0.15s;
+  cursor: default;
+}
+.rl-stat:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+.rl-stat-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.rl-stat-body { flex: 1; min-width: 0; }
+.rl-stat-value {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+.rl-stat-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-top: 0.15rem;
+}
+.rl-stat-trend {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin-top: 0.1rem;
+}
+
+/* Filter card */
+.rl-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  flex-wrap: wrap;
+}
+.rl-search-wrap {
+  flex: 1;
+  min-width: 200px;
+  position: relative;
+}
+.rl-search-wrap .search-icon {
+  position: absolute;
+  left: 0.7rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.rl-search-wrap .field-input {
+  padding-left: 2.1rem;
+}
+
+/* Table job number */
+.job-num {
+  font-weight: 700;
+  color: var(--gold);
+  font-size: 0.8rem;
+  font-family: monospace;
+  letter-spacing: 0.3px;
+}
+
+/* Table client/vehicle cell */
+.cell-primary {
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: var(--text-primary);
+}
+.cell-sub {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 0.1rem;
+}
+
+/* Table service */
+.cell-service {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* Table date */
+.cell-date {
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+.cell-date-muted {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .rl-stats { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 540px) {
+  .rl-stats { grid-template-columns: 1fr 1fr; }
+  .rl-stat-value { font-size: 1.3rem; }
+}

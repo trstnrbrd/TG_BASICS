@@ -207,3 +207,35 @@ function validate_search(string $v): string {
 function validate_amount(mixed $v): bool {
     return is_numeric($v) && (float)$v >= 0 && (float)$v <= 999_999_999.99;
 }
+
+// ── CSRF PROTECTION ───────────────────────────────────────────────────────────
+
+/**
+ * Return the current session CSRF token, generating one if needed.
+ */
+function csrf_token(): string {
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+/**
+ * Verify the CSRF token submitted with a form.
+ * Call at the top of every POST handler. Terminates with 403 on failure.
+ */
+function csrf_verify(): void {
+    $submitted = $_POST['csrf_token'] ?? '';
+    if (!isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $submitted)) {
+        http_response_code(403);
+        die('Invalid or missing CSRF token. Please go back and try again.');
+    }
+}
+
+/**
+ * Output a hidden CSRF input field for use inside <form> tags.
+ * Usage: <?= csrf_field() ?>
+ */
+function csrf_field(): string {
+    return '<input type="hidden" name="csrf_token" value="' . htmlspecialchars(csrf_token()) . '"/>';
+}

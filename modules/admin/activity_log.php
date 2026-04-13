@@ -199,10 +199,6 @@ require_once '../../includes/topbar.php';
 
   <div class="content">
 
-    <div class="page-header">
-      <div class="page-header-title"><?= icon('clipboard-list', 18) ?> Activity Log</div>
-      <div class="page-header-sub">Monitor all system activity. See who did what and when.</div>
-    </div>
 
     <!-- FILTERS -->
     <div class="card" style="margin-bottom:1.25rem;">

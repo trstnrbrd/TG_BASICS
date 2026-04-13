@@ -29,6 +29,7 @@ $errors  = [];
 $success = false;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_verify();
     $full_name      = san_str($_POST['full_name'] ?? '', MAX_NAME);
     $contact_number = san_str($_POST['contact_number'] ?? '', MAX_PHONE);
     $email          = san_str($_POST['email'] ?? '', MAX_EMAIL);
@@ -85,10 +86,6 @@ require_once '../../includes/topbar.php';
 
     <a href="view_client.php?id=<?= $client_id ?>" class="back-link"><?= icon('arrow-left', 14) ?> Back to Client Profile</a>
 
-    <div class="page-header">
-      <div class="page-header-title"><?= icon('pencil', 18) ?> Edit Client Information</div>
-      <div class="page-header-sub">Update the personal details of <?= htmlspecialchars($client['full_name']) ?>.</div>
-    </div>
 
     <?php if (!empty($errors)): ?>
     <div class="alert alert-danger">
@@ -102,6 +99,7 @@ require_once '../../includes/topbar.php';
     <?php endif; ?>
 
     <form method="POST" action="">
+      <?= csrf_field() ?>
       <div class="card">
         <div class="card-header">
           <div class="card-icon"><?= icon('user', 16) ?></div>

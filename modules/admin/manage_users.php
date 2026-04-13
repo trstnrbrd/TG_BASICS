@@ -18,6 +18,7 @@ $errors  = [];
 
 // ── HANDLE DELETE ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
+    csrf_verify();
     $del_id = (int)($_POST['user_id'] ?? 0);
 
     // Cannot delete yourself
@@ -41,6 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 // ── HANDLE CREATE ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'create') {
+    csrf_verify();
     $new_name     = san_str($_POST['new_full_name'] ?? '', MAX_NAME);
     $new_email    = san_str($_POST['new_email'] ?? '', MAX_EMAIL);
     $new_username = san_str($_POST['new_username'] ?? '', MAX_USERNAME);
@@ -129,10 +131,6 @@ require_once '../../includes/topbar.php';
 
   <div class="content">
 
-    <div class="page-header">
-      <div class="page-header-title"><?= icon('users', 18) ?> User Account Management</div>
-      <div class="page-header-sub">Only the owner can create or delete accounts. Admin and Mechanic accounts only.</div>
-    </div>
 
     <?php if ($success): ?>
     <script>
@@ -210,6 +208,7 @@ require_once '../../includes/topbar.php';
               <td>
                 <?php if ($u['role'] !== 'super_admin'): ?>
                 <form method="POST" action="">
+                  <?= csrf_field() ?>
                   <input type="hidden" name="action" value="delete"/>
                   <input type="hidden" name="user_id" value="<?= $u['user_id'] ?>"/>
                   <button type="button"
@@ -239,6 +238,7 @@ require_once '../../includes/topbar.php';
           </div>
         </div>
         <form method="POST" action="">
+          <?= csrf_field() ?>
           <input type="hidden" name="action" value="create"/>
           <div style="padding:1.25rem;display:flex;flex-direction:column;gap:0.9rem;">
 

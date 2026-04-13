@@ -92,6 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     // No 2FA — normal login
                     rate_limit_clear($conn, 'login');
+                    session_regenerate_id(true);
                     $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'LOGIN', ?)");
                     $desc = $user['full_name'] . ' logged in.';
                     $log->bind_param('is', $user['user_id'], $desc);

@@ -28,6 +28,7 @@ if (!$client) {
 $errors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_verify();
     $plate_number  = strtoupper(san_str($_POST['plate_number'] ?? '', MAX_PLATE));
     $make          = san_str($_POST['make'] ?? '', MAX_MAKE_MODEL);
     $model         = san_str($_POST['model'] ?? '', MAX_MAKE_MODEL);
@@ -90,10 +91,6 @@ require_once '../../includes/topbar.php';
 
     <a href="view_client.php?id=<?= $client_id ?>" class="back-link"><?= icon('arrow-left', 14) ?> Back to Client Profile</a>
 
-    <div class="page-header">
-      <div class="page-header-title"><?= icon('vehicle', 18) ?> Add New Vehicle</div>
-      <div class="page-header-sub">Adding a vehicle for <?= htmlspecialchars($client['full_name']) ?>.</div>
-    </div>
 
     <?php if (!empty($errors)): ?>
     <div class="alert alert-danger">
@@ -118,6 +115,7 @@ require_once '../../includes/topbar.php';
     </div>
 
     <form method="POST" action="">
+      <?= csrf_field() ?>
       <div class="card">
         <div class="card-header">
           <div class="card-icon"><?= icon('vehicle', 16) ?></div>

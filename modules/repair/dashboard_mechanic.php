@@ -88,7 +88,7 @@ require_once '../../includes/topbar.php';
             <div class="card-title">Quotations &amp; Receipts</div>
             <div class="card-sub">Generate and manage quotations</div>
           </div>
-          <a href="quotation_list.php" class="btn-sm-gold" style="margin-left:auto;"><?= icon('arrow-right', 14) ?> Go</a>
+          <a href="../quotations/quotation_list.php" class="btn-sm-gold" style="margin-left:auto;"><?= icon('arrow-right', 14) ?> Go</a>
         </div>
         <div style="padding:1.25rem 1.5rem;">
           <div class="empty-state" style="padding:1rem 0;">

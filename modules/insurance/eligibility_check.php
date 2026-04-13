@@ -135,10 +135,6 @@ require_once '../../includes/topbar.php';
 
     <a href="../admin/dashboard_admin.php" class="back-link"><?= icon('arrow-left', 14) ?> Back to Dashboard</a>
 
-    <div class="page-header">
-      <div class="page-header-title"><?= icon('shield-check', 18) ?> Insurance Eligibility and Policy Processing</div>
-      <div class="page-header-sub">Search a client, select a vehicle, and check PhilBritish Insurance eligibility before encoding a policy.</div>
-    </div>
 
     <!-- INFO BOX -->
     <div class="info-box" style="margin-bottom:1.25rem;">

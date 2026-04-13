@@ -43,22 +43,31 @@ if (!$policy) {
 
 // ── HANDLE DELETE ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_policy'])) {
+    csrf_verify();
     $with_claims = isset($_POST['delete_claims']) && $_POST['delete_claims'] === '1';
 
     if ($with_claims) {
         // Delete claim files first
-        $claim_rows = $conn->query("SELECT doc_or_cr_file, doc_drivers_license_file, doc_insurance_policy_file, doc_damage_photos_file, doc_police_report_file FROM claims WHERE policy_id = $policy_id");
         $upload_dir = __DIR__ . '/../../uploads/claims/';
+        $cr_stmt = $conn->prepare("SELECT doc_or_cr_file, doc_drivers_license_file, doc_insurance_policy_file, doc_damage_photos_file, doc_police_report_file FROM claims WHERE policy_id = ?");
+        $cr_stmt->bind_param('i', $policy_id);
+        $cr_stmt->execute();
+        $claim_rows = $cr_stmt->get_result();
         while ($cr = $claim_rows->fetch_assoc()) {
             foreach ($cr as $f) {
                 if ($f && file_exists($upload_dir . $f)) unlink($upload_dir . $f);
             }
         }
-        $photos = $conn->query("SELECT filename FROM claim_damage_photos cdp INNER JOIN claims c ON cdp.claim_id = c.claim_id WHERE c.policy_id = $policy_id");
+        $ph_stmt = $conn->prepare("SELECT filename FROM claim_damage_photos cdp INNER JOIN claims c ON cdp.claim_id = c.claim_id WHERE c.policy_id = ?");
+        $ph_stmt->bind_param('i', $policy_id);
+        $ph_stmt->execute();
+        $photos = $ph_stmt->get_result();
         while ($p = $photos->fetch_assoc()) {
             if (file_exists($upload_dir . $p['filename'])) unlink($upload_dir . $p['filename']);
         }
-        $conn->query("DELETE cl FROM claims cl WHERE cl.policy_id = $policy_id");
+        $del_cl = $conn->prepare("DELETE cl FROM claims cl WHERE cl.policy_id = ?");
+        $del_cl->bind_param('i', $policy_id);
+        $del_cl->execute();
     }
 
     $del = $conn->prepare("DELETE FROM insurance_policies WHERE policy_id = ?");
@@ -95,14 +104,18 @@ if ($has_installments && $_SERVER['REQUEST_METHOD'] !== 'POST') {
     }
     $current_status = $policy['payment_status'];
     if ($auto_overdue && $current_status !== 'Paid' && $current_status !== 'Overdue') {
-        $conn->query("UPDATE insurance_policies SET payment_status = 'Overdue' WHERE policy_id = $policy_id");
+        $ao_upd = $conn->prepare("UPDATE insurance_policies SET payment_status = 'Overdue' WHERE policy_id = ?");
+        $ao_upd->bind_param('i', $policy_id);
+        $ao_upd->execute();
         $policy['payment_status'] = 'Overdue';
     } elseif (!$auto_overdue && $current_status === 'Overdue') {
         // Recalculate back to correct status
         $total_paid_check = array_sum(array_column($installments, 'amount_paid'));
         $bal_check = (float)$policy['total_premium'] - $total_paid_check;
         $revert = $bal_check <= 0 ? 'Paid' : ($total_paid_check > 0 ? 'Partial' : 'Unpaid');
-        $conn->query("UPDATE insurance_policies SET payment_status = '$revert' WHERE policy_id = $policy_id");
+        $rv_upd = $conn->prepare("UPDATE insurance_policies SET payment_status = ? WHERE policy_id = ?");
+        $rv_upd->bind_param('si', $revert, $policy_id);
+        $rv_upd->execute();
         $policy['payment_status'] = $revert;
     }
 }
@@ -112,6 +125,7 @@ $pay_errors  = [];
 $pay_success = false;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
+    csrf_verify();
 
     if ($has_installments) {
         // Installment-based update
@@ -521,6 +535,7 @@ require_once '../../includes/topbar.php';
           <?php endif; ?>
 
           <form method="POST" action="">
+            <?= csrf_field() ?>
             <input type="hidden" name="record_payment" value="1"/>
 
             <?php if ($has_installments): ?>
@@ -662,6 +677,7 @@ require_once '../../includes/topbar.php';
 
 <!-- Hidden delete form — submitted by Swal -->
 <form id="delete-policy-form" method="POST" action="" style="display:none;">
+  <?= csrf_field() ?>
   <input type="hidden" name="delete_policy" value="1"/>
   <input type="hidden" name="delete_claims" id="delete-claims-val" value="0"/>
 </form>

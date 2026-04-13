@@ -35,15 +35,23 @@ $claim = $stmt->get_result()->fetch_assoc();
 if (!$claim) { header("Location: claims_list.php"); exit; }
 
 // Display number — sequential position, not raw ID
-$display_num = $conn->query("SELECT COUNT(*) as pos FROM claims WHERE claim_id <= $claim_id")->fetch_assoc()['pos'];
+$dn_stmt = $conn->prepare("SELECT COUNT(*) as pos FROM claims WHERE claim_id <= ?");
+$dn_stmt->bind_param('i', $claim_id);
+$dn_stmt->execute();
+$display_num = $dn_stmt->get_result()->fetch_assoc()['pos'];
 
 // Load damage photos
-$dp_res = $conn->query("SELECT photo_id, filename FROM claim_damage_photos WHERE claim_id = $claim_id ORDER BY uploaded_at ASC");
-$damage_photos = $dp_res->fetch_all(MYSQLI_ASSOC);
+$dp_stmt = $conn->prepare("SELECT photo_id, filename FROM claim_damage_photos WHERE claim_id = ? ORDER BY uploaded_at ASC");
+$dp_stmt->bind_param('i', $claim_id);
+$dp_stmt->execute();
+$damage_photos = $dp_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
 // Helper: re-fetch doc counts
 function fetchDocCounts($conn, $claim_id) {
-    $chk = $conn->query("SELECT claim_type, doc_insurance_policy, doc_or, doc_cr, doc_drivers_license, doc_affidavit, doc_estimate, doc_damage_photos FROM claims WHERE claim_id = $claim_id")->fetch_assoc();
+    $s = $conn->prepare("SELECT claim_type, doc_insurance_policy, doc_or, doc_cr, doc_drivers_license, doc_affidavit, doc_estimate, doc_damage_photos FROM claims WHERE claim_id = ?");
+    $s->bind_param('i', $claim_id);
+    $s->execute();
+    $chk = $s->get_result()->fetch_assoc();
     $req  = 7; // policy, OR, CR, license, affidavit, estimate, photos
     $done = (int)$chk['doc_insurance_policy'] + (int)$chk['doc_or'] + (int)$chk['doc_cr']
           + (int)$chk['doc_drivers_license'] + (int)$chk['doc_affidavit']
@@ -83,8 +91,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_upload'])) {
     $filename = 'claim_' . $claim_id . '_' . $doc_field . '_' . time() . '.' . $ext;
     $dest     = __DIR__ . '/../../uploads/claims/' . $filename;
 
-    // Delete old file if exists
-    $old = $conn->query("SELECT {$doc_field}_file FROM claims WHERE claim_id = $claim_id")->fetch_assoc()["{$doc_field}_file"] ?? '';
+    // Delete old file if exists — $doc_field is already whitelist-validated above
+    $file_col_old = $doc_field . '_file';
+    $old_stmt = $conn->prepare("SELECT `{$file_col_old}` FROM claims WHERE claim_id = ?");
+    $old_stmt->bind_param('i', $claim_id);
+    $old_stmt->execute();
+    $old = $old_stmt->get_result()->fetch_assoc()[$file_col_old] ?? '';
     if ($old && file_exists(__DIR__ . '/../../uploads/claims/' . $old)) {
         unlink(__DIR__ . '/../../uploads/claims/' . $old);
     }
@@ -108,14 +120,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_upload'])) {
 // Handle AJAX file remove
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_remove_doc'])) {
     header('Content-Type: application/json');
-    $doc_field = $_POST['doc_field'] ?? '';
+    $doc_field = san_str($_POST['doc_field'] ?? '', 40);
     $allowed   = ['doc_insurance_policy', 'doc_or', 'doc_cr', 'doc_drivers_license', 'doc_affidavit', 'doc_estimate', 'doc_damage_photos'];
-    if (!in_array($doc_field, $allowed) || !in_array($claim['status'], ['document_collection', 'submitted'])) {
+    if (!in_array($doc_field, $allowed, true) || !in_array($claim['status'], ['document_collection', 'submitted'])) {
         echo json_encode(['ok' => false]); exit;
     }
 
     $file_col = $doc_field . '_file';
-    $old = $conn->query("SELECT {$file_col} FROM claims WHERE claim_id = $claim_id")->fetch_assoc()[$file_col] ?? '';
+    $rm_stmt = $conn->prepare("SELECT `{$file_col}` FROM claims WHERE claim_id = ?");
+    $rm_stmt->bind_param('i', $claim_id);
+    $rm_stmt->execute();
+    $old = $rm_stmt->get_result()->fetch_assoc()[$file_col] ?? '';
     if ($old && file_exists(__DIR__ . '/../../uploads/claims/' . $old)) {
         unlink(__DIR__ . '/../../uploads/claims/' . $old);
     }
@@ -157,7 +172,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_damage_upload'])
     $photo_id = $conn->insert_id;
 
     // Mark doc_damage_photos = 1 if not already
-    $conn->query("UPDATE claims SET doc_damage_photos = 1 WHERE claim_id = $claim_id AND doc_damage_photos = 0");
+    $dmg_upd = $conn->prepare("UPDATE claims SET doc_damage_photos = 1 WHERE claim_id = ? AND doc_damage_photos = 0");
+    $dmg_upd->bind_param('i', $claim_id);
+    $dmg_upd->execute();
 
     $counts = fetchDocCounts($conn, $claim_id);
     $url    = '../../uploads/claims/' . $filename;
@@ -172,17 +189,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_damage_remove'])
     if (!in_array($claim['status'], ['document_collection', 'submitted']) || $policy_expired_ajax) { echo json_encode(['ok' => false]); exit; }
 
     $photo_id = (int)($_POST['photo_id'] ?? 0);
-    $row = $conn->query("SELECT filename FROM claim_damage_photos WHERE photo_id = $photo_id AND claim_id = $claim_id")->fetch_assoc();
+    $ph_sel = $conn->prepare("SELECT filename FROM claim_damage_photos WHERE photo_id = ? AND claim_id = ?");
+    $ph_sel->bind_param('ii', $photo_id, $claim_id);
+    $ph_sel->execute();
+    $row = $ph_sel->get_result()->fetch_assoc();
     if ($row) {
         $path = __DIR__ . '/../../uploads/claims/' . $row['filename'];
         if (file_exists($path)) unlink($path);
-        $conn->query("DELETE FROM claim_damage_photos WHERE photo_id = $photo_id");
+        $ph_del = $conn->prepare("DELETE FROM claim_damage_photos WHERE photo_id = ?");
+        $ph_del->bind_param('i', $photo_id);
+        $ph_del->execute();
     }
 
     // If no photos remain, uncheck doc_damage_photos
-    $remaining = $conn->query("SELECT COUNT(*) as c FROM claim_damage_photos WHERE claim_id = $claim_id")->fetch_assoc()['c'];
+    $rem_stmt = $conn->prepare("SELECT COUNT(*) as c FROM claim_damage_photos WHERE claim_id = ?");
+    $rem_stmt->bind_param('i', $claim_id);
+    $rem_stmt->execute();
+    $remaining = $rem_stmt->get_result()->fetch_assoc()['c'];
     if ($remaining === 0) {
-        $conn->query("UPDATE claims SET doc_damage_photos = 0 WHERE claim_id = $claim_id");
+        $uncheck = $conn->prepare("UPDATE claims SET doc_damage_photos = 0 WHERE claim_id = ?");
+        $uncheck->bind_param('i', $claim_id);
+        $uncheck->execute();
     }
 
     $counts = fetchDocCounts($conn, $claim_id);
@@ -201,7 +228,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_send_admin_email
     }
 
     // Reload fresh claim data
-    $fresh = $conn->query("SELECT * FROM claims WHERE claim_id = $claim_id")->fetch_assoc();
+    $fr_stmt = $conn->prepare("SELECT * FROM claims WHERE claim_id = ?");
+    $fr_stmt->bind_param('i', $claim_id);
+    $fr_stmt->execute();
+    $fresh = $fr_stmt->get_result()->fetch_assoc();
 
     $upload_dir = __DIR__ . '/../../uploads/claims/';
 
@@ -233,7 +263,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_send_admin_email
     }
 
     // Also attach damage photos (stored in separate table)
-    $photos = $conn->query("SELECT filename FROM claim_damage_photos WHERE claim_id = $claim_id ORDER BY uploaded_at ASC");
+    $ph_stmt = $conn->prepare("SELECT filename FROM claim_damage_photos WHERE claim_id = ? ORDER BY uploaded_at ASC");
+    $ph_stmt->bind_param('i', $claim_id);
+    $ph_stmt->execute();
+    $photos = $ph_stmt->get_result();
     $photo_idx = 1;
     while ($ph = $photos->fetch_assoc()) {
         $ph_path = $upload_dir . $ph['filename'];
@@ -269,7 +302,10 @@ function deleteClaim($conn, $claim_id, $display_num, $user_id, $actor_name) {
         'doc_drivers_license_file', 'doc_affidavit_file', 'doc_estimate_file',
         'doc_damage_photos_file', 'doc_or_cr_file', 'doc_police_report_file',
     ];
-    $row = $conn->query("SELECT " . implode(',', $doc_cols) . " FROM claims WHERE claim_id = $claim_id")->fetch_assoc();
+    $dc_stmt = $conn->prepare("SELECT " . implode(',', $doc_cols) . " FROM claims WHERE claim_id = ?");
+    $dc_stmt->bind_param('i', $claim_id);
+    $dc_stmt->execute();
+    $row = $dc_stmt->get_result()->fetch_assoc();
     if ($row) {
         foreach ($doc_cols as $col) {
             if (!empty($row[$col]) && file_exists($upload_dir . $row[$col])) {
@@ -279,7 +315,10 @@ function deleteClaim($conn, $claim_id, $display_num, $user_id, $actor_name) {
     }
 
     // Delete damage photos from claim_damage_photos table + files
-    $photos = $conn->query("SELECT filename FROM claim_damage_photos WHERE claim_id = $claim_id");
+    $dp2 = $conn->prepare("SELECT filename FROM claim_damage_photos WHERE claim_id = ?");
+    $dp2->bind_param('i', $claim_id);
+    $dp2->execute();
+    $photos = $dp2->get_result();
     while ($p = $photos->fetch_assoc()) {
         if (file_exists($upload_dir . $p['filename'])) unlink($upload_dir . $p['filename']);
     }
@@ -308,6 +347,7 @@ if (isset($_GET['do_delete']) && $_GET['do_delete'] === '1') {
 
 // Handle delete (POST from view page)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_claim'])) {
+    csrf_verify();
     deleteClaim($conn, $claim_id, $display_num, $_SESSION['user_id'], $_SESSION['full_name'] ?? 'Unknown');
     header("Location: claims_list.php?success=" . urlencode('Claim #' . $display_num . ' has been deleted.'));
     exit;
@@ -315,6 +355,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_claim'])) {
 
 // Handle status update
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
+    csrf_verify();
     $allowed_statuses = ['document_collection', 'submitted', 'under_review', 'approved', 'denied', 'resolved'];
     $new_status    = san_enum($_POST['new_status'] ?? '', $allowed_statuses);
     $denial_reason = san_str($_POST['denial_reason'] ?? '', MAX_TEXT);
@@ -447,6 +488,7 @@ require_once '../../includes/topbar.php';
       </div>
       <?php if (in_array($claim['status'], ['resolved', 'denied'])): ?>
       <form method="POST" style="display:inline;">
+        <?= csrf_field() ?>
         <input type="hidden" name="delete_claim" value="1"/>
         <button type="button" class="btn-primary js-delete-claim"
           style="background:var(--danger);color:#fff;border-color:var(--danger);display:flex;align-items:center;gap:0.5rem;"
@@ -800,6 +842,7 @@ require_once '../../includes/topbar.php';
             </div>
             <?php endif; ?>
             <form method="POST" id="status-form">
+              <?= csrf_field() ?>
               <input type="hidden" name="update_status" value="1"/>
               <div class="field" style="margin-bottom:0.75rem;">
                 <label class="field-label">New Status</label>

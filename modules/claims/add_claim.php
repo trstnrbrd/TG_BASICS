@@ -44,6 +44,7 @@ if (isset($_GET['ajax_policies']) && isset($_GET['client_id'])) {
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_verify();
     $client_id    = (int)($_POST['client_id'] ?? 0);
     $policy_id    = (int)($_POST['policy_id'] ?? 0);
     $claim_type   = san_enum($_POST['claim_type'] ?? '', ALLOWED_CLAIM_TYPES);
@@ -103,6 +104,7 @@ require_once '../../includes/topbar.php';
       <?php endif; ?>
 
       <form method="POST" action="">
+        <?= csrf_field() ?>
         <div class="card" style="margin-bottom:1.25rem;overflow:visible;">
           <div class="card-header">
             <div class="card-icon"><?= icon('user', 16) ?></div>

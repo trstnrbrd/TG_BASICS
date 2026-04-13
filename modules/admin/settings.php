@@ -20,6 +20,14 @@ $is_super = $role === 'super_admin';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
     header('Content-Type: application/json');
 
+    // CSRF check for all POST handlers
+    $submitted_token = $_POST['csrf_token'] ?? '';
+    if (!isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $submitted_token)) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Invalid or missing CSRF token.']);
+        exit;
+    }
+
     $section    = san_str($_POST['section'] ?? '', 30);
     $admin_only = ['system_settings'];
 
@@ -336,11 +344,8 @@ require_once '../../includes/topbar.php';
 ?>
 
   <div class="content">
+    <script>window._csrf = <?= json_encode(csrf_token()) ?>;</script>
 
-    <div class="page-header">
-      <div class="page-header-title"><?= icon('cog', 18) ?> System Settings</div>
-      <div class="page-header-sub">Configure your profile and system preferences for TG-BASICS.</div>
-    </div>
 
     <?php
     $has_photo   = !empty($current_user['profile_photo']);
@@ -408,6 +413,7 @@ require_once '../../includes/topbar.php';
 
       <form class="settings-form" data-section="account">
         <input type="hidden" name="section" value="account"/>
+        <?= csrf_field() ?>
 
         <div class="card" style="margin-bottom:1.5rem;">
           <div class="card-header">
@@ -516,7 +522,7 @@ require_once '../../includes/topbar.php';
 
         <!-- Bottom save button -->
         <div class="panel-save-bar">
-          <button type="submit" class="btn-primary"><?= icon('check', 14) ?> Save Changes</button>
+          <button type="button" class="btn-primary js-settings-save"><?= icon('check', 14) ?> Save Changes</button>
         </div>
       </form>
     </div>
@@ -585,6 +591,7 @@ require_once '../../includes/topbar.php';
     <div class="settings-panel" id="panel-system_settings">
       <form class="settings-form" data-section="system_settings">
         <input type="hidden" name="section" value="system_settings"/>
+        <?= csrf_field() ?>
 
         <!-- Company Profile -->
         <div class="card" style="margin-bottom:1.5rem;">
@@ -797,7 +804,7 @@ require_once '../../includes/topbar.php';
 
         <!-- Bottom save button -->
         <div class="panel-save-bar">
-          <button type="submit" class="btn-primary"><?= icon('check', 14) ?> Save All Settings</button>
+          <button type="button" class="btn-primary js-settings-save"><?= icon('check', 14) ?> Save All Settings</button>
         </div>
       </form>
     </div>

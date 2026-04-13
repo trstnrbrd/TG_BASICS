@@ -248,13 +248,12 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
 
   /* ── PAGE HEADER ── */
   .page-header {
-    background: var(--sidebar-bg); border-radius: 12px;
-    padding: 1.5rem 1.75rem; margin-bottom: 1.75rem;
-    position: relative; overflow: hidden;
+    display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem;
+    margin-bottom: 1.5rem;
   }
-  .page-header::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--gold-bright), var(--gold-muted), transparent); }
-  .page-header-title { font-size: 1.1rem; font-weight: 800; color: #fff; margin-bottom: 0.2rem; }
-  .page-header-sub   { font-size: 0.75rem; color: rgba(200,192,176,0.5); }
+  .page-header::before { display: none; }
+  .page-header-title { font-size: 1.05rem; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; }
+  .page-header-sub   { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem; }
 
   /* ── INFO BOX ── */
   .info-box {

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
+require_once '../../config/validators.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
     header("Location: ../../auth/login.php");
@@ -15,6 +16,7 @@ if ($client_id === 0) {
 
 // Handle delete
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) {
+    csrf_verify();
     $del_id = (int)$_POST['delete_client_id'];
     $cstmt  = $conn->prepare("SELECT full_name FROM clients WHERE client_id = ?");
     $cstmt->bind_param('i', $del_id);
@@ -63,6 +65,19 @@ $clstmt = $conn->prepare("
 $clstmt->bind_param('i', $client_id);
 $clstmt->execute();
 $claims = $clstmt->get_result();
+
+// Load repair jobs
+$rjstmt = $conn->prepare("
+    SELECT j.job_id, j.job_number, j.service_type, j.status, j.repair_date, j.release_date,
+           v.plate_number, v.make, v.model
+    FROM repair_jobs j
+    INNER JOIN vehicles v ON j.vehicle_id = v.vehicle_id
+    WHERE j.client_id = ?
+    ORDER BY j.created_at DESC
+");
+$rjstmt->bind_param('i', $client_id);
+$rjstmt->execute();
+$repair_jobs = $rjstmt->get_result();
 
 // Load policies
 $pstmt = $conn->prepare("
@@ -136,6 +151,7 @@ require_once '../../includes/topbar.php';
           <?= icon('pencil', 14) ?> Edit Client
         </a>
         <form method="POST" action="" style="display:inline;">
+          <?= csrf_field() ?>
           <input type="hidden" name="delete_client_id" value="<?= $client_id ?>"/>
           <button type="button"
              class="btn-ghost js-delete-client-profile"
@@ -265,6 +281,7 @@ require_once '../../includes/topbar.php';
                   <form method="POST" action="delete_vehicle.php" style="display:inline;"
                         class="js-delete-vehicle-form"
                         data-plate="<?= htmlspecialchars($v['plate_number'], ENT_QUOTES) ?>">
+                    <?= csrf_field() ?>
                     <input type="hidden" name="vehicle_id" value="<?= $v['vehicle_id'] ?>"/>
                     <button type="submit" class="btn-sm-danger" title="Delete">
                       <?= icon('trash', 14) ?>
@@ -454,20 +471,82 @@ require_once '../../includes/topbar.php';
       <?php endif; ?>
     </div>
 
-    <!-- REPAIR JOBS PLACEHOLDER -->
+    <!-- REPAIR JOBS -->
+    <?php
+    $repair_status_badges = [
+        'pending'     => ['Pending',     'badge-yellow'],
+        'in_progress' => ['In Progress', 'badge-blue'],
+        'for_pickup'  => ['For Pickup',  'badge-gold'],
+        'completed'   => ['Completed',   'badge-green'],
+        'cancelled'   => ['Cancelled',   'badge-gray'],
+    ];
+    $repair_service_labels = [
+        'repair_panel'   => 'Per Panel Repair',
+        'repair_full'    => 'Full Body Repair',
+        'paint_panel'    => 'Per Panel Paint',
+        'paint_full'     => 'Full Body Paint',
+        'washover_basic' => 'Basic Wash Over',
+        'washover_full'  => 'Fully Wash Over',
+        'custom'         => 'Custom / Mixed',
+    ];
+    ?>
     <div class="card">
-      <div class="card-header">
-        <div class="card-icon"><?= icon('wrench', 16) ?></div>
-        <div>
-          <div class="card-title">Repair Jobs</div>
-          <div class="card-sub">Repair history for this client</div>
+      <div class="card-header" style="justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+          <div class="card-icon"><?= icon('wrench', 16) ?></div>
+          <div>
+            <div class="card-title">Repair Jobs</div>
+            <div class="card-sub">Repair history for this client</div>
+          </div>
         </div>
+        <a href="../repair/repair_list.php" class="btn-sm-gold"><?= icon('wrench', 12) ?> All Jobs</a>
       </div>
+      <?php if ($repair_jobs->num_rows > 0): ?>
+      <table class="tg-table">
+        <thead>
+          <tr>
+            <th>Job #</th>
+            <th>Vehicle</th>
+            <th>Service</th>
+            <th>Repair Date</th>
+            <th>Est. Release</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php while ($rj = $repair_jobs->fetch_assoc()):
+              $rsb = $repair_status_badges[$rj['status']] ?? ['Unknown', 'badge-gray'];
+              $rsv = $repair_service_labels[$rj['service_type']] ?? $rj['service_type'];
+          ?>
+          <tr>
+            <td style="font-weight:700;color:var(--gold);font-size:0.8rem;"><?= htmlspecialchars($rj['job_number']) ?></td>
+            <td>
+              <div style="font-weight:600;font-size:0.82rem;"><?= htmlspecialchars($rj['plate_number']) ?></div>
+              <div style="font-size:0.7rem;color:var(--text-muted);"><?= htmlspecialchars($rj['make'] . ' ' . $rj['model']) ?></div>
+            </td>
+            <td style="font-size:0.8rem;"><?= htmlspecialchars($rsv) ?></td>
+            <td style="font-size:0.8rem;white-space:nowrap;"><?= date('M d, Y', strtotime($rj['repair_date'])) ?></td>
+            <td style="font-size:0.8rem;white-space:nowrap;color:var(--text-muted);">
+              <?= $rj['release_date'] ? date('M d, Y', strtotime($rj['release_date'])) : '—' ?>
+            </td>
+            <td><span class="badge <?= $rsb[1] ?>"><?= $rsb[0] ?></span></td>
+            <td>
+              <a href="../repair/view_repair.php?id=<?= $rj['job_id'] ?>" class="btn-sm-gold" title="View">
+                <?= icon('eye', 14) ?>
+              </a>
+            </td>
+          </tr>
+          <?php endwhile; ?>
+        </tbody>
+      </table>
+      <?php else: ?>
       <div class="empty-state">
         <div class="empty-icon"><?= icon('wrench', 28) ?></div>
-        <div class="empty-title">Repair module coming soon</div>
-        <div class="empty-desc">Repair job history will appear here once Module 5 is complete.</div>
+        <div class="empty-title">No repair jobs yet</div>
+        <div class="empty-desc">No repair jobs have been filed for this client yet.</div>
       </div>
+      <?php endif; ?>
     </div>
 
   </div>

@@ -84,6 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // Set full session
             rate_limit_clear($conn, 'verify_2fa');
+            session_regenerate_id(true);
             $_SESSION['user_id']   = $pending_uid;
             $_SESSION['username']  = $pending_user;
             $_SESSION['role']      = $pending_role;

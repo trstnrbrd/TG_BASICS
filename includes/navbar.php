@@ -124,7 +124,7 @@ $role        = $_SESSION['role'] ?? '';
        class="nav-item <?= $active_page === 'repair' ? 'active' : '' ?>">
       <span class="nav-icon"><?= icon('wrench', 16) ?></span> Repair Jobs
     </a>
-    <a href="<?= $base_path ?>modules/repair/quotation_list.php"
+    <a href="<?= $base_path ?>modules/quotations/quotation_list.php"
        class="nav-item <?= $active_page === 'quotations' ? 'active' : '' ?>">
       <span class="nav-icon"><?= icon('receipt', 16) ?></span> Quotations &amp; Receipts
     </a>
@@ -169,7 +169,7 @@ $role        = $_SESSION['role'] ?? '';
        class="nav-item <?= $active_page === 'repair' ? 'active' : '' ?>">
       <span class="nav-icon"><?= icon('wrench', 16) ?></span> Repair Jobs
     </a>
-    <a href="<?= $base_path ?>modules/repair/quotation_list.php"
+    <a href="<?= $base_path ?>modules/quotations/quotation_list.php"
        class="nav-item <?= $active_page === 'quotations' ? 'active' : '' ?>">
       <span class="nav-icon"><?= icon('receipt', 16) ?></span> Quotations &amp; Receipts
     </a>

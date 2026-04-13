@@ -30,6 +30,7 @@ if (isset($_GET['ajax_ac']) && isset($_GET['q'])) {
 
 // Handle delete
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) {
+    csrf_verify();
     $del_id = (int)$_POST['delete_client_id'];
     $cstmt  = $conn->prepare("SELECT full_name FROM clients WHERE client_id = ?");
     $cstmt->bind_param('i', $del_id);
@@ -257,6 +258,7 @@ require_once '../../includes/topbar.php';
                     <?= icon('eye', 14) ?>
                   </a>
                   <form method="POST" action="" style="display:inline;">
+                    <?= csrf_field() ?>
                     <input type="hidden" name="delete_client_id" value="<?= $row['client_id'] ?>"/>
                     <button type="button"
                        class="btn-sm-danger js-delete-client"

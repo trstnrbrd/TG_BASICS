@@ -1,0 +1,142 @@
+/* ── add_repair.css — Unit Inspection / Add Repair Job ── */
+
+/* Car diagram wrapper */
+.car-diagram-wrap {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto auto;
+  gap: 1rem;
+  align-items: start;
+  margin-bottom: 1.25rem;
+  padding: 1rem;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.car-view-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.car-view-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.car-svg { width: 100%; height: auto; }
+
+/* SVG panels */
+.panel {
+  cursor: pointer;
+  transition: fill 0.15s, stroke 0.15s;
+}
+.panel:hover { fill: rgba(212,160,23,0.15) !important; stroke: var(--gold) !important; }
+.panel title { display: none; }
+
+.panel.minor { fill: rgba(217,119,6,0.25)  !important; stroke: #D97706 !important; stroke-width: 2 !important; }
+.panel.major { fill: rgba(220,38,38,0.28)  !important; stroke: #DC2626 !important; stroke-width: 2 !important; }
+
+.panel-lbl {
+  font-size: 7px;
+  fill: var(--text-muted);
+  pointer-events: none;
+  text-anchor: middle;
+}
+
+/* Legend */
+.legend-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+  padding: 0.25rem 0.65rem;
+  border-radius: 20px;
+}
+
+/* Table radio dots */
+.radio-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.radio-dot span {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  display: inline-block;
+  transition: all 0.15s;
+  position: relative;
+}
+.radio-dot.active span { border-color: var(--gold); background: var(--gold); }
+.radio-dot.active span::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: #fff;
+}
+.radio-dot.minor span { border-color: #D97706; background: rgba(217,119,6,0.2); }
+.radio-dot.major span { border-color: #DC2626; background: rgba(220,38,38,0.2); }
+
+/* Row damage states */
+.checklist-row.state-minor td.area-name { color: #D97706 !important; font-weight: 600 !important; }
+.checklist-row.state-major td.area-name { color: #DC2626 !important; font-weight: 700 !important; }
+
+/* Row flash on panel click */
+@keyframes row-flash {
+  0%   { background: rgba(212,160,23,0.22); }
+  70%  { background: rgba(212,160,23,0.10); }
+  100% { background: transparent; }
+}
+.checklist-row.row-flash { animation: row-flash 0.9s ease forwards; }
+
+/* Panel popup */
+#panel-popup {
+  position: fixed;
+  z-index: 999;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-md);
+  padding: 0.9rem 1rem;
+  min-width: 220px;
+  display: none;
+}
+#panel-popup .pp-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.65rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.pp-options {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.65rem;
+}
+.pp-btn {
+  flex: 1;
+  padding: 0.4rem 0.2rem;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border: 1.5px solid var(--border);
+  cursor: pointer;
+  background: var(--bg-3);
+  color: var(--text-secondary);
+  transition: all 0.15s;
+  text-align: center;
+}
+.pp-btn:hover                    { border-color: var(--gold); color: var(--gold); }
+.pp-btn.active[data-val="none"]  { background: var(--gold-pale); border-color: var(--gold); color: var(--gold); }
+.pp-btn.active[data-val="minor"] { background: rgba(217,119,6,0.15); border-color: #D97706; color: #D97706; }
+.pp-btn.active[data-val="major"] { background: rgba(220,38,38,0.15); border-color: #DC2626; color: #DC2626; }

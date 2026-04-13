@@ -57,6 +57,7 @@ $success = false;
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_verify();
 
     // Required fields — sanitized
     $policy_number     = san_str($_POST['policy_number'] ?? '', MAX_POLICY_NUM);
@@ -251,15 +252,6 @@ require_once '../../includes/topbar.php';
     <a href="eligibility_check.php" class="back-link"><?= icon('arrow-left', 14) ?> Back to Eligibility Check</a>
     <?php endif; ?>
 
-    <div class="page-header">
-      <?php if ($renew_policy): ?>
-      <div class="page-header-title"><?= icon('arrow-path', 18) ?> Renew Insurance Policy</div>
-      <div class="page-header-sub">Pre-filled from previous policy. Enter the new policy number and updated dates.</div>
-      <?php else: ?>
-      <div class="page-header-title"><?= icon('document', 18) ?> Insurance Policy Encoding</div>
-      <div class="page-header-sub">Manually encode all policy details from the PhilBritish renewal notice or new policy document.</div>
-      <?php endif; ?>
-    </div>
 
 
     <?php if (!empty($errors)): ?>
@@ -301,6 +293,7 @@ require_once '../../includes/topbar.php';
 
     <!-- POLICY FORM -->
     <form method="POST" action="">
+      <?= csrf_field() ?>
       <div class="card">
         <div class="card-header">
           <div class="card-icon"><?= icon('document', 16) ?></div>

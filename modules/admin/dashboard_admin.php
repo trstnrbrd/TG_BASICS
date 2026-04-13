@@ -22,21 +22,31 @@ $recent_vehicles = $conn->query("SELECT COUNT(*) as c FROM vehicles WHERE create
 
 $total_policies   = $conn->query("SELECT COUNT(*) as c FROM insurance_policies")->fetch_assoc()['c'];
 $active_policies  = $conn->query("SELECT COUNT(*) as c FROM insurance_policies WHERE policy_end >= CURDATE()")->fetch_assoc()['c'];
-$expiring_soon    = $conn->query("SELECT COUNT(*) as c FROM insurance_policies WHERE DATEDIFF(policy_end, CURDATE()) BETWEEN 0 AND $exp_days")->fetch_assoc()['c'];
-$urgent_policies  = $conn->query("SELECT COUNT(*) as c FROM insurance_policies WHERE DATEDIFF(policy_end, CURDATE()) BETWEEN 0 AND $urg_days")->fetch_assoc()['c'];
+$es_stmt = $conn->prepare("SELECT COUNT(*) as c FROM insurance_policies WHERE DATEDIFF(policy_end, CURDATE()) BETWEEN 0 AND ?");
+$es_stmt->bind_param('i', $exp_days);
+$es_stmt->execute();
+$expiring_soon = $es_stmt->get_result()->fetch_assoc()['c'];
+
+$up_stmt = $conn->prepare("SELECT COUNT(*) as c FROM insurance_policies WHERE DATEDIFF(policy_end, CURDATE()) BETWEEN 0 AND ?");
+$up_stmt->bind_param('i', $urg_days);
+$up_stmt->execute();
+$urgent_policies = $up_stmt->get_result()->fetch_assoc()['c'];
 
 // ── RENEWAL ALERTS (policies expiring within 30 days) ──
-$renewals = $conn->query("
+$rn_stmt = $conn->prepare("
     SELECT p.policy_id, p.policy_number, p.policy_end, p.coverage_type,
            DATEDIFF(p.policy_end, CURDATE()) as days_left,
            c.full_name, v.plate_number, v.make, v.model
     FROM insurance_policies p
     INNER JOIN vehicles v ON p.vehicle_id = v.vehicle_id
     INNER JOIN clients c ON p.client_id = c.client_id
-    WHERE DATEDIFF(p.policy_end, CURDATE()) BETWEEN 0 AND $exp_days
+    WHERE DATEDIFF(p.policy_end, CURDATE()) BETWEEN 0 AND ?
     ORDER BY p.policy_end ASC
     LIMIT 6
 ");
+$rn_stmt->bind_param('i', $exp_days);
+$rn_stmt->execute();
+$renewals = $rn_stmt->get_result();
 
 // ── RECENT CLIENTS ──
 $recent_list = $conn->query("

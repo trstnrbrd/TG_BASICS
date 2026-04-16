@@ -59,12 +59,27 @@ $success = false;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
 
+    // Validate receipt file if uploaded (for 1st installment)
+    $receipt_file_name = null;
+    if (!empty($_FILES['first_receipt']['tmp_name']) && $_FILES['first_receipt']['error'] === UPLOAD_ERR_OK) {
+        $rf   = $_FILES['first_receipt'];
+        $mime = mime_content_type($rf['tmp_name']);
+        if (!in_array($mime, ['image/jpeg','image/png','image/webp','image/gif'])) {
+            $errors[] = 'Receipt must be a JPEG, PNG, WEBP, or GIF image.';
+        } elseif ($rf['size'] > 5 * 1024 * 1024) {
+            $errors[] = 'Receipt image too large (max 5 MB).';
+        } else {
+            $receipt_file_name = '__pending__';
+        }
+    }
+
     // Required fields — sanitized
     $policy_number     = san_str($_POST['policy_number'] ?? '', MAX_POLICY_NUM);
     $coverage_type     = san_enum($_POST['coverage_type'] ?? '', ALLOWED_COVERAGE_TYPES);
     $sum_insured       = san_float($_POST['sum_insured'] ?? '');
-    $basic_premium     = san_float($_POST['basic_premium'] ?? '');
+    $basic_premium     = san_float($_POST['basic_premium'] ?? ''); // stores markup
     $total_premium     = san_float($_POST['total_premium'] ?? '');
+    $payable_amount    = $total_premium + $basic_premium; // total client must pay
     $participation_fee = san_float($_POST['participation_fee'] ?? '0');
     $policy_start      = san_str($_POST['policy_start'] ?? '', 10);
     $policy_end        = san_str($_POST['policy_end'] ?? '', 10);
@@ -89,7 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif (!validate_policy_number($policy_number)) $errors[] = 'Policy number contains invalid characters.';
     if ($coverage_type === '')   $errors[] = 'Coverage type is required or invalid.';
     if ($sum_insured <= 0)       $errors[] = 'Sum insured must be a valid positive number.';
-    if ($basic_premium <= 0)     $errors[] = 'Basic premium must be a valid positive number.';
+    if ($basic_premium < 0)      $errors[] = 'Markup must be a valid number (0 or more).';
     if ($total_premium <= 0)     $errors[] = 'Total premium must be a valid positive number.';
     if ($policy_start === '' || !validate_date($policy_start)) $errors[] = 'Starting date is required and must be a valid date.';
     if ($policy_end === '' || !validate_date($policy_end))     $errors[] = 'Inception date is required and must be a valid date.';
@@ -112,16 +127,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Compute total paid and balance from installments
+    // Payable = total_premium + markup; installments split against payable
     $amount_paid = 0;
     foreach ($installment_amounts as $amt) {
         $amount_paid += (float)$amt;
     }
-    $balance = (float)$total_premium - $amount_paid;
+    $balance = $payable_amount - $amount_paid;
 
-    // Validate: total paid cannot exceed total premium
-    if (empty($errors) && is_numeric($total_premium)) {
-        if ($amount_paid > (float)$total_premium) {
-            $errors[] = 'Total amount paid (₱' . number_format($amount_paid, 2) . ') cannot exceed the total premium (₱' . number_format((float)$total_premium, 2) . ').';
+    // Validate: total paid cannot exceed payable amount
+    if (empty($errors) && $payable_amount > 0) {
+        if ($amount_paid > $payable_amount) {
+            $errors[] = 'Total amount paid (₱' . number_format($amount_paid, 2) . ') cannot exceed the payable amount (₱' . number_format($payable_amount, 2) . ').';
         }
     }
 
@@ -137,11 +153,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Determine payment_status — check if any installment is overdue
     $today_str   = date('Y-m-d');
     $has_overdue = false;
+    $per_month   = round($payable_amount / $num_months, 2);
     for ($i = 0; $i < $num_months; $i++) {
         $due = date('Y-m-d', strtotime($policy_start . ' +' . $i . ' months'));
         $amt_paid_i = (float)($installment_amounts[$i] ?? 0);
-        $per = round((float)$total_premium / $num_months, 2);
-        if ($due < $today_str && $amt_paid_i < $per) {
+        if ($due < $today_str && $amt_paid_i < $per_month) {
             $has_overdue = true;
             break;
         }
@@ -160,7 +176,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ins = $conn->prepare("
             INSERT INTO insurance_policies (
                 client_id, vehicle_id, policy_number, coverage_type,
-                sum_insured, basic_premium, total_premium, participation_fee,
+                sum_insured, markup, total_premium, participation_fee,
                 policy_start, policy_end, payment_terms, mortgagee, payment_status,
                 amount_paid, balance, notes
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -189,7 +205,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $new_policy_id = $conn->insert_id;
 
             // Insert installment schedule into policy_payments
-            $per_installment = round((float)$total_premium / $num_months, 2);
+            // Each installment = (total_premium + markup) / num_months
+            $per_installment = round($payable_amount / $num_months, 2);
             for ($i = 0; $i < $num_months; $i++) {
                 $due_date   = date('Y-m-d', strtotime($policy_start . ' +' . $i . ' months'));
                 $amt_due    = $per_installment;
@@ -202,6 +219,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $inst_no = $i + 1;
                 $pp->bind_param('iisddsss', $new_policy_id, $inst_no, $due_date, $amt_due, $amt_paid_i, $paid_at, $inst_mode, $inst_ctrl);
                 $pp->execute();
+
+                // Save receipt for 1st installment if uploaded
+                if ($i === 0 && $receipt_file_name === '__pending__') {
+                    $new_pp_id = $conn->insert_id;
+                    $rf        = $_FILES['first_receipt'];
+                    $mime      = mime_content_type($rf['tmp_name']);
+                    $ext_map   = ['image/jpeg'=>'jpg','image/png'=>'png','image/webp'=>'webp','image/gif'=>'gif'];
+                    $ext       = $ext_map[$mime] ?? 'jpg';
+                    $fname     = 'rcpt_' . $new_pp_id . '_' . time() . '.' . $ext;
+                    $dest      = __DIR__ . '/../../uploads/receipts/' . $fname;
+                    if (move_uploaded_file($rf['tmp_name'], $dest)) {
+                        $upd_rc = $conn->prepare("UPDATE policy_payments SET receipt_file = ? WHERE payment_id = ?");
+                        $upd_rc->bind_param('si', $fname, $new_pp_id);
+                        $upd_rc->execute();
+                    }
+                }
             }
 
             // Delete old policy when renewed (new policy is the active record)
@@ -218,7 +251,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $uid  = $_SESSION['user_id'];
             $action = $renew_from > 0 ? 'POLICY_RENEWED' : 'POLICY_CREATED';
             $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, ?, ?)");
-            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ($renew_from > 0 ? ' renewed policy as ' : ' created policy ') . $policy_number . ' (' . $coverage_type . ') for vehicle ' . ($vehicle['plate_number'] ?? '') . ' — Premium: ₱' . number_format((float)$total_premium, 2) . '.';
+            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ($renew_from > 0 ? ' renewed policy as ' : ' created policy ') . $policy_number . ' (' . $coverage_type . ') for vehicle ' . ($vehicle['plate_number'] ?? '') . ' — Payable: ₱' . number_format($payable_amount, 2) . ' (Premium: ₱' . number_format((float)$total_premium, 2) . ' + Markup: ₱' . number_format((float)$basic_premium, 2) . ').';
             $log->bind_param('iss', $uid, $action, $desc);
             $log->execute();
 
@@ -292,7 +325,7 @@ require_once '../../includes/topbar.php';
     </div>
 
     <!-- POLICY FORM -->
-    <form method="POST" action="">
+    <form method="POST" action="" enctype="multipart/form-data">
       <?= csrf_field() ?>
       <div class="card">
         <div class="card-header">
@@ -351,7 +384,7 @@ require_once '../../includes/topbar.php';
           <div class="field-section">Premium Breakdown</div>
           <div style="margin-bottom:0.75rem;">
             <div class="alert alert-info" style="margin-bottom:0;">
-              <?= icon('information-circle', 14) ?> Copy these figures directly from the PhilBritish policy document. Leave fields as 0 if not applicable.
+              <?= icon('information-circle', 14) ?> Copy the figures from the PhilBritish policy document. The client pays Total Premium + Markup.
             </div>
           </div>
           <div class="form-grid" style="margin-bottom:1rem;">
@@ -359,18 +392,28 @@ require_once '../../includes/topbar.php';
               <label class="field-label">Sum Insured (PHP) <span class="req">*</span></label>
               <input type="number" step="0.01" min="0" name="sum_insured" class="field-input" placeholder="0.00"
                 value="<?= htmlspecialchars($_POST['sum_insured'] ?? ($renew_policy['sum_insured'] ?? '')) ?>"/>
-            </div>
-            <div class="field">
-              <label class="field-label">Basic Premium (PHP) <span class="req">*</span></label>
-              <input type="number" step="0.01" min="0" name="basic_premium" class="field-input" placeholder="0.00"
-                value="<?= htmlspecialchars($_POST['basic_premium'] ?? ($renew_policy['basic_premium'] ?? '')) ?>"/>
+              <span class="field-hint">Coverage amount from the PhilBritish policy.</span>
             </div>
             <div class="field">
               <label class="field-label">Total Premium (PHP) <span class="req">*</span></label>
               <input type="number" step="0.01" min="0" name="total_premium" id="total_premium" class="field-input" placeholder="0.00"
                 value="<?= htmlspecialchars($_POST['total_premium'] ?? ($renew_policy['total_premium'] ?? '')) ?>"/>
-              <span class="field-hint">Final amount the client owes.</span>
+              <span class="field-hint">Premium amount from PhilBritish.</span>
             </div>
+            <div class="field">
+              <label class="field-label">Markup (PHP)</label>
+              <input type="number" step="0.01" min="0" name="basic_premium" id="markup_field" class="field-input" placeholder="0.00"
+                value="<?= htmlspecialchars($_POST['basic_premium'] ?? ($renew_policy['markup'] ?? '0')) ?>"/>
+              <span class="field-hint">Additional charge on top of premium paid by client.</span>
+            </div>
+            <div class="field">
+              <label class="field-label">Total Payable (PHP)</label>
+              <input type="text" id="total_payable_display" class="field-input" placeholder="0.00" readonly
+                style="background:var(--bg-3);font-weight:700;color:var(--gold);cursor:default;"/>
+              <span class="field-hint">Total Premium + Markup — amount split into installments.</span>
+            </div>
+          </div>
+          <div class="form-grid" style="margin-bottom:1rem;">
             <div class="field">
               <label class="field-label">Participation Fee (PHP)</label>
               <input type="number" step="0.01" min="0" name="participation_fee" class="field-input" placeholder="0.00"
@@ -420,6 +463,7 @@ require_once '../../includes/topbar.php';
                   <th>Control No.</th>
                   <th>Amount Due</th>
                   <th>Amount Paid</th>
+                  <th>Receipt</th>
                   <th>Status</th>
                 </tr>
               </thead>
@@ -462,11 +506,13 @@ require_once '../../includes/topbar.php';
 <?php
 $footer_scripts = '
   (function () {
-    const termsEl    = document.getElementById("payment_terms");
-    const totalEl    = document.getElementById("total_premium");
-    const startEl    = document.querySelector("[name=\'policy_start\']");
-    const tbody      = document.getElementById("installment-body");
-    const balanceEl  = document.getElementById("balance-display");
+    const termsEl       = document.getElementById("payment_terms");
+    const totalEl       = document.getElementById("total_premium");
+    const markupEl      = document.getElementById("markup_field");
+    const payableEl     = document.getElementById("total_payable_display");
+    const startEl       = document.querySelector("[name=\'policy_start\']");
+    const tbody         = document.getElementById("installment-body");
+    const balanceEl     = document.getElementById("balance-display");
 
     const termsMap = { "1 time": 1, "3 months": 3, "4 months": 4, "6 months": 6 };
 
@@ -481,33 +527,49 @@ $footer_scripts = '
       return "₱" + n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
+    function getPayable() {
+      const total  = parseFloat(totalEl.value)  || 0;
+      const markup = parseFloat(markupEl.value) || 0;
+      return total + markup;
+    }
+
+    function updatePayableDisplay() {
+      const payable = getPayable();
+      payableEl.value = payable > 0 ? fmt(payable) : "0.00";
+    }
+
     function buildTable() {
       const terms     = termsEl.value;
       const numMonths = termsMap[terms] || 1;
-      const total     = parseFloat(totalEl.value) || 0;
+      const payable   = getPayable();
       const start     = startEl ? startEl.value : "";
 
+      updatePayableDisplay();
       tbody.innerHTML = "";
 
-      const perInstallment = total > 0 ? Math.round((total / numMonths) * 100) / 100 : 0;
-
+      const perInstallment = payable > 0 ? Math.round((payable / numMonths) * 100) / 100 : 0;
       const ordinals = ["1st","2nd","3rd","4th","5th","6th"];
 
       for (let i = 0; i < numMonths; i++) {
-        const dueDate = addMonths(start, i);
-        const amtDue  = perInstallment;
-        const tr      = document.createElement("tr");
-        tr.dataset.idx = i;
+        const dueDate    = addMonths(start, i);
+        const amtDue     = perInstallment;
+        const prefillAmt = 0;
+        const tr        = document.createElement("tr");
+        tr.dataset.idx  = i;
 
         const label = numMonths === 1
           ? "Full Payment"
           : (ordinals[i] || (i + 1) + "th") + " Payment";
 
-        const modeOpts = ["Cash","GCash","Maya","Bank Transfer","Check","E-Wallet","Other"];
+        const modeOpts = ["Cash","Bank Transfer","Check","E-Wallet","Other"];
         const modeSelect = "<select name=\"installment_mode[]\" class=\"field-select\" style=\"width:120px;\">" +
           "<option value=\"\">— Select —</option>" +
           modeOpts.map(function(m){ return "<option value=\"" + m + "\">" + m + "</option>"; }).join("") +
           "</select>";
+
+        const receiptCell = i === 0
+          ? "<td style=\"text-align:center;\"><label style=\"display:inline-flex;align-items:center;gap:0.3rem;background:var(--bg-2);border:1px dashed var(--border);border-radius:6px;padding:0.3rem 0.6rem;cursor:pointer;font-size:0.72rem;color:var(--text-muted);white-space:nowrap;\"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 20 20\" fill=\"currentColor\" width=\"12\" height=\"12\"><path fill-rule=\"evenodd\" d=\"M15.621 4.379a3 3 0 0 0-4.242 0l-7 7a3 3 0 0 0 4.241 4.243h.001l.497-.5a.75.75 0 0 1 1.064 1.057l-.498.501-.002.002a4.5 4.5 0 0 1-6.364-6.364l7-7a4.5 4.5 0 0 1 6.368 6.36l-3.455 3.553A2.625 2.625 0 1 1 9.52 9.52l3.45-3.451a.75.75 0 1 1 1.061 1.06l-3.45 3.451a1.125 1.125 0 0 0 1.587 1.595l3.454-3.553a3 3 0 0 0 0-4.242Z\" clip-rule=\"evenodd\"/></svg> Attach<input type=\"file\" name=\"first_receipt\" accept=\"image/*\" style=\"display:none;\"/></label></td>"
+          : "<td style=\"text-align:center;\"><span style=\"color:var(--text-muted);font-size:0.72rem;\">—</span></td>";
 
         tr.innerHTML =
           "<td style=\"text-align:center;font-weight:600;white-space:nowrap;\">" + label + "</td>" +
@@ -517,8 +579,9 @@ $footer_scripts = '
           "<td style=\"text-align:center;\">" + (amtDue > 0 ? fmt(amtDue) : "—") + "</td>" +
           "<td style=\"text-align:center;\"><input type=\"number\" step=\"0.01\" min=\"0\" " +
             "name=\"installment_amount[]\" class=\"field-input inst-amount-input\" " +
-            "style=\"width:110px;text-align:right;\" placeholder=\"0.00\" value=\"0\" " +
+            "style=\"width:110px;text-align:right;\" placeholder=\"0.00\" value=\"" + prefillAmt + "\" " +
             "data-due=\"" + amtDue + "\"/></td>" +
+          receiptCell +
           "<td style=\"text-align:center;\" class=\"status-cell\"><span class=\"badge badge-red\">Unpaid</span></td>";
 
         tbody.appendChild(tr);
@@ -530,7 +593,7 @@ $footer_scripts = '
     }
 
     function updateBalance() {
-      const total    = parseFloat(totalEl.value) || 0;
+      const payable  = getPayable();
       let totalPaid  = 0;
 
       tbody.querySelectorAll("tr").forEach(function (tr) {
@@ -552,10 +615,10 @@ $footer_scripts = '
         }
       });
 
-      const balance = total - totalPaid;
-      if (total > 0) {
-        if (totalPaid > total) {
-          balanceEl.textContent = "Exceeds total premium!";
+      const balance = payable - totalPaid;
+      if (payable > 0) {
+        if (totalPaid > payable) {
+          balanceEl.textContent = "Exceeds payable amount!";
           balanceEl.style.color = "var(--danger)";
         } else {
           balanceEl.textContent = fmt(balance);
@@ -568,8 +631,9 @@ $footer_scripts = '
     }
 
     termsEl.addEventListener("change", buildTable);
-    totalEl.addEventListener("input", buildTable);
-    if (startEl) startEl.addEventListener("change", buildTable);
+    totalEl.addEventListener("input",  buildTable);
+    markupEl.addEventListener("input", buildTable);
+    if (startEl)   startEl.addEventListener("change", buildTable);
 
     buildTable();
 

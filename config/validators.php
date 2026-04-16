@@ -40,8 +40,6 @@ const ALLOWED_PAYMENT_TERMS = [
 
 const ALLOWED_PAYMENT_MODES = [
     'Cash',
-    'GCash',
-    'Maya',
     'Bank Transfer',
     'Check',
     'E-Wallet',

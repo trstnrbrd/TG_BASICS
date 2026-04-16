@@ -120,6 +120,76 @@ if ($has_installments && $_SERVER['REQUEST_METHOD'] !== 'POST') {
     }
 }
 
+// ── HANDLE RECEIPT UPLOAD (AJAX) ──
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_receipt'])) {
+    csrf_verify();
+    header('Content-Type: application/json');
+    $payment_id = isset($_POST['payment_id']) ? (int)$_POST['payment_id'] : 0;
+    if ($payment_id <= 0) { echo json_encode(['ok' => false, 'msg' => 'Invalid payment.']); exit; }
+
+    // Verify it belongs to this policy
+    $chk = $conn->prepare("SELECT payment_id, receipt_file FROM policy_payments WHERE payment_id = ? AND policy_id = ?");
+    $chk->bind_param('ii', $payment_id, $policy_id);
+    $chk->execute();
+    $chk_row = $chk->get_result()->fetch_assoc();
+    if (!$chk_row) { echo json_encode(['ok' => false, 'msg' => 'Not found.']); exit; }
+
+    if (empty($_FILES['receipt_file']['tmp_name'])) {
+        echo json_encode(['ok' => false, 'msg' => 'No file received.']); exit;
+    }
+    $f    = $_FILES['receipt_file'];
+    $mime = mime_content_type($f['tmp_name']);
+    $allowed_mime = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!in_array($mime, $allowed_mime)) {
+        echo json_encode(['ok' => false, 'msg' => 'Only JPEG, PNG, WEBP, or GIF images are allowed.']); exit;
+    }
+    if ($f['size'] > 5 * 1024 * 1024) {
+        echo json_encode(['ok' => false, 'msg' => 'File too large (max 5 MB).']); exit;
+    }
+    $ext      = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'][$mime];
+    $filename = 'rcpt_' . $payment_id . '_' . time() . '.' . $ext;
+    $dest     = __DIR__ . '/../../uploads/receipts/' . $filename;
+
+    // Delete old file if exists
+    if ($chk_row['receipt_file'] && file_exists(__DIR__ . '/../../uploads/receipts/' . $chk_row['receipt_file'])) {
+        unlink(__DIR__ . '/../../uploads/receipts/' . $chk_row['receipt_file']);
+    }
+
+    if (!move_uploaded_file($f['tmp_name'], $dest)) {
+        echo json_encode(['ok' => false, 'msg' => 'Upload failed. Check server permissions.']); exit;
+    }
+    $upd_rc = $conn->prepare("UPDATE policy_payments SET receipt_file = ? WHERE payment_id = ?");
+    $upd_rc->bind_param('si', $filename, $payment_id);
+    $upd_rc->execute();
+
+    $uid  = $_SESSION['user_id'];
+    $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'RECEIPT_UPLOADED', ?)");
+    $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' uploaded receipt for payment #' . $payment_id . ' on policy ' . $policy['policy_number'] . '.';
+    $log->bind_param('is', $uid, $desc);
+    $log->execute();
+
+    echo json_encode(['ok' => true, 'filename' => $filename]); exit;
+}
+
+// ── HANDLE RECEIPT DELETE (AJAX) ──
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_receipt'])) {
+    csrf_verify();
+    header('Content-Type: application/json');
+    $payment_id = isset($_POST['payment_id']) ? (int)$_POST['payment_id'] : 0;
+    $chk2 = $conn->prepare("SELECT receipt_file FROM policy_payments WHERE payment_id = ? AND policy_id = ?");
+    $chk2->bind_param('ii', $payment_id, $policy_id);
+    $chk2->execute();
+    $chk2_row = $chk2->get_result()->fetch_assoc();
+    if ($chk2_row && $chk2_row['receipt_file']) {
+        $f2 = __DIR__ . '/../../uploads/receipts/' . $chk2_row['receipt_file'];
+        if (file_exists($f2)) unlink($f2);
+        $clr = $conn->prepare("UPDATE policy_payments SET receipt_file = NULL WHERE payment_id = ?");
+        $clr->bind_param('i', $payment_id);
+        $clr->execute();
+    }
+    echo json_encode(['ok' => true]); exit;
+}
+
 // ── HANDLE PAYMENT UPDATE ──
 $pay_errors  = [];
 $pay_success = false;
@@ -460,7 +530,7 @@ require_once '../../includes/topbar.php';
           <?php
           $breakdown = [
             ['Sum Insured',       $policy['sum_insured']],
-            ['Basic Premium',     $policy['basic_premium']],
+            ['Markup',            $policy['markup']],
             ['Participation Fee', $policy['participation_fee']],
           ];
           foreach ($breakdown as [$label, $amount]):
@@ -540,9 +610,9 @@ require_once '../../includes/topbar.php';
 
             <?php if ($has_installments): ?>
             <!-- Installment schedule table -->
-            <?php $pay_mode_opts = ['Cash','GCash','Maya','Bank Transfer','Check','E-Wallet','Other']; ?>
+            <?php $pay_mode_opts = ['Cash','Bank Transfer','Check','E-Wallet','Other']; ?>
             <div class="tg-table-wrap" style="margin-bottom:1rem;overflow-x:auto;">
-              <table class="tg-table" id="installment-view-table" style="min-width:600px;">
+              <table class="tg-table" id="installment-view-table" style="min-width:700px;">
                 <thead>
                   <tr>
                     <th style="text-align:center;white-space:nowrap;">Payment</th>
@@ -551,6 +621,7 @@ require_once '../../includes/topbar.php';
                     <th style="text-align:center;white-space:nowrap;">Control No.</th>
                     <th style="text-align:center;white-space:nowrap;">Amount Due</th>
                     <th style="text-align:center;white-space:nowrap;">Amount Paid</th>
+                    <th style="text-align:center;white-space:nowrap;">Receipt</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -637,6 +708,29 @@ require_once '../../includes/topbar.php';
                           data-due="<?= $amt_due ?>"/>
                       <?php endif; ?>
                     </td>
+                    <!-- RECEIPT COLUMN -->
+                    <td style="text-align:center;" class="receipt-cell" data-pid="<?= $inst['payment_id'] ?>">
+                      <?php if (!empty($inst['receipt_file'])): ?>
+                        <div style="display:flex;align-items:center;justify-content:center;gap:0.4rem;">
+                          <button type="button" class="btn-sm-gold rc-view-btn"
+                            data-src="../../uploads/receipts/<?= htmlspecialchars($inst['receipt_file']) ?>"
+                            title="View Receipt" style="padding:0.3rem 0.5rem;">
+                            <?= icon('eye', 13) ?>
+                          </button>
+                          <button type="button" class="rc-del-btn"
+                            data-pid="<?= $inst['payment_id'] ?>"
+                            title="Remove"
+                            style="padding:0.3rem 0.5rem;display:inline-flex;align-items:center;gap:0.25rem;background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border);border-radius:6px;font-size:0.72rem;font-weight:600;cursor:pointer;">
+                            <?= icon('x-mark', 12) ?>
+                          </button>
+                        </div>
+                      <?php else: ?>
+                        <label class="rc-upload-label" title="Attach receipt" style="display:inline-flex;align-items:center;gap:0.3rem;background:var(--bg-2);border:1px dashed var(--border);border-radius:6px;padding:0.3rem 0.6rem;cursor:pointer;font-size:0.72rem;color:var(--text-muted);white-space:nowrap;">
+                          <?= icon('paper-clip', 12) ?> Attach
+                          <input type="file" accept="image/*" class="rc-file-input" data-pid="<?= $inst['payment_id'] ?>" style="display:none;"/>
+                        </label>
+                      <?php endif; ?>
+                    </td>
                   </tr>
                   <?php endforeach; ?>
                 </tbody>
@@ -672,6 +766,14 @@ require_once '../../includes/topbar.php';
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- RECEIPT LIGHTBOX -->
+<div id="receipt-lightbox" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.82);align-items:center;justify-content:center;">
+  <div style="position:relative;max-width:90vw;max-height:90vh;">
+    <button id="rc-lb-close" type="button" style="position:absolute;top:-14px;right:-14px;width:32px;height:32px;border-radius:50%;background:var(--bg-3);border:1px solid var(--border);color:var(--text-primary);font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;">&#x2715;</button>
+    <img id="rc-lb-img" src="" alt="Receipt" style="max-width:80vw;max-height:80vh;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,0.5);display:block;"/>
   </div>
 </div>
 
@@ -829,5 +931,148 @@ require_once '../../includes/footer.php';
       }
     }
   });
+})();
+</script>
+
+<script>
+(function () {
+  // ── RECEIPT LIGHTBOX ──
+  var lb    = document.getElementById('receipt-lightbox');
+  var lbImg = document.getElementById('rc-lb-img');
+  var lbClose = document.getElementById('rc-lb-close');
+
+  function openLightbox(src) {
+    lbImg.src = src;
+    lb.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  }
+  function closeLightbox() {
+    lb.style.display = 'none';
+    lbImg.src = '';
+    document.body.style.overflow = '';
+  }
+  if (lbClose) lbClose.addEventListener('click', closeLightbox);
+  if (lb) lb.addEventListener('click', function(e){ if (e.target === lb) closeLightbox(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeLightbox(); });
+
+  // View buttons (existing receipts)
+  document.querySelectorAll('.rc-view-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){ openLightbox(this.dataset.src); });
+  });
+
+  // Upload — file input change
+  var csrf = <?= json_encode(csrf_token()) ?>;
+
+  document.querySelectorAll('.rc-file-input').forEach(function(input){
+    input.addEventListener('change', function(){
+      var file = this.files[0];
+      if (!file) return;
+      var pid = this.dataset.pid;
+      var cell = document.querySelector('.receipt-cell[data-pid="' + pid + '"]');
+      var fd   = new FormData();
+      fd.append('upload_receipt', '1');
+      fd.append('payment_id', pid);
+      fd.append('receipt_file', file);
+      fd.append('csrf_token', csrf);
+
+      cell.innerHTML = '<span style="font-size:0.72rem;color:var(--text-muted);">Uploading...</span>';
+
+      fetch(window.location.href, { method: 'POST', body: fd })
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+          if (data.ok) {
+            var src = '../../uploads/receipts/' + data.filename;
+            cell.innerHTML =
+              '<div style="display:flex;align-items:center;justify-content:center;gap:0.4rem;">' +
+                '<button type="button" class="btn-sm-gold rc-view-btn" data-src="' + src + '" title="View Receipt" style="padding:0.3rem 0.5rem;">' +
+                  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="13" height="13"><path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/><path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 0 1 0-1.186A10.004 10.004 0 0 1 10 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0 1 10 17c-4.257 0-7.893-2.66-9.336-6.41ZM14 10a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" clip-rule="evenodd"/></svg>' +
+                '</button>' +
+                '<button type="button" class="rc-del-btn" data-pid="' + pid + '" title="Remove" style="padding:0.3rem 0.5rem;display:inline-flex;align-items:center;gap:0.25rem;background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border);border-radius:6px;font-size:0.72rem;font-weight:600;cursor:pointer;">' +
+                  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="12" height="12"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>' +
+                '</button>' +
+              '</div>';
+            // re-bind view btn
+            cell.querySelector('.rc-view-btn').addEventListener('click', function(){ openLightbox(this.dataset.src); });
+            // re-bind delete btn
+            bindDelBtn(cell.querySelector('.rc-del-btn'));
+          } else {
+            cell.innerHTML = '<span style="font-size:0.7rem;color:var(--danger);">' + (data.msg || 'Upload failed') + '</span>';
+          }
+        })
+        .catch(function(){ cell.innerHTML = '<span style="font-size:0.7rem;color:var(--danger);">Upload error.</span>'; });
+    });
+  });
+
+  function bindDelBtn(btn) {
+    if (!btn) return;
+    btn.addEventListener('click', function(){
+      var pid = this.dataset.pid;
+      Swal.fire({
+        icon: 'question',
+        title: 'Remove Receipt?',
+        text: 'This will permanently delete the attached receipt image.',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, remove',
+        confirmButtonColor: '#c0392b',
+        cancelButtonText: 'Cancel',
+        cancelButtonColor: '#6b7280'
+      }).then(function(result){
+        if (!result.isConfirmed) return;
+        var cell = document.querySelector('.receipt-cell[data-pid="' + pid + '"]');
+        var fd   = new FormData();
+        fd.append('delete_receipt', '1');
+        fd.append('payment_id', pid);
+        fd.append('csrf_token', csrf);
+        fetch(window.location.href, { method: 'POST', body: fd })
+          .then(function(r){ return r.json(); })
+          .then(function(data){
+            if (data.ok) {
+              cell.innerHTML =
+                '<label class="rc-upload-label" title="Attach receipt" style="display:inline-flex;align-items:center;gap:0.3rem;background:var(--bg-2);border:1px dashed var(--border);border-radius:6px;padding:0.3rem 0.6rem;cursor:pointer;font-size:0.72rem;color:var(--text-muted);white-space:nowrap;">' +
+                  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="12" height="12"><path fill-rule="evenodd" d="M15.621 4.379a3 3 0 0 0-4.242 0l-7 7a3 3 0 0 0 4.241 4.243h.001l.497-.5a.75.75 0 0 1 1.064 1.057l-.498.501-.002.002a4.5 4.5 0 0 1-6.364-6.364l7-7a4.5 4.5 0 0 1 6.368 6.36l-3.455 3.553A2.625 2.625 0 1 1 9.52 9.52l3.45-3.451a.75.75 0 1 1 1.061 1.06l-3.45 3.451a1.125 1.125 0 0 0 1.587 1.595l3.454-3.553a3 3 0 0 0 0-4.242Z" clip-rule="evenodd"/></svg> Attach' +
+                  '<input type="file" accept="image/*" class="rc-file-input" data-pid="' + pid + '" style="display:none;"/>' +
+                '</label>';
+              cell.querySelector('.rc-file-input').addEventListener('change', uploadHandler);
+            }
+          });
+      });
+    });
+  }
+
+  // bind existing delete buttons
+  document.querySelectorAll('.rc-del-btn').forEach(bindDelBtn);
+
+  // shared upload handler for dynamically re-created inputs
+  function uploadHandler() {
+    var event = { target: this }; // simulate
+    var file = this.files[0];
+    if (!file) return;
+    var pid  = this.dataset.pid;
+    var cell = document.querySelector('.receipt-cell[data-pid="' + pid + '"]');
+    var fd   = new FormData();
+    fd.append('upload_receipt', '1');
+    fd.append('payment_id', pid);
+    fd.append('receipt_file', file);
+    fd.append('csrf_token', csrf);
+    cell.innerHTML = '<span style="font-size:0.72rem;color:var(--text-muted);">Uploading...</span>';
+    fetch(window.location.href, { method: 'POST', body: fd })
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        if (data.ok) {
+          var src = '../../uploads/receipts/' + data.filename;
+          cell.innerHTML =
+            '<div style="display:flex;align-items:center;justify-content:center;gap:0.4rem;">' +
+              '<button type="button" class="btn-sm-gold rc-view-btn" data-src="' + src + '" title="View Receipt" style="padding:0.3rem 0.5rem;">' +
+                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="13" height="13"><path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/><path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 0 1 0-1.186A10.004 10.004 0 0 1 10 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0 1 10 17c-4.257 0-7.893-2.66-9.336-6.41ZM14 10a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" clip-rule="evenodd"/></svg>' +
+              '</button>' +
+              '<button type="button" class="rc-del-btn" data-pid="' + pid + '" title="Remove" style="padding:0.3rem 0.5rem;display:inline-flex;align-items:center;gap:0.25rem;background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border);border-radius:6px;font-size:0.72rem;font-weight:600;cursor:pointer;">' +
+                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="12" height="12"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>' +
+              '</button>' +
+            '</div>';
+          cell.querySelector('.rc-view-btn').addEventListener('click', function(){ openLightbox(this.dataset.src); });
+          bindDelBtn(cell.querySelector('.rc-del-btn'));
+        }
+      });
+  }
 })();
 </script>

@@ -52,12 +52,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) 
 $full_name = $_SESSION['full_name'];
 $initials  = substr(implode('', array_map(fn($w) => strtoupper($w[0]), explode(' ', $full_name))), 0, 2);
 
-$search    = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
-$filter_by = san_enum($_GET['filter_by'] ?? 'all', ['all', 'name', 'plate', 'contact', 'email']);
-$sort_by   = $_GET['sort'] ?? 'newest';
-$where     = '';
-$params    = [];
-$types     = '';
+$search      = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
+$filter_by   = san_enum($_GET['filter_by'] ?? 'all', ['all', 'name', 'plate', 'contact', 'email']);
+$sort_by     = $_GET['sort'] ?? 'newest';
+$filter_type = san_enum($_GET['client_type'] ?? 'all', ['all', 'insurance', 'walkin']);
+$where       = '';
+$params      = [];
+$types       = '';
 
 if ($search !== '') {
     $like = "%$search%";
@@ -97,13 +98,23 @@ $order = match ($sort_by) {
     default    => 'c.created_at DESC',
 };
 
+$type_having = '';
+if ($filter_type === 'insurance') {
+    $type_having = 'HAVING has_policy = 1';
+} elseif ($filter_type === 'walkin') {
+    $type_having = 'HAVING has_policy = 0';
+}
+
 $sql = "
     SELECT c.client_id, c.full_name, c.contact_number, c.email,
-           COUNT(v.vehicle_id) AS vehicle_count, c.created_at
+           COUNT(DISTINCT v.vehicle_id) AS vehicle_count, c.created_at,
+           COUNT(DISTINCT ip.policy_id) > 0 AS has_policy
     FROM clients c
-    LEFT JOIN vehicles v ON c.client_id = v.client_id
+    LEFT JOIN vehicles v            ON c.client_id = v.client_id
+    LEFT JOIN insurance_policies ip ON c.client_id = ip.client_id
     $where
     GROUP BY c.client_id
+    $type_having
     ORDER BY $order
 ";
 
@@ -199,6 +210,13 @@ require_once '../../includes/topbar.php';
           <option value="email"   <?= $filter_by === 'email' ? 'selected' : '' ?>>Email</option>
         </select>
 
+        <!-- CLIENT TYPE -->
+        <select name="client_type" class="filter-input" style="min-width:150px;">
+          <option value="all"       <?= $filter_type === 'all'       ? 'selected' : '' ?>>All Types</option>
+          <option value="insurance" <?= $filter_type === 'insurance' ? 'selected' : '' ?>>Insurance</option>
+          <option value="walkin"    <?= $filter_type === 'walkin'    ? 'selected' : '' ?>>Walk-in</option>
+        </select>
+
         <!-- SORT BY -->
         <select name="sort" class="filter-input" style="min-width:150px;">
           <option value="newest"   <?= $sort_by === 'newest' ? 'selected' : '' ?>>Newest First</option>
@@ -210,7 +228,7 @@ require_once '../../includes/topbar.php';
 
         <!-- BUTTONS -->
         <button type="submit" class="btn-primary"><?= icon('magnifying-glass', 14) ?> Search</button>
-        <?php if ($search || $filter_by !== 'all' || $sort_by !== 'newest'): ?>
+        <?php if ($search || $filter_by !== 'all' || $sort_by !== 'newest' || $filter_type !== 'all'): ?>
         <a href="client_list.php" class="btn-ghost"><?= icon('x-mark', 14) ?> Clear</a>
         <?php endif; ?>
         <a href="add_client.php" class="btn-primary"><?= icon('plus', 14) ?> Add Client</a>
@@ -238,6 +256,7 @@ require_once '../../includes/topbar.php';
               <th style="text-align:center;">Email</th>
               <th style="text-align:center;">Date Added</th>
               <th style="text-align:center;">Vehicles</th>
+              <th style="text-align:center;">Type</th>
               <th style="text-align:center;">Action</th>
             </tr>
           </thead>
@@ -251,6 +270,17 @@ require_once '../../includes/topbar.php';
               <td style="font-size:0.75rem;color:var(--text-muted);text-align:center;"><?= date('M d, Y', strtotime($row['created_at'])) ?></td>
               <td style="text-align:center;">
                 <span class="badge badge-gold"><?= $row['vehicle_count'] ?> vehicle<?= $row['vehicle_count'] != 1 ? 's' : '' ?></span>
+              </td>
+              <td style="text-align:center;">
+                <?php if ($row['has_policy']): ?>
+                  <span class="badge" style="background:#2E7D52;color:#fff;font-size:0.68rem;display:inline-flex;align-items:center;gap:0.25rem;">
+                    <?= icon('shield-check', 11) ?> Insurance
+                  </span>
+                <?php else: ?>
+                  <span class="badge" style="background:#B8860B;color:#fff;font-size:0.68rem;display:inline-flex;align-items:center;gap:0.25rem;">
+                    <?= icon('wrench', 11) ?> Walk-in
+                  </span>
+                <?php endif; ?>
               </td>
               <td style="text-align:center;">
                 <div style="display:inline-flex;gap:0.4rem;align-items:center;">

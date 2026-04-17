@@ -134,11 +134,9 @@ require_once '../../includes/topbar.php';
       <?php endforeach; ?>
     </div>
 
-    <?php if (in_array($role, ['admin', 'super_admin'])): ?>
     <div style="display:flex;justify-content:flex-end;margin-bottom:1.25rem;">
       <a href="add_repair.php" class="btn-primary"><?= icon('plus', 14) ?> New Repair Job</a>
     </div>
-    <?php endif; ?>
 
     <!-- FILTERS -->
     <div class="card" style="margin-bottom:1.25rem;">
@@ -163,7 +161,7 @@ require_once '../../includes/topbar.php';
         </select>
         <button type="submit" class="btn-primary"><?= icon('search', 14) ?> Search</button>
         <?php if ($search !== '' || $filter_status !== 'all'): ?>
-        <a href="repair_list.php" class="btn-ghost"><?= icon('x', 14) ?> Clear</a>
+        <a href="repair_list.php" class="btn-ghost"><?= icon('x-mark', 14) ?> Clear</a>
         <?php endif; ?>
       </form>
     </div>
@@ -230,7 +228,7 @@ require_once '../../includes/topbar.php';
         <div class="empty-desc">
           <?= ($search !== '' || $filter_status !== 'all') ? 'Try adjusting your search or filters.' : 'Create the first repair job to get started.' ?>
         </div>
-        <?php if ($search === '' && $filter_status === 'all' && in_array($role, ['admin', 'super_admin'])): ?>
+        <?php if ($search === '' && $filter_status === 'all'): ?>
         <a href="add_repair.php" class="btn-primary" style="margin-top:1rem;display:inline-flex;align-items:center;gap:0.4rem;">
           <?= icon('plus', 14) ?> New Repair Job
         </a>

@@ -3,10 +3,11 @@ require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 
-if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
+if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin', 'mechanic'])) {
     header("Location: ../../auth/login.php");
     exit;
 }
+$is_mechanic = $_SESSION['role'] === 'mechanic';
 
 $client_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if ($client_id === 0) {
@@ -146,6 +147,7 @@ require_once '../../includes/topbar.php';
           <?php endif; ?>
         </div>
       </div>
+      <?php if (!$is_mechanic): ?>
       <div style="position:relative;z-index:1;display:flex;gap:0.6rem;flex-shrink:0;">
         <a href="edit_client.php?id=<?= $client_id ?>" class="btn-ghost" style="background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.1);color:rgba(200,192,176,0.7);">
           <?= icon('pencil', 14) ?> Edit Client
@@ -161,6 +163,7 @@ require_once '../../includes/topbar.php';
           </button>
         </form>
       </div>
+      <?php endif; ?>
     </div>
 
     <!-- TOP GRID: Client Info + Quick Stats -->
@@ -243,9 +246,11 @@ require_once '../../includes/topbar.php';
           <div class="card-title">Registered Vehicles</div>
           <div class="card-sub"><?= $vc ?> vehicle<?= $vc !== 1 ? 's' : '' ?> on record</div>
         </div>
+        <?php if (!$is_mechanic): ?>
         <a href="add_vehicle.php?client_id=<?= $client_id ?>" class="btn-primary" style="margin-left:auto;padding:0.5rem 1rem;font-size:0.78rem;">
           <?= icon('plus', 14) ?> Add Vehicle
         </a>
+        <?php endif; ?>
       </div>
       <?php if ($vehicles->num_rows > 0): ?>
       <div class="tg-table-wrap">
@@ -272,6 +277,7 @@ require_once '../../includes/topbar.php';
               <td style="font-size:0.75rem;color:var(--text-muted);text-align:center;"><?= htmlspecialchars($v['serial_number'] ?: 'N/A') ?></td>
               <td style="text-align:center;">
                 <div style="display:inline-flex;gap:0.4rem;align-items:center;">
+                  <?php if (!$is_mechanic): ?>
                   <a href="../insurance/eligibility_check.php?vehicle_id=<?= $v['vehicle_id'] ?>" class="btn-sm-gold" title="Check Policy" style="padding:0.35rem 0.55rem;">
                     <?= icon('shield-check', 14) ?>
                   </a>
@@ -287,6 +293,7 @@ require_once '../../includes/topbar.php';
                       <?= icon('trash', 14) ?>
                     </button>
                   </form>
+                  <?php endif; ?>
                 </div>
               </td>
             </tr>
@@ -299,7 +306,9 @@ require_once '../../includes/topbar.php';
         <div class="empty-icon"><?= icon('vehicle', 28) ?></div>
         <div class="empty-title">No vehicles yet</div>
         <div class="empty-desc">Add a vehicle to start processing insurance.</div>
+        <?php if (!$is_mechanic): ?>
         <a href="add_vehicle.php?client_id=<?= $client_id ?>" class="btn-primary"><?= icon('plus', 14) ?> Add Vehicle</a>
+        <?php endif; ?>
       </div>
       <?php endif; ?>
     </div>
@@ -312,7 +321,7 @@ require_once '../../includes/topbar.php';
           <div class="card-title">Insurance Policies</div>
           <div class="card-sub"><?= $pc ?> polic<?= $pc !== 1 ? 'ies' : 'y' ?> on record</div>
         </div>
-        <a href="../insurance/eligibility_check.php" class="btn-primary" style="margin-left:auto;padding:0.5rem 1rem;font-size:0.78rem;"><?= icon('shield-check', 14) ?> Check Eligibility</a>
+        <?php if (!$is_mechanic): ?><a href="../insurance/eligibility_check.php" class="btn-primary" style="margin-left:auto;padding:0.5rem 1rem;font-size:0.78rem;"><?= icon('shield-check', 14) ?> Check Eligibility</a><?php endif; ?>
       </div>
       <?php if ($policies->num_rows > 0): ?>
       <div class="tg-table-wrap">
@@ -412,9 +421,11 @@ require_once '../../includes/topbar.php';
           <div class="card-title">Claims History</div>
           <div class="card-sub"><?= $claims->num_rows ?> claim<?= $claims->num_rows !== 1 ? 's' : '' ?> on record</div>
         </div>
+        <?php if (!$is_mechanic): ?>
         <a href="../claims/add_claim.php" class="btn-primary" style="margin-left:auto;padding:0.5rem 1rem;font-size:0.78rem;">
           <?= icon('plus', 14) ?> File New Claim
         </a>
+        <?php endif; ?>
       </div>
       <?php if ($claims->num_rows > 0): ?>
       <div class="tg-table-wrap">
@@ -499,7 +510,7 @@ require_once '../../includes/topbar.php';
             <div class="card-sub">Repair history for this client</div>
           </div>
         </div>
-        <a href="../repair/repair_list.php" class="btn-sm-gold"><?= icon('wrench', 12) ?> All Jobs</a>
+        <a href="../repair/repair_list.php" class="btn-primary" style="margin-left:auto;padding:0.5rem 1rem;font-size:0.78rem;"><?= icon('wrench', 14) ?> All Jobs</a>
       </div>
       <?php if ($repair_jobs->num_rows > 0): ?>
       <table class="tg-table">

@@ -338,11 +338,7 @@ require_once '../../includes/topbar.php';
               <div class="card-sub" id="ct-month-label"><?= $cur_ct['label'] ?></div>
             </div>
           </div>
-          <!-- Month navigator -->
-          <div style="display:flex;align-items:center;gap:0.25rem;">
-            <button id="ct-prev" onclick="ctNavigate(-1)" style="background:var(--bg-2);border:1px solid var(--border);border-radius:6px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-muted);">&#8249;</button>
-            <button id="ct-next" onclick="ctNavigate(1)"  style="background:var(--bg-2);border:1px solid var(--border);border-radius:6px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-muted);">&#8250;</button>
-          </div>
+          <a href="../admin/monthly_report.php" class="btn-sm-gold">Full Report <?= icon('chevron-right', 12) ?></a>
         </div>
         <div style="padding:1rem 1.25rem;display:flex;flex-direction:column;align-items:center;gap:1rem;">
           <div style="position:relative;width:180px;height:180px;">
@@ -477,15 +473,13 @@ require_once '../../includes/topbar.php';
   }, 200);
 
   // ── CLIENT TYPES: month navigator ──
-  const ctData = <?= json_encode(array_values($ct_months)) ?>;
-  let ctIdx = ctData.length - 1; // start at current month
-
-  const ctChart = new Chart(document.getElementById('chart-client-types'), {
+  // ── DOUGHNUT: Client Types (current month) ──
+  new Chart(document.getElementById('chart-client-types'), {
     type: 'doughnut',
     data: {
       labels: ['Insurance', 'Walk-in'],
       datasets: [{
-        data: [ctData[ctIdx].insurance, ctData[ctIdx].walkin],
+        data: [<?= (int)$insurance_clients ?>, <?= (int)$walkin_clients ?>],
         backgroundColor: ['#2E7D52', '#B8860B'],
         hoverBackgroundColor: ['#3aa366', '#D4A017'],
         borderColor: 'transparent',
@@ -496,13 +490,13 @@ require_once '../../includes/topbar.php';
     },
     options: {
       responsive: true,
-      animation: { duration: 700, easing: 'easeOutQuart' },
+      animation: { duration: 1000, easing: 'easeOutQuart' },
       plugins: {
         legend: { display: false },
         tooltip: {
           callbacks: {
             label: (ctx) => {
-              const t = (ctData[ctIdx].total) || 1;
+              const t = (<?= (int)$month_clients_total ?>) || 1;
               const pct = Math.round(ctx.parsed / t * 100);
               return ' ' + ctx.label + ': ' + ctx.parsed + ' (' + pct + '%)';
             }
@@ -512,34 +506,6 @@ require_once '../../includes/topbar.php';
       cutout: '68%',
     }
   });
-
-  function ctRefresh() {
-    const d = ctData[ctIdx];
-    const t = d.total || 1;
-    // update chart
-    ctChart.data.datasets[0].data = [d.insurance, d.walkin];
-    ctChart.update();
-    // update labels
-    document.getElementById('ct-month-label').textContent = d.label;
-    document.getElementById('ct-center-month').textContent = d.short;
-    document.getElementById('ct-center-year').textContent  = d.year;
-    document.getElementById('ct-ins-val').textContent = d.insurance;
-    document.getElementById('ct-wk-val').textContent  = d.walkin;
-    document.getElementById('ct-ins-pct').textContent = Math.round(d.insurance / t * 100) + '%';
-    document.getElementById('ct-wk-pct').textContent  = Math.round(d.walkin    / t * 100) + '%';
-    // disable/enable nav buttons
-    document.getElementById('ct-prev').disabled = ctIdx === 0;
-    document.getElementById('ct-next').disabled = ctIdx === ctData.length - 1;
-    document.getElementById('ct-prev').style.opacity = ctIdx === 0 ? '0.3' : '1';
-    document.getElementById('ct-next').style.opacity = ctIdx === ctData.length - 1 ? '0.3' : '1';
-  }
-
-  window.ctNavigate = function(dir) {
-    ctIdx = Math.max(0, Math.min(ctData.length - 1, ctIdx + dir));
-    ctRefresh();
-  };
-
-  ctRefresh(); // set initial button states
 
   const monthlyPolicyLabels = <?= json_encode(array_column($monthly_policies, 'label')) ?>;
   const monthlyPolicyData   = <?= json_encode(array_column($monthly_policies, 'count')) ?>;

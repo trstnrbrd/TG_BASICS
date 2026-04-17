@@ -3,7 +3,7 @@ require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 
-if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
+if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin', 'mechanic'])) {
     header("Location: ../../auth/login.php");
     exit;
 }
@@ -231,7 +231,9 @@ require_once '../../includes/topbar.php';
         <?php if ($search || $filter_by !== 'all' || $sort_by !== 'newest' || $filter_type !== 'all'): ?>
         <a href="client_list.php" class="btn-ghost"><?= icon('x-mark', 14) ?> Clear</a>
         <?php endif; ?>
+        <?php if ($_SESSION['role'] !== 'mechanic'): ?>
         <a href="add_client.php" class="btn-primary"><?= icon('plus', 14) ?> Add Client</a>
+        <?php endif; ?>
       </div>
     </form>
 
@@ -287,6 +289,7 @@ require_once '../../includes/topbar.php';
                   <a href="view_client.php?id=<?= $row['client_id'] ?>" class="btn-sm-gold" title="View" style="padding:0.35rem 0.55rem;">
                     <?= icon('eye', 14) ?>
                   </a>
+                  <?php if ($_SESSION['role'] !== 'mechanic'): ?>
                   <form method="POST" action="" style="display:inline;">
                     <?= csrf_field() ?>
                     <input type="hidden" name="delete_client_id" value="<?= $row['client_id'] ?>"/>
@@ -297,6 +300,7 @@ require_once '../../includes/topbar.php';
                       <?= icon('trash', 14) ?>
                     </button>
                   </form>
+                  <?php endif; ?>
                 </div>
               </td>
             </tr>
@@ -309,7 +313,7 @@ require_once '../../includes/topbar.php';
         <div class="empty-icon"><?= icon('users', 28) ?></div>
         <div class="empty-title"><?= $search ? 'No results found' : 'No clients yet' ?></div>
         <div class="empty-desc"><?= $search ? 'Try a different name, plate number, or contact.' : 'Start by adding your first client record.' ?></div>
-        <?php if (!$search): ?>
+        <?php if (!$search && $_SESSION['role'] !== 'mechanic'): ?>
         <a href="add_client.php" class="btn-primary"><?= icon('plus', 14) ?> Add First Client</a>
         <?php endif; ?>
       </div>

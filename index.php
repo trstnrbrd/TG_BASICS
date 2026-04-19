@@ -26,6 +26,12 @@
       <span class="nav-tagline">Management System</span>
     </div>
   </a>
+  <div class="nav-links">
+    <a href="#modules" class="nav-link">Modules</a>
+    <a href="#roles" class="nav-link">Access</a>
+    <a href="#security" class="nav-link">Security</a>
+    <a href="#contact" class="nav-link">Contact</a>
+  </div>
   <div class="nav-right">
     <span class="nav-label">Internal system &mdash; authorized users only</span>
     <button class="theme-toggle" id="theme-toggle" title="Toggle light/dark mode" aria-label="Toggle theme">
@@ -121,35 +127,43 @@
   </div>
 </section>
 
-<!-- ABOUT STRIP -->
-<div class="about-strip">
-  <div class="strip-inner">
-    <div class="strip-tagline">&ldquo;Your Journey, Our Care&rdquo;</div>
-    <div class="strip-rule">
-      <span class="strip-rule-line"></span>
-      <span class="strip-rule-diamond">&#9670;</span>
-      <span class="strip-rule-line"></span>
-    </div>
-    <div class="strip-details">
-      <span class="strip-detail-item">
-        <span class="strip-item-icon"><?= icon('building-office', 13) ?></span>
-        49 Villa Tierra St., San Roque, Pandi, Bulacan
-      </span>
-      <span class="strip-dot">&middot;</span>
-      <span class="strip-detail-item">
-        <span class="strip-item-icon"><?= icon('calendar', 13) ?></span>
-        Operating Since 2016
-      </span>
+<!-- SOCIAL PROOF STRIP -->
+<section class="proof-section">
+  <div class="proof-inner js-reveal">
+    <div class="proof-tagline">&ldquo;Your Journey, Our Care&rdquo;</div>
+    <div class="proof-divider"></div>
+    <div class="proof-stats">
+      <div class="proof-stat">
+        <div class="proof-stat-num" id="stat-clients-root"></div>
+        <div class="proof-stat-label">System Modules</div>
+      </div>
+      <div class="proof-stat-sep"></div>
+      <div class="proof-stat">
+        <div class="proof-stat-num" id="stat-policies-root"></div>
+        <div class="proof-stat-label">User Roles</div>
+      </div>
+      <div class="proof-stat-sep"></div>
+      <div class="proof-stat">
+        <div class="proof-stat-num" id="stat-modules-root"></div>
+        <div class="proof-stat-label">Security Features</div>
+      </div>
+      <div class="proof-stat-sep"></div>
+      <div class="proof-stat">
+        <div class="proof-stat-num" id="stat-years-root"></div>
+        <div class="proof-stat-label">Years in Operation</div>
+      </div>
     </div>
   </div>
-</div>
+</section>
 
 <!-- MODULES -->
-<section id="modules" class="modules-section">
-  <div class="modules-inner">
-    <div class="section-label">System Modules</div>
-    <h2 class="section-title">Six modules.<br><span>One platform.</span></h2>
-    <p class="section-desc">Every feature built around the actual workflow of the business, from the first inspection to the final e-receipt.</p>
+<section id="modules" class="page-section">
+  <div class="section-container js-reveal-container">
+    <div class="section-head js-reveal">
+      <div class="section-label">System Modules</div>
+      <h2 class="section-title">Six modules.<br><span>One platform.</span></h2>
+      <p class="section-desc">Every feature built around the actual workflow of the business, from the first inspection to the final e-receipt.</p>
+    </div>
 
     <div class="modules-grid">
       <div class="module-card" data-mod="1">
@@ -199,11 +213,13 @@
 </section>
 
 <!-- ROLES -->
-<section class="roles-section">
-  <div class="roles-inner">
-    <div class="section-label">Access Levels</div>
-    <h2 class="section-title">The right access<br><span>for every role.</span></h2>
-    <p class="section-desc">Each user is redirected to their own dashboard after login. No self-registration. Accounts are created by the administrator.</p>
+<section id="roles" class="page-section page-section--alt">
+  <div class="section-container js-reveal-container">
+    <div class="section-head js-reveal">
+      <div class="section-label">Access Levels</div>
+      <h2 class="section-title">The right access<br><span>for every role.</span></h2>
+      <p class="section-desc">Each user is redirected to their own dashboard after login. No self-registration. Accounts are created by the administrator.</p>
+    </div>
     <div class="roles-grid roles-grid-3">
       <div class="role-card">
         <div class="role-header">
@@ -254,11 +270,13 @@
 </section>
 
 <!-- SECURITY & TECH -->
-<section class="tech-section">
-  <div class="tech-inner">
-    <div class="section-label">Security &amp; Technology</div>
-    <h2 class="section-title">Built secure.<br><span>Built to last.</span></h2>
-    <p class="section-desc">Enterprise-grade security features protecting every transaction and record in the system.</p>
+<section id="security" class="page-section">
+  <div class="section-container js-reveal-container">
+    <div class="section-head js-reveal">
+      <div class="section-label">Security &amp; Technology</div>
+      <h2 class="section-title">Built secure.<br><span>Built to last.</span></h2>
+      <p class="section-desc">Enterprise-grade security features protecting every transaction and record in the system.</p>
+    </div>
     <div class="tech-grid">
       <div class="tech-card">
         <div class="tech-card-icon"><?= icon('lock-closed', 20) ?></div>
@@ -284,10 +302,32 @@
   </div>
 </section>
 
+<!-- CTA -->
+<section id="contact" class="cta-section js-reveal">
+  <div class="cta-inner">
+    <div class="cta-bg-glow"></div>
+    <div class="cta-content">
+      <div class="section-label" style="justify-content:center;">Ready to get started?</div>
+      <h2 class="cta-title">Everything you need.<br><span>All in one place.</span></h2>
+      <p class="cta-desc">TG-BASICS is built exclusively for the team. Sign in to access client records, policies, claims, repair jobs, and billing — all from a single dashboard.</p>
+      <div class="cta-actions">
+        <a href="auth/login.php" class="btn-primary-hero">
+          <?= icon('lock-closed', 14) ?> Sign In to TG-BASICS
+        </a>
+        <a href="#modules" class="btn-secondary-hero">
+          View Modules <?= icon('chevron-down', 14) ?>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- FOOTER -->
 <footer>
   <div class="footer-inner">
-    <div>
+
+    <!-- Brand col -->
+    <div class="footer-brand-col">
       <div class="footer-brand-name">
         <img src="assets/img/tg_logo.png" alt="TG Customworks" class="footer-logo-img"/>
         <div class="footer-logo-sep"></div>
@@ -295,70 +335,62 @@
         TG<span>-BASICS</span>
       </div>
       <p class="footer-brand-desc">Brokerage and Auto Shop Integrated Control System. Built exclusively for TG Customworks and Basic Car Insurance.</p>
+      <div class="footer-socials">
+        <a href="https://www.facebook.com/TGCustomWorks" target="_blank" rel="noopener noreferrer" class="footer-social-icon" title="TG Customworks Facebook">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+        </a>
+        <a href="https://www.facebook.com/basiccarinsurance" target="_blank" rel="noopener noreferrer" class="footer-social-icon" title="Basic Car Insurance Facebook">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+        </a>
+      </div>
     </div>
+
+    <!-- Location col -->
     <div class="footer-col">
-      <h4>Business Address</h4>
-      <p>49 Villa Tierra St., San Roque<br/>Pandi, Bulacan, Philippines<br/>Gerald Peterson V. Carpio, Prop.</p>
+      <h4>Location</h4>
+      <nav class="footer-nav">
+        <span>49 Villa Tierra St., San Roque</span>
+        <span>Pandi, Bulacan, Philippines</span>
+        <span>Gerald Peterson V. Carpio, Prop.</span>
+        <span>Operating Since 2016</span>
+      </nav>
     </div>
+
+    <!-- System col -->
     <div class="footer-col">
-      <h4>System Info</h4>
-      <p>Built with PHP + MySQL<br/>Web-based internal system<br/>STI College Sta. Maria Capstone</p>
+      <h4>System</h4>
+      <nav class="footer-nav">
+        <span>Built with PHP + MySQL</span>
+        <span>Web-based Internal System</span>
+        <span>STI College Sta. Maria</span>
+        <span>Capstone Project 2026</span>
+      </nav>
     </div>
+
+    <!-- Legal col -->
     <div class="footer-col">
       <h4>Legal</h4>
-      <div style="display:flex;flex-direction:column;gap:0.5rem;">
-        <a href="#" class="footer-legal-link" data-tab="privacy">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          Privacy Notice
-        </a>
-        <a href="#" class="footer-legal-link" data-tab="terms">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          Terms &amp; Conditions
-        </a>
-        <a href="#" class="footer-legal-link" data-tab="disclaimer">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          Disclaimer
-        </a>
-      </div>
+      <nav class="footer-nav">
+        <a href="#" class="footer-legal-link" data-tab="privacy">Privacy Notice</a>
+        <a href="#" class="footer-legal-link" data-tab="terms">Terms &amp; Conditions</a>
+        <a href="#" class="footer-legal-link" data-tab="disclaimer">Disclaimer</a>
+      </nav>
     </div>
+
+    <!-- Contact col -->
     <div class="footer-col">
       <h4>Contact Us</h4>
-      <p>
-        <a href="tel:09171453448" class="footer-contact-link">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
-            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.15 12 19.79 19.79 0 0 1 1.07 3.38 2 2 0 0 1 3.05 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21 16.92z"/>
-          </svg>
-          0917 145 3448
-        </a>
-      </p>
-      <p>
-        <a href="mailto:tgcustomworksbulacan@gmail.com" class="footer-contact-link">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
-            <rect x="2" y="4" width="20" height="16" rx="2"/>
-            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
-          </svg>
-          tgcustomworksbulacan@gmail.com
-        </a>
-      </p>
-      <div style="display:flex;flex-direction:column;gap:0.45rem;margin-top:0.25rem;">
-        <a href="https://www.facebook.com/TGCustomWorks" target="_blank" rel="noopener noreferrer" class="footer-fb-link">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="flex-shrink:0;">
-            <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
-          </svg>
-          TG Customworks
-        </a>
-        <a href="https://www.facebook.com/basiccarinsurance" target="_blank" rel="noopener noreferrer" class="footer-fb-link">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="flex-shrink:0;">
-            <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
-          </svg>
-          Basic Car Insurance
-        </a>
-      </div>
+      <nav class="footer-nav">
+        <a href="tel:09171453448" class="footer-nav-link">0917 145 3448</a>
+        <a href="mailto:tgcustomworksbulacan@gmail.com" class="footer-nav-link">tgcustomworksbulacan<br/>@gmail.com</a>
+        <a href="auth/login.php" class="footer-signin-link"><?= icon('lock-closed', 12) ?> Sign In to TG-BASICS</a>
+      </nav>
     </div>
+
   </div>
   <div class="footer-bottom">
     <p>TG-BASICS &mdash; <span>TG Customworks and Basic Car Insurance</span></p>
-    <p>&copy; <?= date('Y') ?> TG Customworks &amp; Basic Car Insurance. All rights reserved. &nbsp;&middot;&nbsp; Internal use only. Unauthorized access is prohibited.</p>
+    <p>&copy; <?= date('Y') ?> TG Customworks &amp; Basic Car Insurance. All rights reserved. &nbsp;&middot;&nbsp; Internal use only.</p>
   </div>
 </footer>
 
@@ -379,14 +411,10 @@
 
 <div id="privacy-modal">
   <div id="privacy-modal-box">
-
-    <!-- Header -->
     <div style="display:flex;align-items:center;justify-content:space-between;padding:1.1rem 1.75rem;border-bottom:1px solid rgba(255,255,255,0.07);background:rgba(212,160,23,0.06);flex-shrink:0;">
       <div style="display:flex;align-items:center;gap:0.85rem;">
         <div style="width:36px;height:36px;background:linear-gradient(135deg,#D4A017,#B8860B);border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 4px 12px rgba(184,134,11,0.35);">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-          </svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         </div>
         <div>
           <div style="font-size:0.95rem;font-weight:800;color:#E8E2D8;letter-spacing:-0.3px;">Legal Documents</div>
@@ -394,13 +422,9 @@
         </div>
       </div>
       <button id="close-privacy-modal" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);color:#7A7268;cursor:pointer;padding:0.4rem;border-radius:8px;transition:all 0.15s;line-height:1;display:flex;" onmouseover="this.style.background='rgba(255,255,255,0.1)';this.style.color='#E8E2D8'" onmouseout="this.style.background='rgba(255,255,255,0.05)';this.style.color='#7A7268'">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
-
-    <!-- Tabs -->
     <div style="display:flex;border-bottom:1px solid rgba(255,255,255,0.07);background:rgba(0,0,0,0.2);flex-shrink:0;">
       <button class="legal-tab-btn active" data-tab="privacy">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:0.35rem;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -415,11 +439,7 @@
         Disclaimer
       </button>
     </div>
-
-    <!-- Body -->
     <div id="privacy-modal-body" style="padding:1.5rem 1.75rem;display:flex;flex-direction:column;gap:1.1rem;font-size:0.82rem;line-height:1.8;color:#B8B0A4;overflow-y:auto;">
-
-      <!-- PRIVACY TAB -->
       <div id="tab-privacy">
         <div style="background:rgba(212,160,23,0.07);border:1px solid rgba(212,160,23,0.15);border-radius:9px;padding:0.85rem 1.1rem;font-size:0.74rem;color:#9C9286;margin-bottom:1.1rem;">
           <strong style="color:#E8E2D8;">Effective Date:</strong> April 2026 &nbsp;&bull;&nbsp;
@@ -442,8 +462,6 @@
         </div>
         <?php endforeach; ?>
       </div>
-
-      <!-- TERMS TAB -->
       <div id="tab-terms" style="display:none;">
         <div style="background:rgba(212,160,23,0.07);border:1px solid rgba(212,160,23,0.15);border-radius:9px;padding:0.85rem 1.1rem;font-size:0.74rem;color:#9C9286;margin-bottom:1.1rem;">
           <strong style="color:#E8E2D8;">Effective Date:</strong> April 2026 &nbsp;&bull;&nbsp;
@@ -467,8 +485,6 @@
         </div>
         <?php endforeach; ?>
       </div>
-
-      <!-- DISCLAIMER TAB -->
       <div id="tab-disclaimer" style="display:none;">
         <div style="background:rgba(212,160,23,0.07);border:1px solid rgba(212,160,23,0.15);border-radius:9px;padding:0.85rem 1.1rem;font-size:0.74rem;color:#9C9286;margin-bottom:1.1rem;">
           <strong style="color:#E8E2D8;">Effective Date:</strong> April 2026 &nbsp;&bull;&nbsp;
@@ -491,17 +507,13 @@
         </div>
         <?php endforeach; ?>
       </div>
-
     </div>
-
-    <!-- Footer -->
     <div style="padding:1rem 1.75rem;border-top:1px solid rgba(255,255,255,0.07);display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.25);flex-shrink:0;gap:1rem;flex-wrap:wrap;">
       <span style="font-size:0.7rem;color:#7A7268;line-height:1.5;">By accessing TG-BASICS, you acknowledge and agree to our<br/>Privacy Notice, Terms &amp; Conditions, and Disclaimer.</span>
       <button id="close-privacy-modal-btn" style="background:linear-gradient(135deg,#D4A017,#B8860B);color:#fff;border:none;padding:0.6rem 1.5rem;border-radius:9px;font-size:0.8rem;font-weight:700;cursor:pointer;font-family:inherit;transition:all 0.15s;box-shadow:0 4px 14px rgba(184,134,11,0.35);white-space:nowrap;" onmouseover="this.style.boxShadow='0 6px 20px rgba(184,134,11,0.5)'" onmouseout="this.style.boxShadow='0 4px 14px rgba(184,134,11,0.35)'">
         I Understand &amp; Continue
       </button>
     </div>
-
   </div>
 </div>
 
@@ -530,7 +542,6 @@
     try { localStorage.setItem('tg-theme', mode); } catch(e) {}
   }
 
-  // Apply saved or default (dark) on load
   var saved = 'dark';
   try { saved = localStorage.getItem('tg-theme') || 'dark'; } catch(e) {}
   applyTheme(saved);
@@ -574,12 +585,10 @@
     setTimeout(function() { modal.style.display = 'none'; }, 320);
   }
 
-  // Tab buttons
   tabBtns.forEach(function(btn) {
     btn.addEventListener('click', function() { switchTab(this.dataset.tab); });
   });
 
-  // Footer legal links
   document.querySelectorAll('.footer-legal-link').forEach(function(link) {
     link.addEventListener('click', function(e) { e.preventDefault(); openModal(this.dataset.tab); });
   });
@@ -589,7 +598,6 @@
   modal.addEventListener('click', function(e) { if (e.target === modal) closeModal(); });
   document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeModal(); });
 
-  // Auto-show on first visit
   var seen = false;
   try { seen = !!localStorage.getItem(STORAGE_KEY); } catch(e) {}
   if (!seen) setTimeout(function() { openModal('privacy'); }, 800);

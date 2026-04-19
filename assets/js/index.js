@@ -93,19 +93,40 @@ function Typewriter({ words, speed = 80, pause = 1800 }) {
   );
 }
 
-// ── NAVBAR SCROLL SHRINK ──
+// ── NAVBAR SCROLL SHRINK + ACTIVE LINK ──
 function NavScroll() {
   useEffect(() => {
-    const nav = document.querySelector(".topnav");
-    if (!nav) return;
-    const onScroll = () => {
-      if (window.scrollY > 40) {
-        nav.classList.add("scrolled");
-      } else {
-        nav.classList.remove("scrolled");
-      }
+    const nav     = document.querySelector(".topnav");
+    const links   = document.querySelectorAll(".nav-link[href^='#']");
+    const sections = [...links].map(l => document.querySelector(l.getAttribute("href"))).filter(Boolean);
+
+    const setActive = () => {
+      const scrollY = window.scrollY + 120;
+      let current = null;
+      sections.forEach(sec => {
+        if (sec.offsetTop <= scrollY) current = sec.id;
+      });
+      links.forEach(l => {
+        l.classList.toggle("active", l.getAttribute("href") === "#" + current);
+      });
     };
+
+    const onScroll = () => {
+      nav && nav.classList.toggle("scrolled", window.scrollY > 40);
+      setActive();
+    };
+
+    // smooth scroll for nav links
+    links.forEach(link => {
+      link.addEventListener("click", e => {
+        e.preventDefault();
+        const target = document.querySelector(link.getAttribute("href"));
+        if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
+
     window.addEventListener("scroll", onScroll, { passive: true });
+    setActive();
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
   return null;
@@ -186,27 +207,6 @@ function TechCardsReveal() {
   return null;
 }
 
-// ── ABOUT STRIP REVEAL ──
-function AboutStripReveal() {
-  useEffect(() => {
-    const strip = document.querySelector(".about-strip .strip-inner");
-    if (!strip) return;
-    strip.style.opacity = "0";
-    strip.style.transform = "translateY(20px)";
-    strip.style.transition = "opacity 0.7s ease, transform 0.7s ease";
-
-    const obs = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) {
-        strip.style.opacity = "1";
-        strip.style.transform = "none";
-        obs.disconnect();
-      }
-    }, { threshold: 0.2 });
-    obs.observe(strip);
-    return () => obs.disconnect();
-  }, []);
-  return null;
-}
 
 // ── FOOTER REVEAL ──
 function FooterReveal() {
@@ -233,38 +233,53 @@ function FooterReveal() {
   return null;
 }
 
-// ── SECTION LABEL + TITLE + DESC REVEAL ──
+// ── SECTION TEXT REVEAL ──
 function SectionTextReveal() {
   useEffect(() => {
-    const groups = document.querySelectorAll(
-      ".modules-section, .roles-section, .tech-section"
-    );
+    const els = document.querySelectorAll(".js-reveal");
     const observers = [];
-    groups.forEach(section => {
-      const label = section.querySelector(".section-label");
-      const title = section.querySelector(".section-title");
-      const desc  = section.querySelector(".section-desc");
+    els.forEach((el, i) => {
+      el.style.opacity = "0";
+      el.style.transform = "translateY(24px)";
+      el.style.transition = `opacity 0.65s ease, transform 0.65s ease`;
 
-      [label, title, desc].forEach((el, i) => {
-        if (!el) return;
-        el.style.opacity = "0";
-        el.style.transform = "translateY(20px)";
-        el.style.transition = `opacity 0.6s ease ${i * 100}ms, transform 0.6s ease ${i * 100}ms`;
-
-        const obs = new IntersectionObserver(([entry]) => {
-          if (entry.isIntersecting) {
-            el.style.opacity = "1";
-            el.style.transform = "none";
-            obs.disconnect();
-          }
-        }, { threshold: 0.15 });
-        obs.observe(el);
-        observers.push(obs);
-      });
+      const obs = new IntersectionObserver(([entry]) => {
+        if (entry.isIntersecting) {
+          el.style.opacity = "1";
+          el.style.transform = "none";
+          obs.disconnect();
+        }
+      }, { threshold: 0.12 });
+      obs.observe(el);
+      observers.push(obs);
     });
     return () => observers.forEach(o => o.disconnect());
   }, []);
   return null;
+}
+
+// ── STATS COUNTERS ──
+function StatsStrip() {
+  const stats = [
+    { id: "stat-clients-root",  target: 6,  suffix: "" },
+    { id: "stat-policies-root", target: 3,  suffix: "" },
+    { id: "stat-modules-root",  target: 7,  suffix: "" },
+    { id: "stat-years-root",    target: 9,  suffix: "+" },
+  ];
+  return (
+    <>
+      {stats.map(({ id, target, suffix }) => {
+        const el = document.getElementById(id);
+        if (!el) return null;
+        return ReactDOM.createPortal(
+          <span className="stat-num-inner">
+            <AnimatedCounter target={target} suffix={suffix} duration={1200} />
+          </span>,
+          el
+        );
+      })}
+    </>
+  );
 }
 
 // ── MOUNT ALL ──
@@ -276,7 +291,6 @@ if (twRoot) ReactDOM.createRoot(twRoot).render(
   <Typewriter words={["Always ready.", "Always accurate.", "Always organized."]} />
 );
 
-// Mount all reveal controllers into a single hidden root
 const revealRoot = document.createElement("div");
 revealRoot.style.display = "none";
 document.body.appendChild(revealRoot);
@@ -286,8 +300,8 @@ ReactDOM.createRoot(revealRoot).render(
     <ModulesReveal />
     <RoleCardsReveal />
     <TechCardsReveal />
-    <AboutStripReveal />
     <FooterReveal />
     <SectionTextReveal />
+    <StatsStrip />
   </>
 );

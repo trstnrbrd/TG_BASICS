@@ -134,20 +134,16 @@ require_once '../../includes/topbar.php';
       <?php endforeach; ?>
     </div>
 
-    <div style="display:flex;justify-content:flex-end;margin-bottom:1.25rem;">
-      <a href="add_repair.php" class="btn-primary"><?= icon('plus', 14) ?> New Repair Job</a>
-    </div>
-
     <!-- FILTERS -->
-    <div class="card" style="margin-bottom:1.25rem;">
-      <form method="GET" action="" class="rl-filter-row">
-        <div class="rl-search-wrap">
-          <span class="search-icon"><?= icon('search', 14) ?></span>
-          <input type="text" name="search" class="field-input"
+    <form method="GET" action="" style="margin-bottom:1rem;">
+      <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
+        <div style="position:relative;flex:1;min-width:200px;max-width:360px;">
+          <span style="position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;"><?= icon('magnifying-glass', 14) ?></span>
+          <input type="text" name="search" class="filter-input"
             placeholder="Search by client, plate, or job #..."
-            value="<?= htmlspecialchars($search) ?>"/>
+            value="<?= htmlspecialchars($search) ?>" style="padding-left:2.4rem;width:100%;"/>
         </div>
-        <select name="status" class="field-select" style="width:160px;">
+        <select name="status" class="filter-input" style="width:160px;">
           <option value="all"         <?= $filter_status === 'all'         ? 'selected' : '' ?>>All Statuses</option>
           <option value="pending"     <?= $filter_status === 'pending'     ? 'selected' : '' ?>>Pending</option>
           <option value="in_progress" <?= $filter_status === 'in_progress' ? 'selected' : '' ?>>In Progress</option>
@@ -155,16 +151,16 @@ require_once '../../includes/topbar.php';
           <option value="completed"   <?= $filter_status === 'completed'   ? 'selected' : '' ?>>Completed</option>
           <option value="cancelled"   <?= $filter_status === 'cancelled'   ? 'selected' : '' ?>>Cancelled</option>
         </select>
-        <select name="sort" class="field-select" style="width:140px;">
+        <select name="sort" class="filter-input" style="width:140px;">
           <option value="newest" <?= $sort_by === 'newest' ? 'selected' : '' ?>>Newest First</option>
           <option value="oldest" <?= $sort_by === 'oldest' ? 'selected' : '' ?>>Oldest First</option>
         </select>
-        <button type="submit" class="btn-primary"><?= icon('search', 14) ?> Search</button>
+        <button type="submit" class="btn-primary"><?= icon('magnifying-glass', 14) ?> Search</button>
         <?php if ($search !== '' || $filter_status !== 'all'): ?>
         <a href="repair_list.php" class="btn-ghost"><?= icon('x-mark', 14) ?> Clear</a>
         <?php endif; ?>
-      </form>
-    </div>
+      </div>
+    </form>
 
     <!-- JOB TABLE -->
     <div class="card">
@@ -173,6 +169,9 @@ require_once '../../includes/topbar.php';
         <div>
           <div class="card-title">Repair Jobs</div>
           <div class="card-sub"><?= $jobs->num_rows ?> job<?= $jobs->num_rows !== 1 ? 's' : '' ?> found</div>
+        </div>
+        <div style="margin-left:auto;">
+          <a href="add_repair.php" class="btn-primary"><?= icon('plus', 14) ?> New Repair Job</a>
         </div>
       </div>
 

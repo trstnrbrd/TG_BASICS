@@ -184,3 +184,51 @@ if (tfaToggle) {
         }
     });
 }
+
+// ── Change Username ──
+const saveUsernameBtn = document.getElementById('save-username-btn');
+if (saveUsernameBtn) {
+    saveUsernameBtn.addEventListener('click', async function () {
+        const newUsername = document.getElementById('new_username')?.value.trim();
+        const curPw       = document.getElementById('username_cur_pw')?.value;
+
+        if (!newUsername) {
+            Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter a new username.', confirmButtonColor: '#B8860B' });
+            return;
+        }
+        if (!curPw) {
+            Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter your current password to confirm.', confirmButtonColor: '#B8860B' });
+            return;
+        }
+
+        const originalHTML = this.innerHTML;
+        this.disabled = true;
+        this.style.opacity = '0.6';
+        this.textContent = 'Saving...';
+
+        const fd = new FormData();
+        fd.append('section', 'username');
+        fd.append('csrf_token', csrfToken());
+        fd.append('new_username', newUsername);
+        fd.append('current_password', curPw);
+
+        let data = null;
+        try {
+            const res = await fetch('settings.php', { method: 'POST', body: fd });
+            data = await res.json();
+        } catch (e) { data = null; }
+
+        this.disabled = false;
+        this.style.opacity = '';
+        this.innerHTML = originalHTML;
+
+        if (!data) {
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Something went wrong.', confirmButtonColor: '#B8860B' });
+        } else if (data.ok) {
+            Swal.fire({ icon: 'success', title: 'Username Updated!', text: data.message, confirmButtonColor: '#B8860B', timer: 2500, timerProgressBar: true })
+                .then(() => location.reload());
+        } else {
+            Swal.fire({ icon: 'error', title: 'Error', text: data.error, confirmButtonColor: '#B8860B' });
+        }
+    });
+}

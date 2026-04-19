@@ -62,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($errors)) {
         $stmt = $conn->prepare("
             INSERT INTO claims (policy_id, client_id, claim_type, incident_date, description, status, created_by)
-            VALUES (?, ?, ?, ?, ?, 'document_collection', ?)
+            VALUES (?, ?, ?, ?, ?, 'compiling', ?)
         ");
         $stmt->bind_param('iisssi', $policy_id, $client_id, $claim_type, $incident_date, $description, $_SESSION['user_id']);
         $stmt->execute();

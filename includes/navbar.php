@@ -169,6 +169,10 @@ $role        = $_SESSION['role'] ?? '';
        class="nav-item <?= $active_page === 'claims' ? 'active' : '' ?>">
       <span class="nav-icon"><?= icon('clipboard-list', 16) ?></span> Claims
     </a>
+    <a href="<?= $base_path ?>modules/billing/billing_list.php"
+       class="nav-item <?= $active_page === 'billing' ? 'active' : '' ?>">
+      <span class="nav-icon"><?= icon('document-text', 16) ?></span> Billing
+    </a>
 
     <div class="nav-group-label">Repair Shop</div>
     <a href="<?= $base_path ?>modules/repair/repair_list.php"

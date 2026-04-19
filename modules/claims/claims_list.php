@@ -9,15 +9,9 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'supe
     exit;
 }
 
-// ── STATS ──
-$total_claims    = $conn->query("SELECT COUNT(*) as c FROM claims")->fetch_assoc()['c'];
-$open_claims     = $conn->query("SELECT COUNT(*) as c FROM claims WHERE status NOT IN ('approved','denied','resolved')")->fetch_assoc()['c'];
-$approved_claims = $conn->query("SELECT COUNT(*) as c FROM claims WHERE status = 'approved'")->fetch_assoc()['c'];
-$denied_claims   = $conn->query("SELECT COUNT(*) as c FROM claims WHERE status = 'denied'")->fetch_assoc()['c'];
-
 // ── FILTERS ──
 $search        = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
-$filter_status = san_enum($_GET['status'] ?? 'all', ['all', 'document_collection', 'submitted', 'under_review', 'approved', 'denied', 'resolved']);
+$filter_status = san_enum($_GET['status'] ?? 'all', ['all', 'compiling', 'sent_admin', 'sent_head_office', 'waiting_loa', 'loa_received', 'pending', 'approved', 'lack_of_requirements', 'denied', 'resolved']);
 $filter_type   = san_enum($_GET['type'] ?? 'all', array_merge(['all'], ALLOWED_CLAIM_TYPES));
 $sort_by       = $_GET['sort'] ?? 'newest';
 
@@ -68,12 +62,16 @@ $stmt->execute();
 $result = $stmt->get_result();
 
 $status_map = [
-    'document_collection' => ['label' => 'Document Collection', 'class' => 'badge-warning'],
-    'submitted'           => ['label' => 'Submitted to Head Office', 'class' => 'badge-info'],
-    'under_review'        => ['label' => 'Under Adjuster Review', 'class' => 'badge-orange'],
-    'approved'            => ['label' => 'Approved', 'class' => 'badge-success'],
-    'denied'              => ['label' => 'Denied', 'class' => 'badge-danger'],
-    'resolved'            => ['label' => 'Resolved', 'class' => 'badge-muted'],
+    'compiling'            => ['label' => 'Compiling Requirements', 'class' => 'badge-warning'],
+    'sent_admin'           => ['label' => 'Sent to Admin',          'class' => 'badge-info'],
+    'sent_head_office'     => ['label' => 'Sent to Head Office',    'class' => 'badge-orange'],
+    'waiting_loa'          => ['label' => 'Waiting for LOA',        'class' => 'badge-blue'],
+    'loa_received'         => ['label' => 'LOA Received',           'class' => 'badge-teal'],
+    'pending'              => ['label' => 'Pending',                'class' => 'badge-yellow'],
+    'approved'             => ['label' => 'Approved',               'class' => 'badge-success'],
+    'denied'               => ['label' => 'Denied',                 'class' => 'badge-danger'],
+    'lack_of_requirements' => ['label' => 'Lack of Requirements',   'class' => 'badge-danger'],
+    'resolved'             => ['label' => 'Resolved',               'class' => 'badge-muted'],
 ];
 
 $page_title  = 'Claims';
@@ -103,26 +101,6 @@ require_once '../../includes/topbar.php';
     </script>
     <?php endif; ?>
 
-    <!-- STATS -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem;">
-      <?php
-      $stats = [
-        [icon('clipboard-list',16), $total_claims,    'Total Claims',    ''],
-        [icon('clock',16),          $open_claims,     'Open Claims',     'color:var(--warning)'],
-        [icon('check-circle',16),   $approved_claims, 'Approved',        'color:var(--success)'],
-        [icon('x-circle',16),       $denied_claims,   'Denied',          'color:var(--danger)'],
-      ];
-      foreach ($stats as $s): ?>
-      <div class="card" style="margin-bottom:0;display:flex;align-items:center;gap:0.9rem;padding:1.1rem 1.25rem;">
-        <div class="card-icon" style="width:42px;height:42px;border-radius:10px;flex-shrink:0;"><?= $s[0] ?></div>
-        <div>
-          <div style="font-size:1.6rem;font-weight:800;line-height:1;letter-spacing:-0.5px;<?= $s[3] ?>"><?= $s[1] ?></div>
-          <div style="font-size:0.7rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-top:0.15rem;"><?= $s[2] ?></div>
-        </div>
-      </div>
-      <?php endforeach; ?>
-    </div>
-
     <!-- TOOLBAR -->
     <form method="GET" action="" style="margin-bottom:1rem;">
       <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
@@ -131,14 +109,18 @@ require_once '../../includes/topbar.php';
           <input type="text" name="search" placeholder="Search by name, plate, policy, vehicle..."
             value="<?= htmlspecialchars($search) ?>" class="filter-input" style="padding-left:2.4rem;width:100%;"/>
         </div>
-        <select name="status" class="filter-input" style="min-width:190px;">
-          <option value="all" <?= $filter_status==='all'?'selected':'' ?>>All Statuses</option>
-          <option value="document_collection" <?= $filter_status==='document_collection'?'selected':'' ?>>Document Collection</option>
-          <option value="submitted"           <?= $filter_status==='submitted'?'selected':'' ?>>Submitted to Head Office</option>
-          <option value="under_review"        <?= $filter_status==='under_review'?'selected':'' ?>>Under Adjuster Review</option>
-          <option value="approved"            <?= $filter_status==='approved'?'selected':'' ?>>Approved</option>
-          <option value="denied"              <?= $filter_status==='denied'?'selected':'' ?>>Denied</option>
-          <option value="resolved"            <?= $filter_status==='resolved'?'selected':'' ?>>Resolved</option>
+        <select name="status" class="filter-input" style="min-width:210px;">
+          <option value="all"                  <?= $filter_status==='all'                 ?'selected':'' ?>>All Statuses</option>
+          <option value="compiling"            <?= $filter_status==='compiling'           ?'selected':'' ?>>Compiling Requirements</option>
+          <option value="sent_admin"           <?= $filter_status==='sent_admin'          ?'selected':'' ?>>Sent to Admin</option>
+          <option value="sent_head_office"     <?= $filter_status==='sent_head_office'    ?'selected':'' ?>>Sent to Head Office</option>
+          <option value="waiting_loa"          <?= $filter_status==='waiting_loa'         ?'selected':'' ?>>Waiting for LOA</option>
+          <option value="loa_received"         <?= $filter_status==='loa_received'        ?'selected':'' ?>>LOA Received</option>
+          <option value="pending"              <?= $filter_status==='pending'             ?'selected':'' ?>>Pending</option>
+          <option value="approved"             <?= $filter_status==='approved'            ?'selected':'' ?>>Approved</option>
+          <option value="lack_of_requirements" <?= $filter_status==='lack_of_requirements'?'selected':'' ?>>Lack of Requirements</option>
+          <option value="denied"               <?= $filter_status==='denied'              ?'selected':'' ?>>Denied</option>
+          <option value="resolved"             <?= $filter_status==='resolved'            ?'selected':'' ?>>Resolved</option>
         </select>
         <select name="type" class="filter-input" style="min-width:160px;">
           <option value="all"   <?= $filter_type==='all'?'selected':'' ?>>All Types</option>
@@ -153,7 +135,6 @@ require_once '../../includes/topbar.php';
         <?php if ($search || $filter_status !== 'all' || $filter_type !== 'all' || $sort_by !== 'newest'): ?>
         <a href="claims_list.php" class="btn-ghost"><?= icon('x-mark',14) ?> Clear</a>
         <?php endif; ?>
-        <a href="add_claim.php" class="btn-primary"><?= icon('plus',14) ?> File New Claim</a>
       </div>
     </form>
 
@@ -164,6 +145,9 @@ require_once '../../includes/topbar.php';
         <div>
           <div class="card-title">All Claims</div>
           <div class="card-sub"><?= $result->num_rows ?> record<?= $result->num_rows !== 1 ? 's' : '' ?></div>
+        </div>
+        <div style="margin-left:auto;">
+          <a href="add_claim.php" class="btn-primary"><?= icon('plus',14) ?> File New Claim</a>
         </div>
       </div>
 
@@ -188,7 +172,7 @@ require_once '../../includes/topbar.php';
                          + (int)$row['doc_drivers_license'] + (int)$row['doc_affidavit']
                          + (int)$row['doc_estimate'] + (int)$row['doc_damage_photos'];
               $s = $status_map[$row['status']] ?? ['label' => $row['status'], 'class' => 'badge-muted'];
-              $is_finished = in_array($row['status'], ['resolved', 'denied']);
+              $is_finished = in_array($row['status'], ['resolved', 'denied', 'lack_of_requirements']);
             ?>
             <tr>
               <td>

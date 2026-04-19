@@ -65,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_upload'])) {
     $doc_field = san_str($_POST['doc_field'] ?? '', 40);
     $allowed   = ['doc_insurance_policy', 'doc_or', 'doc_cr', 'doc_drivers_license', 'doc_affidavit', 'doc_estimate', 'doc_damage_photos'];
     $policy_expired_ajax = strtotime($claim['policy_end']) < strtotime(date('Y-m-d'));
-    $docs_open_statuses = ['document_collection', 'submitted'];
+    $docs_open_statuses = ['compiling', 'sent_admin', 'lack_of_requirements'];
     if (!in_array($doc_field, $allowed, true) || !in_array($claim['status'], $docs_open_statuses) || $policy_expired_ajax) {
         echo json_encode(['ok' => false, 'msg' => 'Not allowed.']); exit;
     }
@@ -122,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_remove_doc'])) {
     header('Content-Type: application/json');
     $doc_field = san_str($_POST['doc_field'] ?? '', 40);
     $allowed   = ['doc_insurance_policy', 'doc_or', 'doc_cr', 'doc_drivers_license', 'doc_affidavit', 'doc_estimate', 'doc_damage_photos'];
-    if (!in_array($doc_field, $allowed, true) || !in_array($claim['status'], ['document_collection', 'submitted'])) {
+    if (!in_array($doc_field, $allowed, true) || !in_array($claim['status'], ['compiling', 'sent_admin', 'lack_of_requirements'])) {
         echo json_encode(['ok' => false]); exit;
     }
 
@@ -148,7 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_remove_doc'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_damage_upload'])) {
     header('Content-Type: application/json');
     $policy_expired_ajax = strtotime($claim['policy_end']) < strtotime(date('Y-m-d'));
-    if (!in_array($claim['status'], ['document_collection', 'submitted']) || $policy_expired_ajax) { echo json_encode(['ok' => false, 'msg' => 'Not allowed.']); exit; }
+    if (!in_array($claim['status'], ['compiling', 'sent_admin', 'lack_of_requirements']) || $policy_expired_ajax) { echo json_encode(['ok' => false, 'msg' => 'Not allowed.']); exit; }
     if (!isset($_FILES['damage_file']) || $_FILES['damage_file']['error'] !== UPLOAD_ERR_OK) { echo json_encode(['ok' => false, 'msg' => 'Upload failed.']); exit; }
 
     $file  = $_FILES['damage_file'];
@@ -186,7 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_damage_upload'])
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_damage_remove'])) {
     header('Content-Type: application/json');
     $policy_expired_ajax = strtotime($claim['policy_end']) < strtotime(date('Y-m-d'));
-    if (!in_array($claim['status'], ['document_collection', 'submitted']) || $policy_expired_ajax) { echo json_encode(['ok' => false]); exit; }
+    if (!in_array($claim['status'], ['compiling', 'sent_admin', 'lack_of_requirements']) || $policy_expired_ajax) { echo json_encode(['ok' => false]); exit; }
 
     $photo_id = (int)($_POST['photo_id'] ?? 0);
     $ph_sel = $conn->prepare("SELECT filename FROM claim_damage_photos WHERE photo_id = ? AND claim_id = ?");
@@ -356,30 +356,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_claim'])) {
 // Handle status update
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
     csrf_verify();
-    $allowed_statuses = ['document_collection', 'submitted', 'under_review', 'approved', 'denied', 'resolved'];
+    $allowed_statuses = ['compiling','sent_admin','sent_head_office','waiting_loa','loa_received','pending','approved','denied','lack_of_requirements','resolved'];
     $new_status    = san_enum($_POST['new_status'] ?? '', $allowed_statuses);
     $denial_reason = san_str($_POST['denial_reason'] ?? '', MAX_TEXT);
     $notes         = san_str($_POST['notes'] ?? '', MAX_TEXT);
 
     // Guard: block all status changes if policy is expired (except deny/resolve by admin)
-    if ($policy_expired && !in_array($new_status, ['denied', 'resolved'])) {
+    if ($policy_expired && !in_array($new_status, ['denied', 'lack_of_requirements', 'resolved'])) {
         header("Location: view_claim.php?id=$claim_id&error=" . urlencode('Policy is expired. Please renew the policy before processing this claim.'));
         exit;
     }
 
     // Guard: block forward status changes if no documents uploaded yet (deny always allowed)
-    if ($new_status !== 'denied' && $docs_done === 0) {
+    if (!in_array($new_status, ['denied', 'lack_of_requirements']) && $docs_done === 0) {
         header("Location: view_claim.php?id=$claim_id&error=" . urlencode('Upload at least one requirement before updating the status.'));
         exit;
     }
 
     // Guard: new status must be a valid next step for this claim
     $next_statuses = match($claim['status']) {
-        'document_collection' => ['submitted'],
-        'submitted'           => $claim['claim_type'] === 'repair' ? ['under_review', 'denied'] : ['approved', 'denied'],
-        'under_review'        => ['approved', 'denied'],
-        'approved'            => ['resolved'],
-        default               => [],
+        'compiling'            => ['sent_admin', 'lack_of_requirements'],
+        'sent_admin'           => ['sent_head_office', 'lack_of_requirements'],
+        'sent_head_office'     => ['waiting_loa', 'denied'],
+        'waiting_loa'          => ['loa_received', 'denied'],
+        'loa_received'         => ['pending', 'denied'],
+        'pending'              => ['approved', 'denied'],
+        'approved'             => ['resolved'],
+        'lack_of_requirements' => ['compiling'],
+        default                => [],
     };
     if (!in_array($new_status, $next_statuses)) {
         header("Location: view_claim.php?id=$claim_id&error=" . urlencode('Invalid status transition.'));
@@ -419,12 +423,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
 $policy_expired = strtotime($claim['policy_end']) < strtotime(date('Y-m-d'));
 
 $status_map = [
-    'document_collection' => ['label' => 'Document Collection', 'class' => 'badge-warning'],
-    'submitted'           => ['label' => 'Forwarded to Head Office', 'class' => 'badge-info'],
-    'under_review'        => ['label' => 'Under Adjuster Review', 'class' => 'badge-orange'],
-    'approved'            => ['label' => 'Approved', 'class' => 'badge-success'],
-    'denied'              => ['label' => 'Denied', 'class' => 'badge-danger'],
-    'resolved'            => ['label' => 'Resolved', 'class' => 'badge-muted'],
+    'compiling'            => ['label' => 'Compiling Requirements', 'class' => 'badge-warning'],
+    'sent_admin'           => ['label' => 'Sent to Admin',          'class' => 'badge-info'],
+    'sent_head_office'     => ['label' => 'Sent to Head Office',    'class' => 'badge-orange'],
+    'waiting_loa'          => ['label' => 'Waiting for LOA',        'class' => 'badge-blue'],
+    'loa_received'         => ['label' => 'LOA Received',           'class' => 'badge-teal'],
+    'pending'              => ['label' => 'Pending',                'class' => 'badge-yellow'],
+    'approved'             => ['label' => 'Approved',               'class' => 'badge-success'],
+    'denied'               => ['label' => 'Denied',                 'class' => 'badge-danger'],
+    'lack_of_requirements' => ['label' => 'Lack of Requirements',   'class' => 'badge-danger'],
+    'resolved'             => ['label' => 'Resolved',               'class' => 'badge-muted'],
 ];
 
 $required_docs = 7; // policy, OR, CR, license, affidavit, estimate, photos
@@ -486,17 +494,35 @@ require_once '../../includes/topbar.php';
           Filed <?= date('M d, Y', strtotime($claim['created_at'])) ?> by <?= htmlspecialchars($claim['filed_by'] ?? 'Unknown') ?>
         </div>
       </div>
-      <?php if (in_array($claim['status'], ['resolved', 'denied'])): ?>
-      <form method="POST" style="display:inline;">
-        <?= csrf_field() ?>
-        <input type="hidden" name="delete_claim" value="1"/>
-        <button type="button" class="btn-primary js-delete-claim"
-          style="background:var(--danger);color:#fff;border-color:var(--danger);display:flex;align-items:center;gap:0.5rem;"
-          data-id="<?= $claim_id ?>">
-          <?= icon('trash',14) ?> Delete Claim
-        </button>
-      </form>
-      <?php endif; ?>
+      <?php
+      // Check if billing already exists for this claim
+      $has_billing_stmt = $conn->prepare("SELECT billing_id FROM billing WHERE claim_id = ?");
+      $has_billing_stmt->bind_param('i', $claim_id);
+      $has_billing_stmt->execute();
+      $has_billing = $has_billing_stmt->get_result()->fetch_assoc();
+      ?>
+      <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+        <?php if (in_array($claim['status'], ['loa_received','pending','approved','resolved'])): ?>
+          <?php if ($has_billing): ?>
+          <a href="../billing/view_billing.php?id=<?= $has_billing['billing_id'] ?>" class="btn-sm-gold">
+            <?= icon('document-text',13) ?> View Billing
+          </a>
+          <?php else: ?>
+          <a href="../billing/add_billing.php?claim_id=<?= $claim_id ?>" class="btn-sm-gold">
+            <?= icon('document-text',13) ?> Create Billing
+          </a>
+          <?php endif; ?>
+        <?php endif; ?>
+        <?php if (in_array($claim['status'], ['resolved', 'denied', 'lack_of_requirements'])): ?>
+        <form method="POST" style="display:inline;">
+          <?= csrf_field() ?>
+          <input type="hidden" name="delete_claim" value="1"/>
+          <button type="button" class="btn-sm-danger js-delete-claim" data-id="<?= $claim_id ?>">
+            <?= icon('trash',13) ?> Delete
+          </button>
+        </form>
+        <?php endif; ?>
+      </div>
     </div>
 
     <!-- POLICY EXPIRED BANNER -->
@@ -516,9 +542,7 @@ require_once '../../includes/topbar.php';
 
     <!-- STATUS FLOW -->
     <?php
-    $flow_statuses = $claim['claim_type'] === 'repair'
-        ? ['document_collection','submitted','under_review','approved','resolved']
-        : ['document_collection','submitted','approved','resolved'];
+    $flow_statuses = ['compiling','sent_admin','sent_head_office','waiting_loa','loa_received','pending','approved','resolved'];
     $current = $claim['status'];
     $current_idx = array_search($current, $flow_statuses);
     $is_denied = $current === 'denied';
@@ -528,7 +552,7 @@ require_once '../../includes/topbar.php';
         $step_label = $status_map[$step]['label'] ?? $step;
         if ($is_denied && $step === 'approved') continue;
         $class = '';
-        if ($is_denied && $step === 'under_review') $class = 'denied-step';
+        if ($is_denied && $step === 'sent_head_office') $class = 'denied-step';
         elseif ($current_idx !== false && $i < $current_idx) $class = 'done';
         elseif ($step === $current) $class = 'active';
       ?>
@@ -637,7 +661,7 @@ require_once '../../includes/topbar.php';
             ['doc_estimate',         'Estimate',                 'Written cost estimate from the repair shop for the damage'],
             // proof/pictures handled separately below as damage photos
           ];
-          $docs_locked = !in_array($claim['status'], ['document_collection', 'submitted']);
+          $docs_locked = !in_array($claim['status'], ['compiling', 'sent_admin', 'lack_of_requirements']);
           foreach ($docs as $d):
             $checked   = (bool)$claim[$d[0]];
             $file_col  = $d[0] . '_file';
@@ -746,21 +770,21 @@ require_once '../../includes/topbar.php';
 
         </div>
 
-        <!-- ACTION BUTTONS — always shown while in document_collection, locked after submitted -->
-        <?php if (in_array($claim['status'], ['document_collection', 'submitted']) && !$policy_expired): ?>
+        <!-- ACTION BUTTONS — open while compiling/sent_admin/lack_of_requirements, locked after forwarded to head office -->
+        <?php if (in_array($claim['status'], ['compiling', 'sent_admin', 'lack_of_requirements']) && !$policy_expired): ?>
         <div style="padding:0 1rem 1rem;display:flex;flex-direction:column;gap:0.5rem;" id="doc-action-btns">
           <button type="button" id="btn-send-admin-email" class="btn-primary" style="width:100%;<?= $docs_done === 0 ? 'opacity:0.45;cursor:not-allowed;' : '' ?>" <?= $docs_done === 0 ? 'disabled' : '' ?>>
             <?= icon('envelope',14) ?> Send Requirements to Admin
           </button>
           <div id="send-btn-hint" style="font-size:0.65rem;color:var(--text-muted);text-align:center;padding:0 0.5rem;"><?= $docs_done === 0 ? 'Upload at least one requirement before sending.' : 'Sends the current requirements checklist to the admin email for review and follow-up.' ?></div>
         </div>
-        <?php elseif ($policy_expired && in_array($claim['status'], ['document_collection', 'submitted'])): ?>
+        <?php elseif ($policy_expired && in_array($claim['status'], ['compiling', 'sent_admin', 'lack_of_requirements'])): ?>
         <div style="padding:0 1rem 1rem;">
           <button class="btn-primary" style="width:100%;opacity:0.45;cursor:not-allowed;background:var(--danger);border-color:var(--danger);" disabled>
             <?= icon('lock-closed',14) ?> Policy Expired — Cannot Process
           </button>
         </div>
-        <?php elseif ($claim['status'] !== 'document_collection'): ?>
+        <?php elseif ($claim['status'] !== 'compiling'): ?>
         <div style="padding:0 1rem 1rem;">
           <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:0.65rem 1rem;font-size:0.75rem;color:var(--text-muted);display:flex;align-items:center;gap:0.5rem;">
             <?= icon('lock-closed',13) ?> Documents locked — claim already forwarded.
@@ -818,11 +842,15 @@ require_once '../../includes/topbar.php';
           <div class="card-body">
             <?php
             $next_statuses = match($claim['status']) {
-                'document_collection' => ['submitted'],
-                'submitted'           => $claim['claim_type'] === 'repair' ? ['under_review', 'denied'] : ['approved', 'denied'],
-                'under_review'        => ['approved', 'denied'],
-                'approved'            => ['resolved'],
-                default               => [],
+                'compiling'            => ['sent_admin', 'lack_of_requirements'],
+                'sent_admin'           => ['sent_head_office', 'lack_of_requirements'],
+                'sent_head_office'     => ['waiting_loa', 'denied'],
+                'waiting_loa'          => ['loa_received', 'denied'],
+                'loa_received'         => ['pending', 'denied'],
+                'pending'              => ['approved', 'denied'],
+                'approved'             => ['resolved'],
+                'lack_of_requirements' => ['compiling'],
+                default                => [],
             };
             // When policy expired, only allow deny or resolve
             $allowed_next = $policy_expired

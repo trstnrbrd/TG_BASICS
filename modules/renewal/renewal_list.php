@@ -13,7 +13,7 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'supe
 }
 
 // ── FILTERS ──
-$filter       = san_enum($_GET['filter'] ?? 'all', ['all', 'urgent', 'expiring', 'stable', 'expired']);
+$filter       = san_enum($_GET['filter'] ?? 'all', ['all', 'urgent', 'expiring', 'stable', 'expired', 'renewed']);
 $search       = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
 $show_renewed = isset($_GET['show_renewed']) && $_GET['show_renewed'] === '1';
 
@@ -22,8 +22,8 @@ $where_clauses = [];
 $params        = [];
 $types         = '';
 
-// Hide renewed policies by default
-if (!$show_renewed) {
+// Hide renewed policies by default (unless explicitly filtering for them)
+if (!$show_renewed && $filter !== 'renewed') {
     $where_clauses[] = "p.is_renewed = 0";
 }
 
@@ -49,7 +49,6 @@ switch ($filter) {
         $where_clauses[] = "p.policy_end < CURDATE()";
         break;
     case 'renewed':
-        $where_clauses = array_filter($where_clauses, fn($w) => $w !== "p.is_renewed = 0");
         $where_clauses[] = "p.is_renewed = 1";
         break;
 }
@@ -81,7 +80,7 @@ $policies = $stmt->get_result();
 $exp_start_count = $urg_days + 1;
 $counts = $conn->query("
     SELECT
-        COUNT(*) AS total,
+        SUM(CASE WHEN is_renewed = 0 THEN 1 ELSE 0 END) AS total,
         SUM(CASE WHEN policy_end >= CURDATE() AND DATEDIFF(policy_end, CURDATE()) <= $urg_days AND is_renewed = 0 THEN 1 ELSE 0 END) AS urgent,
         SUM(CASE WHEN policy_end >= CURDATE() AND DATEDIFF(policy_end, CURDATE()) BETWEEN $exp_start_count AND $exp_days AND is_renewed = 0 THEN 1 ELSE 0 END) AS expiring,
         SUM(CASE WHEN policy_end >= CURDATE() AND DATEDIFF(policy_end, CURDATE()) > $exp_days AND is_renewed = 0 THEN 1 ELSE 0 END) AS stable,
@@ -139,25 +138,22 @@ require_once '../../includes/topbar.php';
     </div>
 
     <!-- TOOLBAR -->
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:1rem;flex-wrap:wrap;">
-      <form method="GET" action="" style="flex:1;min-width:200px;max-width:420px;">
+    <form method="GET" action="" style="margin-bottom:1rem;">
+      <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
         <input type="hidden" name="filter" value="<?= htmlspecialchars($filter) ?>"/>
-        <div style="position:relative;">
+        <div style="position:relative;flex:1;min-width:200px;max-width:420px;">
           <span style="position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;"><?= icon('magnifying-glass', 14) ?></span>
-          <input
-            type="text" name="search"
+          <input type="text" name="search" class="filter-input"
             placeholder="Search by client, plate number, or policy number..."
             value="<?= htmlspecialchars($search) ?>"
-            style="width:100%;background:var(--bg-3);border:1px solid var(--border);color:var(--text-primary);padding:0.6rem 0.9rem 0.6rem 2.4rem;border-radius:9px;font-family:'Plus Jakarta Sans',sans-serif;font-size:0.82rem;outline:none;transition:border-color 0.15s,box-shadow 0.15s;"
-            onfocus="this.style.borderColor='var(--gold-bright)';this.style.boxShadow='0 0 0 3px rgba(212,160,23,0.1)'"
-            onblur="this.style.borderColor='var(--border)';this.style.boxShadow='none'"
-          />
+            style="padding-left:2.4rem;width:100%;"/>
         </div>
-      </form>
-      <?php if ($search): ?>
-      <a href="?filter=<?= $filter ?>" class="btn-ghost"><?= icon('x-mark', 14) ?> Clear</a>
-      <?php endif; ?>
-    </div>
+        <button type="submit" class="btn-primary"><?= icon('magnifying-glass', 14) ?> Search</button>
+        <?php if ($search): ?>
+        <a href="?filter=<?= $filter ?>" class="btn-ghost"><?= icon('x-mark', 14) ?> Clear</a>
+        <?php endif; ?>
+      </div>
+    </form>
 
     <!-- TABLE -->
     <div class="card" style="margin-bottom:0;">
@@ -168,10 +164,11 @@ require_once '../../includes/topbar.php';
             <?php
             $titles = [
               'all'      => 'All Policies',
-              'urgent'   => 'Urgent - Expiring Within ' . $urg_days . ' Days',
+              'urgent'   => 'Urgent — Expiring Within ' . $urg_days . ' Days',
               'expiring' => 'Expiring Within ' . $exp_days . ' Days',
               'stable'   => 'Stable Policies',
               'expired'  => 'Expired Policies',
+              'renewed'  => 'Renewed Policies',
             ];
             echo $titles[$filter] ?? 'All Policies';
             ?>
@@ -202,7 +199,7 @@ require_once '../../includes/topbar.php';
 
               if ($row['is_renewed']) {
                 $status_badge = '<span class="badge badge-info">' . icon('arrow-path', 10) . ' Renewed</span>';
-                $row_style    = 'opacity:0.65;';
+                $row_style    = '';
               } elseif ($row['policy_end'] < date('Y-m-d')) {
                 $status_badge = '<span class="badge badge-gray">Expired</span>';
                 $row_style    = '';

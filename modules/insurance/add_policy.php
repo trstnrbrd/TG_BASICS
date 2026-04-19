@@ -237,14 +237,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
-            // Delete old policy when renewed (new policy is the active record)
+            // Mark old policy as renewed (keep it for history, just flag it)
             if ($renew_from > 0) {
-                $del_pp = $conn->prepare("DELETE FROM policy_payments WHERE policy_id = ?");
-                $del_pp->bind_param('i', $renew_from);
-                $del_pp->execute();
-                $del_old = $conn->prepare("DELETE FROM insurance_policies WHERE policy_id = ?");
-                $del_old->bind_param('i', $renew_from);
-                $del_old->execute();
+                $mark_renewed = $conn->prepare("UPDATE insurance_policies SET is_renewed = 1 WHERE policy_id = ?");
+                $mark_renewed->bind_param('i', $renew_from);
+                $mark_renewed->execute();
             }
 
             // Audit log

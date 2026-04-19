@@ -228,6 +228,72 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             echo json_encode(['ok' => true, 'message' => $msg]);
             break;
 
+        // ── CHANGE USERNAME ──
+        case 'username':
+            $new_username = san_str($_POST['new_username'] ?? '', 50);
+            $cur_pw       = san_str($_POST['current_password'] ?? '', MAX_PASSWORD);
+
+            if ($new_username === '') {
+                echo json_encode(['ok' => false, 'error' => 'Username cannot be empty.']);
+                exit;
+            }
+            if (!preg_match('/^[a-zA-Z0-9._-]{3,50}$/', $new_username)) {
+                echo json_encode(['ok' => false, 'error' => 'Username may only contain letters, numbers, dots, underscores, and hyphens (3–50 characters).']);
+                exit;
+            }
+            if ($cur_pw === '') {
+                echo json_encode(['ok' => false, 'error' => 'Current password is required to change your username.']);
+                exit;
+            }
+
+            // Verify password + check cooldown
+            $pw_stmt = $conn->prepare("SELECT password, username, username_changed_at FROM users WHERE user_id = ?");
+            $pw_stmt->bind_param('i', $user_id);
+            $pw_stmt->execute();
+            $pw_row = $pw_stmt->get_result()->fetch_assoc();
+
+            if ($pw_row['username_changed_at']) {
+                $days_since = (int)floor((time() - strtotime($pw_row['username_changed_at'])) / 86400);
+                $days_left  = 60 - $days_since;
+                if ($days_left > 0) {
+                    echo json_encode(['ok' => false, 'error' => 'You can only change your username once every 60 days. ' . $days_left . ' day' . ($days_left !== 1 ? 's' : '') . ' remaining.']);
+                    exit;
+                }
+            }
+
+            if (!password_verify($cur_pw, $pw_row['password'])) {
+                echo json_encode(['ok' => false, 'error' => 'Current password is incorrect.']);
+                exit;
+            }
+            if ($new_username === $pw_row['username']) {
+                echo json_encode(['ok' => false, 'error' => 'New username is the same as your current one.']);
+                exit;
+            }
+
+            // Check uniqueness
+            $dup = $conn->prepare("SELECT user_id FROM users WHERE username = ? AND user_id != ?");
+            $dup->bind_param('si', $new_username, $user_id);
+            $dup->execute();
+            if ($dup->get_result()->num_rows > 0) {
+                echo json_encode(['ok' => false, 'error' => 'That username is already taken.']);
+                exit;
+            }
+
+            $now = date('Y-m-d H:i:s');
+            $upd = $conn->prepare("UPDATE users SET username = ?, username_changed_at = ? WHERE user_id = ?");
+            $upd->bind_param('ssi', $new_username, $now, $user_id);
+            $upd->execute();
+
+            $_SESSION['username'] = $new_username;
+
+            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'PROFILE_UPDATED', ?)");
+            $desc = ($_SESSION['full_name'] ?? '') . ' changed their username to @' . $new_username . '.';
+            $log->bind_param('is', $user_id, $desc);
+            $log->execute();
+
+            echo json_encode(['ok' => true, 'message' => 'Username updated to @' . $new_username . '.', 'new_username' => $new_username]);
+            exit;
+
         // ── TOGGLE 2FA ──
         case '2fa_toggle':
             $enabled = (int)($_POST['enabled'] ?? 0);
@@ -313,7 +379,7 @@ $full_name = $_SESSION['full_name'];
 $initials  = substr(implode('', array_map(fn($w) => strtoupper($w[0]), explode(' ', $full_name))), 0, 2);
 
 // Current user record (include 2FA status, photo, theme)
-$u_stmt = $conn->prepare("SELECT full_name, username, email, two_factor_enabled, profile_photo, theme FROM users WHERE user_id = ?");
+$u_stmt = $conn->prepare("SELECT full_name, username, username_changed_at, email, two_factor_enabled, profile_photo, theme FROM users WHERE user_id = ?");
 $u_stmt->bind_param('i', $user_id);
 $u_stmt->execute();
 $current_user = $u_stmt->get_result()->fetch_assoc();
@@ -443,18 +509,61 @@ require_once '../../includes/topbar.php';
                 <?php endif; ?>
               </div>
             </div>
+            <?php if (!$pending_email): ?>
             <div class="info-box" style="margin-top:1rem;">
               <?= icon('information-circle', 14) ?>
-              <span>Your username <strong>@<?= htmlspecialchars($current_user['username']) ?></strong> cannot be changed.
-              <?php if (!$pending_email): ?>
-              Changing your email will require verification.
-              <?php endif; ?>
-              </span>
+              <span>Changing your email will require verification.</span>
             </div>
+            <?php endif; ?>
           </div>
         </div>
 
-        <div class="card">
+        <?php
+        $username_changed_at = $current_user['username_changed_at'] ?? null;
+        $cooldown_days_left  = 0;
+        $next_change_date    = '';
+        if ($username_changed_at) {
+            $days_since         = (int)floor((time() - strtotime($username_changed_at)) / 86400);
+            $cooldown_days_left = max(0, 60 - $days_since);
+            $next_change_date   = date('M d, Y', strtotime($username_changed_at . ' +60 days'));
+        }
+        ?>
+        <div class="card" style="margin-top:1.5rem;">
+          <div class="card-header">
+            <div class="card-icon"><?= icon('at-symbol', 16) ?></div>
+            <div>
+              <div class="card-title">Change Username</div>
+              <div class="card-sub">Current: <strong>@<?= htmlspecialchars($current_user['username']) ?></strong></div>
+            </div>
+          </div>
+          <div class="card-body">
+            <?php if ($cooldown_days_left > 0): ?>
+            <div class="info-box">
+              <?= icon('clock', 14) ?>
+              <span>You can change your username again on <strong><?= $next_change_date ?></strong> (<?= $cooldown_days_left ?> day<?= $cooldown_days_left !== 1 ? 's' : '' ?> remaining). Usernames can only be changed once every 60 days.</span>
+            </div>
+            <?php else: ?>
+            <div class="form-grid">
+              <div class="field">
+                <label class="field-label">New Username <span class="req">*</span></label>
+                <input type="text" id="new_username" name="new_username" class="field-input"
+                  placeholder="Letters, numbers, dots, underscores, hyphens"/>
+                <span class="field-hint">3–50 characters. You can change this once every 60 days.</span>
+              </div>
+              <div class="field">
+                <label class="field-label">Current Password <span class="req">*</span></label>
+                <input type="password" id="username_cur_pw" name="username_cur_pw" class="field-input"
+                  placeholder="Confirm your identity"/>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;margin-top:1rem;">
+              <button type="button" class="btn-primary" id="save-username-btn"><?= icon('check', 14) ?> Update Username</button>
+            </div>
+            <?php endif; ?>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:1.5rem;">
           <div class="card-header">
             <div class="card-icon"><?= icon('lock-closed', 16) ?></div>
             <div>

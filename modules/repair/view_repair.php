@@ -151,6 +151,19 @@ document.addEventListener('DOMContentLoaded', function() {
         <?= icon('arrow-right', 13) ?> Update Status
       </button>
       <?php endif; ?>
+      <?php if (in_array($role, ['admin','super_admin'])): ?>
+      <?php
+        $qt_chk = $conn->prepare("SELECT quotation_id FROM quotations WHERE job_id = ? LIMIT 1");
+        $qt_chk->bind_param('i', $job_id);
+        $qt_chk->execute();
+        $existing_qt = $qt_chk->get_result()->fetch_assoc();
+      ?>
+      <?php if ($existing_qt): ?>
+        <a href="../quotations/view_quotation.php?id=<?= $existing_qt['quotation_id'] ?>" class="btn-primary" style="padding:0.45rem 1rem;font-size:0.8rem;"><?= icon('receipt', 13) ?> View Quotation</a>
+      <?php else: ?>
+        <a href="../quotations/add_quotation.php?job_id=<?= $job_id ?>" class="btn-primary" style="padding:0.45rem 1rem;font-size:0.8rem;"><?= icon('receipt', 13) ?> Generate Quotation</a>
+      <?php endif; ?>
+      <?php endif; ?>
     </div>
   </div>
 

@@ -1,0 +1,155 @@
+/* ── quotations.css — shared styles for quotation module ── */
+
+/* ── STAT CARDS ── */
+.qt-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.qt-stat {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  transition: box-shadow 0.15s, transform 0.15s;
+  cursor: default;
+  overflow: hidden;
+  position: relative;
+}
+.qt-stat:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.qt-stat-accent {
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 3px; border-radius: 14px 14px 0 0;
+}
+.qt-stat-icon {
+  width: 42px; height: 42px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.qt-stat-body { flex: 1; min-width: 0; }
+.qt-stat-value { font-size: 1.6rem; font-weight: 800; color: var(--text-primary); line-height: 1.1; }
+.qt-stat-label { font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-top: 0.15rem; }
+
+/* ── QUOTATION NUMBER ── */
+.qt-num {
+  font-weight: 700; color: var(--gold); font-size: 0.8rem;
+  font-family: monospace; letter-spacing: 0.3px;
+}
+
+/* ── LINE ITEMS TABLE ── */
+.line-items-table { width: 100%; border-collapse: collapse; }
+.line-items-table th {
+  font-size: 0.72rem; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.5px;
+  padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border);
+  background: var(--bg-3);
+}
+.line-items-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.line-items-table tbody tr:last-child td { border-bottom: none; }
+.line-items-table tbody tr:hover { background: var(--gold-pale); }
+
+/* ── ADD LINE ITEM ROW ── */
+.item-add-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 36px;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.75rem 1.25rem;
+  background: var(--bg-3);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── TOTAL STRIP ── */
+.qt-totals {
+  display: flex; flex-direction: column; align-items: flex-end;
+  gap: 0.4rem; padding: 1rem 1.25rem;
+}
+.qt-total-row {
+  display: flex; gap: 2rem; align-items: center;
+  font-size: 0.82rem; color: var(--text-secondary);
+}
+.qt-total-row.grand {
+  font-size: 1rem; font-weight: 800; color: var(--text-primary);
+  border-top: 1px solid var(--border); padding-top: 0.5rem; margin-top: 0.25rem;
+}
+.qt-total-label { min-width: 100px; text-align: right; }
+.qt-total-val   { min-width: 120px; text-align: right; font-weight: 600; font-family: monospace; }
+
+/* ── STATUS BADGES ── */
+.badge-draft    { background: rgba(107,114,128,0.15); color: #6B7280; }
+.badge-pending  { background: rgba(184,134,11,0.15);  color: #B8860B; }
+.badge-approved { background: rgba(46,125,82,0.15);   color: #2E7D52; }
+.badge-converted{ background: rgba(26,107,154,0.15);  color: #1A6B9A; }
+.badge-cancelled{ background: rgba(192,57,43,0.15);   color: #C0392B; }
+
+/* ── ACTION BUTTONS HEADER ── */
+.qt-action-bar {
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+}
+
+/* ── PRICE PRESET CHIPS ── */
+.price-presets {
+  display: flex; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.35rem;
+}
+.price-chip {
+  font-size: 0.68rem; padding: 0.2rem 0.55rem; border-radius: 6px;
+  background: var(--bg-3); border: 1px solid var(--border);
+  color: var(--text-muted); cursor: pointer; transition: all 0.12s;
+  white-space: nowrap;
+}
+.price-chip:hover { background: var(--gold-pale); border-color: var(--gold-muted); color: var(--gold); }
+
+/* ── RECEIPT PANEL ── */
+.receipt-panel {
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: 14px; padding: 1.5rem;
+}
+.receipt-logo-row {
+  display: flex; align-items: center; gap: 1rem; margin-bottom: 1.25rem;
+  padding-bottom: 1rem; border-bottom: 2px solid var(--gold-muted);
+}
+.receipt-title { font-size: 1.1rem; font-weight: 800; color: var(--text-primary); }
+.receipt-sub   { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.1rem; }
+.receipt-info-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 1.5rem;
+  margin-bottom: 1.25rem;
+}
+.receipt-info-row { display: flex; flex-direction: column; gap: 0.15rem; }
+.receipt-info-label { font-size: 0.68rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.receipt-info-val   { font-size: 0.82rem; font-weight: 600; color: var(--text-primary); }
+
+/* ── MOBILE RESPONSIVE ── */
+@media (max-width: 900px) {
+  .qt-stats { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .qt-stats { grid-template-columns: 1fr 1fr; }
+  .qt-stat-value { font-size: 1.3rem; }
+
+  .item-add-row {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto auto;
+  }
+  .item-add-row .item-desc-cell { grid-column: 1 / -1; }
+
+  .qt-total-row { font-size: 0.78rem; }
+  .qt-total-val  { min-width: 90px; }
+
+  .receipt-info-grid { grid-template-columns: 1fr; }
+
+  .line-items-table th:nth-child(3),
+  .line-items-table td:nth-child(3) { display: none; }
+}
+
+@media (max-width: 480px) {
+  .qt-stats { grid-template-columns: 1fr; }
+  .qt-action-bar { justify-content: stretch; }
+  .qt-action-bar .btn-primary,
+  .qt-action-bar .btn-ghost,
+  .qt-action-bar .btn-sm-gold { width: 100%; justify-content: center; }
+}

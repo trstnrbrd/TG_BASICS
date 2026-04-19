@@ -36,9 +36,9 @@ function AnimatedCounter({ target, suffix = "", duration = 1400 }) {
 // ── HERO CARD STATS ──
 function HeroStats() {
   const stats = [
-    { num: 48, label: "Clients" },
-    { num: 31, label: "Policies" },
-    { num: 7,  label: "In Repair" },
+    { num: 12, label: "Clients" },
+    { num: 9,  label: "Policies" },
+    { num: 3,  label: "In Repair" },
   ];
   return (
     <>

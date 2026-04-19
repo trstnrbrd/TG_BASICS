@@ -405,6 +405,7 @@ body.light-mode .topnav.scrolled {
   position: relative;
   opacity: 0;
   animation: fadeUp 0.7s ease 0.5s forwards;
+  overflow: visible;
 }
 
 .hero-card-main {
@@ -417,6 +418,7 @@ body.light-mode .topnav.scrolled {
   overflow: hidden;
   position: relative;
   z-index: 2;
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M5 3l14 9-7 1-4 7z' fill='%23d4a017' stroke='%23000' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E") 4 2, auto;
 }
 
 /* Gold top accent line on card */
@@ -498,6 +500,66 @@ body.light-mode .topnav.scrolled {
   border-radius: 10px;
   padding: 0.85rem 0.75rem;
   text-align: center;
+  transition: border-color 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Clients — lift + gold shine sweep */
+.hc-stat:nth-child(1) {
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.2s, box-shadow 0.2s;
+}
+.hc-stat:nth-child(1):hover {
+  transform: translateY(-6px);
+  border-color: rgba(212, 160, 23, 0.4);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+}
+.hc-stat:nth-child(1)::after {
+  content: "";
+  position: absolute;
+  top: 0; left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(120deg, transparent 0%, rgba(212,160,23,0.12) 50%, transparent 100%);
+  transition: left 0.4s ease;
+  pointer-events: none;
+}
+.hc-stat:nth-child(1):hover::after {
+  left: 160%;
+}
+
+/* Policies — scale pop */
+.hc-stat:nth-child(2) {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.2s, background 0.2s;
+}
+.hc-stat:nth-child(2):hover {
+  transform: scale(1.08);
+  border-color: rgba(59, 130, 246, 0.4);
+  background: rgba(59,130,246,0.06);
+}
+.hc-stat:nth-child(2):hover .hc-stat-num {
+  color: #60a5fa;
+}
+
+/* In Repair — shake/wobble */
+.hc-stat:nth-child(3) {
+  transition: border-color 0.2s;
+}
+.hc-stat:nth-child(3):hover {
+  border-color: rgba(239, 68, 68, 0.4);
+  animation: stat-wobble 0.4s ease;
+}
+.hc-stat:nth-child(3):hover .hc-stat-num {
+  color: #f87171;
+}
+
+@keyframes stat-wobble {
+  0%   { transform: rotate(0deg); }
+  20%  { transform: rotate(-4deg); }
+  40%  { transform: rotate(4deg); }
+  60%  { transform: rotate(-3deg); }
+  80%  { transform: rotate(2deg); }
+  100% { transform: rotate(0deg); }
 }
 
 .hc-stat-num {
@@ -531,7 +593,15 @@ body.light-mode .topnav.scrolled {
   border: 1px solid #2a2d3e;
   border-radius: 8px;
   padding: 0.6rem 0.9rem;
-  transition: border-color 0.15s;
+  transition: border-color 0.2s, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s;
+}
+
+.hc-policy-item:hover {
+  border-color: rgba(212, 160, 23, 0.35);
+  transform: scale(1.025);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  z-index: 1;
+  position: relative;
 }
 
 .hc-policy-left {
@@ -591,6 +661,18 @@ body.light-mode .topnav.scrolled {
   border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
+.hc-section-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: #4a5568;
+  margin-bottom: 0.6rem;
+}
+
 /* Floating accent card */
 .hero-card-float {
   position: absolute;
@@ -606,6 +688,12 @@ body.light-mode .topnav.scrolled {
   gap: 0.75rem;
   z-index: 3;
   min-width: 190px;
+}
+
+.hero-card-float--2 {
+  bottom: -1.5rem;
+  right: auto;
+  left: -1.5rem;
 }
 
 .float-icon {

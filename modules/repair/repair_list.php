@@ -10,6 +10,30 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'supe
 
 $role = $_SESSION['role'];
 
+// ── DELETE ──
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
+    if (!in_array($role, ['admin', 'super_admin'])) { header("Location: repair_list.php"); exit; }
+    csrf_verify();
+    $del_id = san_int($_POST['job_id'] ?? 0, 1);
+    if ($del_id) {
+        $job_row = $conn->prepare("SELECT job_number FROM repair_jobs WHERE job_id = ?");
+        $job_row->bind_param('i', $del_id);
+        $job_row->execute();
+        $job_row = $job_row->get_result()->fetch_assoc();
+        if ($job_row) {
+            $del = $conn->prepare("DELETE FROM repair_jobs WHERE job_id = ?");
+            $del->bind_param('i', $del_id);
+            $del->execute();
+            $log = $conn->prepare("INSERT INTO audit_logs (user_id,action,description) VALUES (?,'REPAIR_JOB_DELETED',?)");
+            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' deleted repair job ' . $job_row['job_number'] . '.';
+            $log->bind_param('is', $_SESSION['user_id'], $desc);
+            $log->execute();
+        }
+    }
+    header("Location: repair_list.php?success=" . urlencode('Repair job deleted.'));
+    exit;
+}
+
 // ── FILTERS ──
 $search        = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
 $filter_status = san_enum($_GET['status'] ?? 'all', ['all', 'pending', 'in_progress', 'for_pickup', 'completed', 'cancelled']);
@@ -213,6 +237,11 @@ require_once '../../includes/topbar.php';
                 <a href="view_repair.php?id=<?= $j['job_id'] ?>" class="btn-sm-gold" title="View">
                   <?= icon('eye', 14) ?>
                 </a>
+                <?php if (in_array($role, ['admin','super_admin'])): ?>
+                <button type="button" class="btn-sm-danger btn-delete-job" data-id="<?= $j['job_id'] ?>" data-num="<?= htmlspecialchars($j['job_number']) ?>" title="Delete">
+                  <?= icon('trash', 13) ?>
+                </button>
+                <?php endif; ?>
               </div>
             </td>
           </tr>
@@ -239,4 +268,34 @@ require_once '../../includes/topbar.php';
   </div>
 </div>
 
+<?php if (in_array($role, ['admin','super_admin'])): ?>
+<form id="delete-job-form" method="POST" style="display:none;">
+  <?= csrf_field() ?>
+  <input type="hidden" name="action" value="delete"/>
+  <input type="hidden" name="job_id" id="delete-job-id"/>
+</form>
+<script>
+document.querySelectorAll('.btn-delete-job').forEach(btn => {
+  btn.addEventListener('click', function () {
+    const id  = this.dataset.id;
+    const num = this.dataset.num;
+    Swal.fire({
+      title: 'Delete ' + num + '?',
+      text: 'This will permanently delete the repair job and all related records.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#C0392B',
+      cancelButtonColor: '#6B7280',
+      confirmButtonText: 'Yes, delete',
+      cancelButtonText: 'Cancel',
+    }).then(result => {
+      if (result.isConfirmed) {
+        document.getElementById('delete-job-id').value = id;
+        document.getElementById('delete-job-form').submit();
+      }
+    });
+  });
+});
+</script>
+<?php endif; ?>
 <?php require_once '../../includes/footer.php'; ?>

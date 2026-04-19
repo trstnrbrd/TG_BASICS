@@ -64,9 +64,6 @@
         <a href="auth/login.php" class="btn-primary-hero">
           <?= icon('lock-closed', 14) ?> Sign In to TG-BASICS
         </a>
-        <a href="#modules" class="btn-secondary-hero">
-          View Modules <?= icon('chevron-down', 14) ?>
-        </a>
       </div>
     </div>
 
@@ -82,33 +79,39 @@
         </div>
         <div class="hero-card-body">
           <div class="hc-stat-row" id="hero-stat-root"></div>
+
+          <!-- Section label -->
+          <div class="hc-section-label">
+            <?= icon('clock', 11) ?> Renewal Tracking
+          </div>
+
           <div class="hc-policy-row">
             <div class="hc-policy-item">
               <div class="hc-policy-left">
-                <div class="hc-policy-plate">NCH 7952</div>
+                <div class="hc-policy-plate">AAB 1234</div>
                 <div>
-                  <div class="hc-policy-name">Ofelia P. Ape</div>
-                  <div class="hc-policy-sub">Expires Jun 18, 2026</div>
+                  <div class="hc-policy-name">Miguel R. Dela Cruz</div>
+                  <div class="hc-policy-sub">Expires Dec 10, 2026</div>
                 </div>
               </div>
               <span class="hc-badge green">Stable</span>
             </div>
             <div class="hc-policy-item">
               <div class="hc-policy-left">
-                <div class="hc-policy-plate">ABX 4421</div>
+                <div class="hc-policy-plate">BCD 5678</div>
                 <div>
-                  <div class="hc-policy-name">Ramon T. Santos</div>
-                  <div class="hc-policy-sub">Expires in 22 days</div>
+                  <div class="hc-policy-name">Andrea L. Santos</div>
+                  <div class="hc-policy-sub">Expires in 24 days</div>
                 </div>
               </div>
               <span class="hc-badge yellow">Expiring</span>
             </div>
             <div class="hc-policy-item">
               <div class="hc-policy-left">
-                <div class="hc-policy-plate">PDZ 8812</div>
+                <div class="hc-policy-plate">EFG 9012</div>
                 <div>
-                  <div class="hc-policy-name">Maria C. Reyes</div>
-                  <div class="hc-policy-sub">Expires in 5 days</div>
+                  <div class="hc-policy-name">Jose P. Villanueva</div>
+                  <div class="hc-policy-sub">Expires in 4 days</div>
                 </div>
               </div>
               <span class="hc-badge red">Urgent</span>
@@ -116,11 +119,20 @@
           </div>
         </div>
       </div>
+
+      <!-- Float cards -->
       <div class="hero-card-float">
         <div class="float-icon"><?= icon('document', 18) ?></div>
         <div>
           <div class="float-label">Claims In Progress</div>
           <div class="float-val">3 Active</div>
+        </div>
+      </div>
+      <div class="hero-card-float hero-card-float--2">
+        <div class="float-icon" style="background:rgba(34,197,94,0.12);border-color:rgba(34,197,94,0.2);color:#22c55e;"><?= icon('check-circle', 18) ?></div>
+        <div>
+          <div class="float-label">Policies Renewed</div>
+          <div class="float-val">This Month</div>
         </div>
       </div>
     </div>
@@ -314,9 +326,6 @@
         <a href="auth/login.php" class="btn-primary-hero">
           <?= icon('lock-closed', 14) ?> Sign In to TG-BASICS
         </a>
-        <a href="#modules" class="btn-secondary-hero">
-          View Modules <?= icon('chevron-down', 14) ?>
-        </a>
       </div>
     </div>
   </div>
@@ -383,7 +392,6 @@
       <nav class="footer-nav">
         <a href="tel:09171453448" class="footer-nav-link">0917 145 3448</a>
         <a href="mailto:tgcustomworksbulacan@gmail.com" class="footer-nav-link">tgcustomworksbulacan<br/>@gmail.com</a>
-        <a href="auth/login.php" class="footer-signin-link"><?= icon('lock-closed', 12) ?> Sign In to TG-BASICS</a>
       </nav>
     </div>
 
@@ -522,6 +530,70 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 <script type="text/babel" src="assets/js/index.js"></script>
+
+<script>
+(function() {
+  var floats = document.querySelectorAll('.hero-card-float');
+  var card   = document.querySelector('.hero-card-main');
+  if (!card) return;
+
+  floats.forEach(function(el) {
+    el.style.cursor = 'grab';
+    el.style.userSelect = 'none';
+    el.style.transition = 'box-shadow 0.2s, transform 0.15s';
+
+    var dragging = false, startX, startY, origX, origY;
+
+    el.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      dragging = true;
+      el.style.cursor = 'grabbing';
+      el.style.transform = 'scale(1.05)';
+      el.style.boxShadow = '0 12px 40px rgba(0,0,0,0.5)';
+      el.style.zIndex = '10';
+      el.style.transition = 'box-shadow 0.2s, transform 0.15s';
+
+      var rect  = el.getBoundingClientRect();
+      var cRect = card.getBoundingClientRect();
+      startX = e.clientX;
+      startY = e.clientY;
+      origX  = rect.left - cRect.left;
+      origY  = rect.top  - cRect.top;
+
+      // switch to absolute positioning within card
+      el.style.position = 'absolute';
+      el.style.left  = origX + 'px';
+      el.style.top   = origY + 'px';
+      el.style.bottom = 'auto';
+      el.style.right  = 'auto';
+    });
+
+    document.addEventListener('mousemove', function(e) {
+      if (!dragging) return;
+      var cRect  = card.getBoundingClientRect();
+      var elRect = el.getBoundingClientRect();
+      var dx = e.clientX - startX;
+      var dy = e.clientY - startY;
+
+      var newX = Math.min(Math.max(origX + dx, -elRect.width / 2), cRect.width  - elRect.width / 2);
+      var newY = Math.min(Math.max(origY + dy, -elRect.height / 2), cRect.height - elRect.height / 2);
+
+      el.style.left = newX + 'px';
+      el.style.top  = newY + 'px';
+    });
+
+    document.addEventListener('mouseup', function() {
+      if (!dragging) return;
+      dragging = false;
+      el.style.cursor = 'grab';
+      el.style.transform = 'scale(1)';
+      el.style.boxShadow = '0 8px 32px rgba(0,0,0,0.4)';
+      el.style.zIndex = '3';
+    });
+  });
+})();
+
+</script>
 
 <script>
 (function () {

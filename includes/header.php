@@ -29,6 +29,7 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <meta name="format-detection" content="telephone=no, date=no, email=no, address=no"/>
+<meta name="base_path" content="/TG-BASICS/"/>
 <title><?= htmlspecialchars($page_title) ?> | TG-BASICS</title>
 <link rel="icon" type="image/png" href="<?= $base_path ?>assets/img/tg_logo.png"/>
 <link rel="apple-touch-icon" href="<?= $base_path ?>assets/img/tg_logo.png"/>
@@ -338,14 +339,39 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
   .alert-info    { background: var(--info-bg);    border: 1px solid var(--info-border);    color: var(--info); }
 
   /* ── TABLE ── */
+  .tg-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; position: relative; }
   .tg-table { width: 100%; border-collapse: collapse; }
-  .tg-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .tg-table thead tr { background: var(--bg-2); border-bottom: 1px solid var(--border); }
   .tg-table thead th { padding: 0.65rem 1rem; text-align: center; font-size: 0.62rem; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; white-space: nowrap; }
   .tg-table tbody tr { border-bottom: 1px solid var(--border); transition: background 0.12s; }
   .tg-table tbody tr:last-child { border-bottom: none; }
   .tg-table tbody tr:hover { background: var(--gold-pale); }
   .tg-table tbody td { padding: 0.8rem 1rem; font-size: 0.8rem; color: var(--text-secondary); vertical-align: middle; text-align: center; }
+
+  @media (max-width: 768px) {
+    .tg-table-wrap,
+    .card > .tg-table,
+    .card > div > .tg-table,
+    .tg-table {
+      display: block;
+      width: 100%;
+      overflow-x: auto;
+      overflow-y: auto;
+      max-height: 60vh;
+      -webkit-overflow-scrolling: touch;
+    }
+    .tg-table thead th:last-child,
+    .tg-table tbody td:last-child {
+      position: sticky;
+      right: 0;
+      background: var(--bg-3);
+      z-index: 2;
+      box-shadow: -3px 0 6px rgba(0,0,0,0.08);
+    }
+    .tg-table thead th { position: sticky; top: 0; z-index: 3; background: var(--bg-2); }
+    .tg-table thead th:last-child { z-index: 4; }
+    .tg-table tbody tr:hover td:last-child { background: var(--gold-pale); }
+  }
 
   /* ── BADGES ── */
   .plate-chip { display: inline-flex; background: var(--sidebar-bg); color: var(--gold-bright); padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.72rem; font-weight: 800; letter-spacing: 1.5px; }
@@ -379,83 +405,95 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
 
   /* ── RESPONSIVE: TABLET ── */
   @media (max-width: 1024px) {
-    .topbar { padding: 0.9rem 1.5rem; }
+    .topbar  { padding: 0.9rem 1.5rem; }
     .content { padding: 1.5rem; }
   }
 
   /* ── RESPONSIVE: MOBILE ── */
   @media (max-width: 768px) {
-    .main { margin-left: 0; }
+    .main      { margin-left: 0; }
     .hamburger { display: flex; }
-    .topbar { padding: 0.75rem 1rem; padding-left: 3.25rem; }
+    .topbar    { padding: 0.75rem 1rem; padding-left: 3.25rem; }
     .topbar-breadcrumb { display: none; }
-    .user-chip-label { display: none; }
+    .user-chip-label   { display: none; }
     .content { padding: 1rem; }
+
+    /* Forms */
     .form-grid, .form-grid-3 { grid-template-columns: 1fr; }
     .span-2, .span-3 { grid-column: span 1; }
-    .page-header { padding: 1.1rem 1.25rem; }
-    .page-header-title { font-size: 0.95rem; }
-    .card-header { padding: 0.85rem 1rem; flex-direction: column; align-items: flex-start; }
-    .card-body { padding: 1rem; }
-    .form-actions { padding: 0.9rem 1rem; }
+    .form-actions { padding: 0.9rem 1rem; flex-direction: column; }
     .form-actions .btn-ghost,
-    .form-actions .btn-primary { flex: 1; justify-content: center; }
+    .form-actions .btn-primary { width: 100%; justify-content: center; }
+
+    /* Cards */
+    .card-header { padding: 0.85rem 1rem; flex-wrap: wrap; gap: 0.5rem; }
+    .card-body   { padding: 1rem; }
+    .card-header > *:last-child { margin-left: 0 !important; }
+
+    /* Tables — horizontal scroll */
+    .tg-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 0 0 12px 12px; }
+    .tg-table { min-width: 540px; }
     .tg-table thead th,
     .tg-table tbody td { padding: 0.6rem 0.75rem; font-size: 0.72rem; }
 
-    /* Force inline grids to stack on mobile */
-    .content [style*="grid-template-columns: repeat(3"],
-    .content [style*="grid-template-columns: repeat(4"],
-    .content [style*="grid-template-columns: repeat(5"],
-    .content [style*="grid-template-columns:repeat(3"],
-    .content [style*="grid-template-columns:repeat(4"],
-    .content [style*="grid-template-columns:repeat(5"] {
-      grid-template-columns: 1fr !important;
-    }
-    .content [style*="grid-template-columns: 1fr 1fr"],
-    .content [style*="grid-template-columns:1fr 1fr"] {
-      grid-template-columns: 1fr !important;
-    }
+    /* Stack ALL inline grids */
+    .content [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
 
-    /* Filter toolbars: stack vertically */
-    .content form[method] > div[style*="display:flex"],
-    .content form[method] > div[style*="display: flex"] {
-      flex-direction: column;
-    }
-    .content form[method] [style*="min-width:200px"],
-    .content form[method] [style*="min-width: 200px"] {
-      min-width: 0 !important;
-      max-width: none !important;
-      width: 100%;
-    }
+    /* Stack inline flex rows (filter bars, button rows) */
+    .content > div[style*="display:flex"][style*="gap"],
+    .content > div[style*="display: flex"][style*="gap"] { flex-wrap: wrap; }
 
-    /* Table action buttons: stack */
-    .tg-table td [style*="display:flex"][style*="gap"] {
-      flex-wrap: wrap;
-    }
+    /* Filter inputs full width */
+    .filter-input { width: 100% !important; min-width: 0 !important; max-width: none !important; }
 
-    /* Buttons full width on mobile */
-    .btn-primary, .btn-gold, .btn-ghost, .btn-danger {
-      font-size: 0.78rem;
-      padding: 0.65rem 1rem;
-    }
+    /* Buttons */
+    .btn-primary, .btn-gold, .btn-ghost, .btn-danger { font-size: 0.78rem; padding: 0.65rem 1rem; }
+
+    /* Stat card rows */
+    .qt-stats { grid-template-columns: 1fr 1fr !important; }
+
+    /* Action button groups in table cells */
+    .tg-table td div[style*="display:flex"] { flex-wrap: wrap; justify-content: center; }
+
+    /* Page-level back+header rows */
+    .content > div[style*="justify-content:space-between"] { flex-direction: column; align-items: flex-start !important; gap: 0.75rem; }
+    .content > div[style*="justify-content:space-between"] > div { width: 100%; }
+
+    /* Two-col detail grids inside cards (e.g. view_repair top grid) */
+    .content .card + .card,
+    .content > div[style*="display:grid"] { gap: 0.9rem !important; }
   }
 
   /* ── RESPONSIVE: SMALL MOBILE ── */
   @media (max-width: 480px) {
     .content { padding: 0.75rem; }
-    .topbar { padding: 0.65rem 0.75rem; padding-left: 3rem; }
-    .page-header { padding: 1rem; border-radius: 10px; }
+    .topbar  { padding: 0.65rem 0.75rem; padding-left: 3rem; }
     .user-chip { padding: 0.3rem 0.5rem 0.3rem 0.35rem; font-size: 0; }
-    .user-chip .user-avatar { font-size: 0.62rem; }
-    .user-chip-chevron { display: none; }
+    .user-chip .user-avatar  { font-size: 0.62rem; }
+    .user-chip-chevron       { display: none; }
 
-    /* Smaller text for tight screens */
-    .tg-table thead th { font-size: 0.55rem; padding: 0.5rem 0.5rem; }
-    .tg-table tbody td { font-size: 0.7rem; padding: 0.55rem 0.5rem; }
-    .card-title { font-size: 0.82rem; }
-    .page-header-title { font-size: 0.88rem; }
-    .page-header-sub { font-size: 0.65rem; }
+    .tg-table { min-width: 480px; }
+    .tg-table thead th { font-size: 0.55rem; padding: 0.5rem; }
+    .tg-table tbody td { font-size: 0.68rem; padding: 0.5rem; }
+
+    .card-title        { font-size: 0.82rem; }
+    .card-header       { flex-direction: column; align-items: flex-start; }
+    .card-header .btn-primary,
+    .card-header .btn-sm-gold { width: 100%; justify-content: center; }
+
+    .qt-stats { grid-template-columns: 1fr !important; }
+
+    /* Stat numbers smaller */
+    .qt-stat-value { font-size: 1.4rem !important; }
+
+    /* Filter search bar full width */
+    .content form > div,
+    .content > form > div { flex-direction: column; }
+    .content form .btn-primary,
+    .content form .btn-ghost { width: 100%; justify-content: center; }
+
+    /* Badge wrap */
+    .badge { font-size: 0.62rem; padding: 0.15rem 0.5rem; }
   }
   /* Page loading cursor */
   html.tg-loading, html.tg-loading * { cursor: wait !important; }
@@ -481,6 +519,47 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
     const overlay = document.getElementById('sidebar-overlay');
     if (overlay) overlay.addEventListener('click', toggleSidebar);
   });
+
+  // ── Global Transaction PIN verifier ──
+  // Usage: const ok = await requirePin(); if (!ok) return;
+  window.requirePin = async function() {
+    const base = document.querySelector('meta[name="base_path"]')?.content || '/TG-BASICS/';
+    const endpoint = base + 'ajax/verify_pin.php';
+
+    // Check if user has a PIN (send empty pin = just checking existence)
+    let chk;
+    try { chk = await fetch(endpoint, { method:'POST', body: new FormData() }).then(r=>r.json()); } catch(e) { chk = null; }
+    if (!chk || chk?.no_pin) {
+      alert('[PIN DEBUG] no_pin or null: ' + JSON.stringify(chk));
+      return true;
+    }
+
+    // Show PIN prompt
+    const result = await Swal.fire({
+      title: 'Enter Transaction PIN',
+      html: '<input id="swal-pin-input" type="password" inputmode="numeric" maxlength="6" class="swal2-input" placeholder="Enter your PIN" autocomplete="off" style="letter-spacing:0.4rem;font-size:1.2rem;text-align:center;"/>',
+      confirmButtonText: 'Confirm',
+      confirmButtonColor: '#1C1A17',
+      cancelButtonText: 'Cancel',
+      showCancelButton: true,
+      cancelButtonColor: '#6B7280',
+      didOpen: () => document.getElementById('swal-pin-input').focus(),
+      preConfirm: () => {
+        const pin = document.getElementById('swal-pin-input').value.trim();
+        if (!pin) { Swal.showValidationMessage('PIN is required.'); return false; }
+        return pin;
+      }
+    });
+    if (!result.isConfirmed) return false;
+
+    const vfd = new FormData();
+    vfd.append('pin', result.value);
+    let vres;
+    try { vres = await fetch(endpoint, { method:'POST', body:vfd }).then(r=>r.json()); } catch(e) { return false; }
+    if (vres?.ok) return true;
+    Swal.fire({ icon:'error', title:'Incorrect PIN', text: vres?.error || 'Wrong PIN.', confirmButtonColor:'#B8860B' });
+    return false;
+  };
 
   // Loading cursor — show on navigation, hide when page is fully ready
   (function () {

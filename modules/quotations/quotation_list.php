@@ -159,26 +159,29 @@ document.addEventListener('DOMContentLoaded',function(){
 </div>
 
 <!-- FILTER TABS + SEARCH -->
-<div class="card" style="margin-bottom:1.25rem;">
-  <div style="padding:1rem 1.25rem;display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
-    <div style="display:flex;gap:0.35rem;flex-wrap:wrap;flex:1;">
-      <?php foreach (['all'=>'All', 'draft'=>'Draft', 'pending_approval'=>'Pending', 'approved'=>'Approved', 'converted'=>'Converted', 'cancelled'=>'Cancelled'] as $k => $l): ?>
-      <a href="?filter=<?= $k ?><?= $search ? '&search='.urlencode($search) : '' ?>"
-         class="<?= $filter === $k ? 'btn-primary' : 'btn-ghost' ?>"
-         style="font-size:0.78rem;padding:0.35rem 0.9rem;"><?= $l ?></a>
-      <?php endforeach; ?>
+<form method="GET" action="">
+  <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem;">
+    <div style="position:relative;flex:1;min-width:200px;max-width:360px;">
+      <span style="position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;"><?= icon('magnifying-glass', 14) ?></span>
+      <input type="text" name="search" class="filter-input"
+        placeholder="Search client, plate, quotation #..."
+        value="<?= htmlspecialchars($search) ?>" style="padding-left:2.4rem;width:100%;"/>
     </div>
-    <form method="GET" style="display:flex;gap:0.5rem;align-items:center;">
-      <input type="hidden" name="filter" value="<?= htmlspecialchars($filter) ?>"/>
-      <div style="position:relative;">
-        <span style="position:absolute;left:0.7rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;"><?= icon('magnifying-glass', 13) ?></span>
-        <input type="text" name="search" class="filter-input" value="<?= htmlspecialchars($search) ?>"
-          placeholder="Search client, plate, quotation #..." style="padding-left:2rem;min-width:220px;"/>
-      </div>
-      <button type="submit" class="btn-primary" style="font-size:0.8rem;"><?= icon('magnifying-glass', 13) ?> Search</button>
-      <?php if ($search): ?><a href="?filter=<?= $filter ?>" class="btn-ghost" style="font-size:0.8rem;"><?= icon('x-mark', 13) ?> Clear</a><?php endif; ?>
-    </form>
+    <input type="hidden" name="filter" value="<?= htmlspecialchars($filter) ?>"/>
+    <button type="submit" class="btn-primary"><?= icon('magnifying-glass', 14) ?> Search</button>
+    <?php if ($search): ?>
+    <a href="?filter=<?= $filter ?>" class="btn-ghost"><?= icon('x-mark', 14) ?> Clear</a>
+    <?php endif; ?>
   </div>
+</form>
+
+<!-- FILTER TABS -->
+<div style="display:flex;gap:0.35rem;flex-wrap:wrap;margin-bottom:1rem;">
+  <?php foreach (['all'=>'All', 'draft'=>'Draft', 'pending_approval'=>'Pending', 'approved'=>'Approved', 'converted'=>'Converted', 'cancelled'=>'Cancelled'] as $k => $l): ?>
+  <a href="?filter=<?= $k ?><?= $search ? '&search='.urlencode($search) : '' ?>"
+     class="<?= $filter === $k ? 'btn-primary' : 'btn-ghost' ?>"
+     style="font-size:0.78rem;padding:0.35rem 0.9rem;"><?= $l ?></a>
+  <?php endforeach; ?>
 </div>
 
 <!-- TABLE -->
@@ -281,8 +284,10 @@ document.querySelectorAll('.btn-delete-qt').forEach(btn => {
       cancelButtonColor: '#6B7280',
       confirmButtonText: 'Yes, delete',
       cancelButtonText: 'Cancel',
-    }).then(result => {
+    }).then(async result => {
       if (result.isConfirmed) {
+        const ok = await requirePin();
+        if (!ok) return;
         document.getElementById('delete-qt-id').value = id;
         document.getElementById('delete-qt-form').submit();
       }

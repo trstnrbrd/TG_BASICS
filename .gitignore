@@ -14,6 +14,12 @@ uploads/avatars/*
 !uploads/avatars/.gitkeep
 uploads/claims/*
 !uploads/claims/.gitkeep
+uploads/repair_jobs/*
+!uploads/repair_jobs/.gitkeep
+uploads/client_docs/*
+!uploads/client_docs/.gitkeep
+uploads/receipts/*
+!uploads/receipts/.gitkeep
 
 # ── VENDOR / DEPENDENCIES ────────────────────────────────────────────────────
 # PHPMailer is in vendor/src/ — keep it tracked since there's no composer.json.

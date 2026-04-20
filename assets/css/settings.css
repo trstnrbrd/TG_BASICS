@@ -540,3 +540,25 @@
         max-width: 260px;
     }
 }
+
+/* ── PIN MODAL ── */
+.modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45); z-index: 200;
+  align-items: center; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: var(--bg-3); border: 1px solid var(--border);
+  border-radius: 14px; width: 100%; max-width: 440px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  animation: settings-modal-in 0.18s ease;
+}
+@keyframes settings-modal-in { from { opacity:0; transform:translateY(-12px) scale(0.97); } to { opacity:1; transform:none; } }
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);
+}
+.modal-title { font-size: 0.9rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; }
+.modal-close { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0.2rem; border-radius: 6px; display: flex; align-items: center; }
+.modal-close:hover { background: var(--bg); color: var(--text-primary); }

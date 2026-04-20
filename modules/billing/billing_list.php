@@ -8,6 +8,15 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'supe
     exit;
 }
 
+// ── CHECK ELIGIBLE CLAIMS (claims without billing) ──
+$eligible_claims = $conn->query("
+    SELECT COUNT(*) AS cnt
+    FROM claims cl
+    LEFT JOIN billing b ON b.claim_id = cl.claim_id
+    WHERE cl.status IN ('loa_received','pending','approved','resolved')
+      AND b.billing_id IS NULL
+")->fetch_assoc()['cnt'] ?? 0;
+
 // ── FILTERS ──
 $search        = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
 $filter_status = san_enum($_GET['status'] ?? 'all', ['all', 'draft', 'sent', 'paid', 'unpaid']);
@@ -217,8 +226,10 @@ document.querySelectorAll('.js-delete-billing').forEach(function(btn) {
       cancelButtonText: 'Cancel',
       confirmButtonColor: '#c0392b',
       cancelButtonColor: '#6c757d',
-    }).then(function(result) {
+    }).then(async function(result) {
       if (result.isConfirmed) {
+        const ok = await requirePin();
+        if (!ok) return;
         window.location = 'view_billing.php?id=' + id + '&do_delete=1';
       }
     });

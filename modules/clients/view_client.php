@@ -36,6 +36,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) 
     }
 }
 
+// ── HANDLE DOC UPLOAD ──
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'upload_doc') {
+    csrf_verify();
+    if (!$is_mechanic && !empty($_FILES['policy_doc']['tmp_name'])) {
+        $tmp  = $_FILES['policy_doc']['tmp_name'];
+        $orig = basename($_FILES['policy_doc']['name']);
+        $mime = mime_content_type($tmp);
+        if ($mime === 'application/pdf') {
+            $upload_dir = __DIR__ . '/../../uploads/client_docs/' . $client_id . '/';
+            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+            $fname = uniqid('doc_', true) . '.pdf';
+            if (move_uploaded_file($tmp, $upload_dir . $fname)) {
+                $ins = $conn->prepare("INSERT INTO client_documents (client_id, file_name, original_name, uploaded_by) VALUES (?,?,?,?)");
+                $ins->bind_param('issi', $client_id, $fname, $orig, $_SESSION['user_id']);
+                $ins->execute();
+            }
+        }
+    }
+    header("Location: view_client.php?id=$client_id&success=Document uploaded.");
+    exit;
+}
+
+// ── HANDLE DOC DELETE ──
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_doc') {
+    csrf_verify();
+    if (!$is_mechanic) {
+        $doc_id = (int)($_POST['doc_id'] ?? 0);
+        if ($doc_id) {
+            $fd = $conn->prepare("SELECT file_name FROM client_documents WHERE doc_id = ? AND client_id = ?");
+            $fd->bind_param('ii', $doc_id, $client_id);
+            $fd->execute();
+            $fd_row = $fd->get_result()->fetch_assoc();
+            if ($fd_row) {
+                $path = __DIR__ . '/../../uploads/client_docs/' . $client_id . '/' . $fd_row['file_name'];
+                if (file_exists($path)) unlink($path);
+                $del = $conn->prepare("DELETE FROM client_documents WHERE doc_id = ?");
+                $del->bind_param('i', $doc_id);
+                $del->execute();
+            }
+        }
+    }
+    header("Location: view_client.php?id=$client_id&success=Document removed.");
+    exit;
+}
+
 // Load client
 $stmt = $conn->prepare("SELECT * FROM clients WHERE client_id = ?");
 $stmt->bind_param('i', $client_id);
@@ -91,6 +136,18 @@ $pstmt = $conn->prepare("
 $pstmt->bind_param('i', $client_id);
 $pstmt->execute();
 $policies = $pstmt->get_result();
+
+// ── FETCH DOCUMENTS ──
+$doc_stmt = $conn->prepare("SELECT doc_id, file_name, original_name, uploaded_at FROM client_documents WHERE client_id = ? ORDER BY uploaded_at DESC");
+$doc_stmt->bind_param('i', $client_id);
+$doc_stmt->execute();
+$documents = $doc_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+// ── CHECK IF CLIENT HAS POLICIES ──
+$has_policies = $conn->prepare("SELECT 1 FROM insurance_policies WHERE client_id = ? LIMIT 1");
+$has_policies->bind_param('i', $client_id);
+$has_policies->execute();
+$has_policies = (bool)$has_policies->get_result()->num_rows;
 
 $page_title  = 'View Client';
 $active_page = 'clients';
@@ -560,9 +617,100 @@ require_once '../../includes/topbar.php';
       <?php endif; ?>
     </div>
 
+    <?php if ($has_policies): ?>
+    <!-- POLICY DOCUMENTS -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon"><?= icon('paper-clip', 16) ?></div>
+        <div>
+          <div class="card-title">Policy Documents</div>
+          <div class="card-sub"><?= count($documents) ?> file<?= count($documents) !== 1 ? 's' : '' ?> attached</div>
+        </div>
+        <?php if (!$is_mechanic): ?>
+        <button type="button" onclick="document.getElementById('doc-upload-panel').style.display=document.getElementById('doc-upload-panel').style.display==='none'?'block':'none'" class="btn-sm-gold" style="margin-left:auto;">
+          <?= icon('plus', 13) ?> Attach PDF
+        </button>
+        <?php endif; ?>
+      </div>
+
+      <?php if (!$is_mechanic): ?>
+      <div id="doc-upload-panel" style="display:none;padding:1rem 1.25rem;border-bottom:1px solid var(--border);background:var(--bg-2);">
+        <form method="POST" enctype="multipart/form-data" style="display:flex;flex-direction:column;gap:0.75rem;">
+          <?= csrf_field() ?>
+          <input type="hidden" name="action" value="upload_doc"/>
+          <label style="font-size:0.78rem;font-weight:600;color:var(--text-muted);">Select PDF file (policy document, LOA, etc.)</label>
+          <input type="file" name="policy_doc" accept="application/pdf" required
+            style="font-size:0.8rem;padding:0.5rem;border:1px dashed var(--gold-muted);border-radius:8px;background:var(--bg-3);color:var(--text-primary);width:100%;"/>
+          <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+            <button type="button" onclick="document.getElementById('doc-upload-panel').style.display='none'" class="btn-ghost" style="font-size:0.8rem;">Cancel</button>
+            <button type="submit" class="btn-primary" style="font-size:0.8rem;"><?= icon('arrow-up-tray', 13) ?> Upload</button>
+          </div>
+        </form>
+      </div>
+      <?php endif; ?>
+
+      <div style="padding:1rem 1.25rem;display:flex;flex-direction:column;gap:0.75rem;">
+        <?php if (empty($documents)): ?>
+        <div style="text-align:center;padding:1.5rem;color:var(--text-muted);font-size:0.82rem;">
+          <?= icon('paper-clip', 24) ?><br/>No documents attached yet.
+        </div>
+        <?php else: ?>
+        <?php foreach ($documents as $doc):
+          $pdf_url = '../../uploads/client_docs/' . $client_id . '/' . htmlspecialchars($doc['file_name']);
+        ?>
+        <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+          <!-- File header row -->
+          <div style="display:flex;align-items:center;gap:0.75rem;padding:0.65rem 1rem;background:var(--bg-2);">
+            <div style="background:var(--danger-bg);color:var(--danger);border-radius:6px;padding:0.3rem 0.5rem;font-size:0.65rem;font-weight:700;">PDF</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:0.82rem;font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?= htmlspecialchars($doc['original_name']) ?></div>
+              <div style="font-size:0.68rem;color:var(--text-muted);"><?= date('M d, Y g:i A', strtotime($doc['uploaded_at'])) ?></div>
+            </div>
+            <div style="display:flex;gap:0.4rem;flex-shrink:0;">
+              <a href="<?= $pdf_url ?>" target="_blank" class="btn-sm-gold" style="font-size:0.72rem;padding:0.3rem 0.65rem;" title="Open in new tab">
+                <?= icon('arrow-top-right-on-square', 13) ?>
+              </a>
+              <?php if (!$is_mechanic): ?>
+              <form method="POST" style="display:inline;">
+                <?= csrf_field() ?>
+                <input type="hidden" name="action" value="delete_doc"/>
+                <input type="hidden" name="doc_id" value="<?= $doc['doc_id'] ?>"/>
+                <button type="button" onclick="confirmDeleteDoc(this, '<?= htmlspecialchars($doc['original_name'], ENT_QUOTES) ?>')"
+                  class="btn-sm-danger" style="font-size:0.72rem;padding:0.3rem 0.55rem;" title="Remove">
+                  <?= icon('trash', 12) ?>
+                </button>
+              </form>
+              <?php endif; ?>
+            </div>
+          </div>
+          <!-- PDF Preview -->
+          <div style="width:100%;height:480px;background:#1a1a1a;">
+            <iframe src="<?= $pdf_url ?>" style="width:100%;height:100%;border:none;" loading="lazy"></iframe>
+          </div>
+        </div>
+        <?php endforeach; ?>
+        <?php endif; ?>
+      </div>
+    </div>
+    <?php endif; ?>
+
   </div>
 </div>
 
 <script src="../../assets/js/shared/view_client.js"></script>
+<script>
+function confirmDeleteDoc(btn, name) {
+  const form = btn.closest('form');
+  Swal.fire({
+    title: 'Remove document?',
+    text: '"' + name + '" will be permanently deleted.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#C0392B',
+    cancelButtonColor: '#6B7280',
+    confirmButtonText: 'Yes, remove',
+  }).then(async r => { if (r.isConfirmed) { const ok = await requirePin(); if (ok) form.submit(); } });
+}
+</script>
 
 <?php require_once '../../includes/footer.php'; ?>

@@ -366,6 +366,80 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             echo json_encode(['ok' => true, 'message' => 'All settings saved successfully.']);
             break;
 
+        // ── TRANSACTION PIN ──
+        case 'pin_set':
+            $new_pin  = $_POST['new_pin']     ?? '';
+            $cfm_pin  = $_POST['confirm_pin'] ?? '';
+            $cur_pw   = san_str($_POST['current_password'] ?? '', MAX_PASSWORD);
+
+            if (!preg_match('/^\d{4,6}$/', $new_pin)) {
+                echo json_encode(['ok' => false, 'error' => 'PIN must be 4 to 6 digits.']);
+                exit;
+            }
+            if ($new_pin !== $cfm_pin) {
+                echo json_encode(['ok' => false, 'error' => 'PINs do not match.']);
+                exit;
+            }
+            if ($cur_pw === '') {
+                echo json_encode(['ok' => false, 'error' => 'Current password is required.']);
+                exit;
+            }
+            $pw_stmt = $conn->prepare("SELECT password FROM users WHERE user_id = ?");
+            $pw_stmt->bind_param('i', $user_id);
+            $pw_stmt->execute();
+            $pw_row = $pw_stmt->get_result()->fetch_assoc();
+            if (!password_verify($cur_pw, $pw_row['password'])) {
+                echo json_encode(['ok' => false, 'error' => 'Current password is incorrect.']);
+                exit;
+            }
+            $hashed_pin = password_hash($new_pin, PASSWORD_DEFAULT);
+            $upd = $conn->prepare("UPDATE users SET transaction_pin = ? WHERE user_id = ?");
+            $upd->bind_param('si', $hashed_pin, $user_id);
+            $upd->execute();
+            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'SECURITY_UPDATED', ?)");
+            $desc = ($_SESSION['full_name'] ?? '') . ' set a transaction PIN.';
+            $log->bind_param('is', $user_id, $desc);
+            $log->execute();
+            echo json_encode(['ok' => true, 'message' => 'Transaction PIN set successfully.']);
+            exit;
+
+        case 'pin_remove':
+            $cur_pw = san_str($_POST['current_password'] ?? '', MAX_PASSWORD);
+            if ($cur_pw === '') {
+                echo json_encode(['ok' => false, 'error' => 'Current password is required.']);
+                exit;
+            }
+            $pw_stmt = $conn->prepare("SELECT password FROM users WHERE user_id = ?");
+            $pw_stmt->bind_param('i', $user_id);
+            $pw_stmt->execute();
+            $pw_row = $pw_stmt->get_result()->fetch_assoc();
+            if (!password_verify($cur_pw, $pw_row['password'])) {
+                echo json_encode(['ok' => false, 'error' => 'Current password is incorrect.']);
+                exit;
+            }
+            $upd = $conn->prepare("UPDATE users SET transaction_pin = NULL WHERE user_id = ?");
+            $upd->bind_param('i', $user_id);
+            $upd->execute();
+            echo json_encode(['ok' => true, 'message' => 'Transaction PIN removed.']);
+            exit;
+
+        case 'pin_verify':
+            $pin = $_POST['pin'] ?? '';
+            $pin_stmt = $conn->prepare("SELECT transaction_pin FROM users WHERE user_id = ?");
+            $pin_stmt->bind_param('i', $user_id);
+            $pin_stmt->execute();
+            $pin_row = $pin_stmt->get_result()->fetch_assoc();
+            if (!$pin_row['transaction_pin']) {
+                echo json_encode(['ok' => true, 'no_pin' => true]);
+                exit;
+            }
+            if (password_verify($pin, $pin_row['transaction_pin'])) {
+                echo json_encode(['ok' => true]);
+            } else {
+                echo json_encode(['ok' => false, 'error' => 'Incorrect PIN.']);
+            }
+            exit;
+
         default:
             echo json_encode(['ok' => false, 'error' => 'Unknown section.']);
     }
@@ -379,7 +453,7 @@ $full_name = $_SESSION['full_name'];
 $initials  = substr(implode('', array_map(fn($w) => strtoupper($w[0]), explode(' ', $full_name))), 0, 2);
 
 // Current user record (include 2FA status, photo, theme)
-$u_stmt = $conn->prepare("SELECT full_name, username, username_changed_at, email, two_factor_enabled, profile_photo, theme FROM users WHERE user_id = ?");
+$u_stmt = $conn->prepare("SELECT full_name, username, username_changed_at, email, two_factor_enabled, profile_photo, theme, transaction_pin FROM users WHERE user_id = ?");
 $u_stmt->bind_param('i', $user_id);
 $u_stmt->execute();
 $current_user = $u_stmt->get_result()->fetch_assoc();
@@ -627,6 +701,38 @@ require_once '../../includes/topbar.php';
             </div>
           </div>
           <?php endif; ?>
+        </div>
+
+        <!-- Transaction PIN Card -->
+        <?php $has_pin = !empty($current_user['transaction_pin']); ?>
+        <div class="card" style="margin-top:1.5rem;">
+          <div class="card-header">
+            <div class="card-icon"><?= icon('key', 16) ?></div>
+            <div>
+              <div class="card-title">Transaction PIN</div>
+              <div class="card-sub">Required when deleting sensitive records</div>
+            </div>
+            <div style="margin-left:auto;">
+              <span class="badge <?= $has_pin ? 'badge-green' : 'badge-gray' ?>" id="pin-status-badge">
+                <?= $has_pin ? 'PIN Set' : 'No PIN' ?>
+              </span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div id="pin-info-box" class="info-box" style="margin-bottom:1rem;<?= $has_pin ? 'background:var(--success-bg);border-color:var(--success-border);color:var(--success);' : '' ?>">
+              <?= $has_pin ? icon('check-circle', 14) : icon('information-circle', 14) ?>
+              <span id="pin-info-text"><?= $has_pin
+                ? 'Transaction PIN is active. You will be prompted to enter your PIN before deleting sensitive records.'
+                : 'No PIN set. Deletes will proceed without a PIN prompt. Set a PIN to add an extra layer of protection.'
+              ?></span>
+            </div>
+            <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+              <?php if ($has_pin): ?>
+              <button type="button" class="btn-ghost" id="btn-pin-remove" style="color:var(--danger);border-color:var(--danger);"><?= icon('trash', 14) ?> Remove PIN</button>
+              <?php endif; ?>
+              <button type="button" class="btn-primary" id="btn-pin-set"><?= icon('key', 14) ?> <?= $has_pin ? 'Change PIN' : 'Set PIN' ?></button>
+            </div>
+          </div>
         </div>
 
         <!-- Bottom save button -->
@@ -1095,6 +1201,167 @@ if (tfaToggle) {
 REMOVED HEREDOC END */
 
 echo '<script src="../../assets/js/shared/settings.js"></script>';
+?>
 
+<!-- ── TRANSACTION PIN MODAL ── -->
+<div class="modal-overlay" id="pin-modal" onclick="if(event.target===this)closePinModal()">
+  <div class="modal-box" style="max-width:400px;">
+    <div class="modal-header">
+      <div class="modal-title"><?= icon('key', 16) ?> <span id="pin-modal-title">Set Transaction PIN</span></div>
+      <button class="modal-close" onclick="closePinModal()"><?= icon('x-mark', 14) ?></button>
+    </div>
+    <div style="padding:1.25rem;display:flex;flex-direction:column;gap:1rem;">
+      <div class="field">
+        <label class="field-label">New PIN <span class="req">*</span></label>
+        <input type="password" id="modal-pin-new" class="field-input" inputmode="numeric" maxlength="6" placeholder="4–6 digits" autocomplete="new-password"/>
+      </div>
+      <div class="field">
+        <label class="field-label">Confirm PIN <span class="req">*</span></label>
+        <input type="password" id="modal-pin-confirm" class="field-input" inputmode="numeric" maxlength="6" placeholder="Re-enter PIN" autocomplete="new-password"/>
+      </div>
+      <div class="field">
+        <label class="field-label">Current Password <span class="req">*</span></label>
+        <input type="password" id="modal-pin-curpw" class="field-input" placeholder="Confirm your identity" autocomplete="current-password"/>
+      </div>
+      <div id="pin-modal-error" style="display:none;color:var(--danger);font-size:0.8rem;background:rgba(192,57,43,0.08);border:1px solid rgba(192,57,43,0.2);border-radius:8px;padding:0.6rem 0.8rem;"></div>
+    </div>
+    <div style="padding:1rem 1.25rem;border-top:1px solid var(--border);display:flex;gap:0.5rem;justify-content:flex-end;">
+      <button type="button" class="btn-ghost" onclick="closePinModal()">Cancel</button>
+      <button type="button" class="btn-primary" id="btn-pin-modal-save"><?= icon('key', 14) ?> <span id="pin-modal-btn-label">Set PIN</span></button>
+    </div>
+  </div>
+</div>
+
+<style>
+#pin-modal .modal-box { overflow: hidden; }
+</style>
+
+<script>
+function openPinModal() {
+  document.getElementById('pin-modal').classList.add('open');
+  document.getElementById('modal-pin-new').value = '';
+  document.getElementById('modal-pin-confirm').value = '';
+  document.getElementById('modal-pin-curpw').value = '';
+  document.getElementById('pin-modal-error').style.display = 'none';
+  setTimeout(() => document.getElementById('modal-pin-new').focus(), 80);
+}
+function closePinModal() {
+  document.getElementById('pin-modal').classList.remove('open');
+}
+document.getElementById('btn-pin-set').addEventListener('click', openPinModal);
+
+document.getElementById('btn-pin-modal-save').addEventListener('click', async function() {
+  const newPin  = document.getElementById('modal-pin-new').value.trim();
+  const cfmPin  = document.getElementById('modal-pin-confirm').value.trim();
+  const curPw   = document.getElementById('modal-pin-curpw').value;
+  const errBox  = document.getElementById('pin-modal-error');
+
+  const showErr = (msg) => { errBox.textContent = msg; errBox.style.display = 'block'; };
+  errBox.style.display = 'none';
+
+  if (!newPin)              { showErr('Enter a new PIN.'); return; }
+  if (!/^\d{4,6}$/.test(newPin)) { showErr('PIN must be 4 to 6 digits only.'); return; }
+  if (newPin !== cfmPin)    { showErr('PINs do not match.'); return; }
+  if (!curPw)               { showErr('Enter your current password.'); return; }
+
+  const orig = this.innerHTML; this.disabled = true; this.textContent = 'Saving...';
+
+  const fd = new FormData();
+  fd.append('section', 'pin_set');
+  fd.append('csrf_token', window._csrf || '');
+  fd.append('new_pin', newPin);
+  fd.append('confirm_pin', cfmPin);
+  fd.append('current_password', curPw);
+
+  let data = null;
+  try { const res = await fetch('settings.php', { method:'POST', body:fd }); data = await res.json(); } catch(e) {}
+  this.disabled = false; this.innerHTML = orig;
+
+  if (!data) { showErr('Something went wrong. Please try again.'); return; }
+  if (data.ok) {
+    closePinModal();
+    // Update the UI without reload
+    const badge = document.getElementById('pin-status-badge');
+    const infoBox = document.getElementById('pin-info-box');
+    const infoText = document.getElementById('pin-info-text');
+    if (badge)   { badge.className = 'badge badge-green'; badge.textContent = 'PIN Set'; }
+    if (infoBox) { infoBox.style.cssText = 'margin-bottom:1rem;background:var(--success-bg);border-color:var(--success-border);color:var(--success);'; }
+    if (infoText) infoText.textContent = 'Transaction PIN is active. You will be prompted to enter your PIN before deleting sensitive records.';
+    document.getElementById('btn-pin-set').innerHTML = '<?= icon('key', 14) ?> Change PIN';
+    if (!document.getElementById('btn-pin-remove')) {
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'btn-ghost';
+      removeBtn.id = 'btn-pin-remove';
+      removeBtn.style.cssText = 'color:var(--danger);border-color:var(--danger);';
+      removeBtn.innerHTML = '<?= icon('trash', 14) ?> Remove PIN';
+      document.getElementById('btn-pin-set').parentElement.insertBefore(removeBtn, document.getElementById('btn-pin-set'));
+      removeBtn.addEventListener('click', handlePinRemove);
+    }
+    Swal.fire({ toast:true, position:'top-end', icon:'success', title:'PIN updated!', showConfirmButton:false, timer:2500, timerProgressBar:true });
+  } else {
+    showErr(data.error || 'Failed to save PIN.');
+  }
+});
+
+async function handlePinRemove() {
+  const curPw = document.getElementById('modal-pin-curpw').value;
+  const confirmed = await Swal.fire({
+    title: 'Remove Transaction PIN?',
+    text: 'Deletes will no longer require a PIN.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#C0392B',
+    cancelButtonColor: '#6B7280',
+    confirmButtonText: 'Yes, remove',
+    cancelButtonText: 'Cancel'
+  });
+  if (!confirmed.isConfirmed) return;
+
+  const pw = await Swal.fire({
+    title: 'Confirm Password',
+    html: '<input id="swal-pw-input" type="password" class="swal2-input" placeholder="Current password" autocomplete="current-password"/>',
+    confirmButtonText: 'Remove PIN',
+    confirmButtonColor: '#C0392B',
+    showCancelButton: true,
+    cancelButtonColor: '#6B7280',
+    didOpen: () => document.getElementById('swal-pw-input').focus(),
+    preConfirm: () => {
+      const v = document.getElementById('swal-pw-input').value;
+      if (!v) { Swal.showValidationMessage('Password is required.'); return false; }
+      return v;
+    }
+  });
+  if (!pw.isConfirmed) return;
+
+  const fd = new FormData();
+  fd.append('section', 'pin_remove');
+  fd.append('csrf_token', window._csrf || '');
+  fd.append('current_password', pw.value);
+
+  let data = null;
+  try { const res = await fetch('settings.php', { method:'POST', body:fd }); data = await res.json(); } catch(e) {}
+
+  if (data?.ok) {
+    const badge = document.getElementById('pin-status-badge');
+    const infoBox = document.getElementById('pin-info-box');
+    const infoText = document.getElementById('pin-info-text');
+    if (badge)   { badge.className = 'badge badge-gray'; badge.textContent = 'No PIN'; }
+    if (infoBox) { infoBox.style.cssText = 'margin-bottom:1rem;'; }
+    if (infoText) infoText.textContent = 'No PIN set. Deletes will proceed without a PIN prompt. Set a PIN to add an extra layer of protection.';
+    document.getElementById('btn-pin-set').innerHTML = '<?= icon('key', 14) ?> Set PIN';
+    const removeBtn = document.getElementById('btn-pin-remove');
+    if (removeBtn) removeBtn.remove();
+    Swal.fire({ toast:true, position:'top-end', icon:'success', title:'PIN removed.', showConfirmButton:false, timer:2500, timerProgressBar:true });
+  } else {
+    Swal.fire({ icon:'error', title:'Error', text: data?.error || 'Something went wrong.', confirmButtonColor:'#B8860B' });
+  }
+}
+
+const removePinBtn = document.getElementById('btn-pin-remove');
+if (removePinBtn) removePinBtn.addEventListener('click', handlePinRemove);
+</script>
+
+<?php
 require_once '../../includes/footer.php';
 ?>

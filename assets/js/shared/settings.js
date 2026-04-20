@@ -232,3 +232,5 @@ if (saveUsernameBtn) {
         }
     });
 }
+
+// Transaction PIN handlers are inline in settings.php

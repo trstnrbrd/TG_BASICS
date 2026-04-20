@@ -869,10 +869,12 @@ require_once '../../includes/footer.php';
         confirmButtonColor: "#c0392b",
         denyButtonColor: "#B8860B",
         cancelButtonColor: "#6b7280"
-      }).then(function (result) {
+      }).then(async function (result) {
         if (result.isConfirmed) {
+          const ok = await requirePin(); if (!ok) return;
           submitDelete("1");
         } else if (result.isDenied) {
+          const ok = await requirePin(); if (!ok) return;
           submitDelete("0");
         }
       });
@@ -886,8 +888,9 @@ require_once '../../includes/footer.php';
         cancelButtonText: "Cancel",
         confirmButtonColor: "#c0392b",
         cancelButtonColor: "#6b7280"
-      }).then(function (result) {
+      }).then(async function (result) {
         if (result.isConfirmed) {
+          const ok = await requirePin(); if (!ok) return;
           submitDelete("0");
         }
       });

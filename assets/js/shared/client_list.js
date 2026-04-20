@@ -1,8 +1,8 @@
 document.querySelectorAll('.js-delete-client').forEach(function(btn) {
-  btn.addEventListener('click', function() {
+  btn.addEventListener('click', async function() {
     var name = this.dataset.name;
     var form = this.closest('form');
-    Swal.fire({
+    var confirmed = await Swal.fire({
       title: 'Delete client?',
       text: 'Delete "' + name + '" and all their records? This cannot be undone.',
       icon: 'warning',
@@ -11,8 +11,9 @@ document.querySelectorAll('.js-delete-client').forEach(function(btn) {
       cancelButtonColor: '#6c757d',
       confirmButtonText: 'Yes, delete',
       cancelButtonText: 'Cancel'
-    }).then(function(result) {
-      if (result.isConfirmed) form.submit();
     });
+    if (!confirmed.isConfirmed) return;
+    const ok = await requirePin();
+    if (ok) form.submit();
   });
 });

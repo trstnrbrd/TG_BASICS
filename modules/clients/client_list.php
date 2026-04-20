@@ -323,7 +323,7 @@ require_once '../../includes/topbar.php';
   </div>
 </div>
 
-<script src="../../assets/js/shared/client_list.js"></script>
+<script src="../../assets/js/shared/client_list.js?v=<?= filemtime(__DIR__.'/../../assets/js/shared/client_list.js') ?>"></script>
 <script>
 (function() {
   var input    = document.getElementById('client-search-input');

@@ -35,6 +35,63 @@ $cl_rows = $cl_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $checklist = [];
 foreach ($cl_rows as $row) $checklist[$row['area_key']] = $row;
 
+// ── FETCH IMAGES ──
+$img_stmt = $conn->prepare("SELECT image_id, file_name, uploaded_at FROM repair_job_images WHERE job_id = ? ORDER BY uploaded_at ASC");
+$img_stmt->bind_param('i', $job_id);
+$img_stmt->execute();
+$images = $img_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+// ── HANDLE IMAGE DELETE ──
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_image') {
+    csrf_verify();
+    if (in_array($role, ['admin','super_admin'])) {
+        $img_id = san_int($_POST['image_id'] ?? 0, 1);
+        if ($img_id) {
+            $fi = $conn->prepare("SELECT file_name FROM repair_job_images WHERE image_id = ? AND job_id = ?");
+            $fi->bind_param('ii', $img_id, $job_id);
+            $fi->execute();
+            $fi_row = $fi->get_result()->fetch_assoc();
+            if ($fi_row) {
+                $path = __DIR__ . '/../../uploads/repair_jobs/' . $job_id . '/' . $fi_row['file_name'];
+                if (file_exists($path)) unlink($path);
+                $del = $conn->prepare("DELETE FROM repair_job_images WHERE image_id = ?");
+                $del->bind_param('i', $img_id);
+                $del->execute();
+            }
+        }
+    }
+    header("Location: view_repair.php?id=$job_id&success=Image removed.");
+    exit;
+}
+
+// ── HANDLE IMAGE UPLOAD ──
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'upload_image') {
+    csrf_verify();
+    if (!empty($_FILES['job_images']['name'][0])) {
+        $upload_dir = __DIR__ . '/../../uploads/repair_jobs/' . $job_id . '/';
+        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+        $allowed = ['image/jpeg','image/png','image/webp','image/gif'];
+        $uploaded = 0;
+        foreach ($_FILES['job_images']['tmp_name'] as $i => $tmp) {
+            if ($_FILES['job_images']['error'][$i] !== UPLOAD_ERR_OK) continue;
+            $mime = mime_content_type($tmp);
+            if (!in_array($mime, $allowed)) continue;
+            $ext  = ['image/jpeg'=>'jpg','image/png'=>'png','image/webp'=>'webp','image/gif'=>'gif'][$mime];
+            $fname = uniqid('img_', true) . '.' . $ext;
+            if (move_uploaded_file($tmp, $upload_dir . $fname)) {
+                $ins = $conn->prepare("INSERT INTO repair_job_images (job_id, file_name, uploaded_by) VALUES (?,?,?)");
+                $ins->bind_param('isi', $job_id, $fname, $_SESSION['user_id']);
+                $ins->execute();
+                $uploaded++;
+            }
+        }
+        header("Location: view_repair.php?id=$job_id&success=" . urlencode($uploaded . ' image(s) uploaded.'));
+        exit;
+    }
+    header("Location: view_repair.php?id=$job_id");
+    exit;
+}
+
 // ── HANDLE STATUS UPDATE ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     csrf_verify();
@@ -290,6 +347,73 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
   </div>
 
+  <!-- VEHICLE PHOTOS -->
+  <div class="card" style="margin-bottom:1.25rem;">
+    <div class="card-header">
+      <div class="card-icon"><?= icon('camera', 16) ?></div>
+      <div>
+        <div class="card-title">Vehicle Photos</div>
+        <div class="card-sub"><?= count($images) ?> photo<?= count($images) !== 1 ? 's' : '' ?> attached</div>
+      </div>
+      <div style="margin-left:auto;">
+        <button type="button" onclick="document.getElementById('upload-panel').style.display=document.getElementById('upload-panel').style.display==='none'?'block':'none'" class="btn-sm-gold">
+          <?= icon('plus', 13) ?> Add Photos
+        </button>
+      </div>
+    </div>
+
+    <!-- UPLOAD FORM -->
+    <div id="upload-panel" style="display:none;padding:1rem 1.25rem;border-bottom:1px solid var(--border);background:var(--bg-2);">
+      <form method="POST" enctype="multipart/form-data" style="display:flex;flex-direction:column;gap:0.75rem;">
+        <?= csrf_field() ?>
+        <input type="hidden" name="action" value="upload_image"/>
+        <label style="font-size:0.78rem;font-weight:600;color:var(--text-muted);">Select images (JPG, PNG, WEBP — multiple allowed)</label>
+        <input type="file" name="job_images[]" multiple accept="image/jpeg,image/png,image/webp,image/gif"
+          style="font-size:0.8rem;padding:0.5rem;border:1px dashed var(--gold-muted);border-radius:8px;background:var(--bg-3);color:var(--text-primary);width:100%;"/>
+        <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+          <button type="button" onclick="document.getElementById('upload-panel').style.display='none'" class="btn-ghost" style="font-size:0.8rem;">Cancel</button>
+          <button type="submit" class="btn-primary" style="font-size:0.8rem;"><?= icon('arrow-up-tray', 13) ?> Upload</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- GALLERY -->
+    <div style="padding:1rem 1.25rem;">
+      <?php if (empty($images)): ?>
+      <div style="text-align:center;padding:1.5rem;color:var(--text-muted);font-size:0.82rem;">
+        <?= icon('camera', 24) ?><br/>No photos yet. Add photos of the vehicle for reference.
+      </div>
+      <?php else: ?>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:0.75rem;">
+        <?php foreach ($images as $img):
+          $img_url = '../../uploads/repair_jobs/' . $job_id . '/' . htmlspecialchars($img['file_name']);
+        ?>
+        <div style="position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--border);aspect-ratio:4/3;background:var(--bg-2);">
+          <img src="<?= $img_url ?>" alt="Vehicle photo"
+            style="width:100%;height:100%;object-fit:cover;cursor:pointer;transition:opacity 0.15s;"
+            onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'"
+            onclick="openLightbox('<?= $img_url ?>')"/>
+          <?php if (in_array($role, ['admin','super_admin'])): ?>
+          <form method="POST" style="position:absolute;top:0.35rem;right:0.35rem;">
+            <?= csrf_field() ?>
+            <input type="hidden" name="action" value="delete_image"/>
+            <input type="hidden" name="image_id" value="<?= $img['image_id'] ?>"/>
+            <button type="button" onclick="confirmDeleteImg(this)"
+              style="background:rgba(192,57,43,0.85);border:none;border-radius:6px;padding:0.25rem 0.4rem;cursor:pointer;color:#fff;display:flex;align-items:center;">
+              <?= icon('trash', 12) ?>
+            </button>
+          </form>
+          <?php endif; ?>
+          <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.45);padding:0.25rem 0.5rem;font-size:0.65rem;color:rgba(255,255,255,0.8);">
+            <?= date('M d, Y', strtotime($img['uploaded_at'])) ?>
+          </div>
+        </div>
+        <?php endforeach; ?>
+      </div>
+      <?php endif; ?>
+    </div>
+  </div>
+
   <!-- ADDITIONAL REMARKS -->
   <div class="card" style="margin-bottom:0;">
     <div class="card-header">
@@ -318,6 +442,12 @@ document.addEventListener('DOMContentLoaded', function() {
   </div>
 
 </div>
+</div>
+
+<!-- LIGHTBOX -->
+<div id="img-lightbox" onclick="closeLightbox()"
+  style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:2000;align-items:center;justify-content:center;cursor:zoom-out;">
+  <img src="" alt="Vehicle photo" style="max-width:92vw;max-height:88vh;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.6);"/>
 </div>
 
 <!-- STATUS UPDATE MODAL -->
@@ -349,8 +479,36 @@ document.getElementById('status-modal').addEventListener('click', function(e) {
   if (e.target === this) this.style.display = 'none';
 });
 document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') document.getElementById('status-modal').style.display = 'none';
+  if (e.key === 'Escape') {
+    document.getElementById('status-modal').style.display = 'none';
+    closeLightbox();
+  }
 });
+
+// ── Lightbox ──
+function openLightbox(src) {
+  let lb = document.getElementById('img-lightbox');
+  lb.querySelector('img').src = src;
+  lb.style.display = 'flex';
+}
+function closeLightbox() {
+  const lb = document.getElementById('img-lightbox');
+  if (lb) lb.style.display = 'none';
+}
+
+// ── Delete image confirm ──
+function confirmDeleteImg(btn) {
+  const form = btn.closest('form');
+  Swal.fire({
+    title: 'Remove photo?',
+    text: 'This photo will be permanently deleted.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#C0392B',
+    cancelButtonColor: '#6B7280',
+    confirmButtonText: 'Yes, remove',
+  }).then(async r => { if (r.isConfirmed) { const ok = await requirePin(); if (ok) form.submit(); } });
+}
 </script>
 
 <?php require_once '../../includes/footer.php'; ?>

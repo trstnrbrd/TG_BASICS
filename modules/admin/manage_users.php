@@ -345,6 +345,6 @@ require_once '../../includes/topbar.php';
   </div>
 </div>
 
-<script src="../../assets/js/super_admin/manage_users.js"></script>
+<script src="../../assets/js/super_admin/manage_users.js?v=<?= filemtime(__DIR__.'/../../assets/js/super_admin/manage_users.js') ?>"></script>
 
 <?php require_once '../../includes/footer.php'; ?>

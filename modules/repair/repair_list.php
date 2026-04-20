@@ -288,8 +288,10 @@ document.querySelectorAll('.btn-delete-job').forEach(btn => {
       cancelButtonColor: '#6B7280',
       confirmButtonText: 'Yes, delete',
       cancelButtonText: 'Cancel',
-    }).then(result => {
+    }).then(async result => {
       if (result.isConfirmed) {
+        const ok = await requirePin();
+        if (!ok) return;
         document.getElementById('delete-job-id').value = id;
         document.getElementById('delete-job-form').submit();
       }

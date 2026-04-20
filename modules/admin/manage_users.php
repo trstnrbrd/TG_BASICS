@@ -100,7 +100,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 // ── LOAD USERS ──
 $users = $conn->query("
-    SELECT user_id, full_name, username, role, email, is_active, created_at, last_active
+    SELECT user_id, full_name, username, role, email, is_active, created_at, last_active,
+           (last_active IS NOT NULL AND last_active >= NOW() - INTERVAL 5 MINUTE) AS is_online
     FROM users
     ORDER BY FIELD(role, 'super_admin', 'admin', 'mechanic'), full_name ASC
 ");
@@ -183,7 +184,7 @@ require_once '../../includes/topbar.php';
               $rl = $role_labels[$u['role']] ?? ['Unknown', 'badge-gray'];
             ?>
             <?php
-              $is_online = !empty($u['last_active']) && (time() - strtotime($u['last_active'])) < 300;
+              $is_online = !empty($u['is_online']);
             ?>
             <tr>
               <td style="text-align:center;">

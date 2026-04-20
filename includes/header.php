@@ -529,10 +529,7 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
     // Check if user has a PIN (send empty pin = just checking existence)
     let chk;
     try { chk = await fetch(endpoint, { method:'POST', body: new FormData() }).then(r=>r.json()); } catch(e) { chk = null; }
-    if (!chk || chk?.no_pin) {
-      alert('[PIN DEBUG] no_pin or null: ' + JSON.stringify(chk));
-      return true;
-    }
+    if (!chk || chk?.no_pin) return true; // no PIN set or fetch failed — skip prompt
 
     // Show PIN prompt
     const result = await Swal.fire({

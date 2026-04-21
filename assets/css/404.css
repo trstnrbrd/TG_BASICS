@@ -1,0 +1,94 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background: #1C1A17;
+  color: #C8C0B0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 3rem;
+  text-decoration: none;
+}
+.brand img { width: 32px; height: 32px; border-radius: 8px; }
+.brand-sep { width: 1px; height: 24px; background: rgba(255,255,255,0.12); }
+.brand-name { font-size: 1rem; font-weight: 800; color: #F5F0E8; letter-spacing: -0.02em; }
+.brand-name span { color: #D4A017; }
+
+.error-code {
+  font-size: clamp(6rem, 20vw, 10rem);
+  font-weight: 800;
+  line-height: 1;
+  color: #D4A017;
+  opacity: 0.15;
+  letter-spacing: -0.05em;
+  margin-bottom: -1.5rem;
+  user-select: none;
+}
+.error-icon {
+  width: 64px; height: 64px;
+  background: rgba(212,160,23,0.1);
+  border: 1px solid rgba(212,160,23,0.2);
+  border-radius: 16px;
+  display: flex; align-items: center; justify-content: center;
+  color: #D4A017;
+  margin: 0 auto 1.5rem;
+}
+.error-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #F5F0E8;
+  margin-bottom: 0.75rem;
+}
+.error-sub {
+  font-size: 0.9rem;
+  color: rgba(200,192,176,0.6);
+  max-width: 360px;
+  line-height: 1.6;
+  margin-bottom: 2.5rem;
+}
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.65rem 1.25rem;
+  background: #D4A017;
+  color: #1C1A17;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border-radius: 10px;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.btn-primary:hover { background: #B8860B; }
+.btn-ghost {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.65rem 1.25rem;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #C8C0B0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 10px;
+  text-decoration: none;
+  transition: all 0.15s;
+}
+.btn-ghost:hover { background: rgba(255,255,255,0.08); color: #F5F0E8; }
+
+.footer-note {
+  margin-top: 4rem;
+  font-size: 0.75rem;
+  color: rgba(200,192,176,0.3);
+}

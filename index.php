@@ -343,13 +343,15 @@
         <img src="assets/img/LogoBasicCar.png" alt="Basic Car Insurance" class="footer-logo-img no-ring"/>
         TG<span>-BASICS</span>
       </div>
-      <p class="footer-brand-desc">Brokerage and Auto Shop Integrated Control System. Built exclusively for TG Customworks and Basic Car Insurance.</p>
+      <p class="footer-brand-desc">Brokerage and Auto Shop Integrated Central System. Built exclusively for TG Customworks and Basic Car Insurance.</p>
       <div class="footer-socials">
         <a href="https://www.facebook.com/TGCustomWorks" target="_blank" rel="noopener noreferrer" class="footer-social-icon" title="TG Customworks Facebook">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+          TG Customworks
         </a>
         <a href="https://www.facebook.com/basiccarinsurance" target="_blank" rel="noopener noreferrer" class="footer-social-icon" title="Basic Car Insurance Facebook">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+          Basic Car Insurance
         </a>
       </div>
     </div>

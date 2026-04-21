@@ -1501,27 +1501,24 @@ footer {
 
 .footer-socials {
   display: flex;
-  gap: 0.5rem;
-  margin-top: 0.25rem;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
 }
 
 .footer-social-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(255,255,255,0.04);
   display: flex;
   align-items: center;
-  justify-content: center;
-  color: rgba(200,192,176,0.45);
+  gap: 0.45rem;
+  color: rgba(200,192,176,0.55);
   text-decoration: none;
-  transition: all 0.15s;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: color 0.15s;
+  white-space: nowrap;
 }
 .footer-social-icon:hover {
   color: #1877f2;
-  border-color: rgba(24,119,242,0.3);
-  background: rgba(24,119,242,0.08);
 }
 
 /* Link columns */

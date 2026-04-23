@@ -20,14 +20,14 @@ $total_vehicles = $conn->query("SELECT COUNT(*) as c FROM vehicles")->fetch_asso
 $recent_clients  = $conn->query("SELECT COUNT(*) as c FROM clients WHERE YEAR(created_at)=YEAR(NOW()) AND MONTH(created_at)=MONTH(NOW())")->fetch_assoc()['c'];
 $recent_vehicles = $conn->query("SELECT COUNT(*) as c FROM vehicles WHERE YEAR(created_at)=YEAR(NOW()) AND MONTH(created_at)=MONTH(NOW())")->fetch_assoc()['c'];
 
-$total_policies   = $conn->query("SELECT COUNT(*) as c FROM insurance_policies")->fetch_assoc()['c'];
-$active_policies  = $conn->query("SELECT COUNT(*) as c FROM insurance_policies WHERE policy_end >= CURDATE()")->fetch_assoc()['c'];
-$es_stmt = $conn->prepare("SELECT COUNT(*) as c FROM insurance_policies WHERE DATEDIFF(policy_end, CURDATE()) BETWEEN 0 AND ?");
+$total_policies   = $conn->query("SELECT COUNT(*) as c FROM insurance_policies WHERE is_renewed = 0")->fetch_assoc()['c'];
+$active_policies  = $conn->query("SELECT COUNT(*) as c FROM insurance_policies WHERE is_renewed = 0 AND policy_end >= CURDATE()")->fetch_assoc()['c'];
+$es_stmt = $conn->prepare("SELECT COUNT(*) as c FROM insurance_policies WHERE is_renewed = 0 AND DATEDIFF(policy_end, CURDATE()) BETWEEN 0 AND ?");
 $es_stmt->bind_param('i', $exp_days);
 $es_stmt->execute();
 $expiring_soon = $es_stmt->get_result()->fetch_assoc()['c'];
 
-$up_stmt = $conn->prepare("SELECT COUNT(*) as c FROM insurance_policies WHERE DATEDIFF(policy_end, CURDATE()) BETWEEN 0 AND ?");
+$up_stmt = $conn->prepare("SELECT COUNT(*) as c FROM insurance_policies WHERE is_renewed = 0 AND DATEDIFF(policy_end, CURDATE()) BETWEEN 0 AND ?");
 $up_stmt->bind_param('i', $urg_days);
 $up_stmt->execute();
 $urgent_policies = $up_stmt->get_result()->fetch_assoc()['c'];
@@ -40,7 +40,7 @@ $rn_stmt = $conn->prepare("
     FROM insurance_policies p
     INNER JOIN vehicles v ON p.vehicle_id = v.vehicle_id
     INNER JOIN clients c ON p.client_id = c.client_id
-    WHERE DATEDIFF(p.policy_end, CURDATE()) BETWEEN 0 AND ?
+    WHERE p.is_renewed = 0 AND DATEDIFF(p.policy_end, CURDATE()) BETWEEN 0 AND ?
     ORDER BY p.policy_end ASC
     LIMIT 6
 ");

@@ -237,11 +237,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
-            // Mark old policy as renewed (keep it for history, just flag it)
+            // Mark old policy as renewed and stamp the new policy with renewed_at
             if ($renew_from > 0) {
                 $mark_renewed = $conn->prepare("UPDATE insurance_policies SET is_renewed = 1 WHERE policy_id = ?");
                 $mark_renewed->bind_param('i', $renew_from);
                 $mark_renewed->execute();
+
+                $stamp = $conn->prepare("UPDATE insurance_policies SET renewed_at = NOW() WHERE policy_id = ?");
+                $stamp->bind_param('i', $new_policy_id);
+                $stamp->execute();
             }
 
             // Audit log

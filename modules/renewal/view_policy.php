@@ -343,7 +343,9 @@ $claims_count_res->bind_param('i', $policy_id);
 $claims_count_res->execute();
 $claims_count = (int)$claims_count_res->get_result()->fetch_assoc()['cnt'];
 
-if ($policy['is_renewed']) {
+$recently_renewed = !empty($policy['renewed_at']) && strtotime($policy['renewed_at']) >= strtotime('-3 days');
+$policy_needs_action = $expired || $days <= $exp_days;
+if ($recently_renewed && !$policy_needs_action) {
     $status_label = 'Renewed';
     $status_color = 'var(--info)';
     $status_bg    = 'var(--info-bg, rgba(59,130,246,0.1))';
@@ -395,7 +397,7 @@ require_once '../../includes/topbar.php';
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
       <a href="renewal_list.php" class="back-link" style="margin-bottom:0;"><?= icon('arrow-left', 14) ?> Back to Renewal Tracking</a>
       <div style="display:flex;gap:0.5rem;align-items:center;">
-        <?php if (!$policy['is_renewed'] && ($expired || $days <= $exp_days)): ?>
+        <?php if ($expired || $days <= $exp_days): ?>
         <a href="../insurance/add_policy.php?renew_from=<?= $policy_id ?>"
           style="display:inline-flex;align-items:center;gap:0.4rem;background:var(--gold-pale);color:var(--gold-bright);border:1px solid var(--gold-bright);padding:0.45rem 1rem;border-radius:8px;font-size:0.78rem;font-weight:700;cursor:pointer;text-decoration:none;">
           <?= icon('arrow-path', 14) ?> Renew Policy

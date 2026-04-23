@@ -8,9 +8,10 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $result = $conn->query("
-    SELECT COUNT(*) as c 
-    FROM insurance_policies 
-    WHERE policy_end >= CURDATE() 
+    SELECT COUNT(*) as c
+    FROM insurance_policies
+    WHERE is_renewed = 0
+    AND policy_end >= CURDATE()
     AND DATEDIFF(policy_end, CURDATE()) <= 7
 ");
 

@@ -200,11 +200,6 @@ require_once '../../includes/topbar.php';
         <div class="empty-desc">
           <?= ($search !== '' || $filter_status !== 'all') ? 'Try adjusting your search or filters.' : 'Create a billing record after a claim is approved.' ?>
         </div>
-        <?php if ($search === '' && $filter_status === 'all'): ?>
-        <a href="add_billing.php" class="btn-primary" style="margin-top:1rem;display:inline-flex;align-items:center;gap:0.4rem;">
-          <?= icon('plus', 14) ?> New Billing
-        </a>
-        <?php endif; ?>
       </div>
       <?php endif; ?>
     </div>

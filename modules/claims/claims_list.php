@@ -233,9 +233,6 @@ require_once '../../includes/topbar.php';
         <div class="empty-icon"><?= icon('clipboard-list',28) ?></div>
         <div class="empty-title"><?= $search || $filter_status !== 'all' || $filter_type !== 'all' ? 'No results found' : 'No claims filed yet' ?></div>
         <div class="empty-desc"><?= $search || $filter_status !== 'all' || $filter_type !== 'all' ? 'Try adjusting your filters.' : 'File a new claim to get started.' ?></div>
-        <?php if (!$search && $filter_status === 'all' && $filter_type === 'all'): ?>
-        <a href="add_claim.php" class="btn-primary"><?= icon('plus',14) ?> File New Claim</a>
-        <?php endif; ?>
       </div>
       <?php endif; ?>
     </div>

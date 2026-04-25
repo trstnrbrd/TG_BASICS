@@ -222,9 +222,9 @@ if (newStatusSel) {
 
 // ── Delete claim confirmation ──
 document.querySelectorAll('.js-delete-claim').forEach(function(btn) {
-  btn.addEventListener('click', function() {
+  btn.addEventListener('click', async function() {
     const form = this.closest('form');
-    Swal.fire({
+    const confirmed = await Swal.fire({
       icon: 'warning',
       title: 'Delete Claim?',
       text: 'This will permanently delete this claim record. This action cannot be undone.',
@@ -233,9 +233,10 @@ document.querySelectorAll('.js-delete-claim').forEach(function(btn) {
       cancelButtonText: 'Cancel',
       confirmButtonColor: '#c0392b',
       cancelButtonColor: '#6c757d',
-    }).then(function(result) {
-      if (result.isConfirmed) form.submit();
     });
+    if (!confirmed.isConfirmed) return;
+    const ok = await requirePin();
+    if (ok) form.submit();
   });
 });
 

@@ -921,7 +921,7 @@ const checkIcon  = `<?= icon('check', 12) ?>`;
 const docIcon    = `<?= icon('document', 13) ?>`;
 const xIcon      = `<?= icon('x-mark', 10) ?>`;
 </script>
-<script src="../../assets/js/shared/view_claim.js"></script>
+<script src="../../assets/js/shared/view_claim.js?v=<?= filemtime(__DIR__.'/../../assets/js/shared/view_claim.js') ?>"></script>
 
 <?php require_once '../../includes/footer.php'; ?>
 

@@ -42,7 +42,5 @@ error_log
 *.swo
 
 # ── TESTS / DOCUMENTATION (internal only) ────────────────────────────────────
-tests/run_tests.php
-tests/TEST_CASES.md
 data_gathering (documentation)/Full interview transcript.txt
 data_gathering (documentation)/MANUSCRIPT.txt

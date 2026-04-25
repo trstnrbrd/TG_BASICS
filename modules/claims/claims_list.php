@@ -243,6 +243,6 @@ require_once '../../includes/topbar.php';
   </div>
 </div>
 
-<script src="../../assets/js/shared/claims_list.js"></script>
+<script src="../../assets/js/shared/claims_list.js?v=<?= filemtime(__DIR__.'/../../assets/js/shared/claims_list.js') ?>"></script>
 
 <?php require_once '../../includes/footer.php'; ?>

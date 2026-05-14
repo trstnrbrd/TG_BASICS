@@ -114,6 +114,68 @@ require_once '../../includes/topbar.php';
       </div>
     </div>
 
+    <!-- OCR MODAL -->
+    <div id="ocr-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.55);backdrop-filter:blur(2px);align-items:center;justify-content:center;padding:1rem;" onclick="if(event.target===this)ocrModalClose()">
+      <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:16px;width:100%;max-width:480px;box-shadow:var(--shadow-lg);animation:ocr-modal-in 0.18s ease;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--border);">
+          <div style="display:flex;align-items:center;gap:0.6rem;">
+            <span style="color:var(--gold-bright);"><?= icon('magnifying-glass', 16) ?></span>
+            <span style="font-weight:700;font-size:0.9rem;color:var(--text-primary);">Scan OR / CR</span>
+            <span style="font-size:0.65rem;font-weight:700;color:var(--gold-bright);background:var(--gold-pale);border:1px solid var(--gold-bright);border-radius:6px;padding:0.1rem 0.4rem;">OCR</span>
+          </div>
+          <button type="button" onclick="ocrModalClose()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0.25rem;"><?= icon('x-mark', 16) ?></button>
+        </div>
+        <div style="padding:1.25rem;">
+          <div id="ocr-upload-area" style="border:2px dashed var(--border);border-radius:12px;padding:1.5rem;text-align:center;cursor:pointer;transition:border-color 0.15s;" onclick="document.getElementById('ocr-file-input').click()">
+            <div id="ocr-idle">
+              <div style="color:var(--text-muted);margin-bottom:0.4rem;"><?= icon('camera', 24) ?></div>
+              <div style="font-size:0.85rem;font-weight:700;color:var(--text-primary);margin-bottom:0.2rem;">Tap to take a photo or upload</div>
+              <div style="font-size:0.72rem;color:var(--text-muted);">JPG, PNG, WEBP · Works best on flat, clear documents</div>
+            </div>
+            <div id="ocr-preview" style="display:none;">
+              <img id="ocr-img" style="max-width:100%;max-height:200px;border-radius:8px;object-fit:contain;" alt="OR/CR"/>
+            </div>
+          </div>
+          <input type="file" id="ocr-file-input" accept="image/*" capture="environment" style="display:none;"/>
+
+          <div id="ocr-progress" style="display:none;margin-top:1rem;">
+            <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.5rem;">
+              <div style="width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--gold-bright);border-radius:50%;animation:spin 0.7s linear infinite;flex-shrink:0;"></div>
+              <span id="ocr-status-text" style="font-size:0.78rem;color:var(--text-muted);">Enhancing image…</span>
+            </div>
+            <div style="height:4px;background:var(--border);border-radius:4px;overflow:hidden;">
+              <div id="ocr-bar" style="height:100%;background:var(--gold-bright);width:0%;transition:width 0.3s;border-radius:4px;"></div>
+            </div>
+          </div>
+
+          <div id="ocr-result-notice" style="display:none;margin-top:0.75rem;" class="alert alert-info">
+            <?= icon('check-circle', 13) ?> <span id="ocr-filled-fields">Fields auto-filled.</span> Review before saving.
+          </div>
+          <div id="ocr-error-notice" style="display:none;margin-top:0.75rem;" class="alert alert-warning">
+            <?= icon('exclamation-triangle', 13) ?> <span id="ocr-error-msg">Could not extract text. Fill in manually.</span>
+          </div>
+
+          <div style="display:flex;gap:0.5rem;margin-top:0.75rem;flex-wrap:wrap;">
+            <button type="button" onclick="document.getElementById('ocr-file-input').click()" class="btn-primary" style="font-size:0.78rem;padding:0.4rem 0.9rem;">
+              <?= icon('camera', 12) ?> Retake / Choose
+            </button>
+            <button type="button" id="ocr-clear-btn" onclick="ocrClear()" class="btn-ghost" style="font-size:0.78rem;padding:0.4rem 0.9rem;display:none;">
+              <?= icon('x-mark', 12) ?> Clear
+            </button>
+            <button type="button" onclick="ocrModalClose()" class="btn-ghost" style="font-size:0.78rem;padding:0.4rem 0.9rem;margin-left:auto;">
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <style>
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes ocr-modal-in { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+    #ocr-upload-area:hover { border-color: var(--gold-bright); }
+    .ocr-filled { background: rgba(212,160,23,0.08) !important; border-color: var(--gold-bright) !important; }
+    </style>
+
     <form method="POST" action="">
       <?= csrf_field() ?>
       <div class="card">
@@ -123,6 +185,9 @@ require_once '../../includes/topbar.php';
             <div class="card-title">Vehicle Details</div>
             <div class="card-sub">Fields marked <span style="color:var(--gold-bright);">*</span> are required</div>
           </div>
+          <button type="button" onclick="ocrModalOpen()" class="btn-ghost" style="margin-left:auto;font-size:0.78rem;padding:0.45rem 1rem;">
+            <?= icon('camera', 13) ?> Scan Document
+          </button>
         </div>
         <div style="padding:1.5rem;">
           <div class="form-grid-3">
@@ -194,5 +259,259 @@ require_once '../../includes/topbar.php';
 
   </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script>
+(function() {
+  const fileInput  = document.getElementById("ocr-file-input");
+  const idleEl     = document.getElementById("ocr-idle");
+  const previewEl  = document.getElementById("ocr-preview");
+  const imgEl      = document.getElementById("ocr-img");
+  const progressEl = document.getElementById("ocr-progress");
+  const statusEl   = document.getElementById("ocr-status-text");
+  const barEl      = document.getElementById("ocr-bar");
+  const resultEl   = document.getElementById("ocr-result-notice");
+  const errorEl    = document.getElementById("ocr-error-notice");
+  const clearBtn   = document.getElementById("ocr-clear-btn");
+  const filledEl   = document.getElementById("ocr-filled-fields");
+
+  fileInput.addEventListener("change", function() {
+    if (!this.files || !this.files[0]) return;
+    const url = URL.createObjectURL(this.files[0]);
+    imgEl.src = url;
+    idleEl.style.display    = "none";
+    previewEl.style.display = "block";
+    clearBtn.style.display  = "inline-flex";
+    resultEl.style.display  = "none";
+    errorEl.style.display   = "none";
+    runOCR(url);
+  });
+
+  window.ocrModalOpen = function() {
+    const modal = document.getElementById("ocr-modal");
+    modal.style.display = "flex";
+    document.body.style.overflow = "hidden";
+  };
+  window.ocrModalClose = function() {
+    const modal = document.getElementById("ocr-modal");
+    modal.style.display = "none";
+    document.body.style.overflow = "";
+  };
+
+  window.ocrClear = function() {
+    fileInput.value          = "";
+    imgEl.src                = "";
+    idleEl.style.display     = "block";
+    previewEl.style.display  = "none";
+    clearBtn.style.display   = "none";
+    progressEl.style.display = "none";
+    resultEl.style.display   = "none";
+    errorEl.style.display    = "none";
+    document.querySelectorAll(".ocr-filled").forEach(el => el.classList.remove("ocr-filled"));
+  };
+
+  function fillField(selector, value) {
+    if (!value) return false;
+    const el = document.querySelector(selector);
+    if (!el || el.value) return false;
+    el.value = value.trim();
+    el.classList.add("ocr-filled");
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    return true;
+  }
+
+  // Grab raw text after a label, tolerating spaces/newlines between label and value
+  function afterLabel(upper, labelRe) {
+    const m = upper.match(new RegExp(labelRe + "[.:\\s]*([A-Z0-9][A-Z0-9 \\-]{0,35})", "s"));
+    return m ? m[1].trim().replace(/\s+/g, " ") : null;
+  }
+
+  // Strip spaces then truncate — cleans up OCR spacing artefacts inside numbers
+  function compact(str, max) {
+    return str.trim().replace(/\s+/g, "").slice(0, max);
+  }
+
+  function parseText(text) {
+    const filled = [];
+    const upper  = text.toUpperCase();
+
+    // ── Plate Number ──
+    // Strategy: only trust label-anchored extraction.
+    // Fallback scans are too noisy on CR (125=piston, GAS=fuel, RJC=series code all match plate patterns).
+    let plateVal = null;
+    const plateLabelM = upper.match(/PLATE\s*NO[.:\s]*([A-Z0-9 ]{3,10})/s);
+    if (plateLabelM) {
+      const raw = plateLabelM[1].trim().replace(/\s+/g, "");
+      // Car: AAA1234 or AAA1234 (letters first)
+      const carM  = raw.match(/^([A-Z]{2,3})(\d{3,4})$/);
+      // Motorcycle: 945RJC (digits first)
+      const motoM = raw.match(/^(\d{3})([A-Z]{2,3})$/);
+      if (carM)       plateVal = carM[1]  + " " + carM[2];
+      else if (motoM) plateVal = motoM[1] + " " + motoM[2];
+    }
+    if (plateVal && fillField("[name=plate_number]", plateVal)) filled.push("Plate Number");
+
+    // ── Make ──
+    // On CR the MAKE cell value ("Honda") appears AFTER the label on the next line.
+    // BUT Tesseract table reading often outputs cells left-to-right, so "Honda" may appear
+    // far from the "MAKE" label. Scan whole text for known brands — most reliable approach.
+    const makes = ["TOYOTA","HONDA","MITSUBISHI","FORD","NISSAN","HYUNDAI","KIA","SUZUKI","ISUZU","MAZDA","CHEVROLET","SUBARU","BMW","MERCEDES","VOLKSWAGEN","JEEP","LEXUS","DODGE","YAMAHA","KAWASAKI","DUCATI","BAJAJ","TVS","KYMCO"];
+    for (const mk of makes) {
+      if (upper.includes(mk)) {
+        if (fillField("[name=make]", mk[0] + mk.slice(1).toLowerCase())) { filled.push("Make"); break; }
+      }
+    }
+
+    // ── Year Model ──
+    // "YEAR MODEL" label + value, or any 4-digit year 1960-2035
+    const yearArea = afterLabel(upper, "YEAR\\s*MODEL");
+    let yearVal = yearArea ? yearArea.match(/\b(19\d{2}|20[0-3]\d)\b/) : null;
+    if (!yearVal) yearVal = upper.match(/\b(19[6-9]\d|20[0-3]\d)\b/);
+    if (yearVal && fillField("[name=year_model]", yearVal[1])) filled.push("Year Model");
+
+    // ── Color ──
+    // CR doesn't have a dedicated COLOR cell — skip guessing from body text
+    const colors = ["WHITE","BLACK","SILVER","GRAY","GREY","RED","BLUE","GREEN","YELLOW","ORANGE","BROWN","MAROON","GOLD","BEIGE","PEARL"];
+    const colorArea = afterLabel(upper, "(?:BODY\\s*)?COLOR");
+    if (colorArea) {
+      for (const col of colors) {
+        if (colorArea.toUpperCase().includes(col)) {
+          if (fillField("[name=color]", col[0] + col.slice(1).toLowerCase())) { filled.push("Color"); break; }
+        }
+      }
+    }
+
+    // ── Engine Number ──
+    // Label: "ENGINE NO." — value e.g. "JA46E7357915"
+    // Grab up to 25 chars after label, strip internal spaces, stop at 20
+    const engM = upper.match(/ENGINE\s*NO[.:\s]*([A-Z0-9][A-Z0-9 ]{5,28})/s);
+    if (engM) {
+      const raw    = engM[1].split(/[^A-Z0-9 ]/)[0];  // stop at next label
+      const engVal = compact(raw, 20);
+      if (engVal.length >= 6 && fillField("[name=motor_number]", engVal)) filled.push("Engine Number");
+    }
+
+    // ── Chassis Number ──
+    // Label: "CHASSIS NO." — value e.g. "MH1JA4672MK358119" (17 chars)
+    const chassisM = upper.match(/CHASSIS\s*NO[.:\s]*([A-Z0-9][A-Z0-9 ]{9,25})/s);
+    if (chassisM) {
+      const raw       = chassisM[1].split(/[^A-Z0-9 ]/)[0];
+      const chassisVal = compact(raw, 17);
+      if (chassisVal.length >= 10 && fillField("[name=serial_number]", chassisVal)) filled.push("Chassis Number");
+    }
+    // Fallback: standalone 17-char VIN block (excludes I, O, Q per ISO 3779)
+    if (!filled.includes("Chassis Number")) {
+      const vin = upper.match(/\b([A-HJ-NPR-Z0-9]{17})\b/);
+      if (vin && fillField("[name=serial_number]", vin[1])) filled.push("Chassis Number");
+    }
+
+    return filled;
+  }
+
+  function preprocessImage(imageUrl) {
+    return new Promise(function(resolve) {
+      const img = new Image();
+      img.onload = function() {
+        const canvas  = document.createElement("canvas");
+        const scale   = Math.min(1, 1800 / Math.max(img.width, img.height));
+        canvas.width  = Math.round(img.width  * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const d   = imageData.data;
+        const w   = canvas.width;
+        const h   = canvas.height;
+        const len = w * h;
+
+        // Step 1: grayscale
+        const gray = new Float32Array(len);
+        for (let i = 0; i < len; i++) {
+          gray[i] = 0.299 * d[i*4] + 0.587 * d[i*4+1] + 0.114 * d[i*4+2];
+        }
+
+        // Step 2: box-blur grayscale to estimate local background brightness
+        // Radius ~40px — large enough to span a character, small enough to follow page curl
+        const radius = Math.round(Math.min(w, h) * 0.04);
+        const bg = new Float32Array(len);
+        // Horizontal pass
+        const tmp = new Float32Array(len);
+        for (let y = 0; y < h; y++) {
+          let sum = 0, count = 0;
+          for (let x = 0; x < w; x++) {
+            sum += gray[y*w + x]; count++;
+            if (x >= radius) { sum -= gray[y*w + x - radius]; count--; }
+            const nx = x - Math.floor(radius/2);
+            if (nx >= 0 && nx < w) tmp[y*w + nx] = sum / count;
+          }
+        }
+        // Vertical pass
+        for (let x = 0; x < w; x++) {
+          let sum = 0, count = 0;
+          for (let y = 0; y < h; y++) {
+            sum += tmp[y*w + x]; count++;
+            if (y >= radius) { sum -= tmp[(y-radius)*w + x]; count--; }
+            const ny = y - Math.floor(radius/2);
+            if (ny >= 0 && ny < h) bg[ny*w + x] = sum / count;
+          }
+        }
+
+        // Step 3: normalize — pixel / background, then stretch & clamp
+        // Result: watermarks/yellowing disappear, dark ink stays dark
+        for (let i = 0; i < len; i++) {
+          const bgVal  = Math.max(bg[i], 30);          // avoid div by zero
+          let   norm   = (gray[i] / bgVal) * 255;      // normalize to background
+          // Aggressive output stretch: push mid-tones toward white, keep darks dark
+          norm = Math.min(255, Math.max(0, (norm - 180) * 4 + 255));
+          const out = Math.round(norm);
+          d[i*4] = d[i*4+1] = d[i*4+2] = out;
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+        imgEl.src = canvas.toDataURL("image/png");
+        resolve(canvas.toDataURL("image/png"));
+      };
+      img.src = imageUrl;
+    });
+  }
+
+  async function runOCR(imageUrl) {
+    progressEl.style.display = "block";
+    barEl.style.width = "5%";
+    statusEl.textContent = "Enhancing image…";
+    try {
+      const processedUrl = await preprocessImage(imageUrl);
+      barEl.style.width = "10%";
+      statusEl.textContent = "Loading OCR engine…";
+      const { createWorker } = Tesseract;
+      const worker = await createWorker("eng", 1, {
+        logger: function(info) {
+          if (info.status === "recognizing text") {
+            const pct = Math.round(info.progress * 80) + 15;
+            barEl.style.width = pct + "%";
+            statusEl.textContent = "Reading document… " + Math.round(info.progress * 100) + "%";
+          }
+        }
+      });
+      const result = await worker.recognize(processedUrl);
+      await worker.terminate();
+      progressEl.style.display = "none";
+      const filled = parseText(result.data.text);
+      if (filled.length > 0) {
+        filledEl.textContent = "Auto-filled: " + filled.join(", ") + ". Please verify before saving.";
+        resultEl.style.display = "block";
+      } else {
+        document.getElementById("ocr-error-msg").textContent = "Text was read but no matching fields found. Please fill in manually.";
+        errorEl.style.display = "block";
+      }
+    } catch(err) {
+      progressEl.style.display = "none";
+      document.getElementById("ocr-error-msg").textContent = "OCR failed: " + err.message;
+      errorEl.style.display = "block";
+    }
+  }
+})();
+</script>
 
 <?php require_once '../../includes/footer.php'; ?>

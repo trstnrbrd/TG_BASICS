@@ -6,8 +6,9 @@
  *   $footer_scripts - string of extra inline JS to run after React loads
  *   $base_path      - string, path back to root
  */
-$base_path      = $base_path      ?? '../';
-$footer_scripts = $footer_scripts ?? '';
+$base_path             = $base_path             ?? '../';
+$footer_scripts        = $footer_scripts        ?? '';
+$footer_extra_scripts  = $footer_extra_scripts  ?? '';
 ?>
 
 <!-- SweetAlert2 -->
@@ -210,6 +211,9 @@ $footer_scripts = $footer_scripts ?? '';
 
 </script>
 
+<?php if ($footer_extra_scripts): ?>
+  <?= $footer_extra_scripts ?>
+<?php endif; ?>
 <?php if ($footer_scripts): ?>
 <script type="text/babel">
   <?= $footer_scripts ?>

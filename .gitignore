@@ -41,6 +41,9 @@ error_log
 *.swp
 *.swo
 
+# ── CLAUDE CODE CONTEXT (local only, not for repo) ───────────────────────────
+CLAUDE.md
+
 # ── TESTS / DOCUMENTATION (internal only) ────────────────────────────────────
 data_gathering (documentation)/Full interview transcript.txt
 data_gathering (documentation)/MANUSCRIPT.txt

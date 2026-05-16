@@ -246,14 +246,14 @@ require_once '../../includes/topbar.php';
             <div class="field">
               <label class="field-label">Full Name <span class="req">*</span></label>
               <input type="text" name="new_full_name" class="field-input"
-                placeholder="e.g. Juan dela Cruz"
+                placeholder="First Middle Last"
                 value="<?= htmlspecialchars($_POST['new_full_name'] ?? '') ?>"/>
             </div>
 
             <div class="field">
               <label class="field-label">Email Address <span class="req">*</span></label>
               <input type="email" name="new_email" class="field-input"
-                placeholder="e.g. juan@email.com"
+                placeholder="name@email.com"
                 value="<?= htmlspecialchars($_POST['new_email'] ?? '') ?>"/>
               <span class="field-hint">Activation link will be sent here.</span>
             </div>
@@ -261,7 +261,7 @@ require_once '../../includes/topbar.php';
             <div class="field">
               <label class="field-label">Username <span class="req">*</span></label>
               <input type="text" name="new_username" class="field-input"
-                placeholder="e.g. juan2016"
+                placeholder="Letters, numbers, underscores"
                 value="<?= htmlspecialchars($_POST['new_username'] ?? '') ?>"/>
             </div>
 

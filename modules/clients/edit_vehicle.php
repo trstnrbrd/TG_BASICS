@@ -141,20 +141,20 @@ require_once '../../includes/topbar.php';
             <div class="field">
               <label class="field-label">Plate Number <span class="req">*</span></label>
               <input type="text" name="plate_number" class="field-input"
-                placeholder="e.g. ABC 1234"
+                placeholder="ABC 1234 or 945 RJC"
                 value="<?= htmlspecialchars($vehicle['plate_number']) ?>"
                 style="text-transform:uppercase;" autofocus/>
             </div>
             <div class="field">
               <label class="field-label">Make <span class="req">*</span></label>
               <input type="text" name="make" class="field-input"
-                placeholder="e.g. Toyota"
+                placeholder="Toyota / Honda / Mitsubishi"
                 value="<?= htmlspecialchars($vehicle['make']) ?>"/>
             </div>
             <div class="field">
               <label class="field-label">Model <span class="req">*</span></label>
               <input type="text" name="model" class="field-input"
-                placeholder="e.g. Innova"
+                placeholder="Innova / Civic / L300"
                 value="<?= htmlspecialchars($vehicle['model']) ?>"/>
             </div>
 
@@ -163,13 +163,13 @@ require_once '../../includes/topbar.php';
               <label class="field-label">Year Model <span class="req">*</span></label>
               <input type="number" name="year_model" class="field-input"
                 min="1990" max="<?= date('Y') + 1 ?>"
-                placeholder="e.g. 2020"
+                placeholder="YYYY"
                 value="<?= htmlspecialchars($vehicle['year_model']) ?>"/>
             </div>
             <div class="field span-2">
               <label class="field-label">Color</label>
               <input type="text" name="color" class="field-input"
-                placeholder="e.g. Pearl White"
+                placeholder="Pearl White / Black / Silver"
                 value="<?= htmlspecialchars($vehicle['color'] ?? '') ?>"/>
             </div>
 
@@ -177,7 +177,7 @@ require_once '../../includes/topbar.php';
             <div class="field span-3">
               <label class="field-label">Engine Number <span class="req">*</span></label>
               <input type="text" name="motor_number" class="field-input"
-                placeholder="e.g. 2TR1234567"
+                placeholder="Alphanumeric, from OR-CR"
                 value="<?= htmlspecialchars($vehicle['motor_number'] ?? '') ?>"
                 style="text-transform:uppercase;"/>
               <div class="field-hint">Found on the vehicle registration / OR-CR. Required for insurance eligibility.</div>
@@ -187,7 +187,7 @@ require_once '../../includes/topbar.php';
             <div class="field span-3">
               <label class="field-label">Chassis Number <span class="req">*</span></label>
               <input type="text" name="serial_number" class="field-input"
-                placeholder="e.g. MHF11KH40P0123456"
+                placeholder="17-character VIN"
                 value="<?= htmlspecialchars($vehicle['serial_number'] ?? '') ?>"
                 style="text-transform:uppercase;"/>
               <div class="field-hint">17-character VIN / chassis number from the OR-CR. Required for policy creation.</div>

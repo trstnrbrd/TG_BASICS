@@ -833,13 +833,13 @@ require_once '../../includes/topbar.php';
                 <label class="field-label">Contact Number</label>
                 <input type="text" name="company_contact" class="field-input"
                   value="<?= htmlspecialchars($settings['company_contact']) ?>"
-                  placeholder="e.g. 0917-xxx-xxxx"/>
+                  placeholder="09XXXXXXXXX or 044-XXX-XXXX"/>
               </div>
               <div class="field">
                 <label class="field-label">Email Address</label>
                 <input type="email" name="company_email" class="field-input"
                   value="<?= htmlspecialchars($settings['company_email']) ?>"
-                  placeholder="e.g. info@tgbasics.com"/>
+                  placeholder="name@email.com"/>
               </div>
             </div>
           </div>

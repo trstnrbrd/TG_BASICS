@@ -316,7 +316,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <div><div class="card-title">Notes</div><div class="card-sub">Optional remarks for this quotation</div></div>
       </div>
       <div style="padding:1rem 1.25rem;">
-        <textarea name="notes" class="field-input" rows="3" placeholder="e.g. Client agreed on partial payment, special color requested..." style="resize:vertical;width:100%;"><?= htmlspecialchars($_POST['notes'] ?? '') ?></textarea>
+        <textarea name="notes" class="field-input" rows="3" placeholder="Special instructions, payment arrangements, color requests..." style="resize:vertical;width:100%;"><?= htmlspecialchars($_POST['notes'] ?? '') ?></textarea>
       </div>
     </div>
     <div class="card" style="margin-bottom:0;min-width:220px;">

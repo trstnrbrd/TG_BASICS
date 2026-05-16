@@ -200,7 +200,7 @@ require_once '../../includes/topbar.php';
                 <label class="field-label">Billed To (Insurance Company) <span style="color:var(--danger)">*</span></label>
                 <input type="text" name="billed_to" class="field-input"
                   value="<?= htmlspecialchars($_POST['billed_to'] ?? $prefill_claim['insurer_name'] ?? 'PhilBritish Insurance Corp.') ?>"
-                  placeholder="e.g. PhilBritish Insurance Corp." required style="width:100%;"/>
+                  placeholder="Insurance company name" required style="width:100%;"/>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
                 <div>

@@ -130,13 +130,13 @@ require_once '../../includes/topbar.php';
             <div id="ocr-idle">
               <div style="color:var(--text-muted);margin-bottom:0.4rem;"><?= icon('camera', 24) ?></div>
               <div style="font-size:0.85rem;font-weight:700;color:var(--text-primary);margin-bottom:0.2rem;">Tap to take a photo or upload</div>
-              <div style="font-size:0.72rem;color:var(--text-muted);">JPG, PNG, WEBP · Works best on flat, clear documents</div>
+              <div style="font-size:0.72rem;color:var(--text-muted);">JPG, PNG, WEBP, PDF · Works best on flat, clear documents</div>
             </div>
             <div id="ocr-preview" style="display:none;">
               <img id="ocr-img" style="max-width:100%;max-height:200px;border-radius:8px;object-fit:contain;" alt="OR/CR"/>
             </div>
           </div>
-          <input type="file" id="ocr-file-input" accept="image/*" capture="environment" style="display:none;"/>
+          <input type="file" id="ocr-file-input" accept="image/*,application/pdf" style="display:none;"/>
 
           <div id="ocr-progress" style="display:none;margin-top:1rem;">
             <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.5rem;">
@@ -196,20 +196,20 @@ require_once '../../includes/topbar.php';
             <div class="field">
               <label class="field-label">Plate Number <span class="req">*</span></label>
               <input type="text" name="plate_number" class="field-input"
-                placeholder="e.g. ABC 1234"
+                placeholder="ABC 1234 or 945 RJC"
                 value="<?= htmlspecialchars($_POST['plate_number'] ?? '') ?>"
                 style="text-transform:uppercase;" autofocus/>
             </div>
             <div class="field">
               <label class="field-label">Make <span class="req">*</span></label>
               <input type="text" name="make" class="field-input"
-                placeholder="e.g. Toyota"
+                placeholder="Toyota / Honda / Mitsubishi"
                 value="<?= htmlspecialchars($_POST['make'] ?? '') ?>"/>
             </div>
             <div class="field">
               <label class="field-label">Model <span class="req">*</span></label>
               <input type="text" name="model" class="field-input"
-                placeholder="e.g. Innova"
+                placeholder="Innova / Civic / L300"
                 value="<?= htmlspecialchars($_POST['model'] ?? '') ?>"/>
             </div>
 
@@ -218,13 +218,13 @@ require_once '../../includes/topbar.php';
               <label class="field-label">Year Model <span class="req">*</span></label>
               <input type="number" name="year_model" class="field-input"
                 min="1990" max="<?= date('Y') + 1 ?>"
-                placeholder="e.g. 2020"
+                placeholder="YYYY"
                 value="<?= htmlspecialchars($_POST['year_model'] ?? '') ?>"/>
             </div>
             <div class="field span-2">
               <label class="field-label">Color</label>
               <input type="text" name="color" class="field-input"
-                placeholder="e.g. Pearl White"
+                placeholder="Pearl White / Black / Silver"
                 value="<?= htmlspecialchars($_POST['color'] ?? '') ?>"/>
             </div>
 
@@ -232,7 +232,7 @@ require_once '../../includes/topbar.php';
             <div class="field span-3">
               <label class="field-label">Engine Number <span class="req">*</span></label>
               <input type="text" name="motor_number" class="field-input"
-                placeholder="e.g. 2TR1234567"
+                placeholder="Alphanumeric, from OR-CR"
                 value="<?= htmlspecialchars($_POST['motor_number'] ?? '') ?>"
                 style="text-transform:uppercase;"/>
               <div class="field-hint">Found on the vehicle registration / OR-CR. Required for insurance eligibility.</div>
@@ -242,7 +242,7 @@ require_once '../../includes/topbar.php';
             <div class="field span-3">
               <label class="field-label">Chassis Number <span class="req">*</span></label>
               <input type="text" name="serial_number" class="field-input"
-                placeholder="e.g. MHF11KH40P0123456"
+                placeholder="17-character VIN"
                 value="<?= htmlspecialchars($_POST['serial_number'] ?? '') ?>"
                 style="text-transform:uppercase;"/>
               <div class="field-hint">17-character VIN / chassis number from the OR-CR. Required for policy creation.</div>
@@ -260,7 +260,6 @@ require_once '../../includes/topbar.php';
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>
 (function() {
   const fileInput  = document.getElementById("ocr-file-input");
@@ -277,14 +276,14 @@ require_once '../../includes/topbar.php';
 
   fileInput.addEventListener("change", function() {
     if (!this.files || !this.files[0]) return;
-    const url = URL.createObjectURL(this.files[0]);
-    imgEl.src = url;
+    const file = this.files[0];
+    imgEl.src = URL.createObjectURL(file);
     idleEl.style.display    = "none";
     previewEl.style.display = "block";
     clearBtn.style.display  = "inline-flex";
     resultEl.style.display  = "none";
     errorEl.style.display   = "none";
-    runOCR(url);
+    runOCR(file);
   });
 
   window.ocrModalOpen = function() {
@@ -335,30 +334,72 @@ require_once '../../includes/topbar.php';
     const filled = [];
     const upper  = text.toUpperCase();
 
-    // ── Plate Number ──
-    // Strategy: only trust label-anchored extraction.
-    // Fallback scans are too noisy on CR (125=piston, GAS=fuel, RJC=series code all match plate patterns).
-    let plateVal = null;
-    const plateLabelM = upper.match(/PLATE\s*NO[.:\s]*([A-Z0-9 ]{3,10})/s);
-    if (plateLabelM) {
-      const raw = plateLabelM[1].trim().replace(/\s+/g, "");
-      // Car: AAA1234 or AAA1234 (letters first)
-      const carM  = raw.match(/^([A-Z]{2,3})(\d{3,4})$/);
-      // Motorcycle: 945RJC (digits first)
-      const motoM = raw.match(/^(\d{3})([A-Z]{2,3})$/);
-      if (carM)       plateVal = carM[1]  + " " + carM[2];
-      else if (motoM) plateVal = motoM[1] + " " + motoM[2];
+    // ── Plate + Engine from CR values line ──
+    // CR OCR: headers and values on separate tab-delimited lines.
+    // Values line pattern: "0301-xxx\t945RJC\tJA46E7357915\tMH1JA4672MK358119"
+    // Token 0: MV FILE NO (digits+dashes), Token 1: PLATE, Token 2: ENGINE, Token 3: CHASSIS
+    let plateVal = null, engineValFromLine = null;
+    // Find the line containing the MV file number pattern
+    const lines = upper.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const tokens = lines[i].trim().split(/\t+/);
+      // MV FILE NO value looks like "0301-00001392305"
+      if (tokens[0] && /^\d{4}-\d+$/.test(tokens[0].trim())) {
+        // Token 1 = PLATE
+        if (tokens[1]) {
+          const raw = tokens[1].trim().replace(/\s+/g, "");
+          const carM  = raw.match(/^([A-Z]{2,3})(\d{3,4})$/);
+          const motoM = raw.match(/^(\d{3})([A-Z]{2,3})$/);
+          if (carM)       plateVal = carM[1] + " " + carM[2];
+          else if (motoM) plateVal = motoM[1] + " " + motoM[2];
+          else if (/^[A-Z0-9]{5,8}$/.test(raw)) plateVal = raw;
+        }
+        // Token 2 = ENGINE (between plate and chassis)
+        if (tokens[2]) {
+          const eng = tokens[2].trim().replace(/\s+/g, "");
+          if (/^[A-Z0-9]{6,20}$/.test(eng)) engineValFromLine = eng;
+        }
+        break;
+      }
+    }
+    // Fallback: label-anchored PLATE NO
+    if (!plateVal) {
+      const plateLabelM = upper.match(/PLATE\s*NO[.:\s\t]+([A-Z0-9]{5,8})/);
+      if (plateLabelM) {
+        const raw = plateLabelM[1].trim();
+        const carM  = raw.match(/^([A-Z]{2,3})(\d{3,4})$/);
+        const motoM = raw.match(/^(\d{3})([A-Z]{2,3})$/);
+        if (carM)       plateVal = carM[1] + " " + carM[2];
+        else if (motoM) plateVal = motoM[1] + " " + motoM[2];
+        else plateVal = raw;
+      }
     }
     if (plateVal && fillField("[name=plate_number]", plateVal)) filled.push("Plate Number");
 
     // ── Make ──
     // On CR the MAKE cell value ("Honda") appears AFTER the label on the next line.
-    // BUT Tesseract table reading often outputs cells left-to-right, so "Honda" may appear
+    // OCR table reading often outputs cells left-to-right, so "Honda" may appear
     // far from the "MAKE" label. Scan whole text for known brands — most reliable approach.
     const makes = ["TOYOTA","HONDA","MITSUBISHI","FORD","NISSAN","HYUNDAI","KIA","SUZUKI","ISUZU","MAZDA","CHEVROLET","SUBARU","BMW","MERCEDES","VOLKSWAGEN","JEEP","LEXUS","DODGE","YAMAHA","KAWASAKI","DUCATI","BAJAJ","TVS","KYMCO"];
     for (const mk of makes) {
       if (upper.includes(mk)) {
         if (fillField("[name=make]", mk[0] + mk.slice(1).toLowerCase())) { filled.push("Make"); break; }
+      }
+    }
+
+    // ── Model (Series on CR) ──
+    // CR layout: "Honda  ACB125CBFM  MOTORCYCLE  2021" — series is token after make
+    const seriesM = upper.match(/SERIES[.:\s\t]+([A-Z0-9]{3,20})/);
+    if (seriesM) {
+      if (fillField("[name=model]", seriesM[1])) filled.push("Model");
+    } else {
+      // Fallback: value after make on same line
+      for (const mk of makes) {
+        const mkLineM = upper.match(new RegExp(mk + "\\s*\t+([A-Z0-9]{3,20})"));
+        if (mkLineM) {
+          if (fillField("[name=model]", mkLineM[1])) filled.push("Model");
+          break;
+        }
       }
     }
 
@@ -382,13 +423,18 @@ require_once '../../includes/topbar.php';
     }
 
     // ── Engine Number ──
-    // Label: "ENGINE NO." — value e.g. "JA46E7357915"
-    // Grab up to 25 chars after label, strip internal spaces, stop at 20
-    const engM = upper.match(/ENGINE\s*NO[.:\s]*([A-Z0-9][A-Z0-9 ]{5,28})/s);
-    if (engM) {
-      const raw    = engM[1].split(/[^A-Z0-9 ]/)[0];  // stop at next label
-      const engVal = compact(raw, 20);
-      if (engVal.length >= 6 && fillField("[name=motor_number]", engVal)) filled.push("Engine Number");
+    // CR OCR often drops the ENGINE NO label — value sits between PLATE NO and CHASSIS NO
+    // Use positional value extracted above, fallback to label-anchored
+    let engFilled = false;
+    if (engineValFromLine && fillField("[name=motor_number]", engineValFromLine)) {
+      filled.push("Engine Number"); engFilled = true;
+    }
+    if (!engFilled) {
+      const engM = upper.match(/ENGINE\s*NO[.:\s\t]+([A-Z0-9][A-Z0-9 ]{5,25})/);
+      if (engM) {
+        const engVal = compact(engM[1].split(/[^A-Z0-9 ]/)[0], 20);
+        if (engVal.length >= 6 && fillField("[name=motor_number]", engVal)) filled.push("Engine Number");
+      }
     }
 
     // ── Chassis Number ──
@@ -408,96 +454,29 @@ require_once '../../includes/topbar.php';
     return filled;
   }
 
-  function preprocessImage(imageUrl) {
-    return new Promise(function(resolve) {
-      const img = new Image();
-      img.onload = function() {
-        const canvas  = document.createElement("canvas");
-        const scale   = Math.min(1, 1800 / Math.max(img.width, img.height));
-        canvas.width  = Math.round(img.width  * scale);
-        canvas.height = Math.round(img.height * scale);
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const d   = imageData.data;
-        const w   = canvas.width;
-        const h   = canvas.height;
-        const len = w * h;
-
-        // Step 1: grayscale
-        const gray = new Float32Array(len);
-        for (let i = 0; i < len; i++) {
-          gray[i] = 0.299 * d[i*4] + 0.587 * d[i*4+1] + 0.114 * d[i*4+2];
-        }
-
-        // Step 2: box-blur grayscale to estimate local background brightness
-        // Radius ~40px — large enough to span a character, small enough to follow page curl
-        const radius = Math.round(Math.min(w, h) * 0.04);
-        const bg = new Float32Array(len);
-        // Horizontal pass
-        const tmp = new Float32Array(len);
-        for (let y = 0; y < h; y++) {
-          let sum = 0, count = 0;
-          for (let x = 0; x < w; x++) {
-            sum += gray[y*w + x]; count++;
-            if (x >= radius) { sum -= gray[y*w + x - radius]; count--; }
-            const nx = x - Math.floor(radius/2);
-            if (nx >= 0 && nx < w) tmp[y*w + nx] = sum / count;
-          }
-        }
-        // Vertical pass
-        for (let x = 0; x < w; x++) {
-          let sum = 0, count = 0;
-          for (let y = 0; y < h; y++) {
-            sum += tmp[y*w + x]; count++;
-            if (y >= radius) { sum -= tmp[(y-radius)*w + x]; count--; }
-            const ny = y - Math.floor(radius/2);
-            if (ny >= 0 && ny < h) bg[ny*w + x] = sum / count;
-          }
-        }
-
-        // Step 3: normalize — pixel / background, then stretch & clamp
-        // Result: watermarks/yellowing disappear, dark ink stays dark
-        for (let i = 0; i < len; i++) {
-          const bgVal  = Math.max(bg[i], 30);          // avoid div by zero
-          let   norm   = (gray[i] / bgVal) * 255;      // normalize to background
-          // Aggressive output stretch: push mid-tones toward white, keep darks dark
-          norm = Math.min(255, Math.max(0, (norm - 180) * 4 + 255));
-          const out = Math.round(norm);
-          d[i*4] = d[i*4+1] = d[i*4+2] = out;
-        }
-
-        ctx.putImageData(imageData, 0, 0);
-        imgEl.src = canvas.toDataURL("image/png");
-        resolve(canvas.toDataURL("image/png"));
-      };
-      img.src = imageUrl;
-    });
-  }
-
-  async function runOCR(imageUrl) {
+  async function runOCR(file) {
     progressEl.style.display = "block";
-    barEl.style.width = "5%";
-    statusEl.textContent = "Enhancing image…";
+    barEl.style.width = "20%";
+    statusEl.textContent = "Uploading image…";
     try {
-      const processedUrl = await preprocessImage(imageUrl);
-      barEl.style.width = "10%";
-      statusEl.textContent = "Loading OCR engine…";
-      const { createWorker } = Tesseract;
-      const worker = await createWorker("eng", 1, {
-        logger: function(info) {
-          if (info.status === "recognizing text") {
-            const pct = Math.round(info.progress * 80) + 15;
-            barEl.style.width = pct + "%";
-            statusEl.textContent = "Reading document… " + Math.round(info.progress * 100) + "%";
-          }
-        }
-      });
-      const result = await worker.recognize(processedUrl);
-      await worker.terminate();
+      const formData = new FormData();
+      formData.append("image", file);
+
+      barEl.style.width = "50%";
+      statusEl.textContent = "Reading document…";
+      const res = await fetch("ocr_scan.php", { method: "POST", body: formData });
+      const data = await res.json();
+
+      barEl.style.width = "100%";
       progressEl.style.display = "none";
-      const filled = parseText(result.data.text);
+
+      if (data.error) {
+        document.getElementById("ocr-error-msg").textContent = data.error;
+        errorEl.style.display = "block";
+        return;
+      }
+
+      const filled = parseText(data.text);
       if (filled.length > 0) {
         filledEl.textContent = "Auto-filled: " + filled.join(", ") + ". Please verify before saving.";
         resultEl.style.display = "block";

@@ -341,13 +341,18 @@ require_once '../../includes/topbar.php';
             <div id="ocr-idle">
               <div style="color:var(--text-muted);margin-bottom:0.4rem;"><?= icon('camera', 24) ?></div>
               <div style="font-size:0.85rem;font-weight:700;color:var(--text-primary);margin-bottom:0.2rem;">Tap to take a photo or upload</div>
-              <div style="font-size:0.72rem;color:var(--text-muted);">JPG, PNG, WEBP · Works best on flat, clear documents</div>
+              <div style="font-size:0.72rem;color:var(--text-muted);">JPG, PNG, WEBP, PDF · Works best on flat, clear documents</div>
             </div>
             <div id="ocr-preview" style="display:none;">
               <img id="ocr-img" style="max-width:100%;max-height:200px;border-radius:8px;object-fit:contain;" alt="Policy document"/>
+              <div id="ocr-pdf-preview" style="display:none;padding:1.5rem;text-align:center;">
+                <div style="color:var(--text-muted);"><?= icon('document-text', 32) ?></div>
+                <div id="ocr-pdf-name" style="font-size:0.8rem;font-weight:600;margin-top:0.4rem;color:var(--text-primary);word-break:break-all;"></div>
+                <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.2rem;">PDF document ready to scan</div>
+              </div>
             </div>
           </div>
-          <input type="file" id="ocr-file-input" accept="image/*" capture="environment" style="display:none;"/>
+          <input type="file" id="ocr-file-input" accept="image/*,application/pdf" style="display:none;"/>
 
           <div id="ocr-progress" style="display:none;margin-top:1rem;">
             <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.5rem;">
@@ -408,7 +413,7 @@ require_once '../../includes/topbar.php';
           <div class="form-grid" style="margin-bottom:1rem;">
             <div class="field">
               <label class="field-label">Policy Number <span class="req">*</span></label>
-              <input type="text" name="policy_number" class="field-input" placeholder="e.g. P-BLC-24-1-10-1002-000823"
+              <input type="text" name="policy_number" class="field-input" placeholder="P-BLC-YY-X-XX-XXXX-XXXXXX"
                 value="<?= htmlspecialchars($_POST['policy_number'] ?? '') ?>"/>
               <?php if ($renew_policy): ?><span class="field-hint">Enter the new policy number from the PhilBritish renewal notice.</span><?php endif; ?>
             </div>
@@ -570,7 +575,7 @@ require_once '../../includes/topbar.php';
 </div>
 
 <?php
-$footer_extra_scripts = '<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>';
+$footer_extra_scripts = '';
 $footer_scripts = '
   (function () {
     const termsEl       = document.getElementById("payment_terms");
@@ -714,7 +719,7 @@ $footer_scripts = '
       m.style.display = "none";
     };
 
-    // ── OCR: Tesseract.js field extraction ──
+    // ── OCR: field extraction ──
     (function() {
       const fileInput = document.getElementById("ocr-file-input");
       const uploadArea = document.getElementById("ocr-upload-area");
@@ -732,19 +737,29 @@ $footer_scripts = '
       fileInput.addEventListener("change", function() {
         if (!this.files || !this.files[0]) return;
         const file = this.files[0];
-        const url  = URL.createObjectURL(file);
-        imgEl.src  = url;
+        const isPdf = file.type === "application/pdf";
         idleEl.style.display    = "none";
         previewEl.style.display = "block";
         clearBtn.style.display  = "inline-flex";
         resultEl.style.display  = "none";
         errorEl.style.display   = "none";
-        runOCR(url);
+        if (isPdf) {
+          imgEl.style.display = "none";
+          document.getElementById("ocr-pdf-preview").style.display = "block";
+          document.getElementById("ocr-pdf-name").textContent = file.name;
+        } else {
+          imgEl.style.display = "block";
+          document.getElementById("ocr-pdf-preview").style.display = "none";
+          imgEl.src = URL.createObjectURL(file);
+        }
+        runOCR(file);
       });
 
       window.ocrClear = function() {
         fileInput.value     = "";
         imgEl.src           = "";
+        imgEl.style.display = "block";
+        document.getElementById("ocr-pdf-preview").style.display = "none";
         idleEl.style.display    = "block";
         previewEl.style.display = "none";
         clearBtn.style.display  = "none";
@@ -773,140 +788,120 @@ $footer_scripts = '
       function parseText(text) {
         const filled = [];
 
-        // Policy Number — pattern like P-BLC-1-034-325-33552-562 or similar hyphen-separated codes
-        const pnMatch = text.match(/P[-–][A-Z0-9]+(?:[-–][A-Z0-9]+){2,}/i);
-        if (pnMatch && fillField("[name=policy_number]", pnMatch[0].replace(/–/g, "-"))) filled.push("Policy Number");
+        // Policy Number: P-BLC-25-1-10-1002-000341
+        // Stop at tab, newline, or space followed by a capital word (e.g. "Policy Period")
+        let pnVal = null;
+        const pnLabelM = text.match(/policy\s*no[.\s:]*([P][-–][A-Z0-9][-–A-Z0-9]+)/i);
+        if (pnLabelM) {
+          pnVal = pnLabelM[1].trim().replace(/–/g, "-").toUpperCase();
+          if ((pnVal.match(/-/g) || []).length < 3) pnVal = null;
+        }
+        // Fallback: scan for any P- prefixed hyphenated code
+        if (!pnVal) {
+          const pnFallback = text.match(/\bP[-–][A-Z0-9]+(?:[-–][A-Z0-9]+){2,}/i);
+          if (pnFallback) pnVal = pnFallback[0].replace(/–/g, "-").toUpperCase();
+        }
+        if (pnVal && fillField("[name=policy_number]", pnVal)) filled.push("Policy Number");
 
-        // Coverage Type
-        if (/comprehensive\s+w\/?o/i.test(text)) {
+        // Coverage Type: "Motor Private Car" = Comprehensive; w/o AON/AOG = the other
+        if (/w\/?o\s+ao[ng]/i.test(text) || /without\s+ao[ng]/i.test(text)) {
           const el = document.querySelector("[name=coverage_type]");
           if (el && !el.value) { el.value = "Comprehensive w/o AON/AOG"; el.classList.add("ocr-filled"); filled.push("Coverage Type"); }
-        } else if (/comprehensive/i.test(text)) {
+        } else if (/comprehensive|motor\s+private\s+car/i.test(text)) {
           const el = document.querySelector("[name=coverage_type]");
           if (el && !el.value) { el.value = "Comprehensive"; el.classList.add("ocr-filled"); filled.push("Coverage Type"); }
         }
 
-        // Dates — look for DD/MM/YYYY or MM/DD/YYYY or YYYY-MM-DD or Month DD, YYYY
-        const datePatterns = [
-          /\b(\d{2})[\/\-](\d{2})[\/\-](\d{4})\b/g,
-          /\b(\d{4})[\/\-](\d{2})[\/\-](\d{2})\b/g,
-        ];
-        const dates = [];
-        let m;
-        // DD/MM/YYYY or MM/DD/YYYY format
-        const dRe = /\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\b/g;
-        while ((m = dRe.exec(text)) !== null) {
-          // Treat as MM/DD/YYYY (Philippine standard)
-          const mm = m[1].padStart(2,"0"), dd = m[2].padStart(2,"0"), yy = m[3];
-          const iso = yy + "-" + mm + "-" + dd;
-          if (!isNaN(Date.parse(iso))) dates.push(iso);
+        // Dates: PhilBritish uses "Month DD, YYYY" format
+        const months = { jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12 };
+        const monthToISO = function(str) {
+          const m = str.match(/([A-Za-z]{3,9})\s+(\d{1,2})[,\s]+(\d{4})/);
+          if (!m) return null;
+          const mon = months[m[1].toLowerCase().slice(0,3)];
+          if (!mon) return null;
+          return m[3] + "-" + String(mon).padStart(2,"0") + "-" + m[2].padStart(2,"0");
+        };
+        // Collect all "Month DD, YYYY" dates in the document
+        const allMonthDates = [];
+        const mdRe = /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{1,2})[,\s]+(\d{4})/gi;
+        let mdM;
+        while ((mdM = mdRe.exec(text)) !== null) {
+          const iso = monthToISO(mdM[0]);
+          if (iso && !isNaN(Date.parse(iso))) allMonthDates.push(iso);
         }
-        // YYYY-MM-DD
-        const isoRe = /\b(\d{4})[\/\-](\d{2})[\/\-](\d{2})\b/g;
-        while ((m = isoRe.exec(text)) !== null) {
-          const iso = m[1] + "-" + m[2] + "-" + m[3];
-          if (!isNaN(Date.parse(iso))) dates.push(iso);
+        // PDF layout: "From:	To	May	May	06, 2026...	06, 2027..."
+        // Image layout: "From: May 06, 2026" / "To : May 06, 2027"
+        // Strategy: find all Month-day-year dates then assign first=start, second=end
+        // after filtering out Issue Date year
+        const issueDateM2 = text.match(/Issue\s*Date\s*[:\s]*[A-Za-z]+\s+\d{1,2}[,\s]+(\d{4})/i);
+        const issueYear2 = issueDateM2 ? issueDateM2[1] : null;
+        const policyDates = allMonthDates.filter(d => !issueYear2 || !d.startsWith(issueYear2));
+        const uniquePolicy = [...new Set(policyDates.slice().sort())];
+        if (uniquePolicy.length >= 2) {
+          fillField("[name=policy_start]", uniquePolicy[0]) && filled.push("Start Date");
+          fillField("[name=policy_end]",   uniquePolicy[1]) && filled.push("End Date");
+        } else if (uniquePolicy.length === 1) {
+          fillField("[name=policy_start]", uniquePolicy[0]) && filled.push("Start Date");
+          // End date is always 1 year after start for PhilBritish policies
+          const endDate = new Date(uniquePolicy[0]);
+          endDate.setFullYear(endDate.getFullYear() + 1);
+          fillField("[name=policy_end]", endDate.toISOString().split("T")[0]) && filled.push("End Date");
         }
-        if (dates.length >= 1 && fillField("[name=policy_start]", dates[0])) filled.push("Start Date");
-        if (dates.length >= 2 && fillField("[name=policy_end]",   dates[1])) filled.push("End Date");
 
-        // Sum Insured — look for large amounts near keywords
-        const siMatch = text.match(/(?:sum\s+insured|insured\s+value|face\s+amount)[^\d]*([1-9][\d,]+(?:\.\d{2})?)/i);
+        // Total Premium: PhilBritish shows "Total : PHP 10,489.30"
+        // Also handle dots-as-thousands (8.415.00 → 8415.00)
+        const cleanAmount = function(s) {
+          // If more than one dot, treat all dots as thousand separators except last
+          const parts = s.split(".");
+          if (parts.length > 2) return parts.slice(0, -1).join("") + "." + parts[parts.length - 1];
+          return s.replace(/,/g, "");
+        };
+        const totalM = text.match(/^Total\s*[:\s]+(?:PHP)?\s*([1-9][\d.,]+)/im);
+        if (totalM) {
+          const val = cleanAmount(totalM[1].replace(/,/g, ""));
+          if (fillField("[name=total_premium]", val)) { filled.push("Total Premium"); buildTable(); }
+        }
+        // Fallback: "Premium" label — OCR reads "Premium 8.415.00"
+        if (!filled.includes("Total Premium")) {
+          const premM = text.match(/^Premium\s*[:\s]*([1-9][\d.,]+)/im);
+          if (premM) {
+            const val = cleanAmount(premM[1]);
+            if (fillField("[name=total_premium]", val)) { filled.push("Total Premium"); buildTable(); }
+          }
+        }
+
+        // Sum Insured: first amount after "Sum Insured" header
+        const siMatch = text.match(/sum\s+insured[^\d]*([1-9][\d,]+(?:\.\d{2})?)/i);
         if (siMatch) {
           const val = siMatch[1].replace(/,/g, "");
           if (fillField("[name=sum_insured]", val)) { filled.push("Sum Insured"); buildTable(); }
         }
 
-        // Total Premium — look near "premium" keyword
-        const premMatch = text.match(/(?:total\s+premium|net\s+premium|premium)[^\d]*([1-9][\d,]+(?:\.\d{2})?)/i);
-        if (premMatch) {
-          const val = premMatch[1].replace(/,/g, "");
-          if (fillField("[name=total_premium]", val)) { filled.push("Total Premium"); buildTable(); }
-        }
-
         return filled;
       }
 
-      function preprocessImage(imageUrl) {
-        return new Promise(function(resolve) {
-          const img = new Image();
-          img.onload = function() {
-            const canvas  = document.createElement("canvas");
-            const scale   = Math.min(1, 1800 / Math.max(img.width, img.height));
-            canvas.width  = Math.round(img.width  * scale);
-            canvas.height = Math.round(img.height * scale);
-            const ctx = canvas.getContext("2d");
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const d   = imageData.data;
-            const w   = canvas.width;
-            const h   = canvas.height;
-            const len = w * h;
-            const gray = new Float32Array(len);
-            for (let i = 0; i < len; i++) {
-              gray[i] = 0.299 * d[i*4] + 0.587 * d[i*4+1] + 0.114 * d[i*4+2];
-            }
-            const radius = Math.round(Math.min(w, h) * 0.04);
-            const bg = new Float32Array(len);
-            const tmp = new Float32Array(len);
-            for (let y = 0; y < h; y++) {
-              let sum = 0, count = 0;
-              for (let x = 0; x < w; x++) {
-                sum += gray[y*w + x]; count++;
-                if (x >= radius) { sum -= gray[y*w + x - radius]; count--; }
-                const nx = x - Math.floor(radius/2);
-                if (nx >= 0 && nx < w) tmp[y*w + nx] = sum / count;
-              }
-            }
-            for (let x = 0; x < w; x++) {
-              let sum = 0, count = 0;
-              for (let y = 0; y < h; y++) {
-                sum += tmp[y*w + x]; count++;
-                if (y >= radius) { sum -= tmp[(y-radius)*w + x]; count--; }
-                const ny = y - Math.floor(radius/2);
-                if (ny >= 0 && ny < h) bg[ny*w + x] = sum / count;
-              }
-            }
-            for (let i = 0; i < len; i++) {
-              const bgVal = Math.max(bg[i], 30);
-              let norm    = (gray[i] / bgVal) * 255;
-              norm = Math.min(255, Math.max(0, (norm - 180) * 4 + 255));
-              const out = Math.round(norm);
-              d[i*4] = d[i*4+1] = d[i*4+2] = out;
-            }
-            ctx.putImageData(imageData, 0, 0);
-            imgEl.src = canvas.toDataURL("image/png");
-            resolve(canvas.toDataURL("image/png"));
-          };
-          img.src = imageUrl;
-        });
-      }
-
-      async function runOCR(imageUrl) {
+      async function runOCR(file) {
         progressEl.style.display = "block";
-        setProgress(5, "Enhancing image…");
+        setProgress(20, "Uploading image…");
 
         try {
-          const processedUrl = await preprocessImage(imageUrl);
-          setProgress(10, "Loading OCR engine…");
-          const { createWorker } = Tesseract;
-          const worker = await createWorker("eng", 1, {
-            logger: function(info) {
-              if (info.status === "recognizing text") {
-                const pct = Math.round(info.progress * 80) + 15;
-                setProgress(pct, "Reading document… " + Math.round(info.progress * 100) + "%");
-              }
-            }
-          });
+          const formData = new FormData();
+          formData.append("image", file);
 
-          setProgress(15, "Analyzing document…");
-          const result = await worker.recognize(processedUrl);
-          await worker.terminate();
+          setProgress(50, "Reading document…");
+          const res = await fetch("ocr_scan.php", { method: "POST", body: formData });
+          const data = await res.json();
 
           setProgress(100, "Done");
           progressEl.style.display = "none";
 
-          const filled = parseText(result.data.text);
+          if (data.error) {
+            document.getElementById("ocr-error-msg").textContent = data.error;
+            errorEl.style.display = "block";
+            return;
+          }
+
+          const filled = parseText(data.text);
           if (filled.length > 0) {
             filledEl.textContent = "Auto-filled: " + filled.join(", ") + ". Please verify before saving.";
             resultEl.style.display = "block";

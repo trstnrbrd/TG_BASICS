@@ -95,13 +95,17 @@ $has_installments = count($installments) > 0;
 // If any installment is past due and underpaid, push Overdue to the policy record
 if ($has_installments && $_SERVER['REQUEST_METHOD'] !== 'POST') {
     $today_check = date('Y-m-d');
-    $auto_overdue = false;
+    // Overdue only if total paid < total due across ALL past-due installments
+    // (overpayment in one installment offsets underpayment in another)
+    $total_due_past  = 0;
+    $total_paid_past = 0;
     foreach ($installments as $inst) {
-        if ($inst['due_date'] && $inst['due_date'] < $today_check && (float)$inst['amount_paid'] < (float)$inst['amount_due']) {
-            $auto_overdue = true;
-            break;
+        if ($inst['due_date'] && $inst['due_date'] < $today_check) {
+            $total_due_past  += (float)$inst['amount_due'];
+            $total_paid_past += (float)$inst['amount_paid'];
         }
     }
+    $auto_overdue = $total_due_past > 0 && $total_paid_past < $total_due_past;
     $current_status = $policy['payment_status'];
     if ($auto_overdue && $current_status !== 'Paid' && $current_status !== 'Overdue') {
         $ao_upd = $conn->prepare("UPDATE insurance_policies SET payment_status = 'Overdue' WHERE policy_id = ?");
@@ -258,15 +262,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
 
             $new_balance  = (float)$policy['total_premium'] - $total_paid;
             $today        = date('Y-m-d');
-            $has_overdue  = false;
+            $due_past = 0; $paid_past = 0;
             foreach ($installments as $row) {
-                $idx = $row['installment_no'] - 1;
-                $amt_paid_check = (float)($amounts[$idx] ?? 0);
-                if ($row['due_date'] && $row['due_date'] < $today && $amt_paid_check < (float)$row['amount_due']) {
-                    $has_overdue = true;
-                    break;
+                if ($row['due_date'] && $row['due_date'] < $today) {
+                    $idx = $row['installment_no'] - 1;
+                    $due_past  += (float)$row['amount_due'];
+                    $paid_past += (float)($amounts[$idx] ?? 0);
                 }
             }
+            $has_overdue = $due_past > 0 && $paid_past < $due_past;
             if ($new_balance <= 0) {
                 $new_status = 'Paid';
             } elseif ($has_overdue) {
@@ -753,7 +757,7 @@ require_once '../../includes/topbar.php';
               <div class="field">
                 <label class="field-label">Payment Notes</label>
                 <input type="text" name="payment_notes" class="field-input"
-                  placeholder="e.g. Cash payment, GCash, etc."
+                  placeholder="Cash / GCash / Bank transfer"
                   value="<?= htmlspecialchars($_POST['payment_notes'] ?? '') ?>"/>
                 <span class="field-hint">Optional remarks for this payment.</span>
               </div>
@@ -1013,14 +1017,28 @@ require_once '../../includes/footer.php';
     btn.addEventListener('click', function(){
       var pid = this.dataset.pid;
       Swal.fire({
-        icon: 'question',
+        icon: 'warning',
         title: 'Remove Receipt?',
         text: 'This will permanently delete the attached receipt image.',
+        input: 'password',
+        inputPlaceholder: 'Enter your PIN',
+        inputAttributes: { maxlength: 6, autocomplete: 'off' },
         showCancelButton: true,
         confirmButtonText: 'Yes, remove',
         confirmButtonColor: '#c0392b',
         cancelButtonText: 'Cancel',
-        cancelButtonColor: '#6b7280'
+        cancelButtonColor: '#6b7280',
+        preConfirm: function(pin) {
+          if (!pin) { Swal.showValidationMessage('PIN is required'); return false; }
+          return fetch('/tg-basics/config/verify_pin.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pin: pin, csrf_token: csrf })
+          }).then(function(r){ return r.json(); }).then(function(d){
+            if (!d.ok) { Swal.showValidationMessage(d.error || 'Incorrect PIN'); return false; }
+            return true;
+          });
+        }
       }).then(function(result){
         if (!result.isConfirmed) return;
         var cell = document.querySelector('.receipt-cell[data-pid="' + pid + '"]');

@@ -113,25 +113,25 @@ require_once '../../includes/topbar.php';
             <div class="field">
               <label class="field-label">Full Name <span class="req">*</span></label>
               <input type="text" name="full_name" class="field-input"
-                placeholder="e.g. Juan dela Cruz"
+                placeholder="First Middle Last"
                 value="<?= htmlspecialchars($client['full_name']) ?>"/>
             </div>
             <div class="field">
               <label class="field-label">Contact Number <span class="req">*</span></label>
               <input type="text" name="contact_number" class="field-input"
-                placeholder="e.g. 09xxxxxxxxx"
+                placeholder="09XXXXXXXXX"
                 value="<?= htmlspecialchars($client['contact_number']) ?>"/>
             </div>
             <div class="field">
               <label class="field-label">Email Address</label>
               <input type="email" name="email" class="field-input"
-                placeholder="e.g. juan@email.com"
+                placeholder="name@email.com"
                 value="<?= htmlspecialchars($client['email'] ?? '') ?>"/>
             </div>
             <div class="field">
               <label class="field-label">Address <span class="req">*</span></label>
               <input type="text" name="address" class="field-input"
-                placeholder="e.g. San Roque, Pandi, Bulacan"
+                placeholder="Street, Barangay, Municipality, Province"
                 value="<?= htmlspecialchars($client['address']) ?>"/>
             </div>
           </div>

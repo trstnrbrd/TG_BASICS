@@ -119,13 +119,13 @@ require_once '../../includes/topbar.php';
               <div id="ocr-idle">
                 <div style="color:var(--text-muted);margin-bottom:0.4rem;"><?= icon('camera', 24) ?></div>
                 <div style="font-size:0.85rem;font-weight:700;color:var(--text-primary);margin-bottom:0.2rem;">Tap to take a photo or upload</div>
-                <div style="font-size:0.72rem;color:var(--text-muted);">JPG, PNG, WEBP · Works best on flat, clear documents</div>
+                <div style="font-size:0.72rem;color:var(--text-muted);">JPG, PNG, WEBP, PDF · Works best on flat, clear documents</div>
               </div>
               <div id="ocr-preview" style="display:none;">
                 <img id="ocr-img" style="max-width:100%;max-height:200px;border-radius:8px;object-fit:contain;" alt="Document"/>
               </div>
             </div>
-            <input type="file" id="ocr-file-input" accept="image/*" capture="environment" style="display:none;"/>
+            <input type="file" id="ocr-file-input" accept="image/*,application/pdf" style="display:none;"/>
 
             <div id="ocr-progress" style="display:none;margin-top:1rem;">
               <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.5rem;">
@@ -259,7 +259,7 @@ const savedPolicy = '<?= (int)($_POST['policy_id'] ?? 0) ?>';
 <script src="../../assets/js/shared/add_claim.js"></script>
 
 <?php
-$footer_extra_scripts = '<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>';
+$footer_extra_scripts = '';
 $footer_scripts = '
   window.ocrModalOpen = function() {
     var m = document.getElementById("ocr-modal");
@@ -285,14 +285,14 @@ $footer_scripts = '
 
     fileInput.addEventListener("change", function() {
       if (!this.files || !this.files[0]) return;
-      var url = URL.createObjectURL(this.files[0]);
-      imgEl.src = url;
+      var file = this.files[0];
+      imgEl.src = URL.createObjectURL(file);
       idleEl.style.display    = "none";
       previewEl.style.display = "block";
       clearBtn.style.display  = "inline-flex";
       resultEl.style.display  = "none";
       errorEl.style.display   = "none";
-      runOCR(url);
+      runOCR(file);
     });
 
     window.ocrClear = function() {
@@ -340,81 +340,29 @@ $footer_scripts = '
       return filled;
     }
 
-    function preprocessImage(imageUrl) {
-      return new Promise(function(resolve) {
-        var img = new Image();
-        img.onload = function() {
-          var canvas  = document.createElement("canvas");
-          var scale   = Math.min(1, 1800 / Math.max(img.width, img.height));
-          canvas.width  = Math.round(img.width  * scale);
-          canvas.height = Math.round(img.height * scale);
-          var ctx = canvas.getContext("2d");
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          var d   = imageData.data;
-          var w   = canvas.width;
-          var h   = canvas.height;
-          var len = w * h;
-          var gray = new Float32Array(len);
-          for (var i = 0; i < len; i++) {
-            gray[i] = 0.299 * d[i*4] + 0.587 * d[i*4+1] + 0.114 * d[i*4+2];
-          }
-          var radius = Math.round(Math.min(w, h) * 0.04);
-          var bg  = new Float32Array(len);
-          var tmp = new Float32Array(len);
-          for (var y = 0; y < h; y++) {
-            var sum = 0, count = 0;
-            for (var x = 0; x < w; x++) {
-              sum += gray[y*w + x]; count++;
-              if (x >= radius) { sum -= gray[y*w + x - radius]; count--; }
-              var nx = x - Math.floor(radius/2);
-              if (nx >= 0 && nx < w) tmp[y*w + nx] = sum / count;
-            }
-          }
-          for (var x = 0; x < w; x++) {
-            var sum = 0, count = 0;
-            for (var y = 0; y < h; y++) {
-              sum += tmp[y*w + x]; count++;
-              if (y >= radius) { sum -= tmp[(y-radius)*w + x]; count--; }
-              var ny = y - Math.floor(radius/2);
-              if (ny >= 0 && ny < h) bg[ny*w + x] = sum / count;
-            }
-          }
-          for (var i = 0; i < len; i++) {
-            var bgVal = Math.max(bg[i], 30);
-            var norm  = (gray[i] / bgVal) * 255;
-            norm = Math.min(255, Math.max(0, (norm - 180) * 4 + 255));
-            d[i*4] = d[i*4+1] = d[i*4+2] = Math.round(norm);
-          }
-          ctx.putImageData(imageData, 0, 0);
-          imgEl.src = canvas.toDataURL("image/png");
-          resolve(canvas.toDataURL("image/png"));
-        };
-        img.src = imageUrl;
-      });
-    }
-
-    async function runOCR(imageUrl) {
+    async function runOCR(file) {
       progressEl.style.display = "block";
-      barEl.style.width = "5%";
-      statusEl.textContent = "Enhancing image…";
+      barEl.style.width = "20%";
+      statusEl.textContent = "Uploading image…";
       try {
-        var processedUrl = await preprocessImage(imageUrl);
-        barEl.style.width = "10%";
-        statusEl.textContent = "Loading OCR engine…";
-        var worker = await Tesseract.createWorker("eng", 1, {
-          logger: function(info) {
-            if (info.status === "recognizing text") {
-              var pct = Math.round(info.progress * 80) + 15;
-              barEl.style.width = pct + "%";
-              statusEl.textContent = "Reading document… " + Math.round(info.progress * 100) + "%";
-            }
-          }
-        });
-        var result = await worker.recognize(processedUrl);
-        await worker.terminate();
+        var formData = new FormData();
+        formData.append("image", file);
+
+        barEl.style.width = "50%";
+        statusEl.textContent = "Reading document…";
+        var res = await fetch("ocr_scan.php", { method: "POST", body: formData });
+        var data = await res.json();
+
+        barEl.style.width = "100%";
         progressEl.style.display = "none";
-        var filled = parseText(result.data.text);
+
+        if (data.error) {
+          document.getElementById("ocr-error-msg").textContent = data.error;
+          errorEl.style.display = "block";
+          return;
+        }
+
+        var filled = parseText(data.text);
         if (filled.length > 0) {
           filledEl.textContent = "Detected: " + filled.join(", ") + ". Please verify before filing.";
           resultEl.style.display = "block";

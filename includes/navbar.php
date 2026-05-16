@@ -22,6 +22,12 @@ $role        = $_SESSION['role'] ?? '';
   .logo-name { font-size: 1rem; font-weight: 800; color: #fff; }
   .logo-name span { color: var(--gold-bright); }
   .logo-tagline { font-size: 0.62rem; color: rgba(200,192,176,0.45); letter-spacing: 1.2px; text-transform: uppercase; }
+  [data-theme="high-contrast"] .sidebar-logo { border-bottom-color: rgba(0,0,0,0.1); }
+  [data-theme="high-contrast"] .logo-imgs .logo-sep { background: rgba(0,0,0,0.2); }
+  [data-theme="high-contrast"] .logo-img { border-color: #000; }
+  [data-theme="high-contrast"] .logo-name { color: #000; }
+  [data-theme="high-contrast"] .logo-name span { color: #000; }
+  [data-theme="high-contrast"] .logo-tagline { color: rgba(0,0,0,0.4); }
 
   .sidebar-nav { padding: 1rem 0; flex: 1; }
 
@@ -29,6 +35,7 @@ $role        = $_SESSION['role'] ?? '';
     font-size: 0.58rem; letter-spacing: 2px; text-transform: uppercase;
     color: rgba(200,192,176,0.35); padding: 0.9rem 1.25rem 0.35rem; font-weight: 600;
   }
+  [data-theme="high-contrast"] .nav-group-label { color: rgba(0,0,0,0.4); }
 
   .nav-item {
     display: flex; align-items: center; gap: 0.6rem;
@@ -39,6 +46,8 @@ $role        = $_SESSION['role'] ?? '';
 
   .nav-item:hover { background: rgba(255,255,255,0.05); color: #fff; border-left-color: rgba(212,160,23,0.3); }
   .nav-item.active { background: rgba(212,160,23,0.12); color: var(--sidebar-active); border-left-color: var(--sidebar-active); font-weight: 600; }
+  [data-theme="high-contrast"] .nav-item:hover { background: rgba(0,0,0,0.06); color: #000; border-left-color: rgba(0,0,0,0.3); }
+  [data-theme="high-contrast"] .nav-item.active { background: rgba(0,0,0,0.1); }
   .nav-icon { width: 18px; text-align: center; font-size: 0.9rem; flex-shrink: 0; }
 
   .nav-badge {
@@ -51,6 +60,7 @@ $role        = $_SESSION['role'] ?? '';
   @keyframes pulse-badge { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
 
   .sidebar-footer { padding: 0.9rem 1.25rem; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.65rem; color: rgba(200,192,176,0.25); }
+  [data-theme="high-contrast"] .sidebar-footer { border-top-color: rgba(0,0,0,0.1); color: rgba(0,0,0,0.3); }
 
   /* Hamburger - fixed position on mobile, hidden on desktop */
   .hamburger {

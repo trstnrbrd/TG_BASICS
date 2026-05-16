@@ -191,7 +191,7 @@ require_once '../../includes/topbar.php';
     <?php endif; ?>
 
     <!-- CLIENT HEADER BANNER -->
-    <div style="background:var(--sidebar-bg);border-radius:12px;padding:1.5rem 1.75rem;margin-bottom:1.25rem;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+    <div style="background:var(--btn-bg);border-radius:12px;padding:1.5rem 1.75rem;margin-bottom:1.25rem;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--gold-bright),var(--gold-muted),transparent);"></div>
       <div style="position:absolute;right:2rem;top:50%;transform:translateY(-50%);font-size:5rem;font-weight:800;color:rgba(212,160,23,0.05);pointer-events:none;"><?= icon('user', 28) ?></div>
       <div style="position:relative;z-index:1;">

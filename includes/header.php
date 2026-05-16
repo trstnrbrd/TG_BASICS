@@ -67,10 +67,15 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
     --info: #1A6B9A;
     --info-bg: #EFF6FB;
     --info-border: rgba(26,107,154,0.2);
+    --btn-bg: #1C1A17;
+    --btn-text: #D4A017;
     --sidebar-width: 232px;
   }
 
   [data-theme="dark"] {
+    --gold: #C8A010;
+    --btn-bg: #0F0E0D;
+    --btn-text: #D4A017;
     --bg: #141210;
     --bg-2: #1C1A17;
     --bg-3: #242220;
@@ -94,6 +99,127 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
     --gold-pale: rgba(184,134,11,0.08);
     --gold-light: rgba(184,134,11,0.18);
     --gold-muted: rgba(212,160,23,0.35);
+  }
+
+  /* ── WARM — soft cream ── */
+  [data-theme="warm"] {
+    --btn-bg: #7C5C3A;
+    --btn-text: #FDF6EE;
+    --gold: #9A7B52;
+    --gold-bright: #A8865A;
+    --gold-light: #F0E6D6;
+    --gold-muted: #C9A87A;
+    --gold-pale: #FAF3E8;
+    --bg: #FAF5EE;
+    --bg-2: #F3EBE0;
+    --bg-3: #FFFFFF;
+    --sidebar-bg: #2C1F12;
+    --sidebar-text: #C4A882;
+    --sidebar-active: #C9A87A;
+    --text-primary: #1E140A;
+    --text-secondary: #5C4430;
+    --text-muted: #9A7B5A;
+    --border: #E4D5C0;
+    --border-focus: #A8865A;
+    --shadow: 0 2px 8px rgba(60,35,10,0.07), 0 1px 3px rgba(60,35,10,0.04);
+    --shadow-md: 0 6px 20px rgba(60,35,10,0.09), 0 2px 6px rgba(60,35,10,0.05);
+    --shadow-lg: 0 12px 40px rgba(60,35,10,0.12), 0 4px 12px rgba(60,35,10,0.07);
+    --success: #2E7D52;
+    --success-bg: #F0FAF4;
+    --success-border: rgba(46,125,82,0.2);
+    --warning: #9A6B10;
+    --warning-bg: #FDF8EC;
+    --warning-border: rgba(154,107,16,0.25);
+    --danger: #C0392B;
+    --danger-bg: #FDF2F2;
+    --danger-border: rgba(192,57,43,0.2);
+    --info: #1A6B9A;
+    --info-bg: #EFF6FB;
+    --info-border: rgba(26,107,154,0.2);
+  }
+
+  /* Force icons visible in HC White */
+  [data-theme="high-contrast"] .quick-action-icon,
+  [data-theme="high-contrast"] .dash-stat-icon {
+    background: rgba(0,0,0,0.08) !important;
+    color: #000000 !important;
+  }
+  [data-theme="high-contrast"] .quick-action:hover .quick-action-icon {
+    background: rgba(0,0,0,0.14) !important;
+  }
+
+  /* ── HIGH CONTRAST DARK — pure black ── */
+  [data-theme="high-contrast-dark"] {
+    --btn-bg: #FFFFFF;
+    --btn-text: #000000;
+    --gold: #D4A017;
+    --gold-bright: #E8B824;
+    --gold-light: #3A2E00;
+    --gold-muted: #8B6914;
+    --gold-pale: rgba(212,160,23,0.1);
+    --bg: #000000;
+    --bg-2: #111111;
+    --bg-3: #1A1A1A;
+    --sidebar-bg: #000000;
+    --sidebar-text: #AAAAAA;
+    --sidebar-active: #E8B824;
+    --text-primary: #FFFFFF;
+    --text-secondary: #CCCCCC;
+    --text-muted: #888888;
+    --border: #333333;
+    --border-focus: #FFFFFF;
+    --shadow: 0 1px 4px rgba(0,0,0,0.6);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.7);
+    --shadow-lg: 0 12px 40px rgba(0,0,0,0.8);
+    --success: #00FF88;
+    --success-bg: rgba(0,255,136,0.1);
+    --success-border: rgba(0,255,136,0.35);
+    --warning: #FFD700;
+    --warning-bg: rgba(255,215,0,0.1);
+    --warning-border: rgba(255,215,0,0.35);
+    --danger: #FF5555;
+    --danger-bg: rgba(255,85,85,0.1);
+    --danger-border: rgba(255,85,85,0.35);
+    --info: #55AAFF;
+    --info-bg: rgba(85,170,255,0.1);
+    --info-border: rgba(85,170,255,0.35);
+  }
+
+  /* ── HIGH CONTRAST — pure white ── */
+  [data-theme="high-contrast"] {
+    --btn-bg: #000000;
+    --btn-text: #FFFFFF;
+    --gold: #000000;
+    --gold-bright: #000000;
+    --gold-light: #E0E0E0;
+    --gold-muted: #888888;
+    --gold-pale: #F5F5F5;
+    --bg: #FFFFFF;
+    --bg-2: #F0F0F0;
+    --bg-3: #FFFFFF;
+    --sidebar-bg: #FFFFFF;
+    --sidebar-text: #222222;
+    --sidebar-active: #000000;
+    --text-primary: #000000;
+    --text-secondary: #222222;
+    --text-muted: #555555;
+    --border: #BBBBBB;
+    --border-focus: #000000;
+    --shadow: 0 1px 4px rgba(0,0,0,0.15);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.18);
+    --shadow-lg: 0 12px 40px rgba(0,0,0,0.22);
+    --success: #1A6B3A;
+    --success-bg: #F0FFF4;
+    --success-border: rgba(26,107,58,0.3);
+    --warning: #7A4800;
+    --warning-bg: #FFFBF0;
+    --warning-border: rgba(122,72,0,0.3);
+    --danger: #AA1111;
+    --danger-bg: #FFF0F0;
+    --danger-border: rgba(170,17,17,0.3);
+    --info: #0A4F8A;
+    --info-bg: #F0F7FF;
+    --info-border: rgba(10,79,138,0.3);
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -273,8 +399,8 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
   .card-body  { padding: 1.5rem; }
 
   /* ── BUTTONS ── */
-  .btn-primary { background: var(--sidebar-bg); color: var(--gold-bright); border: none; padding: 0.7rem 1.5rem; border-radius: 9px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.83rem; font-weight: 700; cursor: pointer; text-decoration: none; transition: all 0.15s; display: inline-flex; align-items: center; gap: 0.5rem; box-shadow: 0 4px 12px rgba(28,26,23,0.2); white-space: nowrap; }
-  .btn-primary:hover { background: #2A2724; box-shadow: 0 6px 16px rgba(28,26,23,0.3); }
+  .btn-primary { background: var(--btn-bg); color: var(--btn-text); border: none; padding: 0.7rem 1.5rem; border-radius: 9px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.83rem; font-weight: 700; cursor: pointer; text-decoration: none; transition: all 0.15s; display: inline-flex; align-items: center; gap: 0.5rem; box-shadow: 0 4px 12px rgba(28,26,23,0.2); white-space: nowrap; }
+  .btn-primary:hover { filter: brightness(1.15); box-shadow: 0 6px 16px rgba(28,26,23,0.3); }
 
   .btn-gold { background: var(--gold); color: #fff; border: none; padding: 0.7rem 1.5rem; border-radius: 9px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.83rem; font-weight: 700; cursor: pointer; text-decoration: none; transition: all 0.15s; display: inline-flex; align-items: center; gap: 0.5rem; box-shadow: 0 4px 12px rgba(184,134,11,0.25); white-space: nowrap; }
   .btn-gold:hover { background: var(--gold-bright); }
@@ -374,7 +500,7 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
   }
 
   /* ── BADGES ── */
-  .plate-chip { display: inline-flex; background: var(--sidebar-bg); color: var(--gold-bright); padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.72rem; font-weight: 800; letter-spacing: 1.5px; }
+  .plate-chip { display: inline-flex; background: var(--btn-bg); color: var(--btn-text); padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.72rem; font-weight: 800; letter-spacing: 1.5px; }
   .badge-dark {
   display: inline-block;background: #FFFFFF;color: #1a7a1a;font-family: 'Big Shoulders Text', 'Courier New', monospace;font-weight: 800;font-size: 0.85rem;padding: 0.25rem 0.75rem;border-radius: 3px;letter-spacing: 3px;border: 1.5px solid #1a7a1a;text-transform: uppercase;
 }

@@ -419,7 +419,7 @@ require_once '../../includes/topbar.php';
     <?php endif; ?>
 
     <!-- POLICY STATUS BANNER -->
-    <div style="background:var(--sidebar-bg);border-radius:12px;padding:1.5rem 1.75rem;margin-bottom:1.25rem;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+    <div style="background:var(--btn-bg);border-radius:12px;padding:1.5rem 1.75rem;margin-bottom:1.25rem;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--gold-bright),var(--gold-muted),transparent);"></div>
       <div style="position:relative;z-index:1;">
         <div style="font-size:0.68rem;color:rgba(200,192,176,0.45);letter-spacing:1.5px;text-transform:uppercase;font-weight:600;margin-bottom:0.3rem;">Policy Number</div>
@@ -547,7 +547,7 @@ require_once '../../includes/topbar.php';
           </div>
           <?php endforeach; ?>
           <!-- TOTAL -->
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;background:var(--sidebar-bg);">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;background:var(--btn-bg);">
             <span style="font-size:0.82rem;font-weight:700;color:var(--gold-bright);">Total Premium</span>
             <span style="font-size:1rem;font-weight:800;color:var(--gold-bright);">&#8369;<?= number_format($policy['total_premium'], 2) ?></span>
           </div>

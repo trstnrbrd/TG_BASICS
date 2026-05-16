@@ -322,9 +322,74 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             echo json_encode(['ok' => true, 'message' => '2FA ' . ($enabled ? 'enabled' : 'disabled') . ' successfully.']);
             break;
 
+        // ── TOTP GENERATE ──
+        case 'totp_generate':
+            require_once '../../config/totp.php';
+            $secret = totp_generate_secret();
+            $_SESSION['totp_pending_secret'] = $secret;
+            $label  = $_SESSION['username'] ?? 'user';
+            echo json_encode(['ok' => true, 'secret' => $secret, 'uri' => totp_qr_uri($secret, $label)]);
+            exit;
+
+        // ── TOTP CONFIRM ──
+        case 'totp_confirm':
+            require_once '../../config/totp.php';
+            $code     = preg_replace('/\D/', '', $_POST['code'] ?? '');
+            $password = $_POST['password'] ?? '';
+            $secret   = $_SESSION['totp_pending_secret'] ?? '';
+            if (!$secret) { echo json_encode(['ok' => false, 'error' => 'No pending setup. Please start again.']); exit; }
+            if (!totp_verify($secret, $code)) { echo json_encode(['ok' => false, 'error' => 'Incorrect code. Make sure your authenticator app time is in sync.']); exit; }
+            // Verify password
+            $pw_row = $conn->prepare("SELECT password FROM users WHERE user_id = ?");
+            $pw_row->bind_param('i', $user_id); $pw_row->execute();
+            $pw_hash = $pw_row->get_result()->fetch_assoc()['password'] ?? '';
+            if (!password_verify($password, $pw_hash)) { echo json_encode(['ok' => false, 'error' => 'Incorrect password.']); exit; }
+            $plain_codes  = totp_generate_recovery_codes(8);
+            $hashed_codes = array_map(fn($c) => password_hash($c, PASSWORD_DEFAULT), $plain_codes);
+            $encoded = json_encode($hashed_codes);
+            $u = $conn->prepare("UPDATE users SET totp_secret = ?, totp_enabled = 1, totp_recovery_codes = ?, two_factor_enabled = 0 WHERE user_id = ?");
+            $u->bind_param('ssi', $secret, $encoded, $user_id); $u->execute();
+            unset($_SESSION['totp_pending_secret']);
+            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'TOTP_ENABLED', ?)");
+            $desc = ($_SESSION['full_name'] ?? '') . ' enabled authenticator app 2FA.';
+            $log->bind_param('is', $user_id, $desc); $log->execute();
+            echo json_encode(['ok' => true, 'recovery_codes' => $plain_codes]);
+            exit;
+
+        // ── TOTP DISABLE ──
+        case 'totp_disable':
+            $password = $_POST['password'] ?? '';
+            $s = $conn->prepare("SELECT password FROM users WHERE user_id = ?");
+            $s->bind_param('i', $user_id); $s->execute();
+            $row = $s->get_result()->fetch_assoc();
+            if (!$row || !password_verify($password, $row['password'])) { echo json_encode(['ok' => false, 'error' => 'Incorrect password.']); exit; }
+            $u = $conn->prepare("UPDATE users SET totp_secret = NULL, totp_enabled = 0, totp_recovery_codes = NULL WHERE user_id = ?");
+            $u->bind_param('i', $user_id); $u->execute();
+            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'TOTP_DISABLED', ?)");
+            $desc = ($_SESSION['full_name'] ?? '') . ' disabled authenticator app 2FA.';
+            $log->bind_param('is', $user_id, $desc); $log->execute();
+            echo json_encode(['ok' => true]);
+            exit;
+
+        // ── TOTP REGEN RECOVERY ──
+        case 'totp_regen_recovery':
+            require_once '../../config/totp.php';
+            $password = $_POST['password'] ?? '';
+            $s = $conn->prepare("SELECT password FROM users WHERE user_id = ?");
+            $s->bind_param('i', $user_id); $s->execute();
+            $row = $s->get_result()->fetch_assoc();
+            if (!$row || !password_verify($password, $row['password'])) { echo json_encode(['ok' => false, 'error' => 'Incorrect password.']); exit; }
+            $plain_codes  = totp_generate_recovery_codes(8);
+            $hashed_codes = array_map(fn($c) => password_hash($c, PASSWORD_DEFAULT), $plain_codes);
+            $encoded = json_encode($hashed_codes);
+            $u = $conn->prepare("UPDATE users SET totp_recovery_codes = ? WHERE user_id = ?");
+            $u->bind_param('si', $encoded, $user_id); $u->execute();
+            echo json_encode(['ok' => true, 'recovery_codes' => $plain_codes]);
+            exit;
+
         // ── DESIGN PREFERENCES ──
         case 'design_prefs':
-            $theme = in_array($_POST['theme'] ?? '', ['light', 'dark']) ? $_POST['theme'] : 'light';
+            $theme = in_array($_POST['theme'] ?? '', ['light', 'dark', 'warm', 'high-contrast', 'high-contrast-dark']) ? $_POST['theme'] : 'light';
 
             $upd = $conn->prepare("UPDATE users SET theme = ? WHERE user_id = ?");
             $upd->bind_param('si', $theme, $user_id);
@@ -453,7 +518,7 @@ $full_name = $_SESSION['full_name'];
 $initials  = substr(implode('', array_map(fn($w) => strtoupper($w[0]), explode(' ', $full_name))), 0, 2);
 
 // Current user record (include 2FA status, photo, theme)
-$u_stmt = $conn->prepare("SELECT full_name, username, username_changed_at, email, two_factor_enabled, profile_photo, theme, transaction_pin FROM users WHERE user_id = ?");
+$u_stmt = $conn->prepare("SELECT full_name, username, username_changed_at, email, two_factor_enabled, totp_enabled, profile_photo, theme, transaction_pin FROM users WHERE user_id = ?");
 $u_stmt->bind_param('i', $user_id);
 $u_stmt->execute();
 $current_user = $u_stmt->get_result()->fetch_assoc();
@@ -666,6 +731,18 @@ require_once '../../includes/topbar.php';
           </div>
         </div>
 
+        <!-- Bottom save button for profile/password section -->
+        <div class="panel-save-bar" style="margin-bottom:2.5rem;">
+          <button type="button" class="btn-primary js-settings-save"><?= icon('check', 14) ?> Save Changes</button>
+        </div>
+      </form>
+
+      <!-- ── SECURITY SECTION ── -->
+      <div style="margin-bottom:0.5rem;">
+        <div style="font-size:0.7rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);padding:0 0.25rem;">Security</div>
+        <div style="height:1px;background:var(--border);margin-top:0.5rem;"></div>
+      </div>
+
         <!-- 2FA Card -->
         <div class="card" style="margin-top:1.5rem;">
           <div class="card-header">
@@ -689,18 +766,124 @@ require_once '../../includes/topbar.php';
             <label class="toggle-switch">
               <input type="checkbox" id="tfa-toggle"
                 <?= $current_user['two_factor_enabled'] ? 'checked' : '' ?>
-                <?= empty($current_user['email']) ? 'disabled title="Set an email address first"' : '' ?>/>
+                <?= (!empty($current_user['totp_enabled']) || empty($current_user['email'])) ? 'disabled' : '' ?>
+                <?php if (!empty($current_user['totp_enabled'])): ?>
+                  title="Authenticator 2FA is active — disable it first to switch to email 2FA"
+                <?php elseif (empty($current_user['email'])): ?>
+                  title="Set an email address first"
+                <?php endif; ?>/>
               <span class="toggle-slider"></span>
             </label>
           </div>
-          <?php if (empty($current_user['email'])): ?>
+          <?php if (empty($current_user['email']) && empty($current_user['totp_enabled'])): ?>
           <div style="padding:0 1.75rem 1.25rem;">
             <div class="info-box">
               <?= icon('information-circle', 14) ?>
-              <span>You need to set an email address before enabling Two-Factor Authentication.</span>
+              <span>You need to set an email address before enabling email-based 2FA.</span>
             </div>
           </div>
           <?php endif; ?>
+        </div>
+
+        <!-- Authenticator App 2FA Card -->
+        <div class="card" style="margin-top:1.5rem;">
+          <div class="card-header">
+            <div class="card-icon"><?= icon('device-phone-mobile', 16) ?></div>
+            <div>
+              <div class="card-title">Authenticator App (TOTP)</div>
+              <div class="card-sub">Google Authenticator, Authy, Microsoft Authenticator</div>
+            </div>
+            <div style="margin-left:auto;">
+              <span class="badge <?= $current_user['totp_enabled'] ? 'badge-green' : 'badge-gray' ?>" id="totp-status-badge">
+                <?= $current_user['totp_enabled'] ? icon('check-circle',11).' Enabled' : 'Disabled' ?>
+              </span>
+            </div>
+          </div>
+          <div class="card-body">
+            <?php if (!$current_user['totp_enabled']): ?>
+            <div id="totp-setup-intro">
+              <div class="info-box" style="margin-bottom:<?= $current_user['two_factor_enabled'] ? '0.75rem' : '0' ?>;">
+                <?= icon('information-circle', 14) ?>
+                <span>When enabled, you will be asked for a 6-digit code from your authenticator app on every login. This is stronger than email-based 2FA.</span>
+              </div>
+              <?php if ($current_user['two_factor_enabled']): ?>
+              <div class="info-box" style="background:var(--warning-bg,#fffbeb);border-color:var(--warning-border,#fcd34d);color:var(--warning,#92400e);margin-bottom:0;">
+                <?= icon('exclamation-triangle', 14) ?>
+                <span>Email 2FA is currently active. Setting up the authenticator app will automatically take over — email verification will no longer be required.</span>
+              </div>
+              <?php endif; ?>
+            </div>
+            <div id="totp-setup-flow" style="display:none;">
+              <div style="display:flex;flex-direction:column;align-items:center;gap:1.25rem;padding:0.25rem 0 0.5rem;">
+
+                <!-- Step 1 -->
+                <div style="width:100%;max-width:420px;">
+                  <div style="font-size:0.7rem;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.75rem;text-align:center;">Step 1 — Scan this QR code</div>
+                  <div style="display:flex;flex-direction:column;align-items:center;gap:0.75rem;">
+                    <div id="totp-qr" style="background:#fff;padding:10px;border-radius:12px;border:1px solid var(--border);"></div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);text-align:center;">Open your authenticator app, tap <strong>+</strong>, then scan the QR code.</div>
+                    <div style="width:100%;">
+                      <div style="font-size:0.68rem;color:var(--text-muted);font-weight:600;text-align:center;margin-bottom:0.35rem;">Or enter this key manually</div>
+                      <div id="totp-secret-display" style="font-family:monospace;font-size:0.8rem;font-weight:700;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:0.5rem 0.75rem;letter-spacing:2px;word-break:break-all;text-align:center;"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Divider -->
+                <div style="width:100%;max-width:420px;border-top:1px solid var(--border);"></div>
+
+                <!-- Step 2 -->
+                <div style="width:100%;max-width:420px;">
+                  <div style="font-size:0.7rem;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.75rem;text-align:center;">Step 2 — Enter the 6-digit code</div>
+                  <div id="totp-confirm-alert"></div>
+                  <div style="display:flex;gap:0.5rem;justify-content:center;" id="totp-digit-boxes">
+                    <?php for($i=0;$i<6;$i++): ?>
+                    <input type="text" inputmode="numeric" maxlength="1" autocomplete="off"
+                      class="totp-digit"
+                      style="width:48px;height:56px;text-align:center;font-size:1.5rem;font-weight:700;font-family:monospace;border:1.5px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);outline:none;transition:border-color 0.15s;"/>
+                    <?php endfor; ?>
+                  </div>
+                  <input type="hidden" id="totp-code-input"/>
+                  <div style="display:flex;gap:0.6rem;margin-top:0.75rem;justify-content:center;">
+                    <button type="button" onclick="totpConfirm()" class="btn-primary" style="font-size:0.82rem;"><?= icon('check-circle', 13) ?> Verify &amp; Activate</button>
+                    <button type="button" onclick="totpCancelSetup()" class="btn-ghost" style="font-size:0.82rem;">Cancel</button>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+            <?php else: ?>
+            <div class="info-box" style="background:var(--success-bg);border-color:var(--success-border);color:var(--success);">
+              <?= icon('shield-check', 14) ?>
+              <span>Authenticator 2FA is active. You will be prompted for a code on every login.</span>
+            </div>
+            <?php endif; ?>
+          </div>
+          <div class="form-actions">
+            <?php if (!$current_user['totp_enabled']): ?>
+            <button type="button" onclick="totpStartSetup()" class="btn-primary" id="totp-setup-btn"><?= icon('shield-check', 14) ?> Set Up Authenticator</button>
+            <?php else: ?>
+            <button type="button" onclick="totpRegenRecovery()" class="btn-ghost"><?= icon('arrow-path', 14) ?> Regenerate Recovery Codes</button>
+            <button type="button" onclick="totpDisable()" class="btn-danger"><?= icon('x-mark', 14) ?> Disable Authenticator</button>
+            <?php endif; ?>
+          </div>
+        </div>
+
+        <!-- Recovery Codes Modal -->
+        <div id="recovery-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.6);backdrop-filter:blur(2px);align-items:center;justify-content:center;padding:1rem;">
+          <div style="background:var(--bg-3);border:1px solid var(--border);border-radius:16px;width:100%;max-width:460px;box-shadow:var(--shadow-lg);">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--border);">
+              <div style="font-weight:700;font-size:0.88rem;"><?= icon('key', 14) ?> &nbsp;Save Your Recovery Codes</div>
+            </div>
+            <div style="padding:1.25rem;">
+              <div class="alert alert-warning" style="margin-bottom:1rem;"><?= icon('exclamation-triangle', 13) ?> <span>Save these now — each code can only be used once and you cannot view them again.</span></div>
+              <div id="recovery-codes-list" style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;font-family:monospace;font-size:0.85rem;margin-bottom:1rem;"></div>
+              <div style="display:flex;gap:0.6rem;flex-wrap:wrap;">
+                <button type="button" onclick="downloadRecoveryCodes()" class="btn-primary" style="font-size:0.8rem;"><?= icon('arrow-down-tray', 13) ?> Download</button>
+                <button type="button" onclick="closeRecoveryModal()" class="btn-ghost" style="font-size:0.8rem;">Done</button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Transaction PIN Card -->
@@ -735,11 +918,6 @@ require_once '../../includes/topbar.php';
           </div>
         </div>
 
-        <!-- Bottom save button -->
-        <div class="panel-save-bar">
-          <button type="button" class="btn-primary js-settings-save"><?= icon('check', 14) ?> Save Changes</button>
-        </div>
-      </form>
     </div>
 
     <!-- ── DESIGN PREFERENCES ── -->
@@ -753,44 +931,35 @@ require_once '../../includes/topbar.php';
           </div>
         </div>
         <div class="card-body">
+          <?php
+          $themes = [
+            'light'            => ['name' => 'Light',             'bg' => '#F4F1EC', 'bg2' => '#FAFAF8', 'sidebar' => '#1C1A17', 'accent' => '#D4A017', 'card' => '#FFFFFF'],
+            'dark'             => ['name' => 'Dark',              'bg' => '#141210', 'bg2' => '#1C1A17', 'sidebar' => '#0F0E0D', 'accent' => '#D4A017', 'card' => '#242220'],
+            'warm'             => ['name' => 'Warm',              'bg' => '#FAF5EE', 'bg2' => '#F3EBE0', 'sidebar' => '#2C1F12', 'accent' => '#A8865A', 'card' => '#FFFFFF'],
+            'high-contrast'    => ['name' => 'High Contrast',     'bg' => '#FFFFFF', 'bg2' => '#F0F0F0', 'sidebar' => '#000000', 'accent' => '#000000', 'card' => '#FFFFFF'],
+            'high-contrast-dark' => ['name' => 'High Contrast Dark', 'bg' => '#000000', 'bg2' => '#111111', 'sidebar' => '#000000', 'accent' => '#FFFFFF', 'card' => '#111111'],
+          ];
+          ?>
           <div class="theme-picker">
-
-            <label class="theme-option <?= $user_theme === 'light' ? 'active' : '' ?>">
-              <input type="radio" name="theme" value="light" <?= $user_theme === 'light' ? 'checked' : '' ?> hidden/>
-              <div class="theme-preview theme-preview-light">
-                <div class="tp-sidebar"></div>
-                <div class="tp-main">
-                  <div class="tp-topbar"></div>
+            <?php foreach ($themes as $value => $t): ?>
+            <label class="theme-option <?= $user_theme === $value ? 'active' : '' ?>">
+              <input type="radio" name="theme" value="<?= $value ?>" <?= $user_theme === $value ? 'checked' : '' ?> hidden/>
+              <div class="theme-preview" style="background:<?= $t['bg'] ?>;border:1px solid <?= $t['bg2'] ?>;">
+                <div class="tp-sidebar" style="background:<?= $t['sidebar'] ?>;border-right:2px solid <?= $t['accent'] ?>33;"></div>
+                <div class="tp-main" style="background:<?= $t['bg'] ?>;">
+                  <div class="tp-topbar" style="background:<?= $t['bg2'] ?>;"></div>
                   <div class="tp-content">
-                    <div class="tp-card"></div>
-                    <div class="tp-card short"></div>
+                    <div class="tp-card" style="background:<?= $t['card'] ?>;border:1px solid <?= $t['bg2'] ?>;"></div>
+                    <div class="tp-card short" style="background:<?= $t['card'] ?>;border:1px solid <?= $t['bg2'] ?>;border-top:2px solid <?= $t['accent'] ?>;"></div>
                   </div>
                 </div>
               </div>
               <div class="theme-label">
                 <span class="theme-radio"></span>
-                <span class="theme-name">Light</span>
+                <span class="theme-name"><?= $t['name'] ?></span>
               </div>
             </label>
-
-            <label class="theme-option <?= $user_theme === 'dark' ? 'active' : '' ?>">
-              <input type="radio" name="theme" value="dark" <?= $user_theme === 'dark' ? 'checked' : '' ?> hidden/>
-              <div class="theme-preview theme-preview-dark">
-                <div class="tp-sidebar"></div>
-                <div class="tp-main">
-                  <div class="tp-topbar"></div>
-                  <div class="tp-content">
-                    <div class="tp-card"></div>
-                    <div class="tp-card short"></div>
-                  </div>
-                </div>
-              </div>
-              <div class="theme-label">
-                <span class="theme-radio"></span>
-                <span class="theme-name">Dark</span>
-              </div>
-            </label>
-
+            <?php endforeach; ?>
           </div>
         </div>
       </div>
@@ -1031,6 +1200,8 @@ require_once '../../includes/topbar.php';
 
 <?php
 $footer_scripts = ''; // JS moved to assets/js/shared/settings.js
+$footer_extra_scripts = '<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>'
+    . '<script src="../../assets/js/shared/settings.js"></script>';
 /* REMOVED HEREDOC START
 // ── Tab switching ──
 document.querySelectorAll('.settings-tab-btn').forEach(tab => {
@@ -1124,12 +1295,14 @@ if (avatarRemoveBtn) {
     });
 }
 
-// ── Theme Picker ──
+// ── Theme Picker — live preview on click ──
 document.querySelectorAll('.theme-option').forEach(opt => {
     opt.addEventListener('click', () => {
         document.querySelectorAll('.theme-option').forEach(o => o.classList.remove('active'));
         opt.classList.add('active');
-        opt.querySelector('input[type="radio"]').checked = true;
+        const radio = opt.querySelector('input[type="radio"]');
+        radio.checked = true;
+        document.documentElement.setAttribute('data-theme', radio.value);
     });
 });
 
@@ -1200,7 +1373,6 @@ if (tfaToggle) {
 }
 REMOVED HEREDOC END */
 
-echo '<script src="../../assets/js/shared/settings.js"></script>';
 ?>
 
 <!-- ── TRANSACTION PIN MODAL ── -->
@@ -1365,3 +1537,158 @@ if (removePinBtn) removePinBtn.addEventListener('click', handlePinRemove);
 <?php
 require_once '../../includes/footer.php';
 ?>
+
+<script>
+// ── TOTP digit boxes ──
+(function() {
+    const boxes = document.querySelectorAll('.totp-digit');
+    const hidden = document.getElementById('totp-code-input');
+    if (!boxes.length || !hidden) return;
+
+    function syncHidden() {
+        hidden.value = Array.from(boxes).map(b => b.value).join('');
+    }
+
+    boxes.forEach((box, i) => {
+        box.addEventListener('focus', () => box.style.borderColor = 'var(--gold-bright, #B8860B)');
+        box.addEventListener('blur',  () => box.style.borderColor = 'var(--border)');
+
+        box.addEventListener('input', () => {
+            box.value = box.value.replace(/\D/g, '').slice(-1);
+            syncHidden();
+            if (box.value && i < boxes.length - 1) boxes[i + 1].focus();
+        });
+
+        box.addEventListener('keydown', (e) => {
+            if (e.key === 'Backspace' && !box.value && i > 0) boxes[i - 1].focus();
+        });
+
+        box.addEventListener('paste', (e) => {
+            e.preventDefault();
+            const digits = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6);
+            digits.split('').forEach((d, j) => { if (boxes[j]) boxes[j].value = d; });
+            syncHidden();
+            const next = boxes[Math.min(digits.length, boxes.length - 1)];
+            if (next) next.focus();
+        });
+    });
+})();
+
+// ── TOTP (Authenticator App) — must be after footer.php so SweetAlert2 is loaded ──
+let _recoveryCodes = [];
+
+function totpPost(data) {
+    const fd = new FormData();
+    fd.append('csrf_token', window._csrf || '');
+    Object.entries(data).forEach(([k,v]) => fd.append(k,v));
+    return fetch('settings.php', { method:'POST', body:fd }).then(r=>r.json());
+}
+
+window.totpStartSetup = async function() {
+    const res = await totpPost({ section:'totp_generate' });
+    if (!res.ok) { Swal.fire({ icon:'error', title:'Error', text:res.error, confirmButtonColor:'#B8860B' }); return; }
+    document.getElementById('totp-setup-intro').style.display = 'none';
+    document.getElementById('totp-setup-flow').style.display  = 'block';
+    const btn = document.getElementById('totp-setup-btn');
+    if (btn) btn.style.display = 'none';
+    document.getElementById('totp-secret-display').textContent = res.secret;
+    const qrEl = document.getElementById('totp-qr');
+    qrEl.innerHTML = '';
+    new QRCode(qrEl, { text: res.uri, width: 140, height: 140, correctLevel: QRCode.CorrectLevel.M });
+    const firstBox = document.querySelector('.totp-digit');
+    if (firstBox) firstBox.focus();
+};
+
+window.totpCancelSetup = function() {
+    document.getElementById('totp-setup-intro').style.display = 'block';
+    document.getElementById('totp-setup-flow').style.display  = 'none';
+    const btn = document.getElementById('totp-setup-btn');
+    if (btn) btn.style.display = '';
+    document.querySelectorAll('.totp-digit').forEach(b => b.value = '');
+    document.getElementById('totp-code-input').value = '';
+    document.getElementById('totp-confirm-alert').innerHTML = '';
+};
+
+window.totpConfirm = async function() {
+    const code = document.getElementById('totp-code-input').value.trim();
+    if (!code || code.length < 6) {
+        document.getElementById('totp-confirm-alert').innerHTML =
+            '<div class="alert alert-danger" style="margin-bottom:0.75rem;">Please enter the 6-digit code from your app.</div>';
+        return;
+    }
+    // Ask for password to confirm identity before activating
+    const pwResult = await Swal.fire({
+        title: 'Confirm your password',
+        text: 'Enter your account password to activate Authenticator 2FA.',
+        input: 'password', inputPlaceholder: 'Your password',
+        confirmButtonText: 'Activate', confirmButtonColor: '#B8860B',
+        showCancelButton: true, cancelButtonColor: '#6B7280',
+    });
+    if (!pwResult.isConfirmed) return;
+    const res = await totpPost({ section:'totp_confirm', code, password: pwResult.value });
+    if (!res.ok) {
+        document.getElementById('totp-confirm-alert').innerHTML =
+            '<div class="alert alert-danger" style="margin-bottom:0.75rem;">' + res.error + '</div>';
+        return;
+    }
+    _recoveryCodes = res.recovery_codes;
+    showRecoveryModal(_recoveryCodes);
+};
+
+window.totpDisable = async function() {
+    const result = await Swal.fire({
+        title:'Disable Authenticator App', text:'Enter your password to confirm.',
+        input:'password', inputPlaceholder:'Your password',
+        confirmButtonText:'Disable', confirmButtonColor:'#C0392B',
+        showCancelButton:true, cancelButtonColor:'#6B7280',
+    });
+    if (!result.isConfirmed) return;
+    const res = await totpPost({ section:'totp_disable', password:result.value });
+    if (res.ok) {
+        Swal.fire({ icon:'success', title:'2FA Disabled', confirmButtonColor:'#B8860B' }).then(() => location.reload());
+    } else {
+        Swal.fire({ icon:'error', title:'Error', text:res.error, confirmButtonColor:'#B8860B' });
+    }
+};
+
+window.totpRegenRecovery = async function() {
+    const result = await Swal.fire({
+        title:'Regenerate Recovery Codes',
+        text:'This will invalidate your existing recovery codes. Enter your password to confirm.',
+        input:'password', inputPlaceholder:'Your password',
+        confirmButtonText:'Regenerate', confirmButtonColor:'#1C1A17',
+        showCancelButton:true, cancelButtonColor:'#6B7280',
+    });
+    if (!result.isConfirmed) return;
+    const res = await totpPost({ section:'totp_regen_recovery', password:result.value });
+    if (res.ok) {
+        _recoveryCodes = res.recovery_codes;
+        showRecoveryModal(_recoveryCodes);
+    } else {
+        Swal.fire({ icon:'error', title:'Error', text:res.error, confirmButtonColor:'#B8860B' });
+    }
+};
+
+function showRecoveryModal(codes) {
+    const list = document.getElementById('recovery-codes-list');
+    if (!list) return;
+    list.innerHTML = codes.map(function(c) {
+        return '<div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0.3rem 0.55rem;text-align:center;font-weight:700;font-size:0.8rem;">' + c + '</div>';
+    }).join('');
+    document.getElementById('recovery-modal').style.display = 'flex';
+}
+
+window.closeRecoveryModal = function() {
+    document.getElementById('recovery-modal').style.display = 'none';
+    if (_recoveryCodes.length) location.reload();
+};
+
+window.downloadRecoveryCodes = function() {
+    var text = "TG-BASICS Recovery Codes\nGenerated: " + new Date().toLocaleString() +
+               "\nKeep these safe — each code can only be used once.\n\n" + _recoveryCodes.join("\n");
+    var a = document.createElement('a');
+    a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(text);
+    a.download = 'tg-basics-recovery-codes.txt';
+    a.click();
+};
+</script>

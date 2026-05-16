@@ -234,3 +234,4 @@ if (saveUsernameBtn) {
 }
 
 // Transaction PIN handlers are inline in settings.php
+// TOTP handlers are inline in settings.php (load-order dependency on QRCode CDN)

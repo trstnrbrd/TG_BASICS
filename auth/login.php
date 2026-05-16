@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $lockout = true;
             $error   = 'Account is locked due to too many failed attempts. Please try again later.';
         } else {
-            $stmt = $conn->prepare("SELECT user_id, username, password, role, full_name, is_active, two_factor_enabled, email FROM users WHERE username = ?");
+            $stmt = $conn->prepare("SELECT user_id, username, password, role, full_name, is_active, two_factor_enabled, totp_enabled, email FROM users WHERE username = ?");
             $stmt->bind_param('s', $username);
             $stmt->execute();
             $user = $stmt->get_result()->fetch_assoc();
@@ -61,7 +61,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $reset->bind_param('s', $username);
                     $reset->execute();
 
-                    // Check if 2FA is enabled
+                    // Check if authenticator TOTP is enabled (takes priority over email 2FA)
+                    if (!empty($user['totp_enabled'])) {
+                        $_SESSION['totp_user_id']   = $user['user_id'];
+                        $_SESSION['totp_username']  = $user['username'];
+                        $_SESSION['totp_role']      = $user['role'];
+                        $_SESSION['totp_full_name'] = $user['full_name'];
+                        header("Location: verify_totp.php");
+                        exit;
+                    }
+
+                    // Check if email 2FA is enabled
                     if ($user['two_factor_enabled'] && !empty($user['email'])) {
                         // Generate 6-digit code
                         $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);

@@ -35,8 +35,8 @@
 }
 
 .settings-tab-btn.active {
-    background: var(--sidebar-bg);
-    color: var(--gold-bright);
+    background: var(--btn-bg);
+    color: var(--btn-text);
     font-weight: 700;
     box-shadow: 0 2px 8px rgba(28, 26, 23, 0.15);
 }
@@ -218,7 +218,7 @@
 .avatar-initials {
     font-size: 1.6rem;
     font-weight: 800;
-    color: var(--gold-bright);
+    color: var(--sidebar-active);
     letter-spacing: 1px;
 }
 
@@ -280,9 +280,8 @@
 /* ── THEME PICKER ── */
 .theme-picker {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1.25rem;
-    max-width: 520px;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1rem;
 }
 
 .theme-option {
@@ -345,30 +344,19 @@
     height: 18px;
 }
 
-/* Sidebar gold accent stripe */
+/* Sidebar accent dot */
 .theme-preview .tp-sidebar::after {
     content: '';
     position: absolute;
-    top: 28px;
-    left: 8px;
-    right: 8px;
-    height: 6px;
-    border-radius: 3px;
-    background: #D4A017;
-    opacity: 0.7;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.5;
 }
-
-/* Light theme preview colors */
-.theme-preview-light .tp-sidebar { background: #1C1A17; }
-.theme-preview-light .tp-topbar { background: #FAFAF8; border-bottom: 1px solid #E2D9CC; }
-.theme-preview-light .tp-content { background: #F4F1EC; }
-.theme-preview-light .tp-card { background: #FFFFFF; border: 1px solid #E2D9CC; }
-
-/* Dark theme preview colors */
-.theme-preview-dark .tp-sidebar { background: #0F0E0D; }
-.theme-preview-dark .tp-topbar { background: #1C1A17; border-bottom: 1px solid #2A2724; }
-.theme-preview-dark .tp-content { background: #141210; }
-.theme-preview-dark .tp-card { background: #1C1A17; border: 1px solid #2A2724; }
 
 .theme-label {
     display: flex;
@@ -536,8 +524,7 @@
     .avatar-actions { text-align: center; }
     .avatar-buttons { justify-content: center; }
     .theme-picker {
-        grid-template-columns: 1fr;
-        max-width: 260px;
+        grid-template-columns: repeat(2, 1fr);
     }
 }
 

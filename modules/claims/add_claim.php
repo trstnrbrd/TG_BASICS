@@ -78,6 +78,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// Pre-load client from GET param (coming from view_client.php)
+$prefill_client_id   = 0;
+$prefill_client_name = '';
+if (isset($_GET['client_id']) && !$_POST) {
+    $prefill_client_id = (int)$_GET['client_id'];
+    if ($prefill_client_id > 0) {
+        $pfc = $conn->prepare("SELECT client_id, full_name FROM clients WHERE client_id = ?");
+        $pfc->bind_param('i', $prefill_client_id);
+        $pfc->execute();
+        $pfc_row = $pfc->get_result()->fetch_assoc();
+        if ($pfc_row) {
+            $prefill_client_id   = (int)$pfc_row['client_id'];
+            $prefill_client_name = $pfc_row['full_name'];
+        } else {
+            $prefill_client_id = 0;
+        }
+    }
+}
+
 $page_title  = 'File New Claim';
 $active_page = 'claims';
 $base_path   = '../../';
@@ -251,13 +270,6 @@ require_once '../../includes/topbar.php';
   </div>
 </div>
 
-<script>
-// PHP-injected vars for add_claim.js
-const savedClient = '<?= (int)($_POST['client_id'] ?? 0) ?>';
-const savedPolicy = '<?= (int)($_POST['policy_id'] ?? 0) ?>';
-</script>
-<script src="../../assets/js/shared/add_claim.js"></script>
-
 <?php
 $footer_extra_scripts = '';
 $footer_scripts = '
@@ -380,3 +392,10 @@ $footer_scripts = '
 ';
 require_once '../../includes/footer.php';
 ?>
+<script>
+const savedClient       = '<?= (int)($_POST['client_id'] ?? $prefill_client_id) ?>';
+const savedPolicy       = '<?= (int)($_POST['policy_id'] ?? 0) ?>';
+const prefillClientId   = <?= $prefill_client_id ?>;
+const prefillClientName = <?= json_encode($prefill_client_name) ?>;
+</script>
+<script src="../../assets/js/shared/add_claim.js"></script>

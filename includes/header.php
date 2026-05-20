@@ -621,8 +621,110 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
     /* Badge wrap */
     .badge { font-size: 0.62rem; padding: 0.15rem 0.5rem; }
   }
+  /* ── ROW EXPAND ── */
+  .tg-expandable-row:hover { background: var(--gold-pale); }
+  .tg-expandable-row.expanded { background: var(--gold-pale); }
+  .tg-expandable-row.expanded .row-chevron { transform: rotate(90deg); opacity: 0.7 !important; }
+  .tg-expand-row td { background: var(--bg-2); }
+  .tg-expand-body {
+    padding: 0.85rem 1.25rem 0.85rem 2.9rem;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    animation: expandIn 0.18s ease;
+  }
+  @keyframes expandIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .tg-expand-grid {
+    display: flex; flex-wrap: wrap; gap: 1.25rem 2.5rem;
+  }
+  .tg-expand-item { display: flex; flex-direction: column; gap: 0.2rem; }
+  .tg-expand-label { font-size: 0.62rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); }
+  .tg-expand-value { font-size: 0.8rem; color: var(--text-primary); font-weight: 500; }
+
   /* Page loading cursor */
   html.tg-loading, html.tg-loading * { cursor: wait !important; }
+
+  /* ── GLOBAL SEARCH ── */
+  .gs-wrap { position: relative; }
+  .gs-input-row {
+    display: flex; align-items: center; gap: 0.5rem;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 9px; padding: 0.52rem 0.9rem;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    width: 300px;
+  }
+  .gs-wrap.focused .gs-input-row {
+    border-color: var(--gold-bright);
+    box-shadow: 0 0 0 3px rgba(212,160,23,0.12);
+    background: var(--bg-3);
+  }
+  .gs-icon { color: var(--text-muted); flex-shrink: 0; }
+  .gs-input {
+    flex: 1; background: none; border: none; outline: none;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 0.875rem; color: var(--text-primary);
+    min-width: 0;
+  }
+  .gs-input::placeholder { color: var(--text-muted); }
+  .gs-kbd {
+    font-size: 0.6rem; font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 700; color: var(--text-muted);
+    background: var(--bg-2); border: 1px solid var(--border);
+    border-radius: 4px; padding: 0.1rem 0.35rem;
+    flex-shrink: 0; transition: opacity 0.15s;
+  }
+  .gs-wrap.focused .gs-kbd { opacity: 0; pointer-events: none; }
+  .gs-dropdown {
+    position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+    background: var(--bg-3); border: 1px solid var(--border);
+    border-radius: 12px; box-shadow: var(--shadow-lg);
+    z-index: 200; overflow: hidden; min-width: 340px;
+  }
+  .gs-group-label {
+    font-size: 0.58rem; letter-spacing: 1.5px; text-transform: uppercase;
+    font-weight: 700; color: var(--text-muted);
+    padding: 0.6rem 0.85rem 0.3rem;
+  }
+  .gs-item {
+    display: flex; align-items: center; gap: 0.7rem;
+    padding: 0.55rem 0.85rem; cursor: pointer;
+    text-decoration: none; transition: background 0.1s;
+    border-radius: 0;
+  }
+  .gs-item:hover, .gs-item.active { background: var(--gold-pale); }
+  .gs-item-icon {
+    width: 28px; height: 28px; border-radius: 7px;
+    background: var(--bg-2); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; color: var(--gold);
+  }
+  .gs-item-label {
+    font-size: 0.8rem; font-weight: 600; color: var(--text-primary);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .gs-item-sub {
+    font-size: 0.67rem; color: var(--text-muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .gs-empty {
+    padding: 1.25rem 0.85rem; text-align: center;
+    font-size: 0.78rem; color: var(--text-muted);
+  }
+  .gs-footer {
+    padding: 0.45rem 0.85rem; border-top: 1px solid var(--border);
+    background: var(--bg-2); font-size: 0.63rem; color: var(--text-muted);
+    display: flex; gap: 0.75rem;
+  }
+  .gs-footer kbd {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 3px; padding: 0.05rem 0.3rem; font-size: 0.6rem;
+  }
+  @media (max-width: 768px) {
+    .gs-wrap { display: none; }
+  }
 </style>
 <?= $extra_css ?? '' ?>
 </head>
@@ -694,6 +796,7 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
     document.addEventListener('click', function (e) {
       const a = e.target.closest('a[href]');
       if (a && !a.target && !a.href.startsWith('#') && !a.href.startsWith('javascript')) {
+        if (a.closest('.user-dropdown')) return;
         document.documentElement.classList.add('tg-loading');
       }
     });

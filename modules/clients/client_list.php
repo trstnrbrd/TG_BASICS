@@ -252,55 +252,64 @@ require_once '../../includes/topbar.php';
         <table class="tg-table">
           <thead>
             <tr>
-              <th style="text-align:center;">#</th>
-              <th style="text-align:center;">Full Name</th>
-              <th style="text-align:center;">Contact</th>
-              <th style="text-align:center;">Email</th>
-              <th style="text-align:center;">Date Added</th>
-              <th style="text-align:center;">Vehicles</th>
-              <th style="text-align:center;">Type</th>
-              <th style="text-align:center;">Action</th>
+              <th style="text-align:left;padding-left:2.5rem;">Client</th>
+              <th>Contact</th>
+              <th>Type</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            <?php $i = 1; while ($row = $result->fetch_assoc()): ?>
-            <tr>
-              <td style="color:var(--text-muted);font-size:0.72rem;text-align:center;"><?= $i++ ?></td>
-              <td style="font-weight:700;color:var(--text-primary);font-size:0.85rem;text-align:center;"><?= htmlspecialchars($row['full_name']) ?></td>
-              <td style="text-align:center;"><?= htmlspecialchars($row['contact_number']) ?></td>
-              <td style="color:var(--text-muted);font-size:0.78rem;text-align:center;"><?= htmlspecialchars($row['email'] ?? '-') ?></td>
-              <td style="font-size:0.75rem;color:var(--text-muted);text-align:center;"><?= date('M d, Y', strtotime($row['created_at'])) ?></td>
-              <td style="text-align:center;">
-                <span class="badge badge-gold"><?= $row['vehicle_count'] ?> vehicle<?= $row['vehicle_count'] != 1 ? 's' : '' ?></span>
+            <?php $i = 1; while ($row = $result->fetch_assoc()):
+              $cid = 'client-expand-' . $row['client_id'];
+            ?>
+            <tr class="tg-expandable-row" data-expand="<?= $cid ?>" style="cursor:pointer;">
+              <td style="text-align:left;">
+                <div style="display:flex;align-items:center;gap:0.6rem;">
+                  <svg class="row-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;opacity:0.35;transition:transform 0.2s;"><polyline points="9 18 15 12 9 6"/></svg>
+                  <div>
+                    <div style="font-weight:700;color:var(--text-primary);font-size:0.85rem;"><?= htmlspecialchars($row['full_name']) ?></div>
+                    <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.1rem;"><?= htmlspecialchars($row['email'] ?? '—') ?></div>
+                  </div>
+                </div>
               </td>
-              <td style="text-align:center;">
+              <td style="font-size:0.82rem;"><?= htmlspecialchars($row['contact_number']) ?></td>
+              <td>
                 <?php if ($row['has_policy']): ?>
-                  <span class="badge" style="background:#2E7D52;color:#fff;font-size:0.68rem;display:inline-flex;align-items:center;gap:0.25rem;">
-                    <?= icon('shield-check', 11) ?> Insurance
-                  </span>
+                  <span class="badge badge-green" style="display:inline-flex;align-items:center;gap:0.25rem;"><?= icon('shield-check', 11) ?> Insurance</span>
                 <?php else: ?>
-                  <span class="badge" style="background:#B8860B;color:#fff;font-size:0.68rem;display:inline-flex;align-items:center;gap:0.25rem;">
-                    <?= icon('wrench', 11) ?> Walk-in
-                  </span>
+                  <span class="badge badge-gold" style="display:inline-flex;align-items:center;gap:0.25rem;"><?= icon('wrench', 11) ?> Walk-in</span>
                 <?php endif; ?>
               </td>
-              <td style="text-align:center;">
-                <div style="display:inline-flex;gap:0.4rem;align-items:center;">
-                  <a href="view_client.php?id=<?= $row['client_id'] ?>" class="btn-sm-gold" title="View" style="padding:0.35rem 0.55rem;">
-                    <?= icon('eye', 14) ?>
-                  </a>
+              <td>
+                <div style="display:inline-flex;gap:0.4rem;align-items:center;" onclick="event.stopPropagation()">
+                  <a href="view_client.php?id=<?= $row['client_id'] ?>" class="btn-sm-gold" title="View" style="padding:0.35rem 0.55rem;"><?= icon('eye', 14) ?></a>
                   <?php if ($_SESSION['role'] !== 'mechanic'): ?>
                   <form method="POST" action="" style="display:inline;">
                     <?= csrf_field() ?>
                     <input type="hidden" name="delete_client_id" value="<?= $row['client_id'] ?>"/>
-                    <button type="button"
-                       class="btn-sm-danger js-delete-client"
-                       title="Delete"
-                       data-name="<?= htmlspecialchars($row['full_name'], ENT_QUOTES) ?>">
-                      <?= icon('trash', 14) ?>
-                    </button>
+                    <button type="button" class="btn-sm-danger js-delete-client" title="Delete" data-name="<?= htmlspecialchars($row['full_name'], ENT_QUOTES) ?>"><?= icon('trash', 14) ?></button>
                   </form>
                   <?php endif; ?>
+                </div>
+              </td>
+            </tr>
+            <tr class="tg-expand-row" id="<?= $cid ?>" style="display:none;">
+              <td colspan="4" style="padding:0;">
+                <div class="tg-expand-body">
+                  <div class="tg-expand-grid">
+                    <div class="tg-expand-item">
+                      <span class="tg-expand-label">Date Added</span>
+                      <span class="tg-expand-value"><?= date('M d, Y', strtotime($row['created_at'])) ?></span>
+                    </div>
+                    <div class="tg-expand-item">
+                      <span class="tg-expand-label">Vehicles</span>
+                      <span class="tg-expand-value"><span class="badge badge-gold"><?= $row['vehicle_count'] ?> vehicle<?= $row['vehicle_count'] != 1 ? 's' : '' ?></span></span>
+                    </div>
+                    <div class="tg-expand-item">
+                      <span class="tg-expand-label">Email</span>
+                      <span class="tg-expand-value"><?= htmlspecialchars($row['email'] ?? '—') ?></span>
+                    </div>
+                  </div>
                 </div>
               </td>
             </tr>

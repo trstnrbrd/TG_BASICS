@@ -423,15 +423,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
 $policy_expired = strtotime($claim['policy_end']) < strtotime(date('Y-m-d'));
 
 $status_map = [
-    'compiling'            => ['label' => 'Compiling Requirements', 'class' => 'badge-warning'],
+    'compiling'            => ['label' => 'Compiling Requirements', 'class' => 'badge-info'],
     'sent_admin'           => ['label' => 'Sent to Admin',          'class' => 'badge-info'],
-    'sent_head_office'     => ['label' => 'Sent to Head Office',    'class' => 'badge-orange'],
-    'waiting_loa'          => ['label' => 'Waiting for LOA',        'class' => 'badge-blue'],
-    'loa_received'         => ['label' => 'LOA Received',           'class' => 'badge-teal'],
-    'pending'              => ['label' => 'Pending',                'class' => 'badge-yellow'],
-    'approved'             => ['label' => 'Approved',               'class' => 'badge-success'],
-    'denied'               => ['label' => 'Denied',                 'class' => 'badge-danger'],
-    'lack_of_requirements' => ['label' => 'Lack of Requirements',   'class' => 'badge-danger'],
+    'sent_head_office'     => ['label' => 'Sent to Head Office',    'class' => 'badge-info'],
+    'waiting_loa'          => ['label' => 'Waiting for LOA',        'class' => 'badge-info'],
+    'loa_received'         => ['label' => 'LOA Received',           'class' => 'badge-green'],
+    'pending'              => ['label' => 'Pending',                'class' => 'badge-info'],
+    'approved'             => ['label' => 'Approved',               'class' => 'badge-green'],
+    'denied'               => ['label' => 'Denied',                 'class' => 'badge-red'],
+    'lack_of_requirements' => ['label' => 'Lack of Requirements',   'class' => 'badge-yellow'],
     'resolved'             => ['label' => 'Resolved',               'class' => 'badge-muted'],
 ];
 
@@ -645,7 +645,7 @@ require_once '../../includes/topbar.php';
             <div class="card-sub" id="doc-count-sub"><?= $docs_done ?>/<?= $required_docs ?> documents received</div>
           </div>
           <div style="margin-left:auto;">
-            <span id="doc-badge" class="badge <?= $all_docs_complete ? 'badge-success' : 'badge-warning' ?>">
+            <span id="doc-badge" class="badge <?= $all_docs_complete ? 'badge-green' : 'badge-yellow' ?>">
               <?= $all_docs_complete ? icon('check-circle',12) . ' Complete' : ($required_docs - $docs_done) . ' remaining' ?>
             </span>
           </div>

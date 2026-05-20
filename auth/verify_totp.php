@@ -73,6 +73,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $desc = $pending_name . ' logged in (Authenticator 2FA verified).';
     $log->bind_param('is', $pending_uid, $desc); $log->execute();
 
+    $la = $conn->prepare("UPDATE users SET last_active = NOW() WHERE user_id = ?");
+    $la->bind_param('i', $pending_uid); $la->execute();
+
     $_SESSION['user_id']   = $pending_uid;
     $_SESSION['username']  = $pending_user;
     $_SESSION['role']      = $pending_role;

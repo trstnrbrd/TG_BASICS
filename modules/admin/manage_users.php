@@ -43,13 +43,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 // ── HANDLE CREATE ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'create') {
     csrf_verify();
-    $new_name     = san_str($_POST['new_full_name'] ?? '', MAX_NAME);
+    $new_first    = san_str($_POST['new_first_name'] ?? '', MAX_NAME);
+    $new_last     = san_str($_POST['new_last_name']  ?? '', MAX_NAME);
+    $new_name     = trim($new_first . ' ' . $new_last);
     $new_email    = san_str($_POST['new_email'] ?? '', MAX_EMAIL);
     $new_username = san_str($_POST['new_username'] ?? '', MAX_USERNAME);
     $new_role     = san_enum($_POST['new_role'] ?? '', ['admin', 'mechanic']);
 
-    if ($new_name === '')                    $errors[] = 'Full name is required.';
-    elseif (!validate_name($new_name))       $errors[] = 'Full name contains invalid characters.';
+    if ($new_first === '')                   $errors[] = 'First name is required.';
+    elseif (!validate_name($new_first))      $errors[] = 'First name contains invalid characters.';
+    if ($new_last === '')                    $errors[] = 'Last name is required.';
+    elseif (!validate_name($new_last))       $errors[] = 'Last name contains invalid characters.';
     if ($new_email === '')                   $errors[] = 'Email is required.';
     elseif (!validate_email($new_email))     $errors[] = 'Invalid email format.';
     if ($new_username === '')                $errors[] = 'Username is required.';
@@ -73,10 +77,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $temp_pw  = password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT);
 
         $ins = $conn->prepare("
-            INSERT INTO users (full_name, username, password, role, email, is_active, activation_token)
-            VALUES (?, ?, ?, ?, ?, 0, ?)
+            INSERT INTO users (first_name, last_name, username, password, role, email, is_active, activation_token)
+            VALUES (?, ?, ?, ?, ?, ?, 0, ?)
         ");
-        $ins->bind_param('ssssss', $new_name, $new_username, $temp_pw, $new_role, $new_email, $token);
+        $ins->bind_param('sssssss', $new_first, $new_last, $new_username, $temp_pw, $new_role, $new_email, $token);
 
         if ($ins->execute()) {
             $new_user_id      = $conn->insert_id;
@@ -100,7 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 // ── LOAD USERS ──
 $users = $conn->query("
-    SELECT user_id, full_name, username, role, email, is_active, created_at, last_active,
+    SELECT user_id, full_name, username, role, email, is_active, created_at, last_active, profile_photo,
            (last_active IS NOT NULL AND last_active >= NOW() - INTERVAL 5 MINUTE) AS is_online
     FROM users
     ORDER BY FIELD(role, 'super_admin', 'admin', 'mechanic'), full_name ASC
@@ -168,7 +172,7 @@ require_once '../../includes/topbar.php';
         <table class="tg-table">
           <thead>
             <tr>
-              <th>Name</th>
+              <th style="text-align:left;padding-left:1.25rem;">Name</th>
               <th>Role</th>
               <th>Status</th>
               <th>Action</th>
@@ -186,17 +190,28 @@ require_once '../../includes/topbar.php';
             <?php
               $is_online = !empty($u['is_online']);
             ?>
+            <?php
+              $u_initials = substr(implode('', array_map(fn($w) => strtoupper($w[0] ?? ''), array_filter(explode(' ', $u['full_name'])))), 0, 2);
+              $u_photo    = !empty($u['profile_photo']) ? '../../uploads/avatars/' . htmlspecialchars($u['profile_photo']) : '';
+            ?>
             <tr>
-              <td style="text-align:center;">
-                <div style="display:inline-flex;align-items:center;gap:0.45rem;">
-                  <?php if ($is_online): ?>
-                  <span title="Online" style="width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0;display:inline-block;box-shadow:0 0 0 2px rgba(34,197,94,0.25);"></span>
-                  <?php else: ?>
-                  <span title="Offline" style="width:8px;height:8px;border-radius:50%;background:var(--border);flex-shrink:0;display:inline-block;"></span>
-                  <?php endif; ?>
-                  <div style="font-weight:700;color:var(--text-primary);font-size:0.82rem;"><?= htmlspecialchars($u['full_name']) ?></div>
+              <td style="text-align:left;padding-left:1.25rem;">
+                <div style="display:flex;align-items:center;gap:0.65rem;">
+                  <div data-user-id="<?= $u['user_id'] ?>" title="View profile" style="position:relative;flex-shrink:0;cursor:pointer;">
+                    <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--gold-bright),var(--gold));display:flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:800;color:#fff;overflow:hidden;border:2px solid var(--border);">
+                      <?php if ($u_photo): ?>
+                        <img src="<?= $u_photo ?>" style="width:100%;height:100%;object-fit:cover;" alt=""/>
+                      <?php else: ?>
+                        <?= $u_initials ?>
+                      <?php endif; ?>
+                    </div>
+                    <span title="<?= $is_online ? 'Online' : 'Offline' ?>" style="position:absolute;bottom:0;right:0;width:9px;height:9px;border-radius:50%;background:<?= $is_online ? '#22c55e' : 'var(--border)' ?>;border:2px solid var(--bg-3);<?= $is_online ? 'box-shadow:0 0 0 2px rgba(34,197,94,0.25);' : '' ?>"></span>
+                  </div>
+                  <div data-user-id="<?= $u['user_id'] ?>" title="View profile" style="cursor:pointer;">
+                    <div style="font-weight:700;color:var(--text-primary);font-size:0.82rem;line-height:1.2;"><?= htmlspecialchars($u['full_name']) ?></div>
+                    <div style="font-size:0.7rem;color:var(--text-muted);">@<?= htmlspecialchars($u['username']) ?></div>
+                  </div>
                 </div>
-                <div style="font-size:0.7rem;color:var(--text-muted);">@<?= htmlspecialchars($u['username']) ?></div>
               </td>
               <td><span class="badge <?= $rl[1] ?>"><?= $rl[0] ?></span></td>
               <td>
@@ -243,11 +258,19 @@ require_once '../../includes/topbar.php';
           <input type="hidden" name="action" value="create"/>
           <div style="padding:1.25rem;display:flex;flex-direction:column;gap:0.9rem;">
 
-            <div class="field">
-              <label class="field-label">Full Name <span class="req">*</span></label>
-              <input type="text" name="new_full_name" class="field-input"
-                placeholder="First Middle Last"
-                value="<?= htmlspecialchars($_POST['new_full_name'] ?? '') ?>"/>
+            <div class="form-grid" style="gap:0.9rem;">
+              <div class="field">
+                <label class="field-label">First Name <span class="req">*</span></label>
+                <input type="text" name="new_first_name" class="field-input"
+                  placeholder="e.g. Juan"
+                  value="<?= htmlspecialchars($_POST['new_first_name'] ?? '') ?>"/>
+              </div>
+              <div class="field">
+                <label class="field-label">Last Name <span class="req">*</span></label>
+                <input type="text" name="new_last_name" class="field-input"
+                  placeholder="e.g. dela Cruz"
+                  value="<?= htmlspecialchars($_POST['new_last_name'] ?? '') ?>"/>
+              </div>
             </div>
 
             <div class="field">

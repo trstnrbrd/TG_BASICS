@@ -22,32 +22,32 @@ if ($renew_from > 0) {
     $renew_policy = $rs->get_result()->fetch_assoc();
 }
 
-// Get vehicle_id from URL (or from renew_from policy)
+// Get vehicle_id from URL, POST (lookup flow), or renew_from policy
 $vehicle_id = isset($_GET['vehicle_id']) ? (int)$_GET['vehicle_id'] : 0;
-
+if ($vehicle_id === 0 && isset($_POST['vehicle_id_resolved'])) {
+    $vehicle_id = (int)$_POST['vehicle_id_resolved'];
+}
 if ($vehicle_id === 0 && $renew_policy) {
     $vehicle_id = (int)$renew_policy['vehicle_id'];
 }
 
-if ($vehicle_id === 0) {
-    header("Location: eligibility_check.php");
-    exit;
+$vehicle = null;
+if ($vehicle_id > 0) {
+    $stmt = $conn->prepare("
+        SELECT c.client_id, c.full_name, c.contact_number, c.address,
+               v.vehicle_id, v.plate_number, v.make, v.model,
+               v.year_model, v.color, v.motor_number, v.serial_number
+        FROM vehicles v
+        INNER JOIN clients c ON v.client_id = c.client_id
+        WHERE v.vehicle_id = ?
+    ");
+    $stmt->bind_param('i', $vehicle_id);
+    $stmt->execute();
+    $vehicle = $stmt->get_result()->fetch_assoc();
 }
 
-// Load vehicle + client info
-$stmt = $conn->prepare("
-    SELECT c.client_id, c.full_name, c.contact_number, c.address,
-           v.vehicle_id, v.plate_number, v.make, v.model,
-           v.year_model, v.color, v.motor_number, v.serial_number
-    FROM vehicles v
-    INNER JOIN clients c ON v.client_id = c.client_id
-    WHERE v.vehicle_id = ?
-");
-$stmt->bind_param('i', $vehicle_id);
-$stmt->execute();
-$vehicle = $stmt->get_result()->fetch_assoc();
-
-if (!$vehicle) {
+// If POST submitted without vehicle_id resolved, bounce back
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$vehicle) {
     header("Location: eligibility_check.php");
     exit;
 }
@@ -299,17 +299,48 @@ require_once '../../includes/topbar.php';
       </div>
     <?php endif; ?>
 
+    <!-- PLATE LOOKUP -->
+    <?php if (!$vehicle): ?>
+    <div class="card" style="margin-bottom:1.25rem;" id="plate-lookup-card">
+      <div class="card-header">
+        <div class="card-icon"><?= icon('magnifying-glass', 16) ?></div>
+        <div>
+          <div class="card-title">Find Vehicle by Plate Number</div>
+          <div class="card-sub">Type the plate number to load client and vehicle details</div>
+        </div>
+      </div>
+      <div style="padding:1.25rem 1.5rem;">
+        <div style="display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap;">
+          <div class="field" style="flex:1;min-width:180px;max-width:320px;">
+            <label class="field-label">Plate Number <span class="req">*</span></label>
+            <input type="text" id="plate-lookup-input" class="field-input"
+              placeholder="e.g. ABC 1234" autocomplete="off" style="text-transform:uppercase;letter-spacing:1px;font-weight:700;"/>
+          </div>
+          <button type="button" id="plate-lookup-btn" class="btn-primary" style="margin-bottom:0.4rem;" onclick="doPlateSearch()">
+            <?= icon('magnifying-glass', 14) ?> Search
+          </button>
+        </div>
+        <div id="plate-lookup-result" style="margin-top:0.75rem;display:none;"></div>
+      </div>
+    </div>
+    <?php endif; ?>
+
     <!-- VEHICLE SUMMARY -->
-    <div class="card" style="margin-bottom:1.25rem;">
+    <div class="card" id="vehicle-summary-card" style="margin-bottom:1.25rem;<?= !$vehicle ? 'display:none;' : '' ?>">
       <div class="card-header">
         <div class="card-icon"><?= icon('vehicle', 16) ?></div>
         <div>
           <div class="card-title">Vehicle Being Insured</div>
           <div class="card-sub">Confirm this is the correct vehicle before encoding</div>
         </div>
+        <?php if (!$renew_policy && !isset($_GET['vehicle_id'])): ?>
+        <button type="button" onclick="clearVehicle()" class="btn-ghost" style="margin-left:auto;font-size:0.75rem;padding:0.35rem 0.75rem;">
+          <?= icon('x-mark', 12) ?> Change
+        </button>
+        <?php endif; ?>
       </div>
-      <div style="padding:1.25rem 1.5rem;display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;">
-        <?php
+      <div id="vehicle-summary-grid" style="padding:1.25rem 1.5rem;display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;">
+        <?php if ($vehicle):
         $vinfo = [
           ['Client',       $vehicle['full_name']],
           ['Plate Number', $vehicle['plate_number']],
@@ -321,7 +352,7 @@ require_once '../../includes/topbar.php';
           <div style="font-size:0.62rem;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);font-weight:700;margin-bottom:0.25rem;"><?= $vi[0] ?></div>
           <div style="font-size:0.85rem;font-weight:700;color:var(--text-primary);"><?= htmlspecialchars($vi[1]) ?></div>
         </div>
-        <?php endforeach; ?>
+        <?php endforeach; endif; ?>
       </div>
     </div>
 
@@ -393,8 +424,9 @@ require_once '../../includes/topbar.php';
     </style>
 
     <!-- POLICY FORM -->
-    <form method="POST" action="" enctype="multipart/form-data">
+    <form method="POST" action="" enctype="multipart/form-data" id="policy-form" <?= !$vehicle ? 'style="display:none;"' : '' ?>>
       <?= csrf_field() ?>
+      <input type="hidden" name="vehicle_id_resolved" id="vehicle-id-hidden" value="<?= $vehicle ? $vehicle['vehicle_id'] : '' ?>"/>
       <div class="card">
         <div class="card-header">
           <div class="card-icon"><?= icon('document', 16) ?></div>
@@ -575,6 +607,7 @@ require_once '../../includes/topbar.php';
 </div>
 
 <?php
+$_icon_search  = icon('magnifying-glass', 14);
 $footer_extra_scripts = '';
 $footer_scripts = '
   (function () {
@@ -916,6 +949,101 @@ $footer_scripts = '
         }
       }
     })();
+
+    // ── Plate Lookup ──
+    window.doPlateSearch = async function() {
+      const input  = document.getElementById("plate-lookup-input");
+      const btn    = document.getElementById("plate-lookup-btn");
+      const result = document.getElementById("plate-lookup-result");
+      if (!input) return;
+      const plate = input.value.trim().toUpperCase();
+      if (!plate) { input.focus(); return; }
+
+      btn.disabled = true;
+      btn.textContent = "Searching…";
+      result.style.display = "none";
+
+      try {
+        const base = document.querySelector("meta[name=base_path]")?.content || "/TG-BASICS/";
+        const res  = await fetch(base + "ajax/lookup_vehicle.php?plate=" + encodeURIComponent(plate));
+        const data = await res.json();
+
+        if (data.error) {
+          result.innerHTML = "<div class=\"alert alert-warning\" style=\"margin:0;\">" + data.error + "</div>";
+          result.style.display = "block";
+          btn.disabled = false;
+          btn.innerHTML = "' . $_icon_search . ' Search";
+          return;
+        }
+
+        const v  = data.vehicle;
+        const lp = data.last_policy;
+
+        // Populate vehicle summary card
+        document.getElementById("vehicle-id-hidden").value = v.vehicle_id;
+        document.getElementById("vehicle-summary-grid").innerHTML =
+          [["Client", v.full_name], ["Plate Number", v.plate_number],
+           ["Vehicle", v.make + " " + v.model + " " + v.year_model], ["Color", v.color || "N/A"]]
+          .map(function(vi) {
+            return "<div><div style=\"font-size:0.62rem;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);font-weight:700;margin-bottom:0.25rem;\">" + vi[0] + "</div>" +
+              "<div style=\"font-size:0.85rem;font-weight:700;color:var(--text-primary);\">" + vi[1] + "</div></div>";
+          }).join("");
+
+        document.getElementById("plate-lookup-card").style.display  = "none";
+        document.getElementById("vehicle-summary-card").style.display = "";
+        document.getElementById("policy-form").style.display          = "";
+
+        // Pre-fill from last policy if available
+        if (lp) {
+          const setIfEmpty = function(sel, val) {
+            const el = document.querySelector(sel);
+            if (el && !el.value && val) { el.value = val; el.dispatchEvent(new Event("input", {bubbles:true})); el.dispatchEvent(new Event("change", {bubbles:true})); }
+          };
+          setIfEmpty("[name=coverage_type]",    lp.coverage_type);
+          setIfEmpty("[name=sum_insured]",       lp.sum_insured);
+          setIfEmpty("[name=total_premium]",     lp.total_premium);
+          setIfEmpty("[name=basic_premium]",     lp.markup);
+          setIfEmpty("[name=participation_fee]", lp.participation_fee);
+          setIfEmpty("[name=payment_terms]",     lp.payment_terms);
+          setIfEmpty("[name=mortgagee]",         lp.mortgagee);
+          buildTable();
+
+          Swal.fire({
+            icon: "info",
+            title: "Previous Policy Found",
+            text: "Coverage type and premium amounts pre-filled from the last policy. Review and update before saving.",
+            confirmButtonColor: "#B8860B",
+            timer: 4000,
+            timerProgressBar: true,
+          });
+        }
+
+      } catch(err) {
+        result.innerHTML = "<div class=\"alert alert-danger\" style=\"margin:0;\">Lookup failed: " + err.message + "</div>";
+        result.style.display = "block";
+      }
+
+      btn.disabled = false;
+      btn.innerHTML = "' . $_icon_search . ' Search";
+    };
+
+    // Allow Enter key on plate input
+    const plateInput = document.getElementById("plate-lookup-input");
+    if (plateInput) {
+      plateInput.addEventListener("keydown", function(e) {
+        if (e.key === "Enter") { e.preventDefault(); doPlateSearch(); }
+      });
+    }
+
+    window.clearVehicle = function() {
+      document.getElementById("vehicle-summary-card").style.display = "none";
+      document.getElementById("policy-form").style.display           = "none";
+      document.getElementById("plate-lookup-card").style.display     = "";
+      document.getElementById("vehicle-id-hidden").value             = "";
+      document.getElementById("plate-lookup-input").value            = "";
+      document.getElementById("plate-lookup-result").style.display   = "none";
+      document.getElementById("plate-lookup-input").focus();
+    };
 
     // Form submit validation
     document.querySelector("form").addEventListener("submit", function(e) {

@@ -98,6 +98,15 @@ $vstmt->bind_param('i', $client_id);
 $vstmt->execute();
 $vehicles = $vstmt->get_result();
 
+// Collect vehicle IDs for eligibility button
+$_client_vehicle_ids = [];
+$_vtmp = $conn->prepare("SELECT vehicle_id FROM vehicles WHERE client_id = ? ORDER BY vehicle_id DESC");
+$_vtmp->bind_param('i', $client_id);
+$_vtmp->execute();
+$_vr = $_vtmp->get_result();
+while ($_vrow = $_vr->fetch_assoc()) $_client_vehicle_ids[] = (int)$_vrow['vehicle_id'];
+unset($_vtmp, $_vr, $_vrow);
+
 // Load claims
 $clstmt = $conn->prepare("
     SELECT cl.claim_id, cl.claim_type, cl.status, cl.incident_date, cl.created_at, cl.denial_reason,
@@ -378,7 +387,17 @@ require_once '../../includes/topbar.php';
           <div class="card-title">Insurance Policies</div>
           <div class="card-sub"><?= $pc ?> polic<?= $pc !== 1 ? 'ies' : 'y' ?> on record</div>
         </div>
-        <?php if (!$is_mechanic): ?><a href="../insurance/eligibility_check.php" class="btn-primary" style="margin-left:auto;padding:0.5rem 1rem;font-size:0.78rem;"><?= icon('shield-check', 14) ?> Check Eligibility</a><?php endif; ?>
+        <?php if (!$is_mechanic):
+            if (count($_client_vehicle_ids) === 1) {
+                $_elig_url = '../insurance/eligibility_check.php?vehicle_id=' . $_client_vehicle_ids[0];
+            } elseif (count($_client_vehicle_ids) > 1) {
+                $_elig_url = '../insurance/eligibility_check.php?search=' . urlencode($client['full_name']);
+            } else {
+                $_elig_url = '../insurance/eligibility_check.php';
+            }
+        ?>
+        <a href="<?= $_elig_url ?>" class="btn-primary" style="margin-left:auto;padding:0.5rem 1rem;font-size:0.78rem;"><?= icon('shield-check', 14) ?> Check Eligibility</a>
+        <?php endif; ?>
       </div>
       <?php if ($policies->num_rows > 0): ?>
       <div class="tg-table-wrap">
@@ -479,7 +498,7 @@ require_once '../../includes/topbar.php';
           <div class="card-sub"><?= $claims->num_rows ?> claim<?= $claims->num_rows !== 1 ? 's' : '' ?> on record</div>
         </div>
         <?php if (!$is_mechanic): ?>
-        <a href="../claims/add_claim.php" class="btn-primary" style="margin-left:auto;padding:0.5rem 1rem;font-size:0.78rem;">
+        <a href="../claims/add_claim.php?client_id=<?= $client_id ?>" class="btn-primary" style="margin-left:auto;padding:0.5rem 1rem;font-size:0.78rem;">
           <?= icon('plus', 14) ?> File New Claim
         </a>
         <?php endif; ?>

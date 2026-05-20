@@ -26,16 +26,19 @@ if (!isset($_SESSION['_last_regen'])) {
 }
 
 // ── LAST ACTIVE TRACKING ──
-// Update last_active every 60 seconds to avoid a DB write on every single page load.
-if (isset($_SESSION['user_id']) && (!isset($_SESSION['_last_active_update']) || time() - $_SESSION['_last_active_update'] > 60)) {
-    $_SESSION['_last_active_update'] = time();
-    // Lazy-load DB connection if not already available
-    if (!isset($conn)) {
-        require_once __DIR__ . '/db.php';
+// Update last_active on first visit (if never set) or every 60 seconds.
+if (isset($_SESSION['user_id'])) {
+    $never_stamped = !isset($_SESSION['_last_active_update']);
+    $due_for_update = isset($_SESSION['_last_active_update']) && time() - $_SESSION['_last_active_update'] > 60;
+    if ($never_stamped || $due_for_update) {
+        $_SESSION['_last_active_update'] = time();
+        if (!isset($conn)) {
+            require_once __DIR__ . '/db.php';
+        }
+        $uid = (int)$_SESSION['user_id'];
+        $stmt = $conn->prepare("UPDATE users SET last_active = NOW() WHERE user_id = ?");
+        $stmt->bind_param('i', $uid);
+        $stmt->execute();
+        $stmt->close();
     }
-    $uid = (int)$_SESSION['user_id'];
-    $stmt = $conn->prepare("UPDATE users SET last_active = NOW() WHERE user_id = ?");
-    $stmt->bind_param('i', $uid);
-    $stmt->execute();
-    $stmt->close();
 }

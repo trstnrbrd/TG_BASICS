@@ -103,18 +103,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
 
         // ── MY ACCOUNT ──
         case 'account':
-            $name   = san_str($_POST['full_name'] ?? '', MAX_NAME);
+            $first  = san_str($_POST['first_name'] ?? '', MAX_NAME);
+            $last   = san_str($_POST['last_name']  ?? '', MAX_NAME);
+            $name   = trim($first . ' ' . $last);
             $email  = san_str($_POST['email'] ?? '', MAX_EMAIL);
             $cur_pw = san_str($_POST['current_password'] ?? '', MAX_PASSWORD);
             $new_pw = san_str($_POST['new_password'] ?? '', MAX_PASSWORD);
             $cfm_pw = san_str($_POST['confirm_password'] ?? '', MAX_PASSWORD);
 
-            if ($name === '') {
-                echo json_encode(['ok' => false, 'error' => 'Full name is required.']);
+            if ($first === '') {
+                echo json_encode(['ok' => false, 'error' => 'First name is required.']);
                 exit;
             }
-            if (!validate_name($name)) {
-                echo json_encode(['ok' => false, 'error' => 'Full name contains invalid characters.']);
+            if ($last === '') {
+                echo json_encode(['ok' => false, 'error' => 'Last name is required.']);
+                exit;
+            }
+            if (!validate_name($first) || !validate_name($last)) {
+                echo json_encode(['ok' => false, 'error' => 'Name contains invalid characters.']);
                 exit;
             }
 
@@ -155,8 +161,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                 sendEmailVerificationEmail($email, $name, $verifyLink);
 
                 // Don't update email directly — update name only
-                $upd = $conn->prepare("UPDATE users SET full_name = ? WHERE user_id = ?");
-                $upd->bind_param('si', $name, $user_id);
+                $upd = $conn->prepare("UPDATE users SET first_name = ?, last_name = ? WHERE user_id = ?");
+                $upd->bind_param('ssi', $first, $last, $user_id);
                 $upd->execute();
                 $_SESSION['full_name'] = $name;
 
@@ -168,8 +174,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                 $msg = 'Profile updated. A verification email has been sent to ' . htmlspecialchars($email) . '.';
             } else {
                 // No email change — update profile normally
-                $upd = $conn->prepare("UPDATE users SET full_name = ?, email = ? WHERE user_id = ?");
-                $upd->bind_param('ssi', $name, $email, $user_id);
+                $upd = $conn->prepare("UPDATE users SET first_name = ?, last_name = ?, email = ? WHERE user_id = ?");
+                $upd->bind_param('sssi', $first, $last, $email, $user_id);
                 $upd->execute();
                 $_SESSION['full_name'] = $name;
 
@@ -518,7 +524,7 @@ $full_name = $_SESSION['full_name'];
 $initials  = substr(implode('', array_map(fn($w) => strtoupper($w[0]), explode(' ', $full_name))), 0, 2);
 
 // Current user record (include 2FA status, photo, theme)
-$u_stmt = $conn->prepare("SELECT full_name, username, username_changed_at, email, two_factor_enabled, totp_enabled, profile_photo, theme, transaction_pin FROM users WHERE user_id = ?");
+$u_stmt = $conn->prepare("SELECT first_name, last_name, full_name, username, username_changed_at, email, two_factor_enabled, totp_enabled, profile_photo, theme, transaction_pin FROM users WHERE user_id = ?");
 $u_stmt->bind_param('i', $user_id);
 $u_stmt->execute();
 $current_user = $u_stmt->get_result()->fetch_assoc();
@@ -631,11 +637,16 @@ require_once '../../includes/topbar.php';
           <div class="card-body">
             <div class="form-grid">
               <div class="field">
-                <label class="field-label">Full Name <span class="req">*</span></label>
-                <input type="text" name="full_name" class="field-input"
-                  value="<?= htmlspecialchars($current_user['full_name']) ?>" required/>
+                <label class="field-label">First Name <span class="req">*</span></label>
+                <input type="text" name="first_name" class="field-input"
+                  value="<?= htmlspecialchars($current_user['first_name']) ?>" required/>
               </div>
               <div class="field">
+                <label class="field-label">Last Name <span class="req">*</span></label>
+                <input type="text" name="last_name" class="field-input"
+                  value="<?= htmlspecialchars($current_user['last_name']) ?>" required/>
+              </div>
+              <div class="field span-2">
                 <label class="field-label">Email Address</label>
                 <input type="email" name="email" class="field-input"
                   value="<?= htmlspecialchars($current_user['email'] ?? '') ?>"

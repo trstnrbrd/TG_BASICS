@@ -108,6 +108,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $log->bind_param('is', $user['user_id'], $desc);
                     $log->execute();
 
+                    $la = $conn->prepare("UPDATE users SET last_active = NOW() WHERE user_id = ?");
+                    $la->bind_param('i', $user['user_id']);
+                    $la->execute();
+
                     $_SESSION['user_id']   = $user['user_id'];
                     $_SESSION['username']  = $user['username'];
                     $_SESSION['role']      = $user['role'];

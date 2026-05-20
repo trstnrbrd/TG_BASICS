@@ -25,6 +25,9 @@ if (isset($_SESSION['user_id'], $conn)) {
 ?>
 <div class="topbar">
   <div class="topbar-left">
+    <button class="hamburger" id="hamburger-btn" onclick="toggleSidebar()" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
     <div class="topbar-titles">
       <div class="topbar-title"><?= htmlspecialchars($topbar_title ?? '') ?></div>
       <div class="topbar-breadcrumb">
@@ -43,6 +46,15 @@ if (isset($_SESSION['user_id'], $conn)) {
     </div>
   </div>
   <div class="topbar-right">
+    <!-- GLOBAL SEARCH -->
+    <div class="gs-wrap" id="gs-wrap">
+      <div class="gs-input-row">
+        <svg class="gs-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="gs-input" class="gs-input" placeholder="Search anything…" autocomplete="off" spellcheck="false"/>
+        <kbd class="gs-kbd" id="gs-kbd">/</kbd>
+      </div>
+      <div class="gs-dropdown" id="gs-dropdown" style="display:none;"></div>
+    </div>
     <div id="user-dropdown-root"
       data-name="<?= htmlspecialchars($full_name_display) ?>"
       data-initials="<?= htmlspecialchars($initials_display) ?>"

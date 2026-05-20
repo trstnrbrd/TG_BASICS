@@ -73,8 +73,11 @@ clientSearch.addEventListener('focus', function() {
   if (this.value.trim() && !clientIdInput.value) this.dispatchEvent(new Event('input'));
 });
 
-// Re-select on validation fail
-if (typeof savedClient !== 'undefined' && savedClient) {
+// Pre-fill from view_client.php shortcut (GET param)
+if (typeof prefillClientId !== 'undefined' && prefillClientId && prefillClientName) {
+  selectClient(prefillClientId, prefillClientName);
+} else if (typeof savedClient !== 'undefined' && savedClient) {
+  // Re-select on validation fail (POST roundtrip)
   loadPolicies(savedClient);
   setTimeout(() => { if (typeof savedPolicy !== 'undefined' && savedPolicy) policySelect.value = savedPolicy; }, 600);
 }

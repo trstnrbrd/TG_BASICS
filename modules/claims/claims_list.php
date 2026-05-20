@@ -62,15 +62,15 @@ $stmt->execute();
 $result = $stmt->get_result();
 
 $status_map = [
-    'compiling'            => ['label' => 'Compiling Requirements', 'class' => 'badge-warning'],
+    'compiling'            => ['label' => 'Compiling Requirements', 'class' => 'badge-info'],
     'sent_admin'           => ['label' => 'Sent to Admin',          'class' => 'badge-info'],
-    'sent_head_office'     => ['label' => 'Sent to Head Office',    'class' => 'badge-orange'],
-    'waiting_loa'          => ['label' => 'Waiting for LOA',        'class' => 'badge-blue'],
-    'loa_received'         => ['label' => 'LOA Received',           'class' => 'badge-teal'],
-    'pending'              => ['label' => 'Pending',                'class' => 'badge-yellow'],
-    'approved'             => ['label' => 'Approved',               'class' => 'badge-success'],
-    'denied'               => ['label' => 'Denied',                 'class' => 'badge-danger'],
-    'lack_of_requirements' => ['label' => 'Lack of Requirements',   'class' => 'badge-danger'],
+    'sent_head_office'     => ['label' => 'Sent to Head Office',    'class' => 'badge-info'],
+    'waiting_loa'          => ['label' => 'Waiting for LOA',        'class' => 'badge-info'],
+    'loa_received'         => ['label' => 'LOA Received',           'class' => 'badge-green'],
+    'pending'              => ['label' => 'Pending',                'class' => 'badge-info'],
+    'approved'             => ['label' => 'Approved',               'class' => 'badge-green'],
+    'denied'               => ['label' => 'Denied',                 'class' => 'badge-red'],
+    'lack_of_requirements' => ['label' => 'Lack of Requirements',   'class' => 'badge-yellow'],
     'resolved'             => ['label' => 'Resolved',               'class' => 'badge-muted'],
 ];
 
@@ -156,12 +156,9 @@ require_once '../../includes/topbar.php';
         <table class="tg-table">
           <thead>
             <tr>
-              <th style="text-align:left;">Client / Vehicle</th>
-              <th style="text-align:center;">Policy No.</th>
-              <th>Docs</th>
-              <th>Incident Date</th>
+              <th style="text-align:left;padding-left:2.5rem;">Client / Vehicle</th>
               <th>Filed</th>
-              <th>Type / Status</th>
+              <th>Status</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -173,54 +170,74 @@ require_once '../../includes/topbar.php';
                          + (int)$row['doc_estimate'] + (int)$row['doc_damage_photos'];
               $s = $status_map[$row['status']] ?? ['label' => $row['status'], 'class' => 'badge-muted'];
               $is_finished = in_array($row['status'], ['resolved', 'denied', 'lack_of_requirements']);
+              $cid = 'claim-expand-' . $row['claim_id'];
             ?>
-            <tr>
-              <td>
-                <div style="font-weight:700;color:var(--text-primary);font-size:0.85rem;"><?= htmlspecialchars($row['full_name']) ?></div>
-                <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.1rem;">
-                  <?= htmlspecialchars($row['plate_number'] ?: '—') ?>
-                  <?php if ($row['make']): ?> &middot; <?= htmlspecialchars($row['make'] . ' ' . $row['model']) ?><?php endif; ?>
-                </div>
-              </td>
-              <td style="font-size:0.78rem;color:var(--text-muted);text-align:center;"><?= htmlspecialchars($row['policy_number']) ?></td>
-              <td>
-                <div style="display:flex;justify-content:center;">
-                  <div class="doc-progress" title="<?= $docs_done ?>/<?= $req_docs ?> documents received">
-                    <div class="doc-pip <?= $row['doc_insurance_policy'] ? 'filled' : 'empty' ?>" title="Policy"></div>
-                    <div class="doc-pip <?= $row['doc_or'] ? 'filled' : 'empty' ?>" title="OR"></div>
-                    <div class="doc-pip <?= $row['doc_cr'] ? 'filled' : 'empty' ?>" title="CR"></div>
-                    <div class="doc-pip <?= $row['doc_drivers_license'] ? 'filled' : 'empty' ?>" title="Driver's License"></div>
-                    <div class="doc-pip <?= $row['doc_affidavit'] ? 'filled' : 'empty' ?>" title="Affidavit"></div>
-                    <div class="doc-pip <?= $row['doc_estimate'] ? 'filled' : 'empty' ?>" title="Estimate"></div>
-                    <div class="doc-pip <?= $row['doc_damage_photos'] ? 'filled' : 'empty' ?>" title="Photos"></div>
-                    <span style="font-size:0.7rem;color:var(--text-muted);margin-left:0.35rem;"><?= $docs_done ?>/<?= $req_docs ?></span>
+            <tr class="tg-expandable-row" data-expand="<?= $cid ?>" style="cursor:pointer;">
+              <td style="text-align:left;">
+                <div style="display:flex;align-items:center;gap:0.6rem;">
+                  <svg class="row-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;opacity:0.35;transition:transform 0.2s;"><polyline points="9 18 15 12 9 6"/></svg>
+                  <div>
+                    <div style="font-weight:700;color:var(--text-primary);font-size:0.85rem;"><?= htmlspecialchars($row['full_name']) ?></div>
+                    <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.1rem;">
+                      <?= htmlspecialchars($row['plate_number'] ?: '—') ?>
+                      <?php if ($row['make']): ?> &middot; <?= htmlspecialchars($row['make'] . ' ' . $row['model']) ?><?php endif; ?>
+                    </div>
                   </div>
                 </div>
               </td>
-              <td style="font-size:0.78rem;color:var(--text-muted);white-space:nowrap;"><?= date('M d, Y', strtotime($row['incident_date'])) ?></td>
               <td style="font-size:0.72rem;color:var(--text-muted);white-space:nowrap;"><?= date('M d, Y', strtotime($row['created_at'])) ?></td>
+              <td><span class="badge <?= $s['class'] ?>"><?= $s['label'] ?></span></td>
               <td>
-                <div style="display:flex;flex-direction:column;align-items:center;gap:0.3rem;">
-                  <?php if ($row['claim_type'] === 'repair'): ?>
-                    <span class="badge badge-danger" style="width:fit-content;">Repair</span>
-                  <?php else: ?>
-                    <span class="badge badge-info" style="width:fit-content;">Claims</span>
+                <div style="display:flex;align-items:center;gap:0.35rem;justify-content:center;" onclick="event.stopPropagation()">
+                  <a href="view_claim.php?id=<?= $row['claim_id'] ?>" class="btn-sm-gold" title="View" style="padding:0.35rem 0.55rem;"><?= icon('eye',14) ?></a>
+                  <?php if ($is_finished): ?>
+                  <button type="button" class="btn-sm-danger js-delete-list" title="Delete" data-id="<?= $row['claim_id'] ?>"><?= icon('trash',14) ?></button>
                   <?php endif; ?>
-                  <span class="badge badge-muted" style="width:fit-content;font-size:0.6rem;"><?= htmlspecialchars($row['coverage_type']) ?></span>
-                  <span class="badge <?= $s['class'] ?>" style="width:fit-content;"><?= $s['label'] ?></span>
                 </div>
               </td>
-              <td>
-                <div style="display:flex;align-items:center;gap:0.35rem;justify-content:center;">
-                  <a href="view_claim.php?id=<?= $row['claim_id'] ?>" class="btn-sm-gold" title="View" style="padding:0.35rem 0.55rem;">
-                    <?= icon('eye',14) ?>
-                  </a>
-                  <?php if ($is_finished): ?>
-                  <button type="button" class="btn-sm-danger js-delete-list"
-                    title="Delete" data-id="<?= $row['claim_id'] ?>">
-                    <?= icon('trash',14) ?>
-                  </button>
-                  <?php endif; ?>
+            </tr>
+            <tr class="tg-expand-row" id="<?= $cid ?>" style="display:none;">
+              <td colspan="4" style="padding:0;">
+                <div class="tg-expand-body">
+                  <div class="tg-expand-grid">
+                    <div class="tg-expand-item">
+                      <span class="tg-expand-label">Policy No.</span>
+                      <span class="tg-expand-value"><?= htmlspecialchars($row['policy_number']) ?></span>
+                    </div>
+                    <div class="tg-expand-item">
+                      <span class="tg-expand-label">Coverage</span>
+                      <span class="tg-expand-value"><?= htmlspecialchars($row['coverage_type']) ?></span>
+                    </div>
+                    <div class="tg-expand-item">
+                      <span class="tg-expand-label">Type</span>
+                      <span class="tg-expand-value">
+                        <?php if ($row['claim_type'] === 'repair'): ?>
+                          <span class="badge badge-red">Repair</span>
+                        <?php else: ?>
+                          <span class="badge badge-info">Claims</span>
+                        <?php endif; ?>
+                      </span>
+                    </div>
+                    <div class="tg-expand-item">
+                      <span class="tg-expand-label">Incident Date</span>
+                      <span class="tg-expand-value"><?= date('M d, Y', strtotime($row['incident_date'])) ?></span>
+                    </div>
+                    <div class="tg-expand-item">
+                      <span class="tg-expand-label">Documents</span>
+                      <span class="tg-expand-value">
+                        <div class="doc-progress" title="<?= $docs_done ?>/<?= $req_docs ?> documents received">
+                          <div class="doc-pip <?= $row['doc_insurance_policy'] ? 'filled' : 'empty' ?>" title="Policy"></div>
+                          <div class="doc-pip <?= $row['doc_or'] ? 'filled' : 'empty' ?>" title="OR"></div>
+                          <div class="doc-pip <?= $row['doc_cr'] ? 'filled' : 'empty' ?>" title="CR"></div>
+                          <div class="doc-pip <?= $row['doc_drivers_license'] ? 'filled' : 'empty' ?>" title="Driver's License"></div>
+                          <div class="doc-pip <?= $row['doc_affidavit'] ? 'filled' : 'empty' ?>" title="Affidavit"></div>
+                          <div class="doc-pip <?= $row['doc_estimate'] ? 'filled' : 'empty' ?>" title="Estimate"></div>
+                          <div class="doc-pip <?= $row['doc_damage_photos'] ? 'filled' : 'empty' ?>" title="Photos"></div>
+                          <span style="font-size:0.7rem;color:var(--text-muted);margin-left:0.35rem;"><?= $docs_done ?>/<?= $req_docs ?></span>
+                        </div>
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </td>
             </tr>

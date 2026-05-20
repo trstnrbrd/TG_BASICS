@@ -252,7 +252,20 @@ require_once '../../includes/topbar.php';
         <table class="tg-table">
           <thead>
             <tr>
-              <th style="text-align:left;padding-left:2.5rem;">Client</th>
+              <th style="text-align:left;padding-left:2.5rem;">
+                <?php
+                $next_sort  = $sort_by === 'name_asc' ? 'name_desc' : 'name_asc';
+                $sort_icon  = $sort_by === 'name_asc'
+                  ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>'
+                  : ($sort_by === 'name_desc'
+                    ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>'
+                    : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="opacity:0.35"><path d="M8 9l4-4 4 4M8 15l4 4 4-4"/></svg>');
+                $sort_qs = http_build_query(array_merge($_GET, ['sort' => $next_sort]));
+                ?>
+                <a href="?<?= $sort_qs ?>" style="display:inline-flex;align-items:center;gap:0.35rem;color:inherit;text-decoration:none;">
+                  Client <?= $sort_icon ?>
+                </a>
+              </th>
               <th>Contact</th>
               <th>Type</th>
               <th>Actions</th>

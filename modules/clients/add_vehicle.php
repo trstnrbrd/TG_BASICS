@@ -196,7 +196,7 @@ require_once '../../includes/topbar.php';
             <div class="field">
               <label class="field-label">Plate Number <span class="req">*</span></label>
               <input type="text" name="plate_number" class="field-input"
-                placeholder="ABC 1234 or 945 RJC"
+                placeholder="ABC 1234"
                 value="<?= htmlspecialchars($_POST['plate_number'] ?? '') ?>"
                 style="text-transform:uppercase;" autofocus/>
             </div>

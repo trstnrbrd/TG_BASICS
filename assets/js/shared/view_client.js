@@ -19,6 +19,20 @@ document.querySelectorAll('.js-delete-client-profile').forEach(function(btn) {
   });
 });
 
+// Delete policy document
+function confirmDeleteDoc(btn, name) {
+  var form = btn.closest('form');
+  Swal.fire({
+    title: 'Remove document?',
+    text: '"' + name + '" will be permanently deleted.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#C0392B',
+    cancelButtonColor: '#6B7280',
+    confirmButtonText: 'Yes, remove',
+  }).then(async function(r) { if (r.isConfirmed) { var ok = await requirePin(); if (ok) form.submit(); } });
+}
+
 // Delete vehicle
 document.querySelectorAll('.js-delete-vehicle-form').forEach(function(form) {
   form.addEventListener('submit', async function(e) {

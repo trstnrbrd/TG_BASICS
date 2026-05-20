@@ -318,54 +318,128 @@ require_once '../../includes/topbar.php';
         </a>
         <?php endif; ?>
       </div>
+
       <?php if ($vehicles->num_rows > 0): ?>
-      <div class="tg-table-wrap">
-        <table class="tg-table">
-          <thead>
-            <tr>
-              <th style="text-align:center;">Plate Number</th>
-              <th style="text-align:center;">Make &amp; Model</th>
-              <th style="text-align:center;">Year</th>
-              <th style="text-align:center;">Color</th>
-              <th style="text-align:center;">Engine No.</th>
-              <th style="text-align:center;">Chassis No.</th>
-              <th style="text-align:center;">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            <?php while ($v = $vehicles->fetch_assoc()): ?>
-            <tr>
-              <td style="text-align:center;"><span class="badge-dark"><?= htmlspecialchars($v['plate_number']) ?></span></td>
-              <td style="font-weight:700;color:var(--text-primary);text-align:center;"><?= htmlspecialchars($v['make'] . ' ' . $v['model']) ?></td>
-              <td style="text-align:center;"><?= htmlspecialchars($v['year_model']) ?></td>
-              <td style="text-align:center;"><?= htmlspecialchars($v['color'] ?: 'N/A') ?></td>
-              <td style="font-size:0.75rem;color:var(--text-muted);text-align:center;"><?= htmlspecialchars($v['motor_number'] ?: 'N/A') ?></td>
-              <td style="font-size:0.75rem;color:var(--text-muted);text-align:center;"><?= htmlspecialchars($v['serial_number'] ?: 'N/A') ?></td>
-              <td style="text-align:center;">
-                <div style="display:inline-flex;gap:0.4rem;align-items:center;">
-                  <?php if (!$is_mechanic): ?>
-                  <a href="../insurance/eligibility_check.php?vehicle_id=<?= $v['vehicle_id'] ?>" class="btn-sm-gold" title="Check Policy" style="padding:0.35rem 0.55rem;">
-                    <?= icon('shield-check', 14) ?>
-                  </a>
-                  <a href="edit_vehicle.php?id=<?= $v['vehicle_id'] ?>" class="btn-sm-gold" title="Edit" style="padding:0.35rem 0.55rem;">
-                    <?= icon('pencil', 14) ?>
-                  </a>
-                  <form method="POST" action="delete_vehicle.php" style="display:inline;"
-                        class="js-delete-vehicle-form"
-                        data-plate="<?= htmlspecialchars($v['plate_number'], ENT_QUOTES) ?>">
-                    <?= csrf_field() ?>
-                    <input type="hidden" name="vehicle_id" value="<?= $v['vehicle_id'] ?>"/>
-                    <button type="submit" class="btn-sm-danger" title="Delete">
-                      <?= icon('trash', 14) ?>
-                    </button>
-                  </form>
-                  <?php endif; ?>
-                </div>
-              </td>
-            </tr>
-            <?php endwhile; ?>
-          </tbody>
-        </table>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem;padding:1.25rem;">
+        <?php while ($v = $vehicles->fetch_assoc()):
+          // Build Imagin Studio URL from vehicle data
+          $img_make   = strtolower(trim($v['make']));
+          $img_model  = strtolower(str_replace(' ', '-', trim($v['model'])));
+          $img_year   = (int)($v['year_model'] ?? 0);
+          // Map color name to imagin paint description
+          $color_map = [
+            'white'       => 'glacier-white',
+            'black'       => 'midnight-black',
+            'silver'      => 'star-silver',
+            'gray'        => 'iron-grey',
+            'grey'        => 'iron-grey',
+            'red'         => 'flame-red',
+            'blue'        => 'ocean-blue',
+            'dark blue'   => 'deep-blue',
+            'navy'        => 'deep-blue',
+            'green'       => 'emerald-green',
+            'brown'       => 'hazel-brown',
+            'beige'       => 'pearl-beige',
+            'orange'      => 'sunset-orange',
+            'yellow'      => 'lightning-yellow',
+            'maroon'      => 'vintage-maroon',
+            'pearl'       => 'pearl-white',
+            'champagne'   => 'champagne-gold',
+          ];
+          $color_key   = strtolower(trim($v['color'] ?? ''));
+          $img_paint   = $color_map[$color_key] ?? '';
+          $img_url     = 'https://cdn.imagin.studio/getimage?customer=hrjavascript-mastery'
+                       . '&make=' . urlencode($img_make)
+                       . '&modelFamily=' . urlencode($img_model)
+                       . ($img_year ? '&modelYear=' . $img_year : '')
+                       . ($img_paint ? '&paintdescription=' . urlencode($img_paint) : '')
+                       . '&zoomType=fullscreen&angle=13';
+        ?>
+        <div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--bg-3);box-shadow:var(--shadow);display:flex;flex-direction:column;">
+
+          <!-- 3D Car Image — drag to rotate -->
+          <?php $vid = 'vcar-' . $v['vehicle_id']; ?>
+          <div class="car3d-wrap" id="<?= $vid ?>"
+               data-make="<?= htmlspecialchars($img_make) ?>"
+               data-model="<?= htmlspecialchars($img_model) ?>"
+               data-year="<?= $img_year ?>"
+               data-paint="<?= htmlspecialchars($img_paint) ?>"
+               style="background:linear-gradient(135deg,var(--bg-2),var(--bg));padding:1rem;position:relative;min-height:160px;display:flex;align-items:center;justify-content:center;cursor:grab;user-select:none;">
+            <img class="car3d-img"
+                 src="<?= htmlspecialchars($img_url) ?>"
+                 alt="<?= htmlspecialchars($v['make'] . ' ' . $v['model']) ?>"
+                 draggable="false"
+                 style="width:100%;max-height:140px;object-fit:contain;pointer-events:none;transition:opacity 0.1s;"
+                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
+            <!-- Fallback -->
+            <div class="car3d-fallback" style="display:none;flex-direction:column;align-items:center;justify-content:center;gap:0.4rem;color:var(--text-muted);font-size:0.72rem;height:120px;">
+              <?= icon('vehicle', 36) ?>
+              <span>No preview available</span>
+            </div>
+            <!-- Plate badge overlay -->
+            <div style="position:absolute;bottom:0.6rem;left:0.75rem;">
+              <span class="badge-dark" style="font-size:0.7rem;"><?= htmlspecialchars($v['plate_number']) ?></span>
+            </div>
+            <!-- Drag hint -->
+            <div class="car3d-hint" style="position:absolute;bottom:0.6rem;right:0.75rem;font-size:0.6rem;color:var(--text-muted);display:flex;align-items:center;gap:0.25rem;opacity:0.7;">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg>
+              Drag to rotate
+            </div>
+          </div>
+
+          <!-- Vehicle Details -->
+          <div style="padding:0.85rem 1rem;flex:1;display:flex;flex-direction:column;gap:0.6rem;">
+            <div>
+              <div style="font-size:0.95rem;font-weight:800;color:var(--text-primary);letter-spacing:-0.2px;">
+                <?= htmlspecialchars($v['make'] . ' ' . $v['model']) ?>
+              </div>
+              <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.1rem;">
+                <?= htmlspecialchars($v['year_model'] ?: 'Year unknown') ?>
+                <?php if ($v['color']): ?> &middot; <?= htmlspecialchars($v['color']) ?><?php endif; ?>
+              </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem 0.75rem;">
+              <?php
+              $vdetails = [
+                ['Engine No.',  $v['motor_number']  ?: 'N/A'],
+                ['Chassis No.', $v['serial_number'] ?: 'N/A'],
+              ];
+              foreach ($vdetails as [$vlabel, $vval]): ?>
+              <div style="min-width:0;">
+                <div style="font-size:0.58rem;letter-spacing:1px;text-transform:uppercase;font-weight:700;color:var(--text-muted);"><?= $vlabel ?></div>
+                <div style="font-size:0.75rem;font-weight:600;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<?= htmlspecialchars($vval) ?>"><?= htmlspecialchars($vval) ?></div>
+              </div>
+              <?php endforeach; ?>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div style="padding:0.65rem 1rem;border-top:1px solid var(--border);background:var(--bg-2);display:flex;gap:0.4rem;">
+            <a href="view_vehicle.php?id=<?= $v['vehicle_id'] ?>" class="btn-sm-gold" title="View Vehicle" style="flex:1;justify-content:center;">
+              <?= icon('eye', 13) ?> View
+            </a>
+            <?php if (!$is_mechanic): ?>
+            <a href="../insurance/eligibility_check.php?vehicle_id=<?= $v['vehicle_id'] ?>" class="btn-sm-gold" title="Check Policy" style="padding:0.35rem 0.55rem;">
+              <?= icon('shield-check', 13) ?>
+            </a>
+            <a href="edit_vehicle.php?id=<?= $v['vehicle_id'] ?>" class="btn-sm-gold" title="Edit" style="padding:0.35rem 0.55rem;">
+              <?= icon('pencil', 13) ?>
+            </a>
+            <form method="POST" action="delete_vehicle.php" style="display:inline;"
+                  class="js-delete-vehicle-form"
+                  data-plate="<?= htmlspecialchars($v['plate_number'], ENT_QUOTES) ?>">
+              <?= csrf_field() ?>
+              <input type="hidden" name="vehicle_id" value="<?= $v['vehicle_id'] ?>"/>
+              <button type="submit" class="btn-sm-danger" title="Delete" style="padding:0.35rem 0.55rem;">
+                <?= icon('trash', 13) ?>
+              </button>
+            </form>
+            <?php endif; ?>
+          </div>
+
+        </div>
+        <?php endwhile; ?>
       </div>
       <?php else: ?>
       <div class="empty-state">
@@ -716,20 +790,7 @@ require_once '../../includes/topbar.php';
   </div>
 </div>
 
-<script src="../../assets/js/shared/view_client.js"></script>
-<script>
-function confirmDeleteDoc(btn, name) {
-  const form = btn.closest('form');
-  Swal.fire({
-    title: 'Remove document?',
-    text: '"' + name + '" will be permanently deleted.',
-    icon: 'warning',
-    showCancelButton: true,
-    confirmButtonColor: '#C0392B',
-    cancelButtonColor: '#6B7280',
-    confirmButtonText: 'Yes, remove',
-  }).then(async r => { if (r.isConfirmed) { const ok = await requirePin(); if (ok) form.submit(); } });
-}
-</script>
+<script src="../../assets/js/shared/view_client.js?v=<?= filemtime(__DIR__.'/../../assets/js/shared/view_client.js') ?>"></script>
+<script src="../../assets/js/shared/vehicle_3d_rotation.js?v=<?= filemtime(__DIR__.'/../../assets/js/shared/vehicle_3d_rotation.js') ?>"></script>
 
 <?php require_once '../../includes/footer.php'; ?>

@@ -367,11 +367,19 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
   .content { padding: 2rem; }
 
   .back-link {
-    display: inline-flex; align-items: center; gap: 0.4rem;
-    color: var(--text-muted); text-decoration: none;
-    font-size: 0.78rem; font-weight: 500; margin-bottom: 1.5rem; transition: color 0.15s;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px;
+    background: var(--bg-3); border: 1px solid var(--border);
+    border-radius: 10px; color: var(--text-secondary);
+    text-decoration: none; margin-bottom: 1.25rem;
+    box-shadow: var(--shadow); transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+    flex-shrink: 0; font-size: 0;
   }
-  .back-link:hover { color: var(--gold); }
+  .back-link svg { flex-shrink: 0; font-size: initial; }
+  .back-link:hover {
+    background: var(--gold-pale); border-color: var(--gold-muted);
+    color: var(--gold); box-shadow: var(--shadow-md);
+  }
 
   /* ── PAGE HEADER ── */
   .page-header {
@@ -746,6 +754,18 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
   document.addEventListener('DOMContentLoaded', function () {
     const overlay = document.getElementById('sidebar-overlay');
     if (overlay) overlay.addEventListener('click', toggleSidebar);
+
+    // Mobile: tap nav-item with chevron to toggle accordion flyout
+    document.querySelectorAll('.nav-item-wrap').forEach(function(wrap) {
+      const item = wrap.querySelector('.nav-item');
+      const flyout = wrap.querySelector('.nav-flyout');
+      if (!item || !flyout) return;
+      item.addEventListener('click', function(e) {
+        if (window.innerWidth > 768) return; // desktop uses hover
+        e.preventDefault();
+        wrap.classList.toggle('mob-open');
+      });
+    });
   });
 
   // ── Global Transaction PIN verifier ──
@@ -800,8 +820,8 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
         document.documentElement.classList.add('tg-loading');
       }
     });
-    document.addEventListener('submit', function () {
-      document.documentElement.classList.add('tg-loading');
+    document.addEventListener('submit', function (e) {
+      if (!e.defaultPrevented) document.documentElement.classList.add('tg-loading');
     });
   })();
 </script>

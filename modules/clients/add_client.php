@@ -16,7 +16,7 @@ $success = false;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
-    $full_name      = san_str($_POST['full_name'] ?? '', MAX_NAME);
+    $full_name      = strtoupper(san_str($_POST['full_name'] ?? '', MAX_NAME));
     $contact_number = san_str($_POST['contact_number'] ?? '', MAX_PHONE);
     $email          = san_str($_POST['email'] ?? '', MAX_EMAIL);
     $address        = san_str($_POST['address'] ?? '', MAX_ADDRESS);
@@ -109,7 +109,7 @@ require_once '../../includes/topbar.php';
         <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--border);">
           <div style="display:flex;align-items:center;gap:0.6rem;">
             <span style="color:var(--gold-bright);"><?= icon('magnifying-glass', 16) ?></span>
-            <span style="font-weight:700;font-size:0.9rem;color:var(--text-primary);">Scan OR / CR</span>
+            <span style="font-weight:700;font-size:0.9rem;color:var(--text-primary);">Scan OR / CR / Policy</span>
             <span style="font-size:0.65rem;font-weight:700;color:var(--gold-bright);background:var(--gold-pale);border:1px solid var(--gold-bright);border-radius:6px;padding:0.1rem 0.4rem;">OCR</span>
           </div>
           <button type="button" onclick="ocrModalClose()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0.25rem;"><?= icon('x-mark', 16) ?></button>
@@ -119,7 +119,7 @@ require_once '../../includes/topbar.php';
             <div id="ocr-idle">
               <div style="color:var(--text-muted);margin-bottom:0.4rem;"><?= icon('camera', 24) ?></div>
               <div style="font-size:0.85rem;font-weight:700;color:var(--text-primary);margin-bottom:0.2rem;">Tap to take a photo or upload</div>
-              <div style="font-size:0.72rem;color:var(--text-muted);">JPG, PNG, WEBP, PDF · Works best on flat, clear documents</div>
+              <div style="font-size:0.72rem;color:var(--text-muted);">OR/CR or PhilBritish policy · JPG, PNG, WEBP, PDF</div>
             </div>
             <div id="ocr-preview" style="display:none;">
               <img id="ocr-img" style="max-width:100%;max-height:200px;border-radius:8px;object-fit:contain;" alt="OR/CR"/>
@@ -166,6 +166,24 @@ require_once '../../includes/topbar.php';
     #ocr-upload-area:hover { border-color: var(--gold-bright); }
     .ocr-filled { background: rgba(212,160,23,0.08) !important; border-color: var(--gold-bright) !important; }
     </style>
+    <script>
+    function ocrModalOpen()  { var m = document.getElementById("ocr-modal"); if (m) m.style.display = "flex"; }
+    function ocrModalClose() { var m = document.getElementById("ocr-modal"); if (m) m.style.display = "none"; }
+    function ocrClear() {
+      var fi = document.getElementById("ocr-file-input");
+      var img = document.getElementById("ocr-img");
+      if (fi) fi.value = "";
+      if (img) { img.src = ""; img.style.display = "block"; }
+      var pp = document.getElementById("ocr-pdf-preview"); if (pp) pp.style.display = "none";
+      var idle = document.getElementById("ocr-idle"); if (idle) idle.style.display = "block";
+      var prev = document.getElementById("ocr-preview"); if (prev) prev.style.display = "none";
+      var cb = document.getElementById("ocr-clear-btn"); if (cb) cb.style.display = "none";
+      var prog = document.getElementById("ocr-progress"); if (prog) prog.style.display = "none";
+      var res = document.getElementById("ocr-result-notice"); if (res) res.style.display = "none";
+      var err = document.getElementById("ocr-error-notice"); if (err) err.style.display = "none";
+      document.querySelectorAll(".ocr-filled").forEach(function(el) { el.classList.remove("ocr-filled"); });
+    }
+    </script>
 
     <form method="POST" action="">
       <?= csrf_field() ?>
@@ -187,8 +205,9 @@ require_once '../../includes/topbar.php';
             <div class="field">
               <label class="field-label">Full Name <span class="req">*</span></label>
               <input type="text" name="full_name" class="field-input"
-                placeholder="First Middle Last"
+                placeholder="FIRST MIDDLE LAST"
                 value="<?= htmlspecialchars($_POST['full_name'] ?? '') ?>"
+                style="text-transform:uppercase;"
                 autofocus/>
             </div>
             <div class="field">
@@ -274,7 +293,7 @@ require_once '../../includes/topbar.php';
 
         </div>
         <div class="form-actions">
-          <a href="client_list.php" class="btn-ghost"><?= icon('arrow-left', 14) ?> Cancel</a>
+          <button type="button" class="btn-ghost" id="clear-form-btn"><?= icon('x-mark', 14) ?> Clear</button>
           <button type="submit" class="btn-primary"><?= icon('floppy-disk', 14) ?> Save Client</button>
         </div>
       </div>
@@ -284,65 +303,48 @@ require_once '../../includes/topbar.php';
 </div>
 
 <?php
-$footer_scripts = '
+$footer_scripts = '';
+$footer_extra_scripts = <<<'ADDCLIENT_SCRIPT'
+<script>
 (function() {
-  const fileInput = document.getElementById("ocr-file-input");
-  const idleEl    = document.getElementById("ocr-idle");
-  const previewEl = document.getElementById("ocr-preview");
-  const imgEl     = document.getElementById("ocr-img");
-  const progressEl= document.getElementById("ocr-progress");
-  const statusEl  = document.getElementById("ocr-status-text");
-  const barEl     = document.getElementById("ocr-bar");
-  const resultEl  = document.getElementById("ocr-result-notice");
-  const errorEl   = document.getElementById("ocr-error-notice");
-  const clearBtn  = document.getElementById("ocr-clear-btn");
-  const filledEl  = document.getElementById("ocr-filled-fields");
+  var fileInput = document.getElementById("ocr-file-input");
+  var idleEl    = document.getElementById("ocr-idle");
+  var previewEl = document.getElementById("ocr-preview");
+  var imgEl     = document.getElementById("ocr-img");
+  var progressEl= document.getElementById("ocr-progress");
+  var statusEl  = document.getElementById("ocr-status-text");
+  var barEl     = document.getElementById("ocr-bar");
+  var resultEl  = document.getElementById("ocr-result-notice");
+  var errorEl   = document.getElementById("ocr-error-notice");
+  var clearBtn  = document.getElementById("ocr-clear-btn");
+  var filledEl  = document.getElementById("ocr-filled-fields");
 
-  window.ocrModalOpen = function() {
-    document.getElementById("ocr-modal").style.display = "flex";
-  };
-  window.ocrModalClose = function() {
-    document.getElementById("ocr-modal").style.display = "none";
-  };
-
-  fileInput.addEventListener("change", function() {
-    if (!this.files || !this.files[0]) return;
-    const file = this.files[0];
-    const isPdf = file.type === "application/pdf";
-    idleEl.style.display    = "none";
-    previewEl.style.display = "block";
-    clearBtn.style.display  = "inline-flex";
-    resultEl.style.display  = "none";
-    errorEl.style.display   = "none";
-    if (isPdf) {
-      imgEl.style.display = "none";
-      document.getElementById("ocr-pdf-preview").style.display = "block";
-      document.getElementById("ocr-pdf-name").textContent = file.name;
-    } else {
-      imgEl.style.display = "block";
-      document.getElementById("ocr-pdf-preview").style.display = "none";
-      imgEl.src = URL.createObjectURL(file);
-    }
-    runOCR(file);
-  });
-
-  window.ocrClear = function() {
-    fileInput.value = "";
-    imgEl.src = "";
-    imgEl.style.display = "block";
-    document.getElementById("ocr-pdf-preview").style.display = "none";
-    idleEl.style.display    = "block";
-    previewEl.style.display = "none";
-    clearBtn.style.display  = "none";
-    progressEl.style.display= "none";
-    resultEl.style.display  = "none";
-    errorEl.style.display   = "none";
-    document.querySelectorAll(".ocr-filled").forEach(function(el) { el.classList.remove("ocr-filled"); });
-  };
+  if (fileInput) {
+    fileInput.addEventListener("change", function() {
+      if (!this.files || !this.files[0]) return;
+      var file = this.files[0];
+      var isPdf = file.type === "application/pdf";
+      idleEl.style.display    = "none";
+      previewEl.style.display = "block";
+      clearBtn.style.display  = "inline-flex";
+      resultEl.style.display  = "none";
+      errorEl.style.display   = "none";
+      if (isPdf) {
+        imgEl.style.display = "none";
+        document.getElementById("ocr-pdf-preview").style.display = "block";
+        document.getElementById("ocr-pdf-name").textContent = file.name;
+      } else {
+        imgEl.style.display = "block";
+        document.getElementById("ocr-pdf-preview").style.display = "none";
+        imgEl.src = URL.createObjectURL(file);
+      }
+      runOCR(file);
+    });
+  }
 
   function fillField(selector, value) {
     if (!value) return false;
-    const el = document.querySelector(selector);
+    var el = document.querySelector(selector);
     if (!el || el.value) return false;
     el.value = value.trim();
     el.classList.add("ocr-filled");
@@ -355,24 +357,154 @@ $footer_scripts = '
   }
 
   function parseText(text) {
-    const filled = [];
-    const upper  = text.toUpperCase();
-    const lines  = upper.split(/\r?\n/);
+    var filled = [];
+    var upper  = text.toUpperCase();
+    var lines  = upper.split(/\r?\n/);
 
-    // ── Owner Name ──
-    // OR:  "RECEIVED FROM (Last Name, First Name Middle Name)\nTORRES, PHILLIP LIPATA"
-    // CR:  "...PHILLIP LIPATA TORRES COMPLETE ADDRESS..." (merged line)
-    // CR2: "COMPLETE OWNERS NAME\n[name]"
-    let nameVal = null;
-    // OR: "RECEIVED FROM ...\r\nTORRES, PHILLIP LIPATA\t\r\n"
-    const orNameM = text.match(/RECEIVED\s+FROM[^\r\n]*[\r\n]+([A-Z][A-Z\s.,]{3,60})/i);
+    var isPolicy = /MOTOR\s+CAR\s+POLICY\s+SCHEDULE|PHILBRITISH|POLICY\s+NO\s*\.?\s*:\s*P-BLC/i.test(text);
+    if (isPolicy) {
+      console.log("[OCR-POLICY] raw text:\n", text);
+
+      // MAKE : 2022 SUZUKI...  OR  MAKE\t:\t2022 SUZUKI...
+      var makeLineM = upper.match(/^MAKE[ \t]*:[ \t]*(\d{4})\s+([A-Z]+)\s+([A-Z0-9 ]+)/m);
+      if (makeLineM) {
+        var yr = makeLineM[1];
+        var mk = makeLineM[2];
+        var modelShort = makeLineM[3].trim().split(/\s+/).slice(0, 2).join(" ");
+        fillField("[name=year_model]", yr)   && filled.push("Year Model");
+        fillField("[name=make]", mk[0] + mk.slice(1).toLowerCase()) && filled.push("Make");
+        fillField("[name=model]", modelShort) && filled.push("Model");
+      } else { console.log("[OCR] MAKE line not matched"); }
+
+      var insuredM = upper.match(/INSURED\s*:[ \t]*(.{3,120})/);
+      if (insuredM) {
+        var lineVal = insuredM[1].replace(/\s*:\s*PHP.*$/i, "").trim();
+        lineVal = lineVal.replace(/\s+/g, " ").split(/\t/)[0].trim();
+        var lastColon = lineVal.lastIndexOf(":");
+        if (lastColon !== -1) lineVal = lineVal.slice(lastColon + 1).trim();
+        var insuredIdx = upper.indexOf(insuredM[0]);
+        var afterInsured = upper.slice(insuredIdx + insuredM[0].length);
+        var skipKeywords = /^(PREMIUM|DOCUMENTARY|ADDRESS|AGENT|TOTAL|FROM|TO|PRODUCT|LINE|POLICY|SUB|MAKE|PLATE|MOTOR|SERIAL|COLOR|OTHER|VALUE|LOCAL|HVDC|PHP)/;
+        var nameCont = "";
+        var linesAfter = afterInsured.split(/\r?\n/).slice(0, 5);
+        for (var i = 0; i < linesAfter.length; i++) {
+          var t = linesAfter[i].trim().split(/\t/)[0].trim();
+          if (t.length >= 2 && t.length <= 30 && /^[A-Z ]+$/.test(t) && !skipKeywords.test(t)) {
+            nameCont = t;
+            break;
+          }
+        }
+        var fullName = (lineVal + (nameCont ? " " + nameCont : "")).replace(/\s+/g, " ").trim();
+        console.log("[OCR] name built:", fullName);
+        if (fullName.length >= 3) fillField("[name=full_name]", fullName) && filled.push("Full Name");
+      } else { console.log("[OCR] INSURED not matched"); }
+
+      // Address: PDF layout "Address\t: 32F GT TOWER...\tValue Added Tax\t..."
+      // Continuation line "HVDC SALCEDO VILLAGE, MAKATI CITY\t..." may follow
+      var addrM = upper.match(/^ADDRESS[ \t]*:[ \t]*(.{5,120})/m);
+      if (addrM) {
+        var addrRaw = addrM[1].trim();
+        // Strip tab-separated columns on same line (stop at first tab)
+        addrRaw = addrRaw.split(/\t/)[0].trim();
+        // Strip peso amounts and keyword columns
+        addrRaw = addrRaw.replace(/\s*\d[\d,]*\.\d{2}.*$/, "").trim();
+        addrRaw = addrRaw.replace(/\s*(?:VALUE ADDED|DOCUMENTARY|LOCAL GOV|PREMIUM|TOTAL|ISSUE DATE).*$/i, "").trim();
+        // Try to grab continuation line (next non-empty line before a known keyword)
+        var addrIdx = upper.indexOf(addrM[0]);
+        var afterAddr = upper.slice(addrIdx + addrM[0].length);
+        var addrSkip = /^(VALUE|DOCUMENTARY|LOCAL|OTHER|TOTAL|AGENT|PREMIUM|ADDRESS|MAKE|PLATE|MOTOR|SERIAL|COLOR|MORTGAGEE|INSURED|SCHEDULED)/;
+        var addrLines = afterAddr.split(/\r?\n/).slice(0, 3);
+        for (var ai = 0; ai < addrLines.length; ai++) {
+          var al = addrLines[ai].split(/\t/)[0].trim();
+          if (al.length >= 5 && !addrSkip.test(al) && !/^\d[\d,]*\.\d{2}/.test(al)) {
+            addrRaw = addrRaw + ", " + al;
+            break;
+          }
+        }
+        if (addrRaw.length >= 8) fillField("[name=address]", addrRaw) && filled.push("Address");
+      }
+
+      // PLATE NO line: split by tab, grab first token that looks like a plate (4-8 alphanum)
+      // PDF: "PLATE NO.\tNIC3436\tMV FILE NO."  Image: "PLATE NO.\t: NIC3436"
+      var pPlateRaw = null;
+      var pPlateLineIdx = upper.indexOf("PLATE NO");
+      if (pPlateLineIdx !== -1) {
+        var pPlateLineEnd = upper.indexOf("\n", pPlateLineIdx);
+        if (pPlateLineEnd === -1) pPlateLineEnd = upper.length;
+        var plateLine = upper.slice(pPlateLineIdx, pPlateLineEnd);
+        var plateTokens = plateLine.split(/\t/);
+        for (var pi = 1; pi < plateTokens.length; pi++) {
+          var pt = plateTokens[pi].replace(/^:\s*/, "").trim(); // strip leading colon
+          if (/^[A-Z0-9]{4,8}$/.test(pt)) { pPlateRaw = pt; break; }
+        }
+      }
+      if (pPlateRaw) {
+        var carM = pPlateRaw.match(/^([A-Z]{2,3})(\d{3,4})$/);
+        var moM  = pPlateRaw.match(/^(\d{3})([A-Z]{2,3})$/);
+        var fmt  = carM ? carM[1]+" "+carM[2] : (moM ? moM[1]+" "+moM[2] : pPlateRaw);
+        fillField("[name=plate_number]", fmt) && filled.push("Plate Number");
+      } else console.log("[OCR] PLATE NO not matched");
+
+      // MOTOR NO line: split by tab, grab first token that is 6-20 alphanum
+      // PDF: "MOTOR NO.\tK12MP4273382\t"  Image: "MOTOR NO.\t: K12MP4273382"
+      var motorVal = null;
+      var motorLineIdx = upper.indexOf("MOTOR NO");
+      if (motorLineIdx !== -1) {
+        var motorLineEnd = upper.indexOf("\n", motorLineIdx);
+        if (motorLineEnd === -1) motorLineEnd = upper.length;
+        var motorLine = upper.slice(motorLineIdx, motorLineEnd);
+        var motorTokens = motorLine.split(/\t/);
+        for (var moi = 1; moi < motorTokens.length; moi++) {
+          var mt = motorTokens[moi].replace(/^:\s*/, "").trim();
+          if (/^[A-Z0-9]{6,20}$/.test(mt)) { motorVal = mt; break; }
+        }
+      }
+      if (motorVal) fillField("[name=motor_number]", motorVal) && filled.push("Engine Number");
+      else console.log("[OCR] MOTOR NO not matched");
+
+      // Find SERIAL NO line then grab the first token that looks like a VIN (10-20 alphanum, no spaces)
+      var serialVal = null;
+      var serialLineIdx = upper.indexOf("SERIAL NO");
+      if (serialLineIdx !== -1) {
+        // Get the full line containing SERIAL NO
+        var serialLineEnd = upper.indexOf("\n", serialLineIdx);
+        if (serialLineEnd === -1) serialLineEnd = upper.length;
+        var serialLine = upper.slice(serialLineIdx, serialLineEnd);
+        // Split by tab, find first token that is 10-20 pure alphanum (a VIN)
+        var serialTokens = serialLine.split(/\t/);
+        for (var si = 1; si < serialTokens.length; si++) {
+          var st = serialTokens[si].trim();
+          if (/^[A-Z0-9]{10,20}$/.test(st)) { serialVal = st; break; }
+        }
+        // Fallback: value on next line (image scan layout)
+        if (!serialVal) {
+          var afterSerial = upper.slice(serialLineIdx);
+          var nextM = afterSerial.match(/SERIAL[^\r\n]*[\r\n]+:?[ \t]*([A-Z0-9][A-Z0-9 ]{8,})/);
+          if (nextM) serialVal = nextM[1].replace(/\s+/g, "").trim();
+        }
+      }
+      if (serialVal && serialVal.length >= 10) {
+        fillField("[name=serial_number]", serialVal) && filled.push("Chassis Number");
+      } else console.log("[OCR] SERIAL NO not matched, val:", serialVal);
+
+      var pColorM = upper.match(/^COLOR\s*:?[ \t]+([A-Z][A-Z]+)(?:\s{2,}|\t|$)/m);
+      if (pColorM) {
+        var c = pColorM[1].trim();
+        fillField("[name=color]", c[0]+c.slice(1).toLowerCase()) && filled.push("Color");
+      } else console.log("[OCR] COLOR not matched");
+
+      console.log("[OCR] filled:", filled);
+      return filled;
+    }
+
+    var nameVal = null;
+    var orNameM = text.match(/RECEIVED\s+FROM[^\r\n]*[\r\n]+([A-Z][A-Z\s.,]{3,60})/i);
     if (orNameM) {
-      const raw = orNameM[1].trim().replace(/\s+/g, " ").split("\t")[0].trim();
-      const commaM = raw.match(/^([A-Z][A-Z\s]+),\s*([A-Z][A-Z\s]+)$/i);
+      var raw = orNameM[1].trim().replace(/\s+/g, " ").split("\t")[0].trim();
+      var commaM = raw.match(/^([A-Z][A-Z\s]+),\s*([A-Z][A-Z\s]+)$/i);
       nameVal = commaM ? (commaM[2].trim() + " " + commaM[1].trim()) : raw;
     } else {
-      // CR: name on next line after label
-      const crNameM = text.match(/COMPLETE\s+OWNERS?\s+NAME[^\r\n]*[\r\n]+([A-Z][A-Z\s.,]{3,60})/i);
+      var crNameM = text.match(/COMPLETE\s+OWNERS?\s+NAME[^\r\n]*[\r\n]+([A-Z][A-Z\s.,]{3,60})/i);
       if (crNameM) {
         nameVal = crNameM[1].trim().replace(/\s+/g, " ").split("\t")[0].trim()
                    .replace(/^(?:[A-Z]{1,3}[.\s]+)+/i, "").trim();
@@ -380,152 +512,201 @@ $footer_scripts = '
     }
     if (nameVal && nameVal.length >= 5 && fillField("[name=full_name]", nameVal)) filled.push("Full Name");
 
-    // ── Address ──
-    // OR:  "ADDRESS (No., Street, ...)\nBlk1 L109...\n3022, Bulacan" — stop before TIN/LTO lines
-    // CR:  "COMPLETE ADDRESS...\n[address]"
-    let addrVal = null;
-    // OR: "ADDRESS (...)\tBlk1 L109 ..., Santa Maria,\t\r\n3022, Bulacan\tLTO Client ID..."
-    const orAddrM = text.match(/ADDRESS\s*\([^)]*\)\t([^\t\r\n]{10,120})/i);
+    var addrVal = null;
+    var orAddrM = text.match(/ADDRESS\s*\([^)]*\)\t([^\t\r\n]{10,120})/i);
     if (orAddrM) {
-      const firstPart = orAddrM[1].trim();
-      // Grab continuation on next line — stop at first tab (LTO Client ID comes after tab)
-      const afterIdx = text.indexOf(orAddrM[1]) + orAddrM[1].length;
-      const nextLine = text.slice(afterIdx).match(/[\r\n]+([^\t\r\n]{3,60})/);
-      const secondPart = nextLine ? nextLine[1].trim() : "";
+      var firstPart = orAddrM[1].trim();
+      var afterIdx = text.indexOf(orAddrM[1]) + orAddrM[1].length;
+      var nextLine = text.slice(afterIdx).match(/[\r\n]+([^\t\r\n]{3,60})/);
+      var secondPart = nextLine ? nextLine[1].trim() : "";
       addrVal = (firstPart + (secondPart ? ", " + secondPart : "")).replace(/\s+/g, " ").trim();
     } else {
-      const crAddrM = text.match(/COMPLETE\s+A(?:DD)?RESS[^\r\n]*[\r\n]+([^\r\n]{10,120})/i);
+      var crAddrM = text.match(/COMPLETE\s+A(?:DD)?RESS[^\r\n]*[\r\n]+([^\r\n]{10,120})/i);
       if (crAddrM) addrVal = crAddrM[1].trim().replace(/\s+/g, " ").split("\t")[0].trim();
     }
     if (addrVal && fillField("[name=address]", addrVal)) filled.push("Address");
 
-    // ── Contact Number: 09XXXXXXXXX pattern ──
-    const contactM = text.match(/\b(09\d{9})\b/);
-    if (contactM) {
-      if (fillField("[name=contact_number]", contactM[1])) filled.push("Contact Number");
-    }
+    var contactM = text.match(/\b(09\d{9})\b/);
+    if (contactM && fillField("[name=contact_number]", contactM[1])) filled.push("Contact Number");
 
-    // ── Plate + Engine from CR values line ──
-    let plateVal = null, engineValFromLine = null;
-    for (let i = 0; i < lines.length; i++) {
-      const tokens = lines[i].trim().split(/\t+/);
+    var plateVal = null, engineValFromLine = null;
+    for (var li = 0; li < lines.length; li++) {
+      var tokens = lines[li].trim().split(/\t+/);
       if (tokens[0] && /^\d{4}-\d+$/.test(tokens[0].trim())) {
         if (tokens[1]) {
-          const raw = tokens[1].trim().replace(/\s+/g, "");
-          const carM  = raw.match(/^([A-Z]{2,3})(\d{3,4})$/);
-          const motoM = raw.match(/^(\d{3})([A-Z]{2,3})$/);
-          if (carM)       plateVal = carM[1] + " " + carM[2];
-          else if (motoM) plateVal = motoM[1] + " " + motoM[2];
-          else if (/^[A-Z0-9]{5,8}$/.test(raw)) plateVal = raw;
+          var rawT = tokens[1].trim().replace(/\s+/g, "");
+          var carM2  = rawT.match(/^([A-Z]{2,3})(\d{3,4})$/);
+          var motoM2 = rawT.match(/^(\d{3})([A-Z]{2,3})$/);
+          if (carM2)       plateVal = carM2[1] + " " + carM2[2];
+          else if (motoM2) plateVal = motoM2[1] + " " + motoM2[2];
+          else if (/^[A-Z0-9]{5,8}$/.test(rawT)) plateVal = rawT;
         }
         if (tokens[2]) {
-          const eng = tokens[2].trim().replace(/\s+/g, "");
+          var eng = tokens[2].trim().replace(/\s+/g, "");
           if (/^[A-Z0-9]{6,20}$/.test(eng)) engineValFromLine = eng;
         }
         break;
       }
     }
     if (!plateVal) {
-      const plateLabelM = upper.match(/PLATE\s*NO[.:*\s\t]+([A-Z0-9]{5,8})/);
+      var plateLabelM = upper.match(/PLATE\s*NO[.:*\s\t]+([A-Z0-9]{5,8})/);
       if (plateLabelM) {
-        const raw = plateLabelM[1].trim();
-        const carM  = raw.match(/^([A-Z]{2,3})(\d{3,4})$/);
-        const motoM = raw.match(/^(\d{3})([A-Z]{2,3})$/);
-        if (carM)       plateVal = carM[1] + " " + carM[2];
-        else if (motoM) plateVal = motoM[1] + " " + motoM[2];
-        else plateVal = raw;
+        var rawP = plateLabelM[1].trim();
+        var carMP  = rawP.match(/^([A-Z]{2,3})(\d{3,4})$/);
+        var motoMP = rawP.match(/^(\d{3})([A-Z]{2,3})$/);
+        if (carMP)       plateVal = carMP[1] + " " + carMP[2];
+        else if (motoMP) plateVal = motoMP[1] + " " + motoMP[2];
+        else plateVal = rawP;
       }
     }
     if (plateVal && fillField("[name=plate_number]", plateVal)) filled.push("Plate Number");
 
-    // ── Make ──
-    const makes = ["TOYOTA","HONDA","MITSUBISHI","FORD","NISSAN","HYUNDAI","KIA","SUZUKI","ISUZU","MAZDA","CHEVROLET","SUBARU","BMW","MERCEDES","VOLKSWAGEN","JEEP","LEXUS","DODGE","YAMAHA","KAWASAKI","DUCATI","BAJAJ","TVS","KYMCO"];
-    for (const mk of makes) {
-      if (upper.includes(mk)) {
-        if (fillField("[name=make]", mk[0] + mk.slice(1).toLowerCase())) { filled.push("Make"); break; }
+    if (!filled.includes("Make")) {
+      if (!upper.match(/^MAKE\s*:/m)) {
+        var makes = ["TOYOTA","HONDA","MITSUBISHI","FORD","NISSAN","HYUNDAI","KIA","SUZUKI","ISUZU","MAZDA","CHEVROLET","SUBARU","BMW","MERCEDES","VOLKSWAGEN","JEEP","LEXUS","DODGE","YAMAHA","KAWASAKI","DUCATI","BAJAJ","TVS","KYMCO"];
+        for (var mi = 0; mi < makes.length; mi++) {
+          if (upper.includes(makes[mi])) {
+            if (fillField("[name=make]", makes[mi][0] + makes[mi].slice(1).toLowerCase())) { filled.push("Make"); break; }
+          }
+        }
       }
     }
 
-    // ── Model (Series on CR) ──
-    const seriesM = upper.match(/SERIES[.:\s\t]+([A-Z0-9]{3,20})/);
-    if (seriesM) {
-      if (fillField("[name=model]", seriesM[1])) filled.push("Model");
-    }
+    var seriesM = upper.match(/SERIES[.:\s\t]+([A-Z0-9]{3,20})/);
+    if (seriesM && fillField("[name=model]", seriesM[1])) filled.push("Model");
 
-    // ── Year Model ──
-    const yearM = upper.match(/YEAR\s*MODEL[.:\s\t]*(\d{4})/);
+    var yearM = upper.match(/YEAR\s*MODEL[.:\s\t]*(\d{4})/);
     if (yearM) {
       if (fillField("[name=year_model]", yearM[1])) filled.push("Year Model");
     } else {
-      const anyYear = upper.match(/\b(19[6-9]\d|20[0-3]\d)\b/);
+      var anyYear = upper.match(/\b(19[6-9]\d|20[0-3]\d)\b/);
       if (anyYear && fillField("[name=year_model]", anyYear[1])) filled.push("Year Model");
     }
 
-    // ── Color (OR: "Color:\nBLACK") ──
-    const colorM = upper.match(/\bCOLOR\s*[:\s\t]+([A-Z]{3,20})/);
+    var colorM = upper.match(/\bCOLOR\s*[:\s\t]+([A-Z]{3,20})/);
     if (colorM) {
-      const colorVal = colorM[1][0] + colorM[1].slice(1).toLowerCase();
+      var colorVal = colorM[1][0] + colorM[1].slice(1).toLowerCase();
       if (fillField("[name=color]", colorVal)) filled.push("Color");
     }
 
-    // ── Engine Number ──
     if (engineValFromLine && fillField("[name=motor_number]", engineValFromLine)) {
       filled.push("Engine Number");
     } else {
-      const engM = upper.match(/ENGINE\s*NO[.:\s\t]+([A-Z0-9][A-Z0-9 ]{5,25})/);
+      var engM = upper.match(/ENGINE\s*NO[.:\s\t]+([A-Z0-9][A-Z0-9 ]{5,25})/);
       if (engM) {
-        const engVal = compact(engM[1].split(/[^A-Z0-9 ]/)[0], 20);
+        var engVal = compact(engM[1].split(/[^A-Z0-9 ]/)[0], 20);
         if (engVal.length >= 6 && fillField("[name=motor_number]", engVal)) filled.push("Engine Number");
       }
     }
 
-    // ── Chassis Number ──
-    const chassisM = upper.match(/CHASSIS\s*NO[.:\s\t]+([A-Z0-9][A-Z0-9 ]{9,25})/);
+    var chassisM = upper.match(/CHASSIS\s*NO[.:\s\t]+([A-Z0-9][A-Z0-9 ]{9,25})/);
     if (chassisM) {
-      const chassisVal = compact(chassisM[1].split(/[^A-Z0-9 ]/)[0], 17);
+      var chassisVal = compact(chassisM[1].split(/[^A-Z0-9 ]/)[0], 17);
       if (chassisVal.length >= 10 && fillField("[name=serial_number]", chassisVal)) filled.push("Chassis Number");
     }
     if (!filled.includes("Chassis Number")) {
-      const vin = upper.match(/\b([A-HJ-NPR-Z0-9]{17})\b/);
+      var vin = upper.match(/\b([A-HJ-NPR-Z0-9]{17})\b/);
       if (vin && fillField("[name=serial_number]", vin[1])) filled.push("Chassis Number");
     }
 
     return filled;
   }
 
-  async function runOCR(file) {
+  function runOCR(file) {
     progressEl.style.display = "block";
     barEl.style.width = "20%";
     statusEl.textContent = "Uploading image…";
-    try {
-      const formData = new FormData();
-      formData.append("image", file);
-      barEl.style.width = "50%";
-      statusEl.textContent = "Reading document…";
-      const res  = await fetch("ocr_scan.php", { method: "POST", body: formData });
-      const data = await res.json();
-      barEl.style.width = "100%";
-      progressEl.style.display = "none";
-      if (data.error) {
-        document.getElementById("ocr-error-msg").textContent = data.error;
+    var formData = new FormData();
+    formData.append("image", file);
+    barEl.style.width = "50%";
+    statusEl.textContent = "Reading document…";
+    fetch("ocr_scan.php", { method: "POST", body: formData })
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        barEl.style.width = "100%";
+        progressEl.style.display = "none";
+        if (data.error) {
+          document.getElementById("ocr-error-msg").textContent = data.error;
+          errorEl.style.display = "block";
+          return;
+        }
+        var filled = parseText(data.text);
+        if (filled.length > 0) {
+          filledEl.textContent = "Auto-filled: " + filled.join(", ") + ". Please verify before saving.";
+          resultEl.style.display = "block";
+        } else {
+          document.getElementById("ocr-error-msg").textContent = "Text was read but no matching fields found. Please fill in manually.";
+          errorEl.style.display = "block";
+        }
+      })
+      .catch(function(err) {
+        progressEl.style.display = "none";
+        document.getElementById("ocr-error-msg").textContent = "OCR failed: " + err.message;
         errorEl.style.display = "block";
-        return;
-      }
-      const filled = parseText(data.text);
-      if (filled.length > 0) {
-        filledEl.textContent = "Auto-filled: " + filled.join(", ") + ". Please verify before saving.";
-        resultEl.style.display = "block";
-      } else {
-        document.getElementById("ocr-error-msg").textContent = "Text was read but no matching fields found. Please fill in manually.";
-        errorEl.style.display = "block";
-      }
-    } catch(err) {
-      progressEl.style.display = "none";
-      document.getElementById("ocr-error-msg").textContent = "OCR failed: " + err.message;
-      errorEl.style.display = "block";
-    }
+      });
   }
+
+  var clearFormBtn = document.getElementById("clear-form-btn");
+  if (clearFormBtn) {
+    clearFormBtn.addEventListener("click", function() {
+      Swal.fire({
+        icon: "warning",
+        title: "Clear all fields?",
+        text: "This will reset the entire form.",
+        confirmButtonText: "Yes, Clear",
+        cancelButtonText: "Cancel",
+        showCancelButton: true,
+        confirmButtonColor: "#B8860B",
+        cancelButtonColor: "#6c757d",
+        reverseButtons: true
+      }).then(function(result) {
+        if (result.isConfirmed) {
+          var fieldNames = ["full_name","contact_number","email","address","plate_number","make","model","year_model","color","motor_number","serial_number"];
+          fieldNames.forEach(function(name) {
+            var el = document.querySelector("[name=" + name + "]");
+            if (el) { el.value = ""; el.classList.remove("ocr-filled"); }
+          });
+          document.querySelectorAll(".ocr-filled").forEach(function(el) { el.classList.remove("ocr-filled"); });
+        }
+      });
+    });
+  }
+
+  var theForm = document.querySelector("form");
+  if (theForm) {
+    theForm.addEventListener("submit", function(e) {
+      e.preventDefault();
+      var form = this;
+      var name    = (document.querySelector("[name=full_name]")      || {}).value || "—";
+      var plate   = (document.querySelector("[name=plate_number]")   || {}).value || "—";
+      var vmake   = (document.querySelector("[name=make]")           || {}).value || "—";
+      var vmodel  = (document.querySelector("[name=model]")          || {}).value || "—";
+      var year    = (document.querySelector("[name=year_model]")     || {}).value || "—";
+      var chassis = (document.querySelector("[name=serial_number]")  || {}).value || "—";
+      Swal.fire({
+        icon: "question",
+        title: "Confirm Client Details",
+        html:
+          "<table style=\"width:100%;font-size:0.82rem;text-align:left;border-collapse:collapse;\">" +
+          "<tr><td style=\"padding:0.3rem 0.5rem;color:var(--text-muted);width:45%;\">Full Name</td><td style=\"padding:0.3rem 0.5rem;font-weight:700;\">" + name + "</td></tr>" +
+          "<tr style=\"background:rgba(0,0,0,0.03);\"><td style=\"padding:0.3rem 0.5rem;color:var(--text-muted);\">Plate Number</td><td style=\"padding:0.3rem 0.5rem;font-weight:700;\">" + plate + "</td></tr>" +
+          "<tr><td style=\"padding:0.3rem 0.5rem;color:var(--text-muted);\">Vehicle</td><td style=\"padding:0.3rem 0.5rem;font-weight:700;\">" + year + " " + vmake + " " + vmodel + "</td></tr>" +
+          "<tr style=\"background:rgba(0,0,0,0.03);\"><td style=\"padding:0.3rem 0.5rem;color:var(--text-muted);\">Chassis No.</td><td style=\"padding:0.3rem 0.5rem;font-weight:700;font-family:monospace;\">" + chassis + "</td></tr>" +
+          "</table>",
+        confirmButtonText: "Yes, Save Client",
+        cancelButtonText: "Review Again",
+        showCancelButton: true,
+        confirmButtonColor: "#B8860B",
+        cancelButtonColor: "#6c757d",
+        reverseButtons: true
+      }).then(function(result) {
+        if (result.isConfirmed) { form.submit(); }
+      });
+    });
+  }
+
 })();
-';
+</script>
+ADDCLIENT_SCRIPT;
 require_once '../../includes/footer.php';
 ?>

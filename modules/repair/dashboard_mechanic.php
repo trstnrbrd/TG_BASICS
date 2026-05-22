@@ -122,7 +122,7 @@ require_once '../../includes/topbar.php';
         </div>
 
         <?php if ($jobs->num_rows > 0): ?>
-        <table class="tg-table">
+        <table class="tg-table repair-jobs-table dash-jobs-table">
           <thead>
             <tr>
               <th>Job #</th>

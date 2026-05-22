@@ -91,10 +91,11 @@ $footer_extra_scripts  = $footer_extra_scripts  ?? '';
     try {
       const res  = await fetch('<?= $base_path ?>modules/renewal/get_urgent_count.php');
       const data = await res.json();
-      const badge = document.getElementById('expiry-badge');
-      if (badge && data.count > 0) {
-        badge.textContent = data.count;
-        badge.style.display = 'inline-flex';
+      if (data.count > 0) {
+        const badge = document.getElementById('expiry-badge');
+        if (badge) { badge.textContent = data.count; badge.style.display = 'inline-flex'; }
+        const mobBadge = document.getElementById('mob-expiry-badge');
+        if (mobBadge) { mobBadge.textContent = data.count; mobBadge.style.display = 'inline-flex'; }
       }
     } catch(e) {
       // Fail silently if renewal module not yet built
@@ -180,7 +181,7 @@ $footer_extra_scripts  = $footer_extra_scripts  ?? '';
               </div>
             </div>
             <div className="user-dropdown-menu">
-              <button className="user-dropdown-item" style={{border:'none',background:'none',width:'100%',textAlign:'left',cursor:'pointer',fontFamily:"'Plus Jakarta Sans',sans-serif"}}
+              <button className="user-dropdown-item"
                 onClick={(e) => { handleClose(); setTimeout(() => window.openEditProfileModal && window.openEditProfileModal(), 50); }}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
                   stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -528,7 +529,7 @@ $footer_extra_scripts  = $footer_extra_scripts  ?? '';
   };
 
   function timeAgo(dateStr) {
-    if (!dateStr) return 'No recent activity';
+    if (!dateStr) return 'no recent activity';
     var diff = Math.floor((Date.now() - new Date(dateStr)) / 1000);
     if (diff < 60)    return 'Just now';
     if (diff < 3600)  return Math.floor(diff/60) + 'm ago';

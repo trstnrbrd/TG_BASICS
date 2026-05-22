@@ -176,7 +176,7 @@ require_once '../../includes/topbar.php';
 
       <?php if ($policies->num_rows > 0): ?>
       <div class="tg-table-wrap">
-        <table class="tg-table">
+        <table class="tg-table mob-card mob-renewal-table">
           <thead>
             <tr>
               <th style="text-align:center;">Client</th>

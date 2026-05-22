@@ -144,3 +144,106 @@
   .rl-stats { grid-template-columns: 1fr 1fr; }
   .rl-stat-value { font-size: 1.3rem; }
 }
+
+/* ── MOBILE: repair job list as cards ── */
+@media (max-width: 768px) {
+
+  /* Override global min-width + max-height so table can reflow as cards */
+  .tg-table.repair-jobs-table {
+    min-width: 0 !important;
+    max-height: none !important;
+    display: block !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+  }
+  .tg-table.repair-jobs-table thead { display: none !important; }
+  .tg-table.repair-jobs-table tbody {
+    display: flex !important;
+    flex-direction: column;
+    gap: 0.65rem;
+    padding: 0.75rem;
+  }
+  .tg-table.repair-jobs-table tr {
+    display: grid !important;
+    grid-template-columns: 1fr auto !important;
+    background: var(--bg-2);
+    border: 1px solid var(--border) !important;
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+    gap: 0.2rem 0.75rem;
+  }
+  .tg-table.repair-jobs-table td {
+    display: block;
+    padding: 0 !important;
+    border: none !important;
+    font-size: 0.8rem !important;
+    text-align: left !important;
+    position: static !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  /* Row layout: job# top-left, badge top-right, client+vehicle middle, service+date bottom, actions bottom-right */
+  .tg-table.repair-jobs-table td:nth-child(1) { /* Job # */
+    grid-column: 1; grid-row: 1;
+    font-size: 0.75rem !important;
+  }
+  .tg-table.repair-jobs-table td:nth-child(2) { /* Client */
+    grid-column: 1; grid-row: 2;
+  }
+  .tg-table.repair-jobs-table td:nth-child(3) { /* Vehicle */
+    grid-column: 1; grid-row: 3;
+  }
+  .tg-table.repair-jobs-table td:nth-child(4) { /* Service */
+    grid-column: 1; grid-row: 4;
+    color: var(--text-muted);
+    font-size: 0.72rem !important;
+  }
+  .tg-table.repair-jobs-table td:nth-child(5) { /* Repair Date */
+    grid-column: 1; grid-row: 5;
+    color: var(--text-muted);
+    font-size: 0.72rem !important;
+  }
+  .tg-table.repair-jobs-table td:nth-child(6) { display: none; } /* Est. Release — hide on mobile */
+  .tg-table.repair-jobs-table td:nth-child(7) { /* Status badge */
+    grid-column: 2; grid-row: 1;
+    display: flex !important;
+    align-items: flex-start;
+    justify-content: flex-end;
+  }
+  .tg-table.repair-jobs-table td:nth-child(8) { /* Actions */
+    grid-column: 2; grid-row: 2 / 6;
+    display: flex !important;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+
+}
+
+/* ── Dashboard jobs table: 6-col variant (Job#, Client, Vehicle, Service, Status, Action) ── */
+@media (max-width: 768px) {
+  /* Undo repair-jobs-table positioning for cols 5 & 6 */
+  .tg-table.dash-jobs-table td:nth-child(5) { /* Status badge */
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    display: flex !important;
+    align-items: flex-start;
+    justify-content: flex-end;
+    color: inherit !important;
+    font-size: 0.8rem !important;
+  }
+  .tg-table.dash-jobs-table td:nth-child(6) { /* Actions */
+    display: flex !important;
+    grid-column: 2 !important;
+    grid-row: 2 / 5 !important;
+    align-items: center;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 480px) {
+  .rl-stats { grid-template-columns: 1fr 1fr; }
+  .rl-stat { padding: 0.85rem 1rem; }
+  .rl-stat-icon { width: 36px; height: 36px; }
+}

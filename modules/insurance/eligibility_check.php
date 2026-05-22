@@ -181,7 +181,7 @@ require_once '../../includes/topbar.php';
         <?php elseif (count($search_results) > 0 && $selected_vid === 0): ?>
           <div style="margin-top:1.25rem;">
 <style>.tg-table tbody tr:hover { background: var(--gold-light) !important; }</style>
-            <table class="tg-table">
+            <table class="tg-table mob-card mob-eligibility-table">
               <thead>
                 <tr>
                   <th style="text-align:center;">Client Name</th>

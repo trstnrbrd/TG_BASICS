@@ -45,11 +45,11 @@ $dash_url = $role === 'mechanic'
 
     <?php if ($role !== 'mechanic'): ?>
 
-    <!-- Renewals -->
+    <!-- Policy -->
     <div class="nav-item-wrap">
       <a href="<?= $base_path ?>modules/renewal/renewal_list.php"
          class="nav-item <?= $active_group === 'renewals' ? 'active' : '' ?>">
-        <?= icon('clock', 16) ?> Renewals
+        <?= icon('shield-check', 16) ?> Policy
         <span class="nav-badge" id="expiry-badge" style="display:none;"></span>
         <?= $chevron ?>
       </a>

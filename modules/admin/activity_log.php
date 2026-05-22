@@ -116,8 +116,8 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     $exp_stmt->execute();
     $exp_rows = $exp_stmt->get_result();
 
-    $filter_labels = ['Period: ' . date('M 1, Y') . ' — ' . date('M d, Y')];
-    if ($filter_user > 0)      $filter_labels[] = 'User ID: ' . $filter_user;
+    $filter_labels = [date('M j, Y', strtotime($exp_month_start)) . ' — ' . date('M j, Y', strtotime($exp_today))];
+    if ($filter_user > 0)      $filter_labels[] = 'User: ' . $filter_user;
     if ($filter_action !== '') $filter_labels[] = 'Action: ' . $filter_action;
     if ($filter_search !== '') $filter_labels[] = 'Search: "' . $filter_search . '"';
     $filters_text = implode('   |   ', $filter_labels);
@@ -317,7 +317,7 @@ require_once '../../includes/topbar.php';
     <div class="card">
       <?php if ($logs->num_rows > 0): ?>
       <div class="tg-table-wrap">
-        <table class="tg-table">
+        <table class="tg-table mob-card mob-activity-table">
           <thead>
             <tr>
               <th style="width:40px;">#</th>

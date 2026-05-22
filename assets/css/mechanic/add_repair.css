@@ -3,7 +3,7 @@
 /* Car diagram wrapper */
 .car-diagram-wrap {
   display: grid;
-  grid-template-columns: 1fr 1fr auto auto;
+  grid-template-columns: 1fr 1fr;
   gap: 1rem;
   align-items: start;
   margin-bottom: 1.25rem;
@@ -140,3 +140,143 @@
 .pp-btn.active[data-val="none"]  { background: var(--gold-pale); border-color: var(--gold); color: var(--gold); }
 .pp-btn.active[data-val="minor"] { background: rgba(217,119,6,0.15); border-color: #D97706; color: #D97706; }
 .pp-btn.active[data-val="major"] { background: rgba(220,38,38,0.15); border-color: #DC2626; color: #DC2626; }
+
+/* ── MOBILE ── */
+@media (max-width: 768px) {
+
+  /* Diagram: stack columns vertically */
+  .car-diagram-wrap {
+    grid-template-columns: 1fr !important;
+    padding: 0.75rem;
+    gap: 0.75rem;
+  }
+
+  /* Side views side by side within their column */
+  .car-sides-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+
+  /* End column: front/rear/top stack vertically */
+  .car-end-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  /* Front + rear side by side on mobile too */
+  .car-end-col > div:first-child {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.75rem;
+  }
+
+  /* Top view: limit width so it doesn't stretch */
+  .car-end-col .car-view-block:last-child svg {
+    max-width: 100px !important;
+  }
+
+  /* Bigger touch targets on SVG panels */
+  .panel { stroke-width: 2 !important; }
+
+  /* Checklist table: no horizontal scroll — reflow to card layout */
+  .tg-table.checklist-table {
+    min-width: 0 !important;
+    display: block !important;
+    overflow-x: visible !important;
+    max-height: none !important;
+  }
+  .tg-table.checklist-table thead { display: none !important; }
+  .tg-table.checklist-table tbody { display: flex !important; flex-direction: column; gap: 0.5rem; }
+
+  /* Each row becomes a card with:
+     Row 1: area name (full width)
+     Row 2: 3 radio cells side by side
+     Row 3: notes input (full width) */
+  .tg-table.checklist-table tr {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr 1fr !important;
+    grid-template-rows: auto auto !important;
+    background: var(--bg-2) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 10px !important;
+    padding: 0.75rem !important;
+    gap: 0.35rem 0 !important;
+  }
+  .tg-table.checklist-table td {
+    display: flex !important;
+    padding: 0 !important;
+    border: none !important;
+    font-size: 0.82rem !important;
+    text-align: center !important;
+    justify-content: center;
+    align-items: center;
+  }
+  /* Area name spans all 3 columns on row 1 */
+  .tg-table.checklist-table td.area-name {
+    grid-column: 1 / -1 !important;
+    justify-content: flex-start !important;
+    font-weight: 700 !important;
+    font-size: 0.85rem !important;
+    color: var(--text-primary) !important;
+    padding-bottom: 0.35rem !important;
+    border-bottom: 1px solid var(--border) !important;
+    margin-bottom: 0.15rem;
+  }
+  /* Radio cells: td 2, 3, 4 — each takes 1 of 3 columns on row 2 */
+  .tg-table.checklist-table td:nth-child(2),
+  .tg-table.checklist-table td:nth-child(3),
+  .tg-table.checklist-table td:nth-child(4) {
+    display: flex !important;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0 !important;
+  }
+  /* Show column header labels as pseudo-elements on mobile */
+  .tg-table.checklist-table td:nth-child(2)::before { content: 'No Damage'; font-size: 0.6rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+  .tg-table.checklist-table td:nth-child(3)::before { content: 'Minor'; font-size: 0.6rem; color: #D97706; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+  .tg-table.checklist-table td:nth-child(4)::before { content: 'Major'; font-size: 0.6rem; color: #DC2626; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+  /* Notes cell spans all 3 columns on row 3 */
+  .tg-table.checklist-table td:last-child {
+    grid-column: 1 / -1 !important;
+    padding-top: 0.35rem !important;
+  }
+  /* Bigger radio dots */
+  .radio-dot span {
+    width: 26px !important;
+    height: 26px !important;
+  }
+  .radio-dot.active span::after { inset: 5px !important; }
+
+  /* Notes input full width */
+  .tg-table.checklist-table .note-input {
+    width: 100% !important;
+    font-size: 0.82rem !important;
+    padding: 0.5rem 0.7rem !important;
+  }
+
+  /* Panel popup: centered bottom sheet on mobile */
+  #panel-popup {
+    position: fixed !important;
+    left: 0.75rem !important;
+    right: 0.75rem !important;
+    bottom: 0.75rem !important;
+    top: auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+    border-radius: 14px !important;
+    padding: 1.1rem 1.1rem 1.25rem !important;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.18) !important;
+  }
+  .pp-btn { padding: 0.55rem 0.2rem !important; font-size: 0.78rem !important; }
+
+  /* Legend wraps cleanly */
+  .legend-dot { font-size: 0.72rem; }
+}
+
+@media (max-width: 480px) {
+  .car-sides-col { grid-template-columns: 1fr; }
+  .car-end-col > div:first-child { grid-template-columns: 1fr 1fr !important; }
+}

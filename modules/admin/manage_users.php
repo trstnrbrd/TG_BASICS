@@ -169,7 +169,7 @@ require_once '../../includes/topbar.php';
             <div class="card-sub">All active accounts</div>
           </div>
         </div>
-        <table class="tg-table">
+        <table class="tg-table mob-card mob-users-table">
           <thead>
             <tr>
               <th style="text-align:left;padding-left:1.25rem;">Name</th>
@@ -321,7 +321,7 @@ require_once '../../includes/topbar.php';
         </a>
       </div>
       <?php if ($logs->num_rows > 0): ?>
-      <table class="tg-table">
+      <table class="tg-table mob-card mob-audit-table">
         <thead>
           <tr>
             <th>User</th>

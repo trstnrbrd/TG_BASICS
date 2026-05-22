@@ -122,6 +122,7 @@ $stmt = $conn->prepare($sql);
 if (!empty($params)) $stmt->bind_param($types, ...$params);
 $stmt->execute();
 $result = $stmt->get_result();
+$rows = $result->fetch_all(MYSQLI_ASSOC);
 
 $total_clients  = $conn->query("SELECT COUNT(*) as c FROM clients")->fetch_assoc()['c'];
 $total_vehicles = $conn->query("SELECT COUNT(*) as c FROM vehicles")->fetch_assoc()['c'];
@@ -134,7 +135,7 @@ require_once '../../includes/header.php';
 require_once '../../includes/navbar.php';
 ?>
 
-<link rel="stylesheet" href="../../assets/css/shared/clients.css"/>
+<link rel="stylesheet" href="../../assets/css/shared/clients.css?v=<?= filemtime(__DIR__ . '/../../assets/css/shared/clients.css') ?>"/>
 
 <div class="main">
 
@@ -168,7 +169,7 @@ require_once '../../includes/topbar.php';
     <?php endif; ?>
 
     <!-- STATS -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem;">
+    <div class="client-stats-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem;">
       <?php
       $stats = [
         [icon('user', 16), $total_clients,  'Total Clients'],
@@ -187,7 +188,7 @@ require_once '../../includes/topbar.php';
     </div>
 
     <!-- TOOLBAR -->
-    <form method="GET" action="" style="margin-bottom:1rem;">
+    <form method="GET" action="" class="client-toolbar" style="margin-bottom:1rem;">
       <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
 
         <!-- SEARCH INPUT with autocomplete -->
@@ -243,13 +244,45 @@ require_once '../../includes/topbar.php';
         <div class="card-icon"><?= icon('users', 16) ?></div>
         <div>
           <div class="card-title"><?= $search ? 'Search Results' : 'All Clients' ?></div>
-          <div class="card-sub"><?= $result->num_rows ?> record<?= $result->num_rows !== 1 ? 's' : '' ?></div>
+          <div class="card-sub"><?= count($rows) ?> record<?= count($rows) !== 1 ? 's' : '' ?></div>
         </div>
       </div>
 
-      <?php if ($result->num_rows > 0): ?>
-      <div class="tg-table-wrap">
-        <table class="tg-table">
+      <?php if (count($rows) > 0): ?>
+
+      <!-- ── MOBILE CARD LIST (hidden on desktop) ── -->
+      <div class="cl-mobile-list">
+        <?php foreach ($rows as $row):
+          $badge = $row['has_policy']
+            ? '<span class="badge badge-green" style="display:inline-flex;align-items:center;gap:0.25rem;">' . icon('shield-check', 11) . ' Insurance</span>'
+            : '<span class="badge badge-gold" style="display:inline-flex;align-items:center;gap:0.25rem;">' . icon('wrench', 11) . ' Walk-in</span>';
+        ?>
+        <a href="view_client.php?id=<?= $row['client_id'] ?>" class="cl-card">
+          <div class="cl-card-body">
+            <div class="cl-card-name"><?= htmlspecialchars($row['full_name']) ?></div>
+            <div class="cl-card-meta">
+              <?= icon('phone', 11) ?> <?= htmlspecialchars($row['contact_number']) ?>
+              &nbsp;·&nbsp;
+              <?= $row['vehicle_count'] ?> vehicle<?= $row['vehicle_count'] != 1 ? 's' : '' ?>
+            </div>
+          </div>
+          <div class="cl-card-right">
+            <?= $badge ?>
+            <?php if ($_SESSION['role'] !== 'mechanic'): ?>
+            <form method="POST" action="" style="display:inline;" onclick="event.preventDefault();event.stopPropagation();">
+              <?= csrf_field() ?>
+              <input type="hidden" name="delete_client_id" value="<?= $row['client_id'] ?>"/>
+              <button type="button" class="btn-sm-danger js-delete-client cl-card-del" data-name="<?= htmlspecialchars($row['full_name'], ENT_QUOTES) ?>"><?= icon('trash', 13) ?></button>
+            </form>
+            <?php endif; ?>
+          </div>
+        </a>
+        <?php endforeach; ?>
+      </div>
+
+      <!-- ── DESKTOP TABLE (hidden on mobile) ── -->
+      <div class="cl-desktop-table tg-table-wrap">
+        <table class="tg-table client-list-table">
           <thead>
             <tr>
               <th style="text-align:left;padding-left:2.5rem;">
@@ -272,7 +305,7 @@ require_once '../../includes/topbar.php';
             </tr>
           </thead>
           <tbody>
-            <?php $i = 1; while ($row = $result->fetch_assoc()):
+            <?php foreach ($rows as $row):
               $cid = 'client-expand-' . $row['client_id'];
             ?>
             <tr class="tg-expandable-row" data-expand="<?= $cid ?>" style="cursor:pointer;">
@@ -281,7 +314,6 @@ require_once '../../includes/topbar.php';
                   <svg class="row-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;opacity:0.35;transition:transform 0.2s;"><polyline points="9 18 15 12 9 6"/></svg>
                   <div>
                     <div style="font-weight:700;color:var(--text-primary);font-size:0.85rem;"><?= htmlspecialchars($row['full_name']) ?></div>
-                    <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.1rem;"><?= htmlspecialchars($row['email'] ?? '—') ?></div>
                   </div>
                 </div>
               </td>
@@ -326,7 +358,7 @@ require_once '../../includes/topbar.php';
                 </div>
               </td>
             </tr>
-            <?php endwhile; ?>
+            <?php endforeach; ?>
           </tbody>
         </table>
       </div>
@@ -336,7 +368,7 @@ require_once '../../includes/topbar.php';
         <div class="empty-title"><?= $search ? 'No results found' : 'No clients yet' ?></div>
         <div class="empty-desc"><?= $search ? 'Try a different name, plate number, or contact.' : 'Start by adding your first client record.' ?></div>
         <?php if (!$search && $_SESSION['role'] !== 'mechanic'): ?>
-        <a href="add_client.php" class="btn-primary"><?= icon('plus', 14) ?> Add First Client</a>
+        <a href="add_client.php" class="btn-primary" style="display:inline-flex;align-items:center;gap:0.4rem;"><?= icon('plus', 14) ?> Add First Client</a>
         <?php endif; ?>
       </div>
       <?php endif; ?>

@@ -1,1 +1,78 @@
 .tg-table tbody tr:hover { background: var(--gold-light) !important; }
+
+/* ── Show/hide: mobile cards vs desktop table ── */
+.cl-mobile-list  { display: none; }
+.cl-desktop-table { display: block; }
+
+/* ── MOBILE CARD STYLES ── */
+.cl-card {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  gap: 0.85rem;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.12s;
+}
+.cl-card:last-child { border-bottom: none; }
+.cl-card:active { background: var(--gold-pale); }
+
+
+.cl-card-body {
+  flex: 1;
+  min-width: 0;
+}
+.cl-card-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cl-card-meta {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.cl-card-right {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+.cl-card-del {
+  padding: 0.3rem 0.45rem !important;
+}
+
+/* ── MOBILE: switch to cards ── */
+@media (max-width: 768px) {
+  .cl-mobile-list   { display: block; }
+  .cl-desktop-table { display: none; }
+
+  /* Keep stats 3-across on mobile */
+  .client-stats-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 0.5rem !important;
+  }
+  .client-stats-grid .card {
+    padding: 0.75rem 0.85rem !important;
+    gap: 0.55rem !important;
+  }
+  .client-stats-grid .card-icon { width: 32px !important; height: 32px !important; }
+
+  /* Filter toolbar: stack vertically */
+  .client-toolbar > div { flex-direction: column !important; }
+  .client-toolbar input,
+  .client-toolbar select { width: 100% !important; min-width: 0 !important; max-width: none !important; }
+  .client-toolbar button,
+  .client-toolbar a.btn-primary,
+  .client-toolbar a.btn-ghost { width: 100% !important; justify-content: center !important; }
+}

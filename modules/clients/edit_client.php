@@ -30,7 +30,7 @@ $success = false;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
-    $full_name      = san_str($_POST['full_name'] ?? '', MAX_NAME);
+    $full_name      = strtoupper(san_str($_POST['full_name'] ?? '', MAX_NAME));
     $contact_number = san_str($_POST['contact_number'] ?? '', MAX_PHONE);
     $email          = san_str($_POST['email'] ?? '', MAX_EMAIL);
     $address        = san_str($_POST['address'] ?? '', MAX_ADDRESS);
@@ -113,8 +113,9 @@ require_once '../../includes/topbar.php';
             <div class="field">
               <label class="field-label">Full Name <span class="req">*</span></label>
               <input type="text" name="full_name" class="field-input"
-                placeholder="First Middle Last"
-                value="<?= htmlspecialchars($client['full_name']) ?>"/>
+                placeholder="FIRST MIDDLE LAST"
+                value="<?= htmlspecialchars($client['full_name']) ?>"
+                style="text-transform:uppercase;"/>
             </div>
             <div class="field">
               <label class="field-label">Contact Number <span class="req">*</span></label>

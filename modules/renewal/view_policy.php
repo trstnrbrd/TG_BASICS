@@ -547,9 +547,9 @@ require_once '../../includes/topbar.php';
           </div>
           <?php endforeach; ?>
           <!-- TOTAL -->
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;background:var(--btn-bg);">
-            <span style="font-size:0.82rem;font-weight:700;color:var(--gold-bright);">Total Premium</span>
-            <span style="font-size:1rem;font-weight:800;color:var(--gold-bright);">&#8369;<?= number_format($policy['total_premium'], 2) ?></span>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;background:var(--gold-pale);border-top:1px solid var(--gold-muted);">
+            <span style="font-size:0.82rem;font-weight:700;color:var(--gold);">Total Premium</span>
+            <span style="font-size:1rem;font-weight:800;color:var(--gold);">&#8369;<?= number_format($policy['total_premium'], 2) ?></span>
           </div>
         </div>
 

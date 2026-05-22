@@ -200,7 +200,7 @@ require_once '../../includes/topbar.php';
       </div>
 
       <?php if ($jobs->num_rows > 0): ?>
-      <table class="tg-table">
+      <table class="tg-table repair-jobs-table">
         <thead>
           <tr>
             <th>Job #</th>
@@ -256,11 +256,7 @@ require_once '../../includes/topbar.php';
         <div class="empty-desc">
           <?= ($search !== '' || $filter_status !== 'all') ? 'Try adjusting your search or filters.' : 'Create the first repair job to get started.' ?>
         </div>
-        <?php if ($search === '' && $filter_status === 'all'): ?>
-        <a href="add_repair.php" class="btn-primary" style="margin-top:1rem;display:inline-flex;align-items:center;gap:0.4rem;">
-          <?= icon('plus', 14) ?> New Repair Job
-        </a>
-        <?php endif; ?>
+
       </div>
       <?php endif; ?>
     </div>

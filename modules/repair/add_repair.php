@@ -476,7 +476,7 @@ require_once '../../includes/topbar.php';
           <?php endforeach; ?>
 
           <!-- CHECKLIST TABLE (synced with diagram) -->
-          <table class="tg-table" style="margin-bottom:0;">
+          <table class="tg-table checklist-table" style="margin-bottom:0;">
             <thead>
               <tr>
                 <th style="text-align:left;">Exterior Area</th>
@@ -490,13 +490,11 @@ require_once '../../includes/topbar.php';
               <?php foreach ($checklist_areas as $key => $label): ?>
               <tr class="checklist-row" id="row_<?= $key ?>" data-key="<?= $key ?>">
                 <td class="area-name" style="font-weight:500;font-size:0.82rem;"><?= $label ?></td>
-                <td style="text-align:center;"><span class="radio-dot active" data-val="none"   data-key="<?= $key ?>"><span></span></span></td>
-                <td style="text-align:center;"><span class="radio-dot"        data-val="minor"  data-key="<?= $key ?>"><span></span></span></td>
-                <td style="text-align:center;"><span class="radio-dot"        data-val="major"  data-key="<?= $key ?>"><span></span></span></td>
-                <td>
-                  <input type="text" class="field-input note-input" data-key="<?= $key ?>"
-                    placeholder="—" style="font-size:0.78rem;padding:0.35rem 0.6rem;"/>
-                </td>
+                <td style="text-align:center;"><span class="radio-dot active" data-val="none"  data-key="<?= $key ?>"><span></span></span></td>
+                <td style="text-align:center;"><span class="radio-dot"        data-val="minor" data-key="<?= $key ?>"><span></span></span></td>
+                <td style="text-align:center;"><span class="radio-dot"        data-val="major" data-key="<?= $key ?>"><span></span></span></td>
+                <td><input type="text" class="field-input note-input" data-key="<?= $key ?>"
+                  placeholder="—" style="font-size:0.78rem;padding:0.35rem 0.6rem;"/></td>
               </tr>
               <?php endforeach; ?>
             </tbody>

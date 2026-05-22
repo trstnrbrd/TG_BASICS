@@ -543,14 +543,210 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
     .content { padding: 1.5rem; }
   }
 
+  /* ── MOBILE APP SHELL ── */
+
+  /* Bottom nav bar */
+  .mob-nav {
+    display: none;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 62px;
+    background: var(--bg-3);
+    border-top: 1px solid var(--border);
+    z-index: 200;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
+  }
+  .mob-nav-inner {
+    display: flex;
+    height: 100%;
+    align-items: stretch;
+    width: 100%;
+  }
+  .mob-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    text-decoration: none;
+    color: var(--text-muted);
+    font-size: 0.55rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    transition: color 0.15s;
+    padding: 0.4rem 0.2rem;
+    position: relative;
+    -webkit-tap-highlight-color: transparent;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+  .mob-nav-item svg { flex-shrink: 0; transition: transform 0.15s; }
+  .mob-nav-item:active svg { transform: scale(0.88); }
+  .mob-nav-item.active { color: var(--gold); }
+  .mob-nav-item.active svg { stroke: var(--gold); }
+  .mob-nav-item.active::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 20%; right: 20%;
+    height: 2.5px;
+    background: var(--gold);
+    border-radius: 0 0 4px 4px;
+  }
+  .mob-nav-badge {
+    position: absolute;
+    top: 6px; right: calc(50% - 14px);
+    background: var(--danger);
+    color: #fff;
+    font-size: 0.5rem;
+    font-weight: 800;
+    min-width: 14px;
+    height: 14px;
+    border-radius: 7px;
+    padding: 0 3px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+
+  /* Mobile topbar (replaces desktop topbar) */
+  .mob-topbar {
+    display: none;
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: var(--bg-3);
+    border-bottom: 1px solid var(--border);
+    padding: 0 1rem;
+    height: 54px;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 1px 8px rgba(0,0,0,0.06);
+  }
+  .mob-topbar-title {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    letter-spacing: -0.2px;
+  }
+  .mob-topbar-avatar {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--gold-bright), var(--gold));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.65rem; font-weight: 800; color: #fff;
+    overflow: hidden;
+    border: 2px solid var(--gold-muted);
+    flex-shrink: 0;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* More sheet */
+  .mob-more-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 300;
+    backdrop-filter: blur(2px);
+  }
+  .mob-more-overlay.open { display: block; }
+  .mob-more-sheet {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--bg-3);
+    border-radius: 20px 20px 0 0;
+    border-top: 1px solid var(--border);
+    z-index: 301;
+    padding: 0 0 env(safe-area-inset-bottom, 0);
+    transform: translateY(100%);
+    transition: transform 0.28s cubic-bezier(0.32,0.72,0,1);
+    box-shadow: 0 -8px 32px rgba(0,0,0,0.15);
+  }
+  .mob-more-sheet.open { transform: translateY(0); }
+  .mob-more-handle {
+    width: 36px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 0.75rem auto 0;
+  }
+  .mob-more-header {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.9rem 1.25rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .mob-more-avatar {
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--gold-bright), var(--gold));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.8rem; font-weight: 800; color: #fff;
+    overflow: hidden; flex-shrink: 0;
+    border: 2px solid var(--gold-muted);
+  }
+  .mob-more-name { font-size: 0.88rem; font-weight: 700; color: var(--text-primary); line-height: 1.3; }
+  .mob-more-role { font-size: 0.68rem; color: var(--text-muted); }
+  .mob-more-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+    padding: 1rem;
+  }
+  .mob-more-item {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 0.45rem; padding: 0.85rem 0.5rem;
+    border-radius: 12px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    text-decoration: none; color: var(--text-secondary);
+    font-size: 0.6rem; font-weight: 600; letter-spacing: 0.2px;
+    text-align: center; text-transform: uppercase;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
+    cursor: pointer; background-color: var(--bg-2);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    border: 1px solid var(--border);
+  }
+  .mob-more-item:active, .mob-more-item:hover {
+    background: var(--gold-pale);
+    border-color: var(--gold-muted);
+    color: var(--gold);
+  }
+  .mob-more-item-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--gold);
+    flex-shrink: 0;
+  }
+  .mob-more-divider {
+    height: 1px; background: var(--border);
+    margin: 0 1rem;
+  }
+  .mob-more-logout {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.9rem 1.25rem;
+    text-decoration: none; color: var(--danger);
+    font-size: 0.82rem; font-weight: 600;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   /* ── RESPONSIVE: MOBILE ── */
   @media (max-width: 768px) {
     .main      { margin-left: 0; }
-    .hamburger { display: flex; }
-    .topbar    { padding: 0.75rem 1rem; padding-left: 3.25rem; }
-    .topbar-breadcrumb { display: none; }
-    .user-chip-label   { display: none; }
-    .content { padding: 1rem; }
+    .hamburger { display: none; }
+    .topbar    { display: none !important; }
+    .sidebar   { display: none !important; }
+    .sidebar-overlay { display: none !important; }
+    .mob-nav     { display: flex; }
+    .mob-topbar  { display: flex; }
+    .content { padding: 1rem; padding-bottom: 80px; }
 
     /* Forms */
     .form-grid, .form-grid-3 { grid-template-columns: 1fr; }
@@ -734,11 +930,127 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
     .gs-wrap { display: none; }
   }
 </style>
+<link rel="stylesheet" href="<?= $base_path ?>assets/css/shared/mobile_tables.css?v=<?= filemtime(__DIR__ . '/../assets/css/shared/mobile_tables.css') ?>"/>
 <?= $extra_css ?? '' ?>
 </head>
 <body>
 
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<?php
+/* ── MOBILE BOTTOM NAV ── */
+$_mob_role        = $_SESSION['role'] ?? '';
+$_mob_active      = $active_page ?? '';
+$_mob_is_admin    = in_array($_mob_role, ['admin', 'super_admin']);
+$_mob_is_mechanic = $_mob_role === 'mechanic';
+
+// Determine nav items per role
+if ($_mob_is_admin) {
+    $_mob_nav = [
+        ['id' => 'dashboard', 'label' => 'Home',    'href' => $base_path . 'modules/admin/dashboard_admin.php',    'icon' => 'home'],
+        ['id' => 'clients',   'label' => 'Clients', 'href' => $base_path . 'modules/clients/client_list.php',      'icon' => 'users'],
+        ['id' => 'repair',    'label' => 'Repairs', 'href' => $base_path . 'modules/repair/repair_list.php',       'icon' => 'wrench'],
+        ['id' => 'policy',    'label' => 'Policy',  'href' => $base_path . 'modules/renewal/renewal_list.php',     'icon' => 'shield'],
+        ['id' => 'more',      'label' => 'More',    'href' => '#', 'icon' => 'more'],
+    ];
+    // Policy tab is active for renewal/insurance/claims/billing pages
+    $_mob_policy_pages = ['renewal', 'insurance', 'claims', 'billing', 'quotations'];
+    if (in_array($_mob_active, $_mob_policy_pages)) $_mob_active = 'policy';
+    // More tab active for settings/admin pages
+    $_mob_more_pages = ['settings', 'manage_users', 'activity_log', 'monthly_report', 'my_account'];
+    if (in_array($_mob_active, $_mob_more_pages)) $_mob_active = 'more';
+} else {
+    $_mob_nav = [
+        ['id' => 'dashboard', 'label' => 'Home',    'href' => $base_path . 'modules/repair/dashboard_mechanic.php', 'icon' => 'home'],
+        ['id' => 'clients',   'label' => 'Clients', 'href' => $base_path . 'modules/clients/client_list.php',       'icon' => 'users'],
+        ['id' => 'repair',    'label' => 'Repairs', 'href' => $base_path . 'modules/repair/repair_list.php',        'icon' => 'wrench'],
+        ['id' => 'more',      'label' => 'More',    'href' => '#', 'icon' => 'more'],
+    ];
+}
+
+function _mob_icon(string $name): string {
+    return match($name) {
+        'home'        => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
+        'users'       => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+        'wrench'      => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+        'shield'      => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+        'user-circle' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+        'more'        => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>',
+        default       => '',
+    };
+}
+?>
+<nav class="mob-nav" id="mob-nav">
+  <div class="mob-nav-inner">
+    <?php foreach ($_mob_nav as $_n):
+        $_active_class = ($_n['id'] === $_mob_active) ? ' active' : '';
+        $_is_btn       = in_array($_n['id'], ['more', 'profile']);
+    ?>
+    <?php if ($_is_btn): ?>
+    <button type="button" class="mob-nav-item<?= $_active_class ?>" id="mob-nav-<?= $_n['id'] ?>-btn">
+      <?= _mob_icon($_n['icon']) ?>
+      <span><?= $_n['label'] ?></span>
+    </button>
+    <?php else: ?>
+    <a href="<?= htmlspecialchars($_n['href']) ?>" class="mob-nav-item<?= $_active_class ?>">
+      <?= _mob_icon($_n['icon']) ?>
+      <?php if ($_n['id'] === 'policy'): ?>
+      <span id="mob-expiry-badge" class="mob-nav-badge"></span>
+      <?php endif; ?>
+      <span><?= $_n['label'] ?></span>
+    </a>
+    <?php endif; ?>
+    <?php endforeach; ?>
+  </div>
+</nav>
+
+<!-- ── MOBILE MORE SHEET ── -->
+<div class="mob-more-overlay" id="mob-more-overlay"></div>
+<div class="mob-more-sheet" id="mob-more-sheet">
+  <div class="mob-more-handle"></div>
+  <div class="mob-more-header">
+    <div class="mob-more-avatar" id="mob-more-avatar">
+      <?php
+      $_mob_full   = $_SESSION['full_name'] ?? 'User';
+      $_mob_inits  = strtoupper(substr(implode('', array_map(fn($w) => $w[0] ?? '', array_filter(explode(' ', $_mob_full)))), 0, 2));
+      echo htmlspecialchars($_mob_inits);
+      ?>
+    </div>
+    <div>
+      <div class="mob-more-name"><?= htmlspecialchars($_mob_full) ?></div>
+      <div class="mob-more-role"><?= $role_label ?></div>
+    </div>
+  </div>
+  <div class="mob-more-grid">
+    <button type="button" class="mob-more-item" onclick="mobMoreClose();setTimeout(()=>window.openEditProfileModal&&window.openEditProfileModal(),200)">
+      <div class="mob-more-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+      <span>Profile</span>
+    </button>
+    <a href="<?= $base_path ?>modules/admin/settings.php" class="mob-more-item" onclick="mobMoreClose()">
+      <div class="mob-more-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
+      <span>Settings</span>
+    </a>
+    <?php if ($_mob_is_admin): ?>
+    <a href="<?= $base_path ?>modules/admin/monthly_report.php" class="mob-more-item" onclick="mobMoreClose()">
+      <div class="mob-more-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
+      <span>Reports</span>
+    </a>
+    <a href="<?= $base_path ?>modules/admin/manage_users.php" class="mob-more-item" onclick="mobMoreClose()">
+      <div class="mob-more-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+      <span>Users</span>
+    </a>
+    <a href="<?= $base_path ?>modules/admin/activity_log.php" class="mob-more-item" onclick="mobMoreClose()">
+      <div class="mob-more-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div>
+      <span>Logs</span>
+    </a>
+    <?php endif; ?>
+  </div>
+  <div class="mob-more-divider"></div>
+  <a href="<?= $base_path ?>auth/logout.php" class="mob-more-logout">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+    Logout
+  </a>
+</div>
 
 <script>
   function toggleSidebar() {
@@ -751,9 +1063,35 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
     if (hamburger) hamburger.classList.toggle('open', isOpen);
   }
 
+  // ── Mobile More Sheet ──
+  function mobMoreOpen() {
+    document.getElementById('mob-more-overlay').classList.add('open');
+    document.getElementById('mob-more-sheet').classList.add('open');
+  }
+  function mobMoreClose() {
+    document.getElementById('mob-more-overlay').classList.remove('open');
+    document.getElementById('mob-more-sheet').classList.remove('open');
+  }
+  window.mobMoreOpen  = mobMoreOpen;
+  window.mobMoreClose = mobMoreClose;
+
   document.addEventListener('DOMContentLoaded', function () {
     const overlay = document.getElementById('sidebar-overlay');
     if (overlay) overlay.addEventListener('click', toggleSidebar);
+
+    // More button
+    const moreBtn = document.getElementById('mob-nav-more-btn');
+    if (moreBtn) moreBtn.addEventListener('click', mobMoreOpen);
+
+    // Profile button (mechanic)
+    const profileBtn = document.getElementById('mob-nav-profile-btn');
+    if (profileBtn) profileBtn.addEventListener('click', function() {
+      window.openEditProfileModal && window.openEditProfileModal();
+    });
+
+    // Overlay click closes sheet
+    const moreOverlay = document.getElementById('mob-more-overlay');
+    if (moreOverlay) moreOverlay.addEventListener('click', mobMoreClose);
 
     // Mobile: tap nav-item with chevron to toggle accordion flyout
     document.querySelectorAll('.nav-item-wrap').forEach(function(wrap) {

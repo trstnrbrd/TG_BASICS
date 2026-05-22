@@ -137,7 +137,7 @@ require_once '../../includes/topbar.php';
       </div>
 
       <?php if ($result->num_rows > 0): ?>
-      <table class="tg-table">
+      <table class="tg-table mob-card mob-billing-table">
         <thead>
           <tr>
             <th>Billing #</th>

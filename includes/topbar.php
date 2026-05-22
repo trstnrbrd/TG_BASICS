@@ -23,6 +23,17 @@ if (isset($_SESSION['user_id'], $conn)) {
     }
 }
 ?>
+<div class="mob-topbar" id="mob-topbar">
+  <div class="mob-topbar-title"><?= htmlspecialchars($topbar_title ?? '') ?></div>
+  <div class="mob-topbar-avatar" onclick="window.openEditProfileModal && window.openEditProfileModal()" id="mob-topbar-avatar">
+    <?php if (!empty($_profile_photo_url)): ?>
+    <img src="<?= htmlspecialchars($_profile_photo_url) ?>" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/>
+    <?php else: ?>
+    <?= $initials_display ?>
+    <?php endif; ?>
+  </div>
+</div>
+
 <div class="topbar">
   <div class="topbar-left">
     <button class="hamburger" id="hamburger-btn" onclick="toggleSidebar()" aria-label="Menu">

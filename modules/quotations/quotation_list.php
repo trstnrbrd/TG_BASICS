@@ -199,7 +199,7 @@ document.addEventListener('DOMContentLoaded',function(){
 
   <?php if ($rows->num_rows > 0): ?>
   <div class="tg-table-wrap">
-    <table class="tg-table">
+    <table class="tg-table mob-card mob-quotation-table">
       <thead>
         <tr>
           <th style="text-align:center;">Quotation #</th>

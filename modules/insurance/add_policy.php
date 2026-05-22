@@ -289,14 +289,7 @@ require_once '../../includes/topbar.php';
 
 
     <?php if (!empty($errors)): ?>
-      <div class="alert alert-danger">
-        <div>
-          <div style="font-weight:700;margin-bottom:0.35rem;">Please fix the following:</div>
-          <?php foreach ($errors as $e): ?>
-            <div style="font-size:0.78rem;">&#8226; <?= htmlspecialchars($e) ?></div>
-          <?php endforeach; ?>
-        </div>
-      </div>
+    <script>window._policyErrors = <?= json_encode(array_values($errors)) ?>;</script>
     <?php endif; ?>
 
     <!-- PLATE LOOKUP -->
@@ -473,13 +466,13 @@ require_once '../../includes/topbar.php';
           <div class="form-grid" style="margin-bottom:1rem;">
             <div class="field">
               <label class="field-label">Starting Date <span class="req">*</span></label>
-              <input type="date" name="policy_start" class="field-input"
-                value="<?= htmlspecialchars($_POST['policy_start'] ?? '') ?>"/>
+              <input type="date" name="policy_start" id="policy_start" class="field-input"
+                value="<?= htmlspecialchars($_POST['policy_start'] ?? date('Y-m-d')) ?>"/>
             </div>
             <div class="field">
               <label class="field-label">Inception Date <span class="req">*</span></label>
-              <input type="date" name="policy_end" class="field-input"
-                value="<?= htmlspecialchars($_POST['policy_end'] ?? '') ?>"/>
+              <input type="date" name="policy_end" id="policy_end" class="field-input"
+                value="<?= htmlspecialchars($_POST['policy_end'] ?? date('Y-m-d', strtotime('+1 year'))) ?>"/>
             </div>
           </div>
 
@@ -528,7 +521,10 @@ require_once '../../includes/topbar.php';
           <!-- PAYMENT SCHEDULE -->
           <div class="field-section">Payment Schedule</div>
           <?php
-          $ph_banks = ['BDO Unibank','BPI (Bank of the Philippine Islands)','Metrobank','PNB (Philippine National Bank)','Land Bank of the Philippines','DBP (Development Bank of the Philippines)','China Bank','Security Bank','UnionBank','RCBC','EastWest Bank','PSBank','AUB (Asia United Bank)','CTBC Bank Philippines','PBCOM','Maybank Philippines','Bank of Commerce','UCPB','Sterling Bank of Asia','Philippine Savings Bank (PSBank)','GCash (GSave)','Maya Bank','Tonik Bank','GoTyme Bank','UNObank','Other'];
+          $ph_banks = ['Toyota Financial Services Philippines','BDO Unibank','BPI (Bank of the Philippine Islands)','Metrobank','PNB (Philippine National Bank)','Land Bank of the Philippines','DBP (Development Bank of the Philippines)','China Bank','Security Bank','UnionBank','RCBC','EastWest Bank','PSBank','AUB (Asia United Bank)','CTBC Bank Philippines','PBCOM','Maybank Philippines','Bank of Commerce','UCPB','Sterling Bank of Asia','Philippine Savings Bank (PSBank)','GCash (GSave)','Maya Bank','Tonik Bank','GoTyme Bank','UNObank','Other'];
+          $prefill_mort = $_POST['mortgagee'] ?? ($renew_policy['mortgagee'] ?? '');
+          $mort_is_other = $prefill_mort !== '' && !in_array($prefill_mort, $ph_banks);
+          $mort_select_val = $mort_is_other ? 'Other' : $prefill_mort;
           ?>
           <div class="form-grid" style="margin-bottom:1rem;">
             <div class="field">
@@ -543,15 +539,18 @@ require_once '../../includes/topbar.php';
             </div>
             <div class="field">
               <label class="field-label">Mortgagee / Financed By</label>
-              <select name="mortgagee" class="field-select">
+              <select id="mortgagee_select" class="field-select">
                 <option value="">— None / Cash —</option>
-                <?php
-                $prefill_mort = $_POST['mortgagee'] ?? ($renew_policy['mortgagee'] ?? '');
-                foreach ($ph_banks as $b): ?>
-                <option value="<?= $b ?>" <?= ($prefill_mort === $b) ? 'selected' : '' ?>><?= $b ?></option>
+                <?php foreach ($ph_banks as $b): ?>
+                <option value="<?= htmlspecialchars($b) ?>" <?= ($mort_select_val === $b) ? 'selected' : '' ?>><?= htmlspecialchars($b) ?></option>
                 <?php endforeach; ?>
               </select>
-              <span class="field-hint">Bank that financed this vehicle, if any.</span>
+              <input type="text" id="mortgagee_other_input" class="field-input"
+                placeholder="Type financing company name"
+                value="<?= htmlspecialchars($mort_is_other ? $prefill_mort : '') ?>"
+                style="margin-top:0.5rem;display:<?= $mort_is_other ? 'block' : 'none' ?>;"/>
+              <input type="hidden" name="mortgagee" id="mortgagee_hidden" value="<?= htmlspecialchars($prefill_mort) ?>"/>
+              <span class="field-hint">Bank or financing company, if any. Leave blank for cash.</span>
             </div>
           </div>
 
@@ -607,17 +606,19 @@ require_once '../../includes/topbar.php';
 </div>
 
 <?php
-$_icon_search  = icon('magnifying-glass', 14);
-$footer_extra_scripts = '';
-$footer_scripts = '
+$footer_scripts = '';
+$footer_extra_scripts = <<<'ADDPOLICY_SCRIPT'
+<script>
   (function () {
     const termsEl       = document.getElementById("payment_terms");
     const totalEl       = document.getElementById("total_premium");
     const markupEl      = document.getElementById("markup_field");
     const payableEl     = document.getElementById("total_payable_display");
-    const startEl       = document.querySelector("[name=\'policy_start\']");
+    const startEl       = document.getElementById("policy_start");
     const tbody         = document.getElementById("installment-body");
     const balanceEl     = document.getElementById("balance-display");
+
+    if (!termsEl || !totalEl || !markupEl || !payableEl || !tbody) return;
 
     const termsMap = { "1 time": 1, "3 months": 3, "4 months": 4, "6 months": 6 };
 
@@ -738,7 +739,17 @@ $footer_scripts = '
     termsEl.addEventListener("change", buildTable);
     totalEl.addEventListener("input",  buildTable);
     markupEl.addEventListener("input", buildTable);
-    if (startEl)   startEl.addEventListener("change", buildTable);
+    if (startEl) {
+      startEl.addEventListener("change", function() {
+        const endEl = document.getElementById("policy_end");
+        if (endEl && this.value) {
+          const d = new Date(this.value);
+          d.setFullYear(d.getFullYear() + 1);
+          endEl.value = d.toISOString().split("T")[0];
+        }
+        buildTable();
+      });
+    }
 
     buildTable();
 
@@ -910,6 +921,38 @@ $footer_scripts = '
           if (fillField("[name=sum_insured]", val)) { filled.push("Sum Insured"); buildTable(); }
         }
 
+        // Mortgagee: "MORTGAGEE\tTOYOTA FINANCIAL\nSERVICES PHILS. CORP."
+        // PDF: tab-separated, may wrap to next line
+        // Normalize known lender names to friendly display names
+        const mortgageeAliases = [
+          [/TOYOTA\s+FINANCIAL/i,                    "Toyota Financial Services Philippines"],
+          [/BDO\s+UNIBANK/i,                         "BDO Unibank"],
+          [/BANK\s+OF\s+THE\s+PHILIPPINE\s+ISLANDS|BPI\b/i, "BPI (Bank of the Philippine Islands)"],
+          [/METROBANK|METROPOLITAN\s+BANK/i,         "Metrobank"],
+          [/PHILIPPINE\s+NATIONAL\s+BANK|PNB\b/i,   "PNB (Philippine National Bank)"],
+          [/SECURITY\s+BANK/i,                       "Security Bank"],
+          [/RCBC|RIZAL\s+COMMERCIAL/i,               "RCBC"],
+          [/EASTWEST/i,                               "EastWest Bank"],
+          [/CHINA\s+BANK/i,                          "China Bank"],
+          [/UNIONBANK/i,                              "UnionBank"],
+          [/LAND\s+BANK/i,                           "Land Bank of the Philippines"],
+        ];
+        const upper = text.toUpperCase();
+        const mortLineIdx = upper.indexOf("MORTGAGEE");
+        if (mortLineIdx !== -1) {
+          const mortSlice = text.slice(mortLineIdx, mortLineIdx + 200);
+          let mortRaw = mortSlice.replace(/^MORTGAGEE[ \t]*:?[ \t]*/i, "").split("\n").slice(0, 2).join(" ").trim();
+          mortRaw = mortRaw.split("\t")[0].trim();
+          if (mortRaw.length >= 3 && document.getElementById("mortgagee_hidden") && !document.getElementById("mortgagee_hidden").value) {
+            let mortVal = null;
+            for (let ai = 0; ai < mortgageeAliases.length; ai++) {
+              if (mortgageeAliases[ai][0].test(mortRaw)) { mortVal = mortgageeAliases[ai][1]; break; }
+            }
+            if (!mortVal) mortVal = mortRaw.replace(/\s+/g, " ").trim();
+            if (window.setMortgagee) { window.setMortgagee(mortVal); filled.push("Mortgagee"); }
+          }
+        }
+
         return filled;
       }
 
@@ -972,7 +1015,7 @@ $footer_scripts = '
           result.innerHTML = "<div class=\"alert alert-warning\" style=\"margin:0;\">" + data.error + "</div>";
           result.style.display = "block";
           btn.disabled = false;
-          btn.innerHTML = "' . $_icon_search . ' Search";
+          btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd"/></svg> Search';
           return;
         }
 
@@ -1005,7 +1048,7 @@ $footer_scripts = '
           setIfEmpty("[name=basic_premium]",     lp.markup);
           setIfEmpty("[name=participation_fee]", lp.participation_fee);
           setIfEmpty("[name=payment_terms]",     lp.payment_terms);
-          setIfEmpty("[name=mortgagee]",         lp.mortgagee);
+          if (lp.mortgagee && window.setMortgagee && !document.getElementById("mortgagee_hidden").value) window.setMortgagee(lp.mortgagee);
           buildTable();
 
           Swal.fire({
@@ -1024,7 +1067,7 @@ $footer_scripts = '
       }
 
       btn.disabled = false;
-      btn.innerHTML = "' . $_icon_search . ' Search";
+      btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd"/></svg> Search';
     };
 
     // Allow Enter key on plate input
@@ -1062,6 +1105,67 @@ $footer_scripts = '
       }
     });
   })();
-';
+
+  // ── Mortgagee select + Other ──
+  (function() {
+    var sel       = document.getElementById("mortgagee_select");
+    var otherInput= document.getElementById("mortgagee_other_input");
+    var hidden    = document.getElementById("mortgagee_hidden");
+    if (!sel || !otherInput || !hidden) return;
+
+    function syncHidden() {
+      if (sel.value === "Other") {
+        hidden.value = otherInput.value.trim();
+      } else {
+        hidden.value = sel.value;
+      }
+    }
+
+    sel.addEventListener("change", function() {
+      if (sel.value === "Other") {
+        otherInput.style.display = "block";
+        otherInput.focus();
+      } else {
+        otherInput.style.display = "none";
+      }
+      syncHidden();
+    });
+
+    otherInput.addEventListener("input", syncHidden);
+
+    // Initial sync on load
+    syncHidden();
+
+    // Expose for OCR: set mortgagee value programmatically
+    window.setMortgagee = function(val) {
+      var opts = sel.options;
+      for (var i = 0; i < opts.length; i++) {
+        if (opts[i].value.toLowerCase() === val.toLowerCase()) {
+          sel.value = opts[i].value;
+          otherInput.style.display = "none";
+          hidden.value = opts[i].value;
+          return;
+        }
+      }
+      // Not in list — use Other
+      sel.value = "Other";
+      otherInput.style.display = "block";
+      otherInput.value = val;
+      hidden.value = val;
+    };
+  })();
+
+  // Show validation errors as SweetAlert
+  if (window._policyErrors && window._policyErrors.length) {
+    Swal.fire({
+      icon: "error",
+      title: "Please fix the following",
+      html: window._policyErrors.map(function(e) { return "&#8226; " + e; }).join("<br>"),
+      confirmButtonColor: "#B8860B",
+      confirmButtonText: "Got it"
+    });
+  }
+</script>
+ADDPOLICY_SCRIPT;
 require_once '../../includes/footer.php';
 ?>

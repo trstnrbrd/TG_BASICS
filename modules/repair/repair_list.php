@@ -159,15 +159,15 @@ require_once '../../includes/topbar.php';
     </div>
 
     <!-- FILTERS -->
-    <form method="GET" action="" style="margin-bottom:1rem;">
-      <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
-        <div style="position:relative;flex:1;min-width:200px;max-width:360px;">
+    <form method="GET" action="" class="rl-filter-form" style="margin-bottom:1rem;">
+      <div class="rl-filter-inner" style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
+        <div class="rl-filter-search" style="position:relative;flex:1;min-width:200px;max-width:360px;">
           <span style="position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;"><?= icon('magnifying-glass', 14) ?></span>
           <input type="text" name="search" class="filter-input"
             placeholder="Search by client, plate, or job #..."
             value="<?= htmlspecialchars($search) ?>" style="padding-left:2.4rem;width:100%;"/>
         </div>
-        <select name="status" class="filter-input" style="width:160px;">
+        <select name="status" class="filter-input rl-filter-status" style="width:160px;">
           <option value="all"         <?= $filter_status === 'all'         ? 'selected' : '' ?>>All Statuses</option>
           <option value="pending"     <?= $filter_status === 'pending'     ? 'selected' : '' ?>>Pending</option>
           <option value="in_progress" <?= $filter_status === 'in_progress' ? 'selected' : '' ?>>In Progress</option>
@@ -175,13 +175,13 @@ require_once '../../includes/topbar.php';
           <option value="completed"   <?= $filter_status === 'completed'   ? 'selected' : '' ?>>Completed</option>
           <option value="cancelled"   <?= $filter_status === 'cancelled'   ? 'selected' : '' ?>>Cancelled</option>
         </select>
-        <select name="sort" class="filter-input" style="width:140px;">
+        <select name="sort" class="filter-input rl-filter-sort" style="width:140px;">
           <option value="newest" <?= $sort_by === 'newest' ? 'selected' : '' ?>>Newest First</option>
           <option value="oldest" <?= $sort_by === 'oldest' ? 'selected' : '' ?>>Oldest First</option>
         </select>
-        <button type="submit" class="btn-primary"><?= icon('magnifying-glass', 14) ?> Search</button>
+        <button type="submit" class="btn-primary rl-filter-btn"><?= icon('magnifying-glass', 14) ?> Search</button>
         <?php if ($search !== '' || $filter_status !== 'all'): ?>
-        <a href="repair_list.php" class="btn-ghost"><?= icon('x-mark', 14) ?> Clear</a>
+        <a href="repair_list.php" class="btn-ghost rl-filter-clear"><?= icon('x-mark', 14) ?> Clear</a>
         <?php endif; ?>
       </div>
     </form>

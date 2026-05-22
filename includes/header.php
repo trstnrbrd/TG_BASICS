@@ -807,7 +807,8 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
     .tg-table tbody td { font-size: 0.68rem; padding: 0.5rem; }
 
     .card-title        { font-size: 0.82rem; }
-    .card-header       { flex-direction: column; align-items: flex-start; }
+    .card-header       { flex-direction: column; align-items: stretch; }
+    .card-header > * { margin-left: 0 !important; width: 100%; }
     .card-header .btn-primary,
     .card-header .btn-sm-gold { width: 100%; justify-content: center; }
 

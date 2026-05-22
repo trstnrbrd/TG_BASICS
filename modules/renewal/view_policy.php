@@ -617,8 +617,8 @@ require_once '../../includes/topbar.php';
             <?php if ($has_installments): ?>
             <!-- Installment schedule table -->
             <?php $pay_mode_opts = ['Cash','Bank Transfer','Check','E-Wallet','Other']; ?>
-            <div class="tg-table-wrap" style="margin-bottom:1rem;overflow-x:auto;">
-              <table class="tg-table" id="installment-view-table" style="min-width:700px;">
+            <div class="tg-table-wrap inst-table-wrap" style="margin-bottom:1rem;overflow-x:auto;">
+              <table class="tg-table inst-schedule-table" id="installment-view-table" style="min-width:700px;">
                 <thead>
                   <tr>
                     <th style="text-align:center;white-space:nowrap;">Payment</th>
@@ -667,7 +667,7 @@ require_once '../../includes/topbar.php';
                   ?>
                   <tr style="<?= $row_bg ?>" data-due="<?= $amt_due ?>" data-due-date="<?= htmlspecialchars($due_date) ?>">
                     <td style="text-align:center;font-weight:600;white-space:nowrap;"><?= $inst_label ?></td>
-                    <td style="text-align:center;white-space:nowrap;">
+                    <td data-label="Due Date" style="text-align:center;white-space:nowrap;">
                       <div style="font-size:0.82rem;"><?= $due_date ? date('M d, Y', strtotime($due_date)) : '—' ?></div>
                       <?php if ($paid_at): ?>
                       <div style="font-size:0.68rem;color:var(--success);font-weight:600;margin-top:0.15rem;">
@@ -675,7 +675,7 @@ require_once '../../includes/topbar.php';
                       </div>
                       <?php endif; ?>
                     </td>
-                    <td style="text-align:center;">
+                    <td data-label="Mode" style="text-align:center;">
                       <?php if ($is_locked): ?>
                         <!-- Hidden input to preserve value on POST -->
                         <input type="hidden" name="payment_mode[]" value="<?= htmlspecialchars($v_mode) ?>"/>
@@ -689,7 +689,7 @@ require_once '../../includes/topbar.php';
                         </select>
                       <?php endif; ?>
                     </td>
-                    <td style="text-align:center;">
+                    <td data-label="Control No." style="text-align:center;">
                       <?php if ($is_locked): ?>
                         <input type="hidden" name="control_number[]" value="<?= htmlspecialchars($v_ctrl) ?>"/>
                         <span style="font-size:0.82rem;font-weight:600;color:var(--text-primary);"><?= $v_ctrl ?: '—' ?></span>
@@ -699,8 +699,8 @@ require_once '../../includes/topbar.php';
                           value="<?= htmlspecialchars($v_ctrl) ?>"/>
                       <?php endif; ?>
                     </td>
-                    <td style="text-align:center;font-weight:700;">&#8369;<?= number_format($amt_due, 2) ?></td>
-                    <td style="text-align:center;">
+                    <td data-label="Amount Due" style="text-align:center;font-weight:700;">&#8369;<?= number_format($amt_due, 2) ?></td>
+                    <td data-label="Amount Paid" style="text-align:center;">
                       <?php if ($is_locked): ?>
                         <input type="hidden" name="installment_amount[]" value="<?= htmlspecialchars($v_amount) ?>"/>
                         <span style="font-size:0.9rem;font-weight:700;color:var(--success);">&#8369;<?= number_format($amt_paid, 2) ?></span>
@@ -715,7 +715,7 @@ require_once '../../includes/topbar.php';
                       <?php endif; ?>
                     </td>
                     <!-- RECEIPT COLUMN -->
-                    <td style="text-align:center;" class="receipt-cell" data-pid="<?= $inst['payment_id'] ?>">
+                    <td data-label="Receipt" style="text-align:center;" class="receipt-cell" data-pid="<?= $inst['payment_id'] ?>">
                       <?php if (!empty($inst['receipt_file'])): ?>
                         <div style="display:flex;align-items:center;justify-content:center;gap:0.4rem;">
                           <button type="button" class="btn-sm-gold rc-view-btn"

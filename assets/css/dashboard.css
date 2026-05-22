@@ -470,13 +470,43 @@
   }
   .dash-stats {
     grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+  }
+  .dash-stat {
+    padding: 0.85rem 0.9rem !important;
+    border-radius: 12px !important;
+  }
+  .dash-stat-top {
+    margin-bottom: 0.55rem !important;
+  }
+  .dash-stat-icon {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 8px !important;
+  }
+  .dash-stat-icon svg { width: 15px !important; height: 15px !important; }
+  .dash-stat-badge {
+    font-size: 0.55rem !important;
+    padding: 0.15rem 0.45rem !important;
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .dash-stat-value {
-    font-size: 1.5rem;
+    font-size: 1.6rem !important;
+    letter-spacing: -1px !important;
+    margin-bottom: 0.2rem !important;
+  }
+  .dash-stat-label {
+    font-size: 0.58rem !important;
+    letter-spacing: 0.5px !important;
   }
 }
 @media (max-width: 480px) {
   .dash-stats {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
   }
 }

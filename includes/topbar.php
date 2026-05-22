@@ -13,14 +13,18 @@ $initials_display  = substr(implode('', array_map(fn($w) => strtoupper($w[0]), e
 
 // Get profile photo for dropdown
 $_profile_photo_url = '';
+$_first_name_display = '';
+$_last_name_display  = '';
 if (isset($_SESSION['user_id'], $conn)) {
-    $_pq = $conn->prepare("SELECT profile_photo FROM users WHERE user_id = ?");
+    $_pq = $conn->prepare("SELECT profile_photo, first_name, last_name FROM users WHERE user_id = ?");
     $_pq->bind_param('i', $_SESSION['user_id']);
     $_pq->execute();
     $_pr = $_pq->get_result()->fetch_assoc();
     if (!empty($_pr['profile_photo'])) {
         $_profile_photo_url = $base_path . 'uploads/avatars/' . $_pr['profile_photo'];
     }
+    $_first_name_display = $_pr['first_name'] ?? '';
+    $_last_name_display  = $_pr['last_name']  ?? '';
 }
 ?>
 <div class="mob-topbar" id="mob-topbar">
@@ -68,6 +72,8 @@ if (isset($_SESSION['user_id'], $conn)) {
     </div>
     <div id="user-dropdown-root"
       data-name="<?= htmlspecialchars($full_name_display) ?>"
+      data-firstname="<?= htmlspecialchars($_first_name_display) ?>"
+      data-lastname="<?= htmlspecialchars($_last_name_display) ?>"
       data-initials="<?= htmlspecialchars($initials_display) ?>"
       data-role="<?= $role_label ?>"
       data-username="<?= htmlspecialchars($_SESSION['username'] ?? '') ?>"

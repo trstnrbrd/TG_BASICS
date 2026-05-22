@@ -1,13 +1,14 @@
 :root {
-  --gold: #b8860b;
-  --gold-bright: #d4a017;
-  --gold-light: #f5e6c0;
-  --gold-muted: #e8d5a3;
+  --gold: #e6b830;
+  --gold-bright: #f5c842;
+  --gold-light: #fde98a;
+  --gold-muted: #f0dc9a;
   --gold-pale: #fdf8ee;
-  --bg: #f4f1ec;
-  --bg-2: #fafaf8;
+  --bg: #faf9f6;
+  --bg-2: #f4f1ec;
   --bg-3: #ffffff;
-  --sidebar-bg: #1c1a17;
+  --panel-bg: #252118;
+  --sidebar-bg: #252118;
   --text-primary: #1a1814;
   --text-secondary: #5c5648;
   --text-muted: #9c9286;
@@ -32,7 +33,6 @@
 }
 
 body {
-  background: var(--bg);
   color: var(--text-primary);
   font-family: "Plus Jakarta Sans", sans-serif;
   font-size: 14px;
@@ -43,6 +43,14 @@ body {
   position: relative;
   overflow-x: hidden;
   -webkit-text-size-adjust: 100%;
+  /* Split: amber top half, dark bottom half */
+  background: linear-gradient(
+    to bottom,
+    #c8961c 0%,
+    #c8961c 48%,
+    var(--panel-bg) 48%,
+    var(--panel-bg) 100%
+  );
 }
 
 /* Prevent mobile auto-linking */
@@ -52,39 +60,28 @@ a[href^="tel"], a[href^="sms"], a[x-apple-data-detectors] {
   pointer-events: none;
 }
 
+/* Dot pattern over dark half + gradient overlay on amber half */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
-  background-image:
-    linear-gradient(var(--border) 1px, transparent 1px),
-    linear-gradient(90deg, var(--border) 1px, transparent 1px);
-  background-size: 40px 40px;
-  opacity: 0.45;
   pointer-events: none;
-  mask-image: radial-gradient(
-    ellipse 80% 80% at 50% 50%,
-    black 30%,
-    transparent 100%
-  );
+  background-image: radial-gradient(circle, rgba(200, 150, 28, 0.14) 1px, transparent 1px);
+  background-size: 26px 26px;
+  /* Only show dots in the dark lower half */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, transparent 48%, black 48%);
+  mask-image: linear-gradient(to bottom, transparent 0%, transparent 48%, black 48%);
 }
 
+/* Amber gradient sheen on top half + decorative rings */
 body::after {
   content: "";
   position: fixed;
   inset: 0;
-  background:
-    radial-gradient(
-      circle at 30% 20%,
-      rgba(212, 160, 23, 0.06) 0%,
-      transparent 50%
-    ),
-    radial-gradient(
-      circle at 75% 80%,
-      rgba(212, 160, 23, 0.04) 0%,
-      transparent 45%
-    );
   pointer-events: none;
+  background:
+    linear-gradient(150deg, rgba(255, 230, 100, 0.2) 0%, rgba(160, 110, 5, 0.22) 100%) top / 100% 48% no-repeat,
+    radial-gradient(ellipse 500px 300px at 50% 25%, rgba(255, 220, 80, 0.12) 0%, transparent 70%);
 }
 
 .wrap {
@@ -114,17 +111,17 @@ body::after {
 .brand-logos .brand-logo-sep {
   width: 1px;
   height: 40px;
-  background: var(--gold-muted);
+  background: rgba(255, 255, 255, 0.35);
 }
 
 .brand-logo-ring {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  border: 2px solid var(--gold-bright);
+  border: 2px solid rgba(255, 255, 255, 0.6);
   overflow: hidden;
   box-shadow:
-    0 0 0 4px var(--gold-light),
+    0 0 0 4px rgba(255, 255, 255, 0.18),
     var(--shadow-md);
 }
 
@@ -151,18 +148,20 @@ body::after {
 .brand-name {
   font-size: 1.4rem;
   font-weight: 800;
-  color: var(--text-primary);
+  color: #fff;
   letter-spacing: -0.3px;
   margin-bottom: 0.2rem;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.18);
 }
 
 .brand-name span {
-  color: var(--gold-bright);
+  color: #fff;
+  opacity: 0.8;
 }
 
 .brand-tag {
   font-size: 0.65rem;
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.7);
   letter-spacing: 2px;
   text-transform: uppercase;
   font-weight: 600;
@@ -177,15 +176,17 @@ body::after {
   display: block;
   width: 20px;
   height: 1px;
-  background: var(--gold-muted);
+  background: rgba(255, 255, 255, 0.4);
 }
 
 /* CARD */
 .card {
   background: var(--bg-3);
-  border: 1px solid var(--border);
+  border: 1px solid rgba(255, 255, 255, 0.4);
   border-radius: 16px;
-  box-shadow: var(--shadow-lg);
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.22),
+    0 4px 16px rgba(0, 0, 0, 0.1);
   overflow: hidden;
   animation: fadeUp 0.5s ease 0.1s both;
 }

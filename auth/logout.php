@@ -34,9 +34,23 @@ $back      = ($role === 'mechanic') ? '../modules/repair/dashboard_mechanic.php'
 <link rel="icon" type="image/png" href="../assets/img/tg_logo.png"/>
 <link rel="apple-touch-icon" href="../assets/img/tg_logo.png"/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="../assets/css/auth/logout.css"/>
+<link rel="stylesheet" href="../assets/css/auth/logout.css?v=<?= filemtime(__DIR__.'/../assets/css/auth/logout.css') ?>"/>
 </head>
 <body>
+
+<!-- Brand above card -->
+<div class="brand">
+  <div class="brand-logos">
+    <div class="brand-logo-ring">
+      <img src="../assets/img/tg_logo.png" alt="TG"/>
+    </div>
+    <div class="brand-logo-sep"></div>
+    <div class="brand-logo-basic">
+      <img src="../assets/img/LogoBasicCar.png" alt="Basic Car"/>
+    </div>
+  </div>
+  <div class="brand-name">TG<span>-BASICS</span></div>
+</div>
 
 <div class="card">
   <div class="card-top">
@@ -50,6 +64,7 @@ $back      = ($role === 'mechanic') ? '../modules/repair/dashboard_mechanic.php'
       Are you sure you want to sign out of <strong>TG-BASICS</strong>?
       Your session will be ended and you will need to sign in again to continue.
     </p>
+    <div class="btn-divider"></div>
     <div class="btn-row">
       <a href="<?= $back ?>" class="btn-cancel">
         <?= icon('arrow-left', 14) ?> Stay

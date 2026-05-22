@@ -235,9 +235,9 @@ require_once '../../includes/topbar.php';
 
     <!-- FILTERS -->
     <div class="card" style="margin-bottom:1.25rem;">
-      <form method="GET" action="" style="padding:1rem 1.25rem;display:flex;align-items:flex-end;gap:0.75rem;flex-wrap:wrap;">
+      <form method="GET" action="" class="al-filter-form" style="padding:1rem 1.25rem;display:flex;align-items:flex-end;gap:0.75rem;flex-wrap:wrap;">
 
-        <div class="field" style="min-width:160px;flex:1;">
+        <div class="field al-f-user" style="min-width:160px;flex:1;">
           <label class="field-label">User</label>
           <select name="user" class="field-select">
             <option value="">All Users</option>
@@ -249,7 +249,7 @@ require_once '../../includes/topbar.php';
           </select>
         </div>
 
-        <div class="field" style="min-width:150px;flex:1;">
+        <div class="field al-f-action" style="min-width:150px;flex:1;">
           <label class="field-label">Action</label>
           <select name="action" class="field-select">
             <option value="">All Actions</option>
@@ -261,24 +261,25 @@ require_once '../../includes/topbar.php';
           </select>
         </div>
 
-        <div class="field" style="min-width:120px;flex:0.8;">
-          <label class="field-label">From</label>
-          <input type="date" name="from" class="field-input" value="<?= htmlspecialchars($filter_from) ?>"/>
+        <div class="al-f-dates" style="display:flex;gap:0.75rem;flex:1.6;min-width:240px;">
+          <div class="field" style="flex:1;min-width:0;">
+            <label class="field-label">From</label>
+            <input type="date" name="from" class="field-input" value="<?= htmlspecialchars($filter_from) ?>"/>
+          </div>
+          <div class="field" style="flex:1;min-width:0;">
+            <label class="field-label">To</label>
+            <input type="date" name="to" class="field-input" value="<?= htmlspecialchars($filter_to) ?>"/>
+          </div>
         </div>
 
-        <div class="field" style="min-width:120px;flex:0.8;">
-          <label class="field-label">To</label>
-          <input type="date" name="to" class="field-input" value="<?= htmlspecialchars($filter_to) ?>"/>
-        </div>
-
-        <div class="field" style="min-width:180px;flex:1.5;">
+        <div class="field al-f-search" style="min-width:180px;flex:1.5;">
           <label class="field-label">Search</label>
           <input type="text" name="q" class="field-input"
             placeholder="Search description..."
             value="<?= htmlspecialchars($filter_search) ?>"/>
         </div>
 
-        <div style="display:flex;gap:0.5rem;padding-bottom:0.05rem;">
+        <div class="al-f-btns" style="display:flex;gap:0.5rem;padding-bottom:0.05rem;">
           <button type="submit" class="btn-primary" style="padding:0.7rem 1.1rem;">
             <?= icon('search', 14) ?> Filter
           </button>

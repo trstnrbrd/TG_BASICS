@@ -169,7 +169,19 @@ require_once '../../includes/topbar.php';
             <div class="card-sub">All active accounts</div>
           </div>
         </div>
-        <table class="tg-table mob-card mob-users-table">
+        <?php
+        // Store users for both desktop table and mobile cards
+        $users_list = [];
+        while ($u = $users->fetch_assoc()) $users_list[] = $u;
+        $role_labels = [
+          'super_admin' => ['Super Admin', 'badge-gold'],
+          'admin'       => ['Admin',       'badge-green'],
+          'mechanic'    => ['Mechanic',    'badge-blue'],
+        ];
+        ?>
+
+        <!-- DESKTOP TABLE -->
+        <table class="tg-table mu-desktop-table">
           <thead>
             <tr>
               <th style="text-align:left;padding-left:1.25rem;">Name</th>
@@ -179,18 +191,9 @@ require_once '../../includes/topbar.php';
             </tr>
           </thead>
           <tbody>
-            <?php while ($u = $users->fetch_assoc()):
-              $role_labels = [
-                'super_admin' => ['Super Admin', 'badge-gold'],
-                'admin'       => ['Admin',       'badge-green'],
-                'mechanic'    => ['Mechanic',    'badge-blue'],
-              ];
-              $rl = $role_labels[$u['role']] ?? ['Unknown', 'badge-gray'];
-            ?>
-            <?php
-              $is_online = !empty($u['is_online']);
-            ?>
-            <?php
+            <?php foreach ($users_list as $u):
+              $rl         = $role_labels[$u['role']] ?? ['Unknown', 'badge-gray'];
+              $is_online  = !empty($u['is_online']);
               $u_initials = substr(implode('', array_map(fn($w) => strtoupper($w[0] ?? ''), array_filter(explode(' ', $u['full_name'])))), 0, 2);
               $u_photo    = !empty($u['profile_photo']) ? '../../uploads/avatars/' . htmlspecialchars($u['profile_photo']) : '';
             ?>
@@ -199,13 +202,9 @@ require_once '../../includes/topbar.php';
                 <div style="display:flex;align-items:center;gap:0.65rem;">
                   <div data-user-id="<?= $u['user_id'] ?>" title="View profile" style="position:relative;flex-shrink:0;cursor:pointer;">
                     <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--gold-bright),var(--gold));display:flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:800;color:#fff;overflow:hidden;border:2px solid var(--border);">
-                      <?php if ($u_photo): ?>
-                        <img src="<?= $u_photo ?>" style="width:100%;height:100%;object-fit:cover;" alt=""/>
-                      <?php else: ?>
-                        <?= $u_initials ?>
-                      <?php endif; ?>
+                      <?php if ($u_photo): ?><img src="<?= $u_photo ?>" style="width:100%;height:100%;object-fit:cover;" alt=""/><?php else: ?><?= $u_initials ?><?php endif; ?>
                     </div>
-                    <span title="<?= $is_online ? 'Online' : 'Offline' ?>" style="position:absolute;bottom:0;right:0;width:9px;height:9px;border-radius:50%;background:<?= $is_online ? '#22c55e' : 'var(--border)' ?>;border:2px solid var(--bg-3);<?= $is_online ? 'box-shadow:0 0 0 2px rgba(34,197,94,0.25);' : '' ?>"></span>
+                    <span style="position:absolute;bottom:0;right:0;width:9px;height:9px;border-radius:50%;background:<?= $is_online ? '#22c55e' : 'var(--border)' ?>;border:2px solid var(--bg-3);<?= $is_online ? 'box-shadow:0 0 0 2px rgba(34,197,94,0.25);' : '' ?>"></span>
                   </div>
                   <div data-user-id="<?= $u['user_id'] ?>" title="View profile" style="cursor:pointer;">
                     <div style="font-weight:700;color:var(--text-primary);font-size:0.82rem;line-height:1.2;"><?= htmlspecialchars($u['full_name']) ?></div>
@@ -214,34 +213,70 @@ require_once '../../includes/topbar.php';
                 </div>
               </td>
               <td><span class="badge <?= $rl[1] ?>"><?= $rl[0] ?></span></td>
-              <td>
-                <?php if ($u['is_active']): ?>
-                  <span class="badge badge-green">Active</span>
-                <?php else: ?>
-                  <span class="badge badge-yellow">Pending</span>
-                <?php endif; ?>
-              </td>
+              <td><?php if ($u['is_active']): ?><span class="badge badge-green">Active</span><?php else: ?><span class="badge badge-yellow">Pending</span><?php endif; ?></td>
               <td>
                 <?php if ($u['role'] !== 'super_admin'): ?>
                 <form method="POST" action="">
                   <?= csrf_field() ?>
                   <input type="hidden" name="action" value="delete"/>
                   <input type="hidden" name="user_id" value="<?= $u['user_id'] ?>"/>
-                  <button type="button"
-                    class="btn-sm-danger js-delete-user"
-                    data-name="<?= htmlspecialchars($u['full_name'], ENT_QUOTES) ?>"
-                    title="Delete">
-                    <?= icon('trash', 14) ?>
-                  </button>
+                  <button type="button" class="btn-sm-danger js-delete-user" data-name="<?= htmlspecialchars($u['full_name'], ENT_QUOTES) ?>" title="Delete"><?= icon('trash', 14) ?></button>
                 </form>
                 <?php else: ?>
                 <span style="font-size:0.7rem;color:var(--text-muted);">Protected</span>
                 <?php endif; ?>
               </td>
             </tr>
-            <?php endwhile; ?>
+            <?php endforeach; ?>
           </tbody>
         </table>
+
+        <!-- MOBILE CARD LIST -->
+        <div class="mu-mobile-list">
+          <?php foreach ($users_list as $u):
+            $rl         = $role_labels[$u['role']] ?? ['Unknown', 'badge-gray'];
+            $is_online  = !empty($u['is_online']);
+            $u_initials = substr(implode('', array_map(fn($w) => strtoupper($w[0] ?? ''), array_filter(explode(' ', $u['full_name'])))), 0, 2);
+            $u_photo    = !empty($u['profile_photo']) ? '../../uploads/avatars/' . htmlspecialchars($u['profile_photo']) : '';
+          ?>
+          <div class="mu-card">
+            <!-- Avatar -->
+            <div class="mu-card-avatar" data-user-id="<?= $u['user_id'] ?>">
+              <div class="mu-card-avatar-inner">
+                <?php if ($u_photo): ?><img src="<?= $u_photo ?>" alt=""/><?php else: ?><?= $u_initials ?><?php endif; ?>
+              </div>
+              <span class="mu-card-dot" style="background:<?= $is_online ? '#22c55e' : 'var(--border)' ?>;<?= $is_online ? 'box-shadow:0 0 0 2px rgba(34,197,94,0.25);' : '' ?>"></span>
+            </div>
+            <!-- Name -->
+            <div class="mu-card-body" data-user-id="<?= $u['user_id'] ?>">
+              <div class="mu-card-name"><?= htmlspecialchars($u['full_name']) ?></div>
+              <div class="mu-card-username">@<?= htmlspecialchars($u['username']) ?></div>
+            </div>
+            <!-- Badges -->
+            <div class="mu-card-badges">
+              <span class="badge <?= $rl[1] ?>"><?= $rl[0] ?></span>
+              <?php if ($u['is_active']): ?>
+                <span class="badge badge-green">Active</span>
+              <?php else: ?>
+                <span class="badge badge-yellow">Pending</span>
+              <?php endif; ?>
+            </div>
+            <!-- Action -->
+            <div class="mu-card-action">
+              <?php if ($u['role'] !== 'super_admin'): ?>
+              <form method="POST" action="">
+                <?= csrf_field() ?>
+                <input type="hidden" name="action" value="delete"/>
+                <input type="hidden" name="user_id" value="<?= $u['user_id'] ?>"/>
+                <button type="button" class="btn-sm-danger js-delete-user" data-name="<?= htmlspecialchars($u['full_name'], ENT_QUOTES) ?>" title="Delete"><?= icon('trash', 14) ?></button>
+              </form>
+              <?php else: ?>
+              <span class="mu-protected">Protected</span>
+              <?php endif; ?>
+            </div>
+          </div>
+          <?php endforeach; ?>
+        </div>
       </div>
 
       <!-- CREATE ACCOUNT FORM -->

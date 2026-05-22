@@ -100,7 +100,7 @@ render:
 <title>Authenticator Verification | TG-BASICS</title>
 <link rel="icon" type="image/png" href="../assets/img/tg_logo.png"/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="../assets/css/auth/activate.css"/>
+<link rel="stylesheet" href="../assets/css/auth/activate.css?v=<?= filemtime(__DIR__.'/../assets/css/auth/activate.css') ?>"/>
 <style>
   .code-inputs { display:flex; gap:0.5rem; justify-content:center; margin-bottom:1.25rem; }
   .code-inputs input {

@@ -160,7 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <link rel="icon" type="image/png" href="../assets/img/tg_logo.png"/>
 <link rel="apple-touch-icon" href="../assets/img/tg_logo.png"/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="../assets/css/auth/login.css"/>
+<link rel="stylesheet" href="../assets/css/auth/login.css?v=<?= filemtime(__DIR__.'/../assets/css/auth/login.css') ?>"/>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body>
@@ -173,31 +173,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   data-icon-warning="<?= htmlspecialchars(icon('exclamation-triangle', 14)) ?>">
 </div>
 
-<div class="login-wrapper">
+<div class="auth-split">
 
-  <a href="../index.php" style="text-decoration:none;color:inherit;">
-  <div class="login-brand">
-    <div class="brand-logos">
-      <div class="brand-logo-wrap">
-        <img src="../assets/img/tg_logo.png" alt="TG Customworks"/>
-      </div>
-      <div class="brand-logo-sep"></div>
-      <div class="brand-logo-wrap no-ring">
-        <img src="../assets/img/LogoBasicCar.png" alt="Basic Car Insurance"/>
-      </div>
+  <!-- LEFT: Branding panel -->
+  <div class="auth-left">
+    <!-- Top: amber area -->
+    <div class="auth-left-img"></div>
+    <!-- Bottom: text -->
+    <div class="auth-left-text">
+      <div class="auth-headline">YOUR<br/>JOURNEY,<br/><em>OUR CARE.</em></div>
+      <div class="auth-sub">Brokerage and Auto Shop Integrated Central System for TG Customworks and Basic Car Insurance.</div>
     </div>
-    <div class="brand-name">TG<span>-BASICS</span></div>
-    <div class="brand-tagline">Brokerage and Auto Shop Integrated Client System</div>
+    <!-- Decorative rings (absolutely positioned, outside grid flow) -->
+    <span class="auth-deco r1"></span>
+    <span class="auth-deco r2"></span>
+    <span class="auth-deco r3"></span>
+    <span class="auth-deco r4"></span>
   </div>
-  </a>
 
-  <div class="login-card">
-    <div class="login-card-header">
-      <div class="login-card-header-title">Welcome back</div>
-      <div class="login-card-header-sub">Sign in to continue to TG-BASICS</div>
-    </div>
+  <!-- RIGHT: Form panel -->
+  <div class="auth-right">
+    <div class="auth-form-wrap">
 
-    <div class="login-card-body">
+      <div class="auth-right-brand">
+        <a href="../" class="auth-brand-link">
+          <div class="auth-brand-logos">
+            <div class="auth-right-logo" style="background-image:url('../assets/img/tg_logo.png')"></div>
+            <div class="auth-brand-sep"></div>
+            <div class="auth-right-logo-basic" style="background-image:url('../assets/img/LogoBasicCar.png')"></div>
+          </div>
+        </a>
+        <div class="auth-right-name">TG<span>-BASICS</span></div>
+      </div>
+
+      <div class="auth-form-title">Welcome back.</div>
+      <div class="auth-form-sub">Sign in to continue to TG-BASICS</div>
 
       <?php if ($error && !$lockout): ?>
       <div class="alert-error">
@@ -234,11 +244,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <div id="submit-root"></div>
       </form>
-    </div>
 
-    <div class="login-note">
-      No self-registration. Contact your administrator for account access.<br/>
-      <a href="forgot_password.php">Forgot your password?</a>
+      <div class="auth-form-note">
+        No self-registration. Contact your administrator for account access.<br/>
+        <a href="forgot_password.php">Forgot your password?</a>
+      </div>
+
     </div>
   </div>
 

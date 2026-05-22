@@ -105,8 +105,8 @@ require_once '../../includes/topbar.php';
 
   <div class="content">
 
-    <!-- SUMMARY CARDS -->
-    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:1rem;margin-bottom:1.5rem;">
+    <!-- SUMMARY CARDS (desktop) -->
+    <div class="rnl-stat-grid" style="display:grid;grid-template-columns:repeat(6,1fr);gap:1rem;margin-bottom:1.5rem;">
       <?php
       $summary = [
         ['all',      'Total Policies',    $counts['total'],    'badge-gold',  'document'],
@@ -135,19 +135,26 @@ require_once '../../includes/topbar.php';
     </div>
 
     <!-- TOOLBAR -->
-    <form method="GET" action="" style="margin-bottom:1rem;">
-      <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
-        <input type="hidden" name="filter" value="<?= htmlspecialchars($filter) ?>"/>
-        <div style="position:relative;flex:1;min-width:200px;max-width:420px;">
+    <form method="GET" action="" class="rnl-filter-form" style="margin-bottom:1rem;">
+      <div class="rnl-filter-inner" style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
+        <!-- Mobile-only filter dropdown (replaces stat cards) -->
+        <select name="filter" class="filter-input rnl-filter-select" onchange="this.form.submit()" style="display:none;">
+          <?php foreach ($summary as [$key, $label, $count, $badge, $ico]): ?>
+          <option value="<?= $key ?>" <?= $filter === $key ? 'selected' : '' ?>><?= $label ?> (<?= (int)$count ?>)</option>
+          <?php endforeach; ?>
+        </select>
+        <!-- Desktop hidden filter passthrough -->
+        <input type="hidden" name="filter" value="<?= htmlspecialchars($filter) ?>" class="rnl-filter-hidden"/>
+        <div class="rnl-filter-search" style="position:relative;flex:1;min-width:200px;max-width:420px;">
           <span style="position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;"><?= icon('magnifying-glass', 14) ?></span>
           <input type="text" name="search" class="filter-input"
             placeholder="Search by client, plate number, or policy number..."
             value="<?= htmlspecialchars($search) ?>"
             style="padding-left:2.4rem;width:100%;"/>
         </div>
-        <button type="submit" class="btn-primary"><?= icon('magnifying-glass', 14) ?> Search</button>
+        <button type="submit" class="btn-primary rnl-filter-btn"><?= icon('magnifying-glass', 14) ?> Search</button>
         <?php if ($search): ?>
-        <a href="?filter=<?= $filter ?>" class="btn-ghost"><?= icon('x-mark', 14) ?> Clear</a>
+        <a href="?filter=<?= $filter ?>" class="btn-ghost rnl-filter-clear"><?= icon('x-mark', 14) ?> Clear</a>
         <?php endif; ?>
       </div>
     </form>

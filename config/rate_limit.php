@@ -14,7 +14,7 @@
  */
 
 define('RL_MAX_ATTEMPTS', 5);
-define('RL_WINDOW_SECS',  15 * 60);   // 15 minutes
+define('RL_WINDOW_SECS',  5 * 60);    // 5 minutes
 
 /**
  * Get the real client IP, accounting for proxies.
@@ -67,11 +67,11 @@ function rate_limit_check(mysqli $conn, string $endpoint): void {
         // Return JSON for AJAX calls, plain message otherwise
         if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) || str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json')) {
             header('Content-Type: application/json');
-            echo json_encode(['error' => 'Too many attempts. Please wait 15 minutes before trying again.']);
+            echo json_encode(['error' => 'Too many attempts. Please wait 5 minutes before trying again.']);
         } else {
             // Store error in session so the page can display it
             if (session_status() === PHP_SESSION_NONE) session_start();
-            $_SESSION['rate_limit_error'] = 'Too many attempts from your IP address. Please wait 15 minutes before trying again.';
+            $_SESSION['rate_limit_error'] = 'Too many attempts from your IP address. Please wait 5 minutes before trying again.';
             // Validate referer is same host before redirecting — prevent open redirect
             $redirect = '../auth/login.php';
             if (!empty($_SERVER['HTTP_REFERER'])) {

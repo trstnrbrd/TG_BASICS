@@ -232,50 +232,63 @@
       <h2 class="section-title">The right access<br><span>for every role.</span></h2>
       <p class="section-desc">Each user is redirected to their own dashboard after login. No self-registration. Accounts are created by the administrator.</p>
     </div>
-    <div class="roles-grid roles-grid-3">
-      <div class="role-card">
-        <div class="role-header">
-          <div class="role-avatar"><?= icon('shield-check', 20) ?></div>
-          <div>
-            <div class="role-title">Super Admin</div>
-          </div>
+    <div class="roles-matrix js-reveal">
+      <div class="rm-header">
+        <div class="rm-perm-col">Module / Permission</div>
+        <div class="rm-role-col">
+          <div class="rm-role-badge"><?= icon('shield-check', 15) ?></div>
+          <div class="rm-role-name">Super Admin</div>
         </div>
-        <ul class="role-list">
-          <li>Full access to all modules plus administration</li>
-          <li>Create and manage user accounts</li>
-          <li>View system activity logs and audit trail</li>
-          <li>Configure system settings and SMTP</li>
-          <li>Toggle two-factor authentication</li>
-        </ul>
+        <div class="rm-role-col">
+          <div class="rm-role-badge"><?= icon('users', 15) ?></div>
+          <div class="rm-role-name">Admin</div>
+        </div>
+        <div class="rm-role-col">
+          <div class="rm-role-badge"><?= icon('wrench', 15) ?></div>
+          <div class="rm-role-name">Mechanic</div>
+        </div>
       </div>
-      <div class="role-card">
-        <div class="role-header">
-          <div class="role-avatar"><?= icon('users', 20) ?></div>
-          <div>
-            <div class="role-title">Admin</div>
-          </div>
-        </div>
-        <ul class="role-list">
-          <li>Full access to all six modules</li>
-          <li>Encode and manage client and vehicle records</li>
-          <li>Process insurance policies and track renewals</li>
-          <li>Monitor claims and document completeness</li>
-          <li>Prepare quotations and confirm billing</li>
-        </ul>
+      <div class="rm-row">
+        <div class="rm-perm">Client &amp; Vehicle Records</div>
+        <div class="rm-cell rm-full">Full</div>
+        <div class="rm-cell rm-full">Full</div>
+        <div class="rm-cell rm-none">&mdash;</div>
       </div>
-      <div class="role-card">
-        <div class="role-header">
-          <div class="role-avatar"><?= icon('wrench', 20) ?></div>
-          <div>
-            <div class="role-title">Mechanic</div>
-          </div>
-        </div>
-        <ul class="role-list">
-          <li>Access to repair job panel only</li>
-          <li>Fill out digital vehicle inspection checklist on arrival</li>
-          <li>Update repair job stages as work progresses</li>
-          <li>Cannot access client records, insurance, or billing</li>
-        </ul>
+      <div class="rm-row">
+        <div class="rm-perm">Insurance &amp; Renewals</div>
+        <div class="rm-cell rm-full">Full</div>
+        <div class="rm-cell rm-full">Full</div>
+        <div class="rm-cell rm-none">&mdash;</div>
+      </div>
+      <div class="rm-row">
+        <div class="rm-perm">Claims Management</div>
+        <div class="rm-cell rm-full">Full</div>
+        <div class="rm-cell rm-full">Full</div>
+        <div class="rm-cell rm-none">&mdash;</div>
+      </div>
+      <div class="rm-row">
+        <div class="rm-perm">Repair Jobs</div>
+        <div class="rm-cell rm-full">Full</div>
+        <div class="rm-cell rm-full">Full</div>
+        <div class="rm-cell rm-limited">View &amp; Update</div>
+      </div>
+      <div class="rm-row">
+        <div class="rm-perm">Billing</div>
+        <div class="rm-cell rm-full">Full</div>
+        <div class="rm-cell rm-full">Full</div>
+        <div class="rm-cell rm-none">&mdash;</div>
+      </div>
+      <div class="rm-row">
+        <div class="rm-perm">User &amp; Account Management</div>
+        <div class="rm-cell rm-full">Full</div>
+        <div class="rm-cell rm-none">&mdash;</div>
+        <div class="rm-cell rm-none">&mdash;</div>
+      </div>
+      <div class="rm-row">
+        <div class="rm-perm">Audit Logs &amp; System Settings</div>
+        <div class="rm-cell rm-full">Full</div>
+        <div class="rm-cell rm-none">&mdash;</div>
+        <div class="rm-cell rm-none">&mdash;</div>
       </div>
     </div>
   </div>
@@ -284,31 +297,86 @@
 <!-- SECURITY & TECH -->
 <section id="security" class="page-section">
   <div class="section-container js-reveal-container">
-    <div class="section-head js-reveal">
-      <div class="section-label">Security &amp; Technology</div>
-      <h2 class="section-title">Built secure.<br><span>Built to last.</span></h2>
-      <p class="section-desc">Enterprise-grade security features protecting every transaction and record in the system.</p>
+    <div class="sec-split">
+      <div class="sec-left js-reveal">
+        <div class="section-label">Security &amp; Technology</div>
+        <h2 class="section-title">Built secure.<br><span>Built to last.</span></h2>
+        <p class="section-desc">Enterprise-grade security features protecting every transaction and record in the system.</p>
+      </div>
+      <div class="sec-right js-reveal">
+        <div class="sec-item">
+          <div class="sec-item-head">
+            <span class="sec-num">01</span>
+            <span class="sec-item-icon"><?= icon('lock-closed', 15) ?></span>
+            <span class="sec-item-name">Two-Factor Authentication</span>
+          </div>
+          <p class="sec-item-desc">Email-based 2FA verification codes on every login for accounts with 2FA enabled.</p>
+        </div>
+        <div class="sec-item">
+          <div class="sec-item-head">
+            <span class="sec-num">02</span>
+            <span class="sec-item-icon"><?= icon('shield-check', 15) ?></span>
+            <span class="sec-item-name">Account Lockout Protection</span>
+          </div>
+          <p class="sec-item-desc">Automatic lockout after multiple failed login attempts to prevent brute-force attacks.</p>
+        </div>
+        <div class="sec-item">
+          <div class="sec-item-head">
+            <span class="sec-num">03</span>
+            <span class="sec-item-icon"><?= icon('clipboard-list', 15) ?></span>
+            <span class="sec-item-name">Full Audit Trail</span>
+          </div>
+          <p class="sec-item-desc">Every login, record change, and system action is logged with timestamps and user details.</p>
+        </div>
+        <div class="sec-item">
+          <div class="sec-item-head">
+            <span class="sec-num">04</span>
+            <span class="sec-item-icon"><?= icon('cog', 15) ?></span>
+            <span class="sec-item-name">Role-Based Access Control</span>
+          </div>
+          <p class="sec-item-desc">Three distinct user roles with strict permission boundaries. No unauthorized module access.</p>
+        </div>
+      </div>
     </div>
-    <div class="tech-grid">
-      <div class="tech-card">
-        <div class="tech-card-icon"><?= icon('lock-closed', 20) ?></div>
-        <div class="tech-card-name">Two-Factor Authentication</div>
-        <div class="tech-card-desc">Email-based 2FA verification codes on every login for accounts with 2FA enabled.</div>
+  </div>
+</section>
+
+<!-- BRAND PANEL -->
+<section class="brand-panel js-reveal">
+  <span class="bp-ring bp-r1"></span>
+  <span class="bp-ring bp-r2"></span>
+  <span class="bp-ring bp-r3"></span>
+  <span class="bp-ring bp-r4"></span>
+  <div class="bp-inner">
+    <div class="bp-system-name">TG<span>-BASICS</span></div>
+    <p class="bp-desc">Brokerage and Auto Shop Integrated Central System &mdash; a unified platform purpose-built for TG Customworks and Basic Car Insurance.</p>
+    <div class="bp-flow">
+      <div class="bp-step">
+        <div class="bp-step-num">01</div>
+        <div class="bp-step-icon"><?= icon('user-plus', 18) ?></div>
+        <div class="bp-step-title">Register</div>
+        <div class="bp-step-text">Client and vehicle details recorded into the central database.</div>
       </div>
-      <div class="tech-card">
-        <div class="tech-card-icon"><?= icon('shield-check', 20) ?></div>
-        <div class="tech-card-name">Account Lockout Protection</div>
-        <div class="tech-card-desc">Automatic lockout after multiple failed login attempts to prevent brute-force attacks.</div>
+      <div class="bp-step-arrow"><?= icon('arrow-right', 14) ?></div>
+      <div class="bp-step">
+        <div class="bp-step-num">02</div>
+        <div class="bp-step-icon"><?= icon('document', 18) ?></div>
+        <div class="bp-step-title">Insure</div>
+        <div class="bp-step-text">Policy filed. OR/CR renewal and PhilBritish premium computed.</div>
       </div>
-      <div class="tech-card">
-        <div class="tech-card-icon"><?= icon('clipboard-list', 20) ?></div>
-        <div class="tech-card-name">Full Audit Trail</div>
-        <div class="tech-card-desc">Every login, record change, and system action is logged with timestamps and user details.</div>
+      <div class="bp-step-arrow"><?= icon('arrow-right', 14) ?></div>
+      <div class="bp-step">
+        <div class="bp-step-num">03</div>
+        <div class="bp-step-icon"><?= icon('wrench', 18) ?></div>
+        <div class="bp-step-title">Repair</div>
+        <div class="bp-step-text">Repair job opened, assigned to mechanic, and tracked to completion.</div>
       </div>
-      <div class="tech-card">
-        <div class="tech-card-icon"><?= icon('cog', 20) ?></div>
-        <div class="tech-card-name">Role-Based Access</div>
-        <div class="tech-card-desc">Three distinct user roles with strict permission boundaries. No unauthorized module access.</div>
+      <div class="bp-step-arrow"><?= icon('arrow-right', 14) ?></div>
+      <div class="bp-step">
+        <div class="bp-step-num">04</div>
+        <div class="bp-step-icon"><?= icon('receipt', 18) ?></div>
+        <div class="bp-step-title">Settle</div>
+        <div class="bp-step-text">Billing finalized, claims resolved, and records updated.</div>
       </div>
     </div>
   </div>

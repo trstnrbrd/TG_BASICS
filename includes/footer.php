@@ -334,12 +334,9 @@ $footer_extra_scripts  = $footer_extra_scripts  ?? '';
   }
 
   window.openEditProfileModal = function() {
-    var root     = document.getElementById('user-dropdown-root');
-    var fullName = root ? (root.dataset.name || '') : '';
-    var parts    = fullName.trim().split(/\s+/);
-    var lastName = parts.length > 1 ? parts.slice(1).join(' ') : '';
-    document.getElementById('ep-first-name').value = parts[0] || '';
-    document.getElementById('ep-last-name').value  = lastName;
+    var root = document.getElementById('user-dropdown-root');
+    document.getElementById('ep-first-name').value = root ? (root.dataset.firstname || '') : '';
+    document.getElementById('ep-last-name').value  = root ? (root.dataset.lastname  || '') : '';
     document.getElementById('ep-email').value = '';
     document.getElementById('ep-error').style.display = 'none';
     document.getElementById('ep-avatar-input').value = '';
@@ -459,7 +456,11 @@ $footer_extra_scripts  = $footer_extra_scripts  ?? '';
         var parts = chipLabel.textContent.split('—');
         chipLabel.textContent = newFullName + (parts[1] ? ' —' + parts[1] : '');
       }
-      if (root) root.dataset.name = newFullName;
+      if (root) {
+        root.dataset.name      = newFullName;
+        root.dataset.firstname = firstName;
+        root.dataset.lastname  = lastName;
+      }
       // Update avatar in user chip
       var avatar = document.querySelector('.user-avatar');
       if (avatar && root) {

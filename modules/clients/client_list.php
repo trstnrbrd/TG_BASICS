@@ -389,7 +389,7 @@ require_once '../../includes/topbar.php';
       </div>
       <?php else: ?>
       <div class="empty-state">
-        <div class="empty-icon"><?= icon('users', 28) ?></div>
+        <div class="empty-icon-wrap"><?= icon('users', 26) ?></div>
         <div class="empty-title"><?= $search ? 'No results found' : 'No clients yet' ?></div>
         <div class="empty-desc"><?= $search ? 'Try a different name, plate number, or contact.' : 'Start by adding your first client record.' ?></div>
       </div>

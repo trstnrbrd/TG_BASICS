@@ -195,7 +195,7 @@ require_once '../../includes/topbar.php';
       </table>
       <?php else: ?>
       <div class="empty-state">
-        <div class="empty-icon"><?= icon('document-text', 32) ?></div>
+        <div class="empty-icon-wrap"><?= icon('document-text', 26) ?></div>
         <div class="empty-title"><?= ($search !== '' || $filter_status !== 'all') ? 'No records found' : 'No billing records yet' ?></div>
         <div class="empty-desc">
           <?= ($search !== '' || $filter_status !== 'all') ? 'Try adjusting your search or filters.' : 'Create a billing record after a claim is approved.' ?>

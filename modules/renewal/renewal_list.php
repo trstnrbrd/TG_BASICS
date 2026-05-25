@@ -260,7 +260,7 @@ require_once '../../includes/topbar.php';
 
       <?php else: ?>
       <div class="empty-state">
-        <div class="empty-icon"><?= icon('clock', 28) ?></div>
+        <div class="empty-icon-wrap"><?= icon('clock', 26) ?></div>
         <div class="empty-title">No policies found</div>
         <div class="empty-desc">
           <?= $search ? 'No results for your search.' : 'No policies in this category yet.' ?>

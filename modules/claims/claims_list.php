@@ -247,7 +247,7 @@ require_once '../../includes/topbar.php';
       </div>
       <?php else: ?>
       <div class="empty-state">
-        <div class="empty-icon"><?= icon('clipboard-list',28) ?></div>
+        <div class="empty-icon-wrap"><?= icon('clipboard-list', 26) ?></div>
         <div class="empty-title"><?= $search || $filter_status !== 'all' || $filter_type !== 'all' ? 'No results found' : 'No claims filed yet' ?></div>
         <div class="empty-desc"><?= $search || $filter_status !== 'all' || $filter_type !== 'all' ? 'Try adjusting your filters.' : 'File a new claim to get started.' ?></div>
       </div>

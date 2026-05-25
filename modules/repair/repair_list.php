@@ -251,7 +251,7 @@ require_once '../../includes/topbar.php';
 
       <?php else: ?>
       <div class="empty-state">
-        <div class="empty-icon"><?= icon('wrench', 32) ?></div>
+        <div class="empty-icon-wrap"><?= icon('wrench', 26) ?></div>
         <div class="empty-title">No repair jobs found</div>
         <div class="empty-desc">
           <?= ($search !== '' || $filter_status !== 'all') ? 'Try adjusting your search or filters.' : 'Create the first repair job to get started.' ?>

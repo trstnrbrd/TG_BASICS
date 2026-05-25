@@ -1314,6 +1314,7 @@ document.querySelectorAll('.theme-option').forEach(opt => {
         const radio = opt.querySelector('input[type="radio"]');
         radio.checked = true;
         document.documentElement.setAttribute('data-theme', radio.value);
+        document.body.classList.toggle('light-mode', radio.value === 'light');
     });
 });
 
@@ -1337,6 +1338,7 @@ if (saveDesignBtn) {
             if (data.ok) {
                 Swal.fire({ toast:true, position:'top-end', icon:'success', title:'Saved!', text:data.message, showConfirmButton:false, timer:3000, timerProgressBar:true });
                 document.documentElement.setAttribute('data-theme', theme);
+                document.body.classList.toggle('light-mode', theme === 'light');
             } else {
                 Swal.fire({ icon: 'error', title: 'Error', text: data.error, confirmButtonColor: '#B8860B' });
             }

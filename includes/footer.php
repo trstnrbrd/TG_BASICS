@@ -122,11 +122,11 @@ $footer_extra_scripts  = $footer_extra_scripts  ?? '';
       const now = new Date();
       const timeEl = document.getElementById('topbar-time');
       const dateEl = document.getElementById('topbar-date');
-      if (timeEl) timeEl.textContent = now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      if (timeEl) timeEl.textContent = now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: false });
       if (dateEl) dateEl.textContent = now.toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
     }
     updateClock();
-    setInterval(updateClock, 1000);
+    setInterval(updateClock, 60000);
   })();
 
   // ── USER DROPDOWN ──

@@ -79,6 +79,22 @@ if (isset($_SESSION['user_id'], $conn)) {
       data-username="<?= htmlspecialchars($_SESSION['username'] ?? '') ?>"
       data-base="<?= $base_path ?>"
       data-photo="<?= htmlspecialchars($_profile_photo_url) ?>">
+      <!-- Pre-rendered placeholder — React replaces this on mount (no flash) -->
+      <div class="user-dropdown-wrap">
+        <div class="user-chip">
+          <div class="user-avatar">
+            <?php if (!empty($_profile_photo_url)): ?>
+              <img src="<?= htmlspecialchars($_profile_photo_url) ?>" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/>
+            <?php else: ?>
+              <?= htmlspecialchars($initials_display) ?>
+            <?php endif; ?>
+          </div>
+          <span class="user-chip-label"><?= htmlspecialchars($full_name_display) ?> &mdash; <?= $role_label ?></span>
+          <span class="user-chip-chevron">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </span>
+        </div>
+      </div>
     </div>
   </div>
 </div>

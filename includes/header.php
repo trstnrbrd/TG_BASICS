@@ -523,10 +523,43 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
   .badge-info   { background: var(--info-bg, rgba(59,130,246,0.1)); color: var(--info, #3b82f6); }
 
   /* ── EMPTY STATE ── */
-  .empty-state { padding: 3rem 2rem; text-align: center; }
-  .empty-icon  { font-size: 2rem; opacity: 0.3; margin-bottom: 0.6rem; }
-  .empty-title { font-size: 0.9rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.3rem; }
-  .empty-desc  { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1.25rem; }
+  .empty-state { padding: 3.5rem 2rem; text-align: center; display: flex; flex-direction: column; align-items: center; }
+  .empty-icon-wrap {
+    width: 64px; height: 64px; border-radius: 50%;
+    background: var(--gold-pale);
+    border: 1px solid rgba(212,160,23,0.15);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 1rem; color: var(--gold-bright); opacity: 0.8;
+  }
+  .empty-title { font-size: 0.9rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 0.35rem; }
+  .empty-desc  { font-size: 0.76rem; color: var(--text-muted); margin-bottom: 1.25rem; max-width: 280px; line-height: 1.6; }
+  .empty-action { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1.1rem; font-size: 0.75rem; font-weight: 600; background: var(--gold); color: #000; border-radius: 8px; text-decoration: none; transition: opacity 0.15s; }
+  .empty-action:hover { opacity: 0.85; }
+
+  /* ── SKELETON LOADER ── */
+  @keyframes shimmer {
+    0%   { background-position: -400px 0; }
+    100% { background-position:  400px 0; }
+  }
+  .skeleton-cell {
+    height: 13px; border-radius: 5px; display: inline-block; width: 100%;
+    background: linear-gradient(90deg, var(--bg-2) 25%, var(--bg-3) 50%, var(--bg-2) 75%);
+    background-size: 400px 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+  }
+  .skeleton-cell.sm  { width: 60%; }
+  .skeleton-cell.xs  { width: 38%; }
+  .skeleton-cell.lg  { width: 80%; }
+  .skeleton-row td   { padding: 0.85rem 1rem; vertical-align: middle; }
+
+  /* ── PAGE TRANSITION BAR ── */
+  #page-loader {
+    position: fixed; top: 0; left: 0; height: 3px;
+    background: linear-gradient(90deg, var(--gold), var(--gold-bright));
+    z-index: 99999; width: 0%; opacity: 1;
+    transition: width 0.25s ease, opacity 0.3s ease;
+    pointer-events: none;
+  }
 
   /* ── FIELD SECTION DIVIDER ── */
   .field-section { font-size: 0.62rem; letter-spacing: 2px; text-transform: uppercase; color: var(--gold); font-weight: 700; margin: 1.25rem 0 1rem; display: flex; align-items: center; gap: 0.75rem; }
@@ -934,7 +967,37 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
 <link rel="stylesheet" href="<?= $base_path ?>assets/css/shared/mobile_tables.css?v=<?= filemtime(__DIR__ . '/../assets/css/shared/mobile_tables.css') ?>"/>
 <?= $extra_css ?? '' ?>
 </head>
-<body>
+<body class="<?= $_user_theme === 'light' ? 'light-mode' : '' ?>">
+<div id="page-loader"></div>
+<script>
+(function(){
+  var bar = document.getElementById('page-loader');
+  var w = 0, tid;
+  function advance() {
+    if (w < 85) { w += (85 - w) * 0.18 + 1; bar.style.width = w + '%'; }
+    tid = setTimeout(advance, 180);
+  }
+  function complete() {
+    clearTimeout(tid);
+    bar.style.width = '100%';
+    setTimeout(function(){ bar.style.opacity = '0'; }, 220);
+  }
+  advance();
+  window.addEventListener('load', complete);
+  document.addEventListener('click', function(e){
+    var a = e.target.closest('a[href]');
+    if (!a) return;
+    var href = a.getAttribute('href');
+    if (!href || href.startsWith('#') || href.startsWith('javascript') || a.target === '_blank') return;
+    bar.style.opacity = '1'; w = 0; bar.style.width = '0%';
+    setTimeout(function(){ w = 30; bar.style.width = '30%'; advance(); }, 10);
+  });
+  document.addEventListener('submit', function(){
+    bar.style.opacity = '1'; w = 0; bar.style.width = '0%';
+    setTimeout(function(){ w = 20; bar.style.width = '20%'; advance(); }, 10);
+  });
+})();
+</script>
 
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
 

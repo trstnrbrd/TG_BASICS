@@ -255,7 +255,7 @@ document.addEventListener('DOMContentLoaded',function(){
   </div>
   <?php else: ?>
   <div class="empty-state">
-    <div class="empty-icon"><?= icon('receipt', 32) ?></div>
+    <div class="empty-icon-wrap"><?= icon('receipt', 26) ?></div>
     <div class="empty-title">No quotations found</div>
     <div class="empty-desc"><?= $search ? 'No results for your search.' : 'Generate a quotation from a repair job to get started.' ?></div>
   </div>

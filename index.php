@@ -122,6 +122,7 @@
 
       <!-- Float cards -->
       <div class="hero-card-float">
+        <div class="float-drag-handle"></div>
         <div class="float-icon"><?= icon('document', 18) ?></div>
         <div>
           <div class="float-label">Claims In Progress</div>
@@ -129,6 +130,7 @@
         </div>
       </div>
       <div class="hero-card-float hero-card-float--2">
+        <div class="float-drag-handle"></div>
         <div class="float-icon" style="background:rgba(34,197,94,0.12);border-color:rgba(34,197,94,0.2);color:#22c55e;"><?= icon('check-circle', 18) ?></div>
         <div>
           <div class="float-label">Policies Renewed</div>
@@ -296,6 +298,9 @@
 
 <!-- SECURITY & TECH -->
 <section id="security" class="page-section">
+  <span class="sec-ring sec-r1"></span>
+  <span class="sec-ring sec-r2"></span>
+  <span class="sec-ring sec-r3"></span>
   <div class="section-container js-reveal-container">
     <div class="sec-split">
       <div class="sec-left js-reveal">
@@ -607,8 +612,11 @@
   var card   = document.querySelector('.hero-card-main');
   if (!card) return;
 
+  var cursorGrab    = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M9 3v8M12 2v8M15 4v6M18 6v5c1.1 0 2 .9 2 2v3a5 5 0 01-5 5h-4a5 5 0 01-5-5v-5c0-1.1.9-2 2-2h.5V3c0-1.1.9-2 2-2s1.5.9 1.5 2' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round' fill='white' paint-order='stroke'/%3E%3C/svg%3E\") 9 2, grab";
+  var cursorGrabbing = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M8 8h8a2 2 0 012 2v4a5 5 0 01-5 5H9a5 5 0 01-5-5v-4a2 2 0 012-2h2V5a1 1 0 012 0v3z' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round' fill='white' paint-order='stroke'/%3E%3C/svg%3E\") 9 8, grabbing";
+
   floats.forEach(function(el) {
-    el.style.cursor = 'grab';
+    el.style.cursor = cursorGrab;
     el.style.userSelect = 'none';
     el.style.transition = 'box-shadow 0.2s, transform 0.15s';
 
@@ -617,7 +625,7 @@
     el.addEventListener('mousedown', function(e) {
       e.preventDefault();
       dragging = true;
-      el.style.cursor = 'grabbing';
+      el.style.cursor = cursorGrabbing;
       el.style.transform = 'scale(1.05)';
       el.style.boxShadow = '0 12px 40px rgba(0,0,0,0.5)';
       el.style.zIndex = '10';
@@ -655,7 +663,7 @@
     document.addEventListener('mouseup', function() {
       if (!dragging) return;
       dragging = false;
-      el.style.cursor = 'grab';
+      el.style.cursor = cursorGrab;
       el.style.transform = 'scale(1)';
       el.style.boxShadow = '0 8px 32px rgba(0,0,0,0.4)';
       el.style.zIndex = '3';

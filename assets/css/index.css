@@ -696,6 +696,22 @@ body.light-mode .topnav.scrolled {
   left: -1.5rem;
 }
 
+.float-drag-handle {
+  width: 12px;
+  height: 18px;
+  background-image: radial-gradient(circle, rgba(255,255,255,0.5) 1.5px, transparent 1.5px);
+  background-size: 5px 6px;
+  background-position: 0 0;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.2s;
+  cursor: grab;
+}
+.hero-card-float:hover .float-drag-handle { opacity: 1; }
+body.light-mode .float-drag-handle {
+  background-image: radial-gradient(circle, rgba(0,0,0,0.35) 1.5px, transparent 1.5px);
+}
+
 .float-icon {
   width: 38px;
   height: 38px;
@@ -1930,31 +1946,69 @@ body.light-mode .float-val {
 }
 
 /* ── BRAND PANEL ── */
-/* Security section gets amber so the gold flows from there into brand panel */
 #security.page-section {
-  background: #c8961c;
+  background: var(--bg);
   position: relative;
+  padding-bottom: 0;
+  margin-bottom: 0;
+  overflow: hidden;
 }
-#security.page-section::after {
+#security.page-section::before {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(150deg, rgba(255,230,100,0.18) 0%, rgba(160,110,5,0.2) 100%);
+  background-image: radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px);
+  background-size: 26px 26px;
+  z-index: 0;
 }
+.sec-ring {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+}
+.sec-r1 { width: 480px; height: 480px; top: -180px; left: -120px; border: 1.5px solid rgba(255,255,255,0.07); }
+.sec-r2 { width: 260px; height: 260px; top: -60px;  left: 60px;   border: 1px solid rgba(255,255,255,0.05); }
+.sec-r3 { width: 360px; height: 360px; bottom: -140px; right: -80px; border: 1.5px solid rgba(255,255,255,0.06); }
 #security .section-container {
+  background: var(--card-bg);
+  border-color: var(--border);
+  position: relative;
+  z-index: 1;
+}
+
+/* Light mode: amber treatment */
+body.light-mode #security.page-section {
+  background: #c8961c;
+}
+body.light-mode #security.page-section::before {
+  background-image: radial-gradient(circle, rgba(0,0,0,0.18) 1px, transparent 1px);
+}
+body.light-mode .sec-r1 { border-color: rgba(255,255,255,0.18); }
+body.light-mode .sec-r2 { border-color: rgba(255,255,255,0.13); }
+body.light-mode .sec-r3 { border-color: rgba(255,255,255,0.12); }
+body.light-mode #security .section-container {
   background: rgba(255,255,255,0.93);
   border: none;
   box-shadow: 0 24px 64px rgba(0,0,0,0.16), 0 4px 16px rgba(0,0,0,0.08);
-  position: relative;
-  z-index: 1;
+}
+body.light-mode .brand-panel {
+  background: linear-gradient(to bottom, #c8961c 0%, #c8961c 12%, #252118 12%, #252118 100%);
+}
+body.light-mode .brand-panel::before {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, transparent 12%, black 12%);
+  mask-image: linear-gradient(to bottom, transparent 0%, transparent 12%, black 12%);
+}
+body.light-mode .brand-panel::after {
+  background: linear-gradient(150deg, rgba(255,230,100,0.2) 0%, rgba(160,110,5,0.22) 100%) top / 100% 12% no-repeat;
 }
 
 .brand-panel {
   position: relative;
   overflow: hidden;
   padding: 0 3rem 0;
-  background: linear-gradient(to bottom, #c8961c 0%, #c8961c 10%, #252118 10%, #252118 100%);
+  background: #252118;
 }
 
 .brand-panel::before {
@@ -1964,8 +2018,8 @@ body.light-mode .float-val {
   pointer-events: none;
   background-image: radial-gradient(circle, rgba(200,150,28,0.14) 1px, transparent 1px);
   background-size: 26px 26px;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, transparent 10%, black 10%);
-  mask-image: linear-gradient(to bottom, transparent 0%, transparent 10%, black 10%);
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 
 .brand-panel::after {
@@ -1973,7 +2027,7 @@ body.light-mode .float-val {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(150deg, rgba(255,230,100,0.2) 0%, rgba(160,110,5,0.22) 100%) top / 100% 10% no-repeat;
+  background: none;
 }
 
 .bp-ring {
@@ -1982,8 +2036,8 @@ body.light-mode .float-val {
   pointer-events: none;
   z-index: 0;
 }
-.bp-r1 { width: 520px; height: 520px; top: -160px; right: -100px; border: 1.5px solid rgba(255,255,255,0.1); }
-.bp-r2 { width: 300px; height: 300px; top: 20px; right: 70px; border: 1px solid rgba(255,255,255,0.15); }
+.bp-r1 { width: 520px; height: 520px; top: 0px; right: -100px; border: 1.5px solid rgba(255,255,255,0.1); }
+.bp-r2 { width: 300px; height: 300px; top: 80px; right: 70px; border: 1px solid rgba(255,255,255,0.15); }
 .bp-r3 { width: 220px; height: 220px; bottom: 60px; left: 80px; border: 1.5px solid rgba(200,150,28,0.25); }
 .bp-r4 { width: 110px; height: 110px; bottom: 20px; left: -20px; border: 1.5px solid rgba(200,150,28,0.2); }
 
@@ -1995,7 +2049,7 @@ body.light-mode .float-val {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: 4rem;
+  padding-top: 5rem;
 }
 
 .bp-system-name {
@@ -2014,7 +2068,7 @@ body.light-mode .float-val {
   line-height: 1.75;
   max-width: 520px;
   text-align: center;
-  margin-bottom: 4rem;
+  margin-bottom: 2rem;
 }
 
 .bp-flow {
@@ -2022,7 +2076,7 @@ body.light-mode .float-val {
   align-items: flex-start;
   width: 100%;
   max-width: 1000px;
-  padding: 3.5rem 0 4rem;
+  padding: 1.5rem 0 4rem;
 }
 
 .bp-step {
@@ -2360,12 +2414,18 @@ a[x-apple-data-detectors] {
     align-self: center;
   }
   .sec-split { grid-template-columns: 1fr; gap: 1.5rem; }
+  .roles-matrix {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
   .rm-header,
-  .rm-row { grid-template-columns: 1fr 1fr 1fr 1fr; }
+  .rm-row { grid-template-columns: 2fr 1fr 1fr 1fr; min-width: 420px; }
   .rm-perm-col,
-  .rm-perm { font-size: 0.7rem; padding: 0.75rem; }
+  .rm-perm { font-size: 0.72rem; padding: 0.75rem 0.85rem; }
   .rm-role-col,
-  .rm-cell { padding: 0.75rem 0.4rem; }
+  .rm-cell { padding: 0.75rem 0.5rem; }
+  .rm-role-badge { width: 26px; height: 26px; }
+  .rm-role-name { font-size: 0.68rem; }
   .cta-actions {
     flex-direction: column;
     width: 100%;

@@ -485,7 +485,10 @@
     height: 32px !important;
     border-radius: 8px !important;
   }
-  .dash-stat-icon svg { width: 15px !important; height: 15px !important; }
+  .dash-stat-icon svg {
+    width: 15px !important;
+    height: 15px !important;
+  }
   .dash-stat-badge {
     font-size: 0.55rem !important;
     padding: 0.15rem 0.45rem !important;

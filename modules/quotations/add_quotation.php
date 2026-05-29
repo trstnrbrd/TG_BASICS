@@ -3,12 +3,33 @@ require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 
-if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
+if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin', 'mechanic'])) {
     header("Location: ../../auth/login.php");
     exit;
 }
 
-$job_id = san_int($_GET['job_id'] ?? 0, 1);
+// ── EDIT MODE: ?quotation_id=X edits an existing draft ──
+$edit_qt_id = san_int($_GET['quotation_id'] ?? 0, 1);
+$edit_mode  = ($edit_qt_id > 0);
+$edit_qt    = null;
+$edit_items = [];
+
+if ($edit_mode) {
+    $eq = $conn->prepare("SELECT * FROM quotations WHERE quotation_id = ? AND status = 'draft'");
+    $eq->bind_param('i', $edit_qt_id);
+    $eq->execute();
+    $edit_qt = $eq->get_result()->fetch_assoc();
+    if (!$edit_qt) {
+        header("Location: quotation_list.php?error=" . urlencode('Quotation not found or is no longer a draft.'));
+        exit;
+    }
+    $ei = $conn->prepare("SELECT * FROM quotation_items WHERE quotation_id = ? ORDER BY sort_order ASC");
+    $ei->bind_param('i', $edit_qt_id);
+    $ei->execute();
+    $edit_items = $ei->get_result()->fetch_all(MYSQLI_ASSOC);
+}
+
+$job_id = $edit_mode ? $edit_qt['job_id'] : san_int($_GET['job_id'] ?? 0, 1);
 if (!$job_id) { header("Location: quotation_list.php"); exit; }
 
 // ── FETCH JOB ──
@@ -26,14 +47,16 @@ $stmt->execute();
 $job = $stmt->get_result()->fetch_assoc();
 if (!$job) { header("Location: quotation_list.php"); exit; }
 
-// Block if quotation already exists for this job
-$chk = $conn->prepare("SELECT quotation_id, quotation_number FROM quotations WHERE job_id = ? LIMIT 1");
-$chk->bind_param('i', $job_id);
-$chk->execute();
-$existing = $chk->get_result()->fetch_assoc();
-if ($existing) {
-    header("Location: view_quotation.php?id={$existing['quotation_id']}&msg=" . urlencode('Quotation already exists for this job.'));
-    exit;
+// Block duplicate — only in create mode
+if (!$edit_mode) {
+    $chk = $conn->prepare("SELECT quotation_id, quotation_number FROM quotations WHERE job_id = ? LIMIT 1");
+    $chk->bind_param('i', $job_id);
+    $chk->execute();
+    $existing = $chk->get_result()->fetch_assoc();
+    if ($existing) {
+        header("Location: view_quotation.php?id={$existing['quotation_id']}&msg=" . urlencode('Quotation already exists for this job.'));
+        exit;
+    }
 }
 
 // ── FETCH CHECKLIST (pre-fill line items from damage) ──
@@ -62,9 +85,11 @@ $service_labels = [
     'custom'         => 'Custom / Mixed',
 ];
 
+$is_mechanic = $_SESSION['role'] === 'mechanic';
+
 // ── HANDLE POST ──
 $errors = [];
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_mechanic) {
     csrf_verify();
 
     $descs      = $_POST['desc']       ?? [];
@@ -98,43 +123,72 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $subtotal = array_sum(array_column($items, 'subtotal'));
         $total    = max(0, $subtotal - $discount);
 
-        // Generate quotation number: Q-YYYYMMDD-XXXX (find next unused number)
-        $prefix = 'Q-' . date('Ymd') . '-';
-        $seq_stmt = $conn->prepare("SELECT quotation_number FROM quotations WHERE quotation_number LIKE ? ORDER BY quotation_number DESC LIMIT 1");
-        $like = $prefix . '%';
-        $seq_stmt->bind_param('s', $like);
-        $seq_stmt->execute();
-        $last = $seq_stmt->get_result()->fetch_row();
-        $seq = $last ? (int)substr($last[0], -4) + 1 : 1;
-        $qt_num = $prefix . str_pad($seq, 4, '0', STR_PAD_LEFT);
-
         $conn->begin_transaction();
         try {
-            $ins = $conn->prepare("
-                INSERT INTO quotations (job_id, quotation_number, status, subtotal, discount, total, notes, created_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ");
-            $ins->bind_param('issdddsi', $job_id, $qt_num, $status, $subtotal, $discount, $total, $notes, $_SESSION['user_id']);
-            $ins->execute();
-            $qt_id = $conn->insert_id;
+            if ($edit_mode) {
+                // ── UPDATE existing draft ──
+                $upd = $conn->prepare("UPDATE quotations SET status=?, subtotal=?, discount=?, total=?, notes=? WHERE quotation_id=?");
+                $upd->bind_param('sddisi', $status, $subtotal, $discount, $total, $notes, $edit_qt_id);
+                $upd->execute();
 
-            $item_ins = $conn->prepare("
-                INSERT INTO quotation_items (quotation_id, description, area, qty, unit_price, subtotal, sort_order)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ");
-            foreach ($items as $it) {
-                $item_ins->bind_param('issdddi', $qt_id, $it['desc'], $it['area'], $it['qty'], $it['unit_price'], $it['subtotal'], $it['sort_order']);
-                $item_ins->execute();
+                $del = $conn->prepare("DELETE FROM quotation_items WHERE quotation_id=?");
+                $del->bind_param('i', $edit_qt_id);
+                $del->execute();
+
+                $item_ins = $conn->prepare("
+                    INSERT INTO quotation_items (quotation_id, description, area, qty, unit_price, subtotal, sort_order)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ");
+                foreach ($items as $it) {
+                    $item_ins->bind_param('issdddi', $edit_qt_id, $it['desc'], $it['area'], $it['qty'], $it['unit_price'], $it['subtotal'], $it['sort_order']);
+                    $item_ins->execute();
+                }
+
+                $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'QUOTATION_UPDATED', ?)");
+                $d    = ($_SESSION['full_name'] ?? 'Unknown') . ' edited quotation ' . $edit_qt['quotation_number'] . '.';
+                $log->bind_param('is', $_SESSION['user_id'], $d);
+                $log->execute();
+
+                $conn->commit();
+                header("Location: view_quotation.php?id=$edit_qt_id&success=" . urlencode('Quotation updated.'));
+                exit;
+            } else {
+                // ── INSERT new quotation ──
+                $prefix = 'Q-' . date('Ymd') . '-';
+                $seq_stmt = $conn->prepare("SELECT quotation_number FROM quotations WHERE quotation_number LIKE ? ORDER BY quotation_number DESC LIMIT 1");
+                $like = $prefix . '%';
+                $seq_stmt->bind_param('s', $like);
+                $seq_stmt->execute();
+                $last = $seq_stmt->get_result()->fetch_row();
+                $seq  = $last ? (int)substr($last[0], -4) + 1 : 1;
+                $qt_num = $prefix . str_pad($seq, 4, '0', STR_PAD_LEFT);
+
+                $ins = $conn->prepare("
+                    INSERT INTO quotations (job_id, quotation_number, status, subtotal, discount, total, notes, created_by)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $ins->bind_param('issdddsi', $job_id, $qt_num, $status, $subtotal, $discount, $total, $notes, $_SESSION['user_id']);
+                $ins->execute();
+                $qt_id = $conn->insert_id;
+
+                $item_ins = $conn->prepare("
+                    INSERT INTO quotation_items (quotation_id, description, area, qty, unit_price, subtotal, sort_order)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ");
+                foreach ($items as $it) {
+                    $item_ins->bind_param('issdddi', $qt_id, $it['desc'], $it['area'], $it['qty'], $it['unit_price'], $it['subtotal'], $it['sort_order']);
+                    $item_ins->execute();
+                }
+
+                $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'QUOTATION_CREATED', ?)");
+                $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' created quotation ' . $qt_num . ' for job ' . $job['job_number'] . '.';
+                $log->bind_param('is', $_SESSION['user_id'], $desc);
+                $log->execute();
+
+                $conn->commit();
+                header("Location: view_quotation.php?id=$qt_id&success=" . urlencode('Quotation ' . $qt_num . ' created.'));
+                exit;
             }
-
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'QUOTATION_CREATED', ?)");
-            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' created quotation ' . $qt_num . ' for job ' . $job['job_number'] . '.';
-            $log->bind_param('is', $_SESSION['user_id'], $desc);
-            $log->execute();
-
-            $conn->commit();
-            header("Location: view_quotation.php?id=$qt_id&success=" . urlencode('Quotation ' . $qt_num . ' created.'));
-            exit;
         } catch (Exception $e) {
             $conn->rollback();
             $errors[] = 'Database error. Please try again.';
@@ -142,40 +196,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// ── PRE-BUILD SUGGESTED ITEMS from checklist + service type ──
+// ── PRE-BUILD ITEMS: use existing if edit mode, else suggest from checklist ──
 $suggested = [];
 $svc = $job['service_type'];
-foreach ($damaged_areas as $dmg) {
-    $lbl   = $area_labels[$dmg['area_key']] ?? $dmg['area_key'];
-    $cond  = $dmg['condition_value'];
-    $price = 3500.00;
-    if (str_contains($svc, 'paint')) $price = 3500.00;
-    $suggested[] = [
-        'desc'       => ($cond === 'major' ? 'Major Damage Repair — ' : 'Minor Scratch Repair — ') . $lbl,
-        'area'       => $dmg['area_key'],
-        'qty'        => 1,
-        'unit_price' => $price,
-        'subtotal'   => $price,
-    ];
-}
-if (empty($suggested)) {
-    $default_prices = [
-        'repair_panel' => 3500, 'repair_full' => 3500,
-        'paint_panel'  => 3500, 'paint_full'  => 3500,
-        'washover_basic' => 0,  'washover_full' => 0,
-        'custom' => 0,
-    ];
-    $default_price = $default_prices[$svc] ?? 0;
-    $suggested[] = [
-        'desc'       => $service_labels[$svc] ?? 'Service',
-        'area'       => '',
-        'qty'        => 1,
-        'unit_price' => $default_price,
-        'subtotal'   => $default_price,
-    ];
+if ($edit_mode && !empty($edit_items)) {
+    foreach ($edit_items as $ei) {
+        $suggested[] = [
+            'desc'       => $ei['description'],
+            'area'       => $ei['area'],
+            'qty'        => $ei['qty'],
+            'unit_price' => $ei['unit_price'],
+            'subtotal'   => $ei['subtotal'],
+        ];
+    }
+} else {
+    foreach ($damaged_areas as $dmg) {
+        $lbl   = $area_labels[$dmg['area_key']] ?? $dmg['area_key'];
+        $cond  = $dmg['condition_value'];
+        $price = 3500.00;
+        $suggested[] = [
+            'desc'       => ($cond === 'major' ? 'Major Damage Repair — ' : 'Minor Scratch Repair — ') . $lbl,
+            'area'       => $dmg['area_key'],
+            'qty'        => 1,
+            'unit_price' => $price,
+            'subtotal'   => $price,
+        ];
+    }
+    if (empty($suggested)) {
+        $default_prices = [
+            'repair_panel' => 3500, 'repair_full' => 3500,
+            'paint_panel'  => 3500, 'paint_full'  => 3500,
+            'washover_basic' => 0,  'washover_full' => 0,
+            'custom' => 0,
+        ];
+        $default_price = $default_prices[$svc] ?? 0;
+        $suggested[] = [
+            'desc'       => $service_labels[$svc] ?? 'Service',
+            'area'       => '',
+            'qty'        => 1,
+            'unit_price' => $default_price,
+            'subtotal'   => $default_price,
+        ];
+    }
 }
 
-$page_title  = 'New Quotation';
+$page_title  = $edit_mode ? 'Edit Quotation' : 'New Quotation';
 $active_page = 'quotations';
 $base_path   = '../../';
 $extra_css   = '<link rel="stylesheet" href="../../assets/css/shared/quotations.css"/>';
@@ -185,8 +250,8 @@ require_once '../../includes/navbar.php';
 
 <div class="main">
 <?php
-$topbar_title      = 'New Quotation';
-$topbar_breadcrumb = ['Repair Shop', 'Quotations', 'New'];
+$topbar_title      = $edit_mode ? 'Edit Quotation' : 'New Quotation';
+$topbar_breadcrumb = $edit_mode ? ['Repair Shop', 'Quotations', $edit_qt['quotation_number'], 'Edit'] : ['Repair Shop', 'Quotations', 'New'];
 require_once '../../includes/topbar.php';
 ?>
 
@@ -344,9 +409,19 @@ document.addEventListener('DOMContentLoaded', function() {
   </div>
 
   <!-- FORM ACTIONS -->
-  <div style="display:flex;justify-content:flex-end;gap:0.6rem;padding-bottom:2rem;">
+  <div style="display:flex;justify-content:flex-end;align-items:center;gap:0.6rem;padding-bottom:2rem;">
+    <?php if ($edit_mode): ?>
+    <a href="view_quotation.php?id=<?= $edit_qt_id ?>" class="btn-ghost">Cancel</a>
+    <?php else: ?>
     <a href="../repair/view_repair.php?id=<?= $job_id ?>" class="btn-ghost">Cancel</a>
-    <button type="submit" class="btn-primary"><?= icon('check', 14) ?> Save Quotation</button>
+    <?php endif; ?>
+    <?php if ($is_mechanic): ?>
+    <div style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem 1rem;background:rgba(184,134,11,0.08);border:1px solid rgba(184,134,11,0.25);border-radius:10px;font-size:0.78rem;color:var(--gold);">
+      <?= icon('exclamation-triangle', 14) ?> Items entered — ask admin to save.
+    </div>
+    <?php else: ?>
+    <button type="submit" class="btn-primary"><?= icon('check', 14) ?> <?= $edit_mode ? 'Update Quotation' : 'Save Quotation' ?></button>
+    <?php endif; ?>
   </div>
 
 </form>

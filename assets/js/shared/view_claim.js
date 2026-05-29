@@ -236,7 +236,6 @@ document.querySelectorAll('.js-delete-claim').forEach(function(btn) {
     });
     if (!confirmed.isConfirmed) return;
     const ok = await requirePin();
-    if (ok) form.submit();
+    if (ok) (form.requestSubmit ? form.requestSubmit() : form.submit());
   });
 });
-

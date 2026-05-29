@@ -1,0 +1,664 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+body {
+  font-family: "Plus Jakarta Sans", "Segoe UI", sans-serif;
+  background:
+    radial-gradient(
+      ellipse at 20% 50%,
+      rgba(212, 160, 23, 0.07) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse at 80% 20%,
+      rgba(184, 134, 11, 0.05) 0%,
+      transparent 50%
+    ),
+    linear-gradient(160deg, #1c1a17 0%, #252118 50%, #1a1710 100%);
+  color: #2c2820;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: #1c1a17;
+}
+::-webkit-scrollbar-thumb {
+  background: #e8d5a3;
+  border-radius: 2px;
+}
+
+/* ── PAGE LOADER ── */
+#pub-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: linear-gradient(160deg, #1c1a17 0%, #252118 50%, #1a1710 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pub-loader-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+}
+.pub-loader-logo {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  animation: loaderPulse 1.2s ease-in-out infinite;
+}
+.pub-loader-spinner {
+  width: 28px;
+  height: 28px;
+  border: 2.5px solid rgba(212, 160, 23, 0.2);
+  border-top-color: #d4a017;
+  border-radius: 50%;
+  animation: loaderSpin 0.75s linear infinite;
+}
+@keyframes loaderSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes loaderPulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(0.95);
+  }
+}
+
+/* ── TOP NAV ── */
+.pub-nav {
+  background: #1c1a17;
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.pub-nav-logos {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.pub-nav-img {
+  height: 34px;
+  width: auto;
+  object-fit: contain;
+}
+.pub-nav-brand {
+  line-height: 1.2;
+}
+.pub-nav-brand-name {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #fff;
+}
+.pub-nav-brand-name span {
+  color: #d4a017;
+}
+.pub-nav-brand-sub {
+  font-size: 0.56rem;
+  color: rgba(200, 192, 176, 0.45);
+  letter-spacing: 0.5px;
+}
+.pub-nav-badge {
+  margin-left: auto;
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  background: rgba(212, 160, 23, 0.12);
+  color: #d4a017;
+  border: 1px solid rgba(212, 160, 23, 0.25);
+  border-radius: 6px;
+  padding: 0.2rem 0.55rem;
+}
+.pub-gold-bar {
+  height: 2px;
+  background: linear-gradient(90deg, #d4a017 0%, #b8860b 60%, transparent 100%);
+}
+
+/* ── PAGE WRAP ── */
+.pub-wrap {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem 1rem 2.5rem;
+}
+.pub-container {
+  width: 100%;
+  max-width: 520px;
+}
+
+/* ── MAIN CARD ── */
+.pub-card {
+  background: #fff;
+  border-radius: 20px;
+  border: 1px solid #ddd6ca;
+  overflow: hidden;
+  box-shadow:
+    0 2px 8px rgba(44, 40, 32, 0.06),
+    0 8px 32px rgba(44, 40, 32, 0.1);
+}
+
+/* ── ID TOP (logos + label) ── */
+.pub-id-top {
+  background: #1c1a17;
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 2px solid #d4a017;
+}
+.pub-id-logos {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.pub-id-logo-img {
+  height: 40px;
+  width: auto;
+  object-fit: contain;
+}
+.pub-id-label {
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #d4a017;
+  text-align: center;
+}
+
+/* ── BANNER (avatar + name, gold bg) ── */
+.pub-banner {
+  background: linear-gradient(
+    160deg,
+    #c8961c 0%,
+    #d4a017 45%,
+    #e8c040 80%,
+    #d4a017 100%
+  );
+  padding: 1.75rem 1.5rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.35rem;
+  position: relative;
+  overflow: hidden;
+}
+.pub-banner::after {
+  content: "";
+  position: absolute;
+  bottom: -40px;
+  right: -40px;
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  pointer-events: none;
+}
+.pub-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: #1c1a17;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #d4a017;
+  flex-shrink: 0;
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.55),
+    0 0 0 6px rgba(0, 0, 0, 0.1),
+    0 6px 20px rgba(0, 0, 0, 0.22);
+  letter-spacing: -0.5px;
+  position: relative;
+  z-index: 1;
+  margin-bottom: 0.25rem;
+}
+.pub-banner-name {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #1c1a17;
+  letter-spacing: -0.3px;
+  line-height: 1.2;
+  position: relative;
+  z-index: 1;
+}
+.pub-verified-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: rgba(39, 174, 96, 0.15);
+  color: #1a6b3a;
+  border: 1.5px solid rgba(39, 174, 96, 0.4);
+  border-radius: 100px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 0.22rem 0.65rem;
+  letter-spacing: 0.3px;
+  position: relative;
+  z-index: 1;
+}
+.pub-banner-contact {
+  font-size: 0.68rem;
+  color: rgba(28, 26, 23, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 1;
+}
+.pub-banner-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(28, 26, 23, 0.3);
+  flex-shrink: 0;
+}
+
+/* ── ID TOGGLE BUTTON ── */
+.pub-id-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.7rem 1.25rem;
+  background: #fafaf8;
+  border: none;
+  border-bottom: 1px solid #f0ede8;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #2c2820;
+  text-align: left;
+  transition: background 0.15s;
+}
+.pub-id-toggle:hover {
+  background: #f4f0ea;
+}
+.pub-id-toggle-icon {
+  color: #b8860b;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+.pub-id-toggle--open .pub-id-toggle-icon {
+  transform: rotate(180deg);
+}
+
+/* ── ID FIELDS ── */
+.pub-id-fields[hidden] {
+  display: none !important;
+}
+.pub-id-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border-bottom: 1px solid #f0ede8;
+}
+.pub-id-field {
+  padding: 0.75rem 1.25rem;
+  border-right: 1px solid #f0ede8;
+  border-bottom: 1px solid #f0ede8;
+}
+.pub-id-field:nth-child(even) {
+  border-right: none;
+}
+.pub-id-field-full {
+  grid-column: 1 / -1;
+  border-right: none;
+}
+.pub-id-field:last-child,
+.pub-id-field-full:last-child {
+  border-bottom: none;
+}
+.pub-id-field-label {
+  font-size: 0.54rem;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #b8860b;
+  margin-bottom: 0.2rem;
+}
+.pub-id-field-value {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #2c2820;
+  word-break: break-word;
+}
+
+/* ── 2-COL GRID ── */
+.pub-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.pub-grid-col {
+  border-top: 1px solid #f0ede8;
+}
+.pub-grid-col-right {
+  border-left: 1px solid #f0ede8;
+}
+
+/* ── SECTIONS ── */
+.pub-section {
+  border-top: 1px solid #f0ede8;
+}
+.pub-section-hdr {
+  padding: 0.9rem 1.25rem 0.65rem;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+.pub-section-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background: #fffbf0;
+  border: 1px solid rgba(212, 160, 23, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #d4a017;
+  flex-shrink: 0;
+}
+.pub-section-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #2c2820;
+}
+.pub-section-count {
+  font-size: 0.62rem;
+  color: #8c8480;
+  margin-left: auto;
+  font-weight: 600;
+}
+.pub-section-body {
+  padding: 0 1.25rem 1.1rem;
+}
+
+/* ── VEHICLES ── */
+.veh-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.veh-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.6rem 0.75rem;
+  background: #fafaf8;
+  border-radius: 8px;
+  border: 1px solid #eee8e0;
+}
+.veh-plate {
+  display: inline-block;
+  background: #ffffff;
+  color: #1a7a1a;
+  font-family: "Big Shoulders Text", "Courier New", monospace;
+  font-weight: 800;
+  font-size: 0.82rem;
+  padding: 0.22rem 0.65rem;
+  border-radius: 3px;
+  letter-spacing: 3px;
+  border: 1.5px solid #1a7a1a;
+  text-transform: uppercase;
+  align-self: flex-start;
+}
+.veh-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #2c2820;
+}
+.veh-meta {
+  font-size: 0.62rem;
+  color: #8c8480;
+  margin-top: 0.05rem;
+}
+
+/* ── POLICY LIST (grid col) ── */
+.pol-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.pol-item {
+  padding: 0.6rem 0.75rem;
+  background: #fafaf8;
+  border-radius: 8px;
+  border: 1px solid #eee8e0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.pol-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+}
+.pol-num {
+  font-size: 0.62rem;
+  font-weight: 800;
+  font-family: monospace;
+  color: #2c2820;
+  letter-spacing: 0.3px;
+}
+.pol-item-meta {
+  font-size: 0.6rem;
+  color: #8c8480;
+  line-height: 1.4;
+}
+
+/* ── BADGES ── */
+.badge {
+  display: inline-block;
+  font-size: 0.56rem;
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 0.16rem 0.42rem;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+.badge-green {
+  background: rgba(39, 174, 96, 0.1);
+  color: #1a7a4a;
+}
+.badge-yellow {
+  background: rgba(243, 156, 18, 0.1);
+  color: #b8860b;
+}
+.badge-red {
+  background: rgba(192, 57, 43, 0.1);
+  color: #c0392b;
+}
+.badge-gray {
+  background: rgba(127, 140, 141, 0.1);
+  color: #5a6268;
+}
+
+/* ── REPAIR JOBS ── */
+.job-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.job-item {
+  background: #fafaf8;
+  border-radius: 9px;
+  border: 1px solid #eee8e0;
+  padding: 0.75rem 0.85rem;
+}
+.job-top {
+  margin-bottom: 0.4rem;
+}
+.job-num {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #d4a017;
+  letter-spacing: 0.3px;
+  margin-bottom: 0.2rem;
+}
+.job-veh {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #2c2820;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.job-svc {
+  font-size: 0.64rem;
+  color: #8c8480;
+  margin-top: 0.08rem;
+}
+.job-date {
+  font-size: 0.61rem;
+  color: #a09890;
+  margin-top: 0.25rem;
+}
+.prog-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.55rem;
+}
+.prog-track {
+  flex: 1;
+  height: 5px;
+  background: #eee8e0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.prog-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+.prog-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.prog-pct {
+  font-size: 0.58rem;
+  color: #9c9286;
+  white-space: nowrap;
+}
+
+/* ── EMPTY ── */
+.pub-empty {
+  padding: 1.25rem 0.5rem;
+  text-align: center;
+  color: #9c9286;
+  font-size: 0.72rem;
+}
+
+/* ── FOOTER ── */
+.pub-footer {
+  text-align: center;
+  padding: 1.5rem 1rem 2rem;
+}
+.pub-footer-tagline {
+  font-size: 0.72rem;
+  color: rgba(200, 192, 176, 0.6);
+  margin-bottom: 0.9rem;
+  font-weight: 500;
+}
+.pub-footer-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin-bottom: 1rem;
+}
+.pub-footer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #d4a017;
+  text-decoration: none;
+  padding: 0.3rem 0.65rem;
+  border: 1px solid rgba(212, 160, 23, 0.2);
+  border-radius: 6px;
+  background: rgba(212, 160, 23, 0.06);
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.pub-footer-link:hover {
+  background: rgba(212, 160, 23, 0.14);
+  border-color: rgba(212, 160, 23, 0.4);
+}
+.pub-footer-copy {
+  font-size: 0.6rem;
+  color: rgba(200, 192, 176, 0.3);
+  line-height: 1.6;
+}
+.pub-footer-copy strong {
+  color: rgba(200, 192, 176, 0.5);
+}
+
+/* ── MOBILE ── */
+@media (max-width: 480px) {
+  .pub-grid {
+    grid-template-columns: 1fr;
+  }
+  .pub-grid-col-right {
+    border-left: none;
+  }
+  .pub-banner {
+    padding: 1.4rem 1rem 1.2rem;
+  }
+  .pub-banner-name {
+    font-size: 1.1rem;
+  }
+  .pub-id-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  .pub-id-label {
+    text-align: left;
+  }
+  .pub-footer-links {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.45rem;
+  }
+}

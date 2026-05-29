@@ -1,8 +1,14 @@
-.tg-table tbody tr:hover { background: var(--gold-light) !important; }
+.tg-table tbody tr:hover {
+  background: var(--gold-light) !important;
+}
 
 /* ── Show/hide: mobile cards vs desktop table ── */
-.cl-mobile-list  { display: none; }
-.cl-desktop-table { display: block; }
+.cl-mobile-list {
+  display: none;
+}
+.cl-desktop-table {
+  display: block;
+}
 
 /* ── MOBILE CARD STYLES ── */
 .cl-card {
@@ -16,9 +22,12 @@
   color: inherit;
   transition: background 0.12s;
 }
-.cl-card:last-child { border-bottom: none; }
-.cl-card:active { background: var(--gold-pale); }
-
+.cl-card:last-child {
+  border-bottom: none;
+}
+.cl-card:active {
+  background: var(--gold-pale);
+}
 
 .cl-card-body {
   flex: 1;
@@ -54,8 +63,12 @@
 
 /* ── MOBILE: switch to cards ── */
 @media (max-width: 768px) {
-  .cl-mobile-list   { display: block; }
-  .cl-desktop-table { display: none; }
+  .cl-mobile-list {
+    display: block;
+  }
+  .cl-desktop-table {
+    display: none;
+  }
 
   /* Compact stat pills — 3-across, tiny */
   .client-stats-grid {
@@ -70,7 +83,9 @@
     align-items: flex-start !important;
     border-radius: 10px !important;
   }
-  .client-stats-grid .card-icon { display: none !important; }
+  .client-stats-grid .card-icon {
+    display: none !important;
+  }
   .client-stats-grid .card > div > div:first-child {
     font-size: 1.15rem !important;
     letter-spacing: -0.5px !important;
@@ -83,10 +98,19 @@
   }
 
   /* Filter toolbar: stack vertically */
-  .client-toolbar > div { flex-direction: column !important; }
+  .client-toolbar > div {
+    flex-direction: column !important;
+  }
   .client-toolbar input,
-  .client-toolbar select { width: 100% !important; min-width: 0 !important; max-width: none !important; }
+  .client-toolbar select {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+  }
   .client-toolbar button,
   .client-toolbar a.btn-primary,
-  .client-toolbar a.btn-ghost { width: 100% !important; justify-content: center !important; }
+  .client-toolbar a.btn-ghost {
+    width: 100% !important;
+    justify-content: center !important;
+  }
 }

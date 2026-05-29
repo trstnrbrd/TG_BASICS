@@ -17,6 +17,32 @@ $checklist_area_keys = [
 $errors  = [];
 $success = '';
 
+// ── PREFILL FROM CLIENT PROFILE ──
+$prefill_data = null;
+$prefill_client_id  = (int)($_GET['prefill_client']  ?? 0);
+$prefill_vehicle_id = (int)($_GET['prefill_vehicle'] ?? 0);
+if ($prefill_client_id > 0) {
+    $pc = $conn->prepare("SELECT client_id, full_name, contact_number FROM clients WHERE client_id = ? AND deleted_at IS NULL");
+    $pc->bind_param('i', $prefill_client_id);
+    $pc->execute();
+    $pc_row = $pc->get_result()->fetch_assoc();
+    if ($pc_row) {
+        $prefill_data = [
+            'client_id' => $pc_row['client_id'],
+            'name'      => $pc_row['full_name'],
+            'contact'   => $pc_row['contact_number'] ?? '',
+            'vehicle'   => null,
+        ];
+        if ($prefill_vehicle_id > 0) {
+            $pv = $conn->prepare("SELECT vehicle_id, plate_number, make, model, year_model, color FROM vehicles WHERE vehicle_id = ? AND client_id = ?");
+            $pv->bind_param('ii', $prefill_vehicle_id, $prefill_client_id);
+            $pv->execute();
+            $pv_row = $pv->get_result()->fetch_assoc();
+            if ($pv_row) $prefill_data['vehicle'] = $pv_row;
+        }
+    }
+}
+
 // ── HANDLE POST ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
@@ -126,7 +152,7 @@ require_once '../../includes/topbar.php';
     </script>
     <?php endif; ?>
 
-    <a href="repair_list.php" class="back-link"><?= icon('arrow-left', 14) ?> Back to Repair Jobs</a>
+    <a href="repair_list.php" class="back-link" onclick="goBack('repair_list.php'); return false;"><?= icon('arrow-left', 14) ?> Back to Repair Jobs</a>
 
     <form method="POST" action="" id="repair-form">
       <?= csrf_field() ?>
@@ -505,7 +531,7 @@ require_once '../../includes/topbar.php';
 
       <!-- FORM ACTIONS -->
       <div class="form-actions" style="background:transparent;border-top:none;padding:0.5rem 0 1.5rem;">
-        <a href="repair_list.php" class="btn-ghost">Cancel</a>
+        <a href="repair_list.php" class="btn-ghost" onclick="goBack('repair_list.php'); return false;">Cancel</a>
         <button type="submit" class="btn-primary"><?= icon('check', 14) ?> Save Repair Job</button>
       </div>
 
@@ -518,9 +544,49 @@ require_once '../../includes/topbar.php';
 <div id="panel-popup"></div>
 
 <script>
-/* Pass PHP data to JS before external script loads */
-window.areaLabels = <?= json_encode($checklist_areas) ?>;
+window.areaLabels   = <?= json_encode($checklist_areas) ?>;
+window.prefillData  = <?= $prefill_data ? json_encode($prefill_data) : 'null' ?>;
 </script>
 <script src="../../assets/js/mechanic/add_repair.js?v=<?= filemtime(__DIR__ . '/../../assets/js/mechanic/add_repair.js') ?>"></script>
+<?php if ($prefill_data): ?>
+<script>
+(function() {
+  if (!window.prefillData) return;
+  var d = window.prefillData;
+  document.getElementById('client-search').value   = d.name;
+  document.getElementById('client_id_input').value = d.client_id;
+  document.getElementById('contact_number').value  = d.contact;
+
+  fetch('ajax_get_vehicles.php?client_id=' + d.client_id)
+    .then(function(r){ return r.json(); })
+    .then(function(vehicles) {
+      var sel = document.getElementById('vehicle_id_select');
+      if (!vehicles.length) {
+        sel.innerHTML = '<option value="">No vehicles for this client</option>';
+        sel.disabled  = true;
+        return;
+      }
+      sel.innerHTML = '<option value="">— Select vehicle —</option>' + vehicles.map(function(v) {
+        return '<option value="' + v.vehicle_id + '"'
+          + ' data-make="'  + (v.make        || '') + '"'
+          + ' data-model="' + (v.model       || '') + '"'
+          + ' data-year="'  + (v.year_model  || '') + '"'
+          + ' data-color="' + (v.color       || '') + '"'
+          + ' data-plate="' + (v.plate_number|| '') + '">'
+          + v.plate_number + ' — ' + v.make + ' ' + v.model
+          + '</option>';
+      }).join('');
+      sel.disabled = false;
+
+      if (d.vehicle) {
+        sel.value = d.vehicle.vehicle_id;
+      } else if (vehicles.length === 1) {
+        sel.value = vehicles[0].vehicle_id;
+      }
+      sel.dispatchEvent(new Event('change'));
+    });
+})();
+</script>
+<?php endif; ?>
 
 <?php require_once '../../includes/footer.php'; ?>

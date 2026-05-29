@@ -226,12 +226,11 @@ document.addEventListener('DOMContentLoaded',function(){
 
 <!-- HEADER ROW -->
 <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
-  <a href="quotation_list.php" style="display:inline-flex;align-items:center;gap:0.4rem;font-size:0.82rem;color:var(--text-muted);text-decoration:none;" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--text-muted)'">
-    <?= icon('chevron-left', 14) ?> Back to Quotations
-  </a>
+  <a href="quotation_list.php" class="back-link" onclick="goBack('quotation_list.php'); return false;"><?= icon('arrow-left', 14) ?> Back to Quotations</a>
   <div class="qt-action-bar">
     <span class="badge <?= $sc[1] ?>"><?= $sc[0] ?></span>
     <?php if ($is_admin && $qt['status'] === 'draft'): ?>
+      <a href="../quotations/add_quotation.php?quotation_id=<?= $qt_id ?>" class="btn-ghost" style="font-size:0.82rem;"><?= icon('pencil', 13) ?> Edit Draft</a>
       <form method="POST" style="display:inline;">
         <?= csrf_field() ?><input type="hidden" name="action" value="send_approval"/>
         <button type="submit" class="btn-primary" style="font-size:0.82rem;"><?= icon('paper-airplane', 13) ?> Send for Approval</button>

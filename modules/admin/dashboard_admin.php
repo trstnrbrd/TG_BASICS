@@ -15,9 +15,9 @@ $full_name = $_SESSION['full_name'];
 $first_name = explode(' ', $full_name)[0];
 
 // ── STATS QUERIES ──
-$total_clients  = $conn->query("SELECT COUNT(*) as c FROM clients")->fetch_assoc()['c'];
+$total_clients  = $conn->query("SELECT COUNT(*) as c FROM clients WHERE deleted_at IS NULL")->fetch_assoc()['c'];
 $total_vehicles = $conn->query("SELECT COUNT(*) as c FROM vehicles")->fetch_assoc()['c'];
-$recent_clients  = $conn->query("SELECT COUNT(*) as c FROM clients WHERE YEAR(created_at)=YEAR(NOW()) AND MONTH(created_at)=MONTH(NOW())")->fetch_assoc()['c'];
+$recent_clients  = $conn->query("SELECT COUNT(*) as c FROM clients WHERE deleted_at IS NULL AND YEAR(created_at)=YEAR(NOW()) AND MONTH(created_at)=MONTH(NOW())")->fetch_assoc()['c'];
 $recent_vehicles = $conn->query("SELECT COUNT(*) as c FROM vehicles WHERE YEAR(created_at)=YEAR(NOW()) AND MONTH(created_at)=MONTH(NOW())")->fetch_assoc()['c'];
 
 $total_policies   = $conn->query("SELECT COUNT(*) as c FROM insurance_policies WHERE is_renewed = 0")->fetch_assoc()['c'];
@@ -54,6 +54,7 @@ $recent_list = $conn->query("
            COUNT(v.vehicle_id) as vehicle_count
     FROM clients c
     LEFT JOIN vehicles v ON c.client_id = v.client_id
+    WHERE c.deleted_at IS NULL
     GROUP BY c.client_id
     ORDER BY c.created_at DESC
     LIMIT 5
@@ -102,8 +103,10 @@ $ct_months = [];
 for ($m = 5; $m >= 0; $m--) {
     $y  = date('Y', strtotime("-$m months"));
     $mo = date('m', strtotime("-$m months"));
-    $ins = (int)$conn->query("SELECT COUNT(DISTINCT c.client_id) as c FROM clients c INNER JOIN insurance_policies ip ON ip.client_id = c.client_id WHERE YEAR(c.created_at)='$y' AND MONTH(c.created_at)='$mo'")->fetch_assoc()['c'];
-    $wk  = (int)$conn->query("SELECT COUNT(*) as c FROM clients c LEFT JOIN insurance_policies ip ON ip.client_id = c.client_id WHERE ip.policy_id IS NULL AND YEAR(c.created_at)='$y' AND MONTH(c.created_at)='$mo'")->fetch_assoc()['c'];
+    // Stats rule: include client if not deleted, OR deleted in a different month/year than added
+    $stats_cond = "(c.deleted_at IS NULL OR (YEAR(c.deleted_at) != YEAR(c.created_at) OR MONTH(c.deleted_at) != MONTH(c.created_at)))";
+    $ins = (int)$conn->query("SELECT COUNT(DISTINCT c.client_id) as c FROM clients c INNER JOIN insurance_policies ip ON ip.client_id = c.client_id WHERE YEAR(c.created_at)='$y' AND MONTH(c.created_at)='$mo' AND $stats_cond")->fetch_assoc()['c'];
+    $wk  = (int)$conn->query("SELECT COUNT(*) as c FROM clients c LEFT JOIN insurance_policies ip ON ip.client_id = c.client_id WHERE ip.policy_id IS NULL AND YEAR(c.created_at)='$y' AND MONTH(c.created_at)='$mo' AND $stats_cond")->fetch_assoc()['c'];
     $ct_months[] = [
         'label'     => date('F Y', strtotime("-$m months")),
         'short'     => date('M',   strtotime("-$m months")),
@@ -451,7 +454,12 @@ require_once '../../includes/topbar.php';
           <!-- Info -->
           <div style="min-width:0;">
             <div style="font-size:0.78rem;font-weight:700;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px;"><?= htmlspecialchars($tm['full_name']) ?></div>
-            <span class="badge <?= $tm_rb ?>" style="font-size:0.6rem;padding:0.1rem 0.45rem;"><?= $tm_rl ?></span>
+            <div style="display:flex;align-items:center;gap:0.3rem;margin-top:0.15rem;">
+              <span class="badge <?= $tm_rb ?>" style="font-size:0.6rem;padding:0.1rem 0.45rem;"><?= $tm_rl ?></span>
+              <?php if ($tm['user_id'] == $_SESSION['user_id']): ?>
+              <span style="font-size:0.6rem;font-weight:700;color:var(--gold);background:rgba(212,160,23,0.12);border:1px solid rgba(212,160,23,0.3);border-radius:4px;padding:0.1rem 0.4rem;line-height:1.4;">You</span>
+              <?php endif; ?>
+            </div>
           </div>
         </div>
         <?php endwhile; ?>

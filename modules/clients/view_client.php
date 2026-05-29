@@ -19,12 +19,12 @@ if ($client_id === 0) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) {
     csrf_verify();
     $del_id = (int)$_POST['delete_client_id'];
-    $cstmt  = $conn->prepare("SELECT full_name FROM clients WHERE client_id = ?");
+    $cstmt  = $conn->prepare("SELECT full_name FROM clients WHERE client_id = ? AND deleted_at IS NULL");
     $cstmt->bind_param('i', $del_id);
     $cstmt->execute();
     $cdata = $cstmt->get_result()->fetch_assoc();
     if ($cdata) {
-        $dstmt = $conn->prepare("DELETE FROM clients WHERE client_id = ?");
+        $dstmt = $conn->prepare("UPDATE clients SET deleted_at = NOW() WHERE client_id = ?");
         $dstmt->bind_param('i', $del_id);
         $dstmt->execute();
         $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'CLIENT_DELETED', ?)");
@@ -81,8 +81,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     exit;
 }
 
-// Load client
-$stmt = $conn->prepare("SELECT * FROM clients WHERE client_id = ?");
+// Load client (exclude soft-deleted)
+$stmt = $conn->prepare("SELECT * FROM clients WHERE client_id = ? AND deleted_at IS NULL");
 $stmt->bind_param('i', $client_id);
 $stmt->execute();
 $client = $stmt->get_result()->fetch_assoc();
@@ -177,7 +177,7 @@ require_once '../../includes/topbar.php';
 
   <div class="content">
 
-    <a href="client_list.php" class="back-link"><?= icon('arrow-left', 14) ?> Back to Client Records</a>
+    <a href="client_list.php" class="back-link" onclick="goBack('client_list.php'); return false;"><?= icon('arrow-left', 14) ?> Back to Client Records</a>
 
     <?php if (!empty($_GET['success'])): ?>
     <script>
@@ -198,6 +198,22 @@ require_once '../../includes/topbar.php';
       });
     </script>
     <?php endif; ?>
+
+    <?php
+    $public_token = $client['public_token'] ?? '';
+    if (empty($public_token)) {
+        $gen = $conn->prepare("UPDATE clients SET public_token = SHA2(CONCAT(?, UUID(), 'tgbasics'), 256) WHERE client_id = ? AND public_token IS NULL");
+        $gen->bind_param('ii', $client_id, $client_id);
+        $gen->execute();
+        $rt = $conn->prepare("SELECT public_token FROM clients WHERE client_id = ?");
+        $rt->bind_param('i', $client_id);
+        $rt->execute();
+        $public_token = $rt->get_result()->fetch_assoc()['public_token'] ?? '';
+    }
+    $public_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
+                . '://' . $_SERVER['HTTP_HOST']
+                . '/TG-BASICS/modules/public/client.php?token=' . urlencode($public_token);
+    ?>
 
     <!-- CLIENT HEADER BANNER -->
     <div style="background:var(--btn-bg);border-radius:12px;padding:1.5rem 1.75rem;margin-bottom:1.25rem;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
@@ -232,77 +248,99 @@ require_once '../../includes/topbar.php';
       <?php endif; ?>
     </div>
 
-    <!-- TOP GRID: Client Info + Quick Stats -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;">
+    <?php
+    $vehicle_count = $conn->prepare("SELECT COUNT(*) as c FROM vehicles WHERE client_id = ?");
+    $vehicle_count->bind_param('i', $client_id);
+    $vehicle_count->execute();
+    $vc = $vehicle_count->get_result()->fetch_assoc()['c'];
 
-      <!-- CLIENT INFO -->
-      <div class="card" style="margin-bottom:0;">
-        <div class="card-header">
-          <div class="card-icon"><?= icon('user', 16) ?></div>
-          <div>
-            <div class="card-title">Client Information</div>
-            <div class="card-sub">Personal details on record</div>
-          </div>
+    $policy_count = $conn->prepare("SELECT COUNT(*) as c FROM insurance_policies WHERE client_id = ?");
+    $policy_count->bind_param('i', $client_id);
+    $policy_count->execute();
+    $pc = $policy_count->get_result()->fetch_assoc()['c'];
+
+    $active_policy = $conn->prepare("SELECT COUNT(*) as c FROM insurance_policies WHERE client_id = ? AND policy_end >= CURDATE()");
+    $active_policy->bind_param('i', $client_id);
+    $active_policy->execute();
+    $apc = $active_policy->get_result()->fetch_assoc()['c'];
+
+    $claim_count = $conn->prepare("SELECT COUNT(*) as c FROM claims WHERE client_id = ?");
+    $claim_count->bind_param('i', $client_id);
+    $claim_count->execute();
+    $clc = $claim_count->get_result()->fetch_assoc()['c'];
+    ?>
+
+    <!-- CLIENT INFO CARD (with QR embedded on the right) -->
+    <div class="card" style="margin-bottom:1.25rem;">
+      <div class="card-header">
+        <div class="card-icon"><?= icon('user', 16) ?></div>
+        <div>
+          <div class="card-title">Client Information</div>
+          <div class="card-sub">Personal details on record</div>
         </div>
-        <div style="padding:1.25rem 1.5rem;display:flex;flex-direction:column;gap:1rem;">
+      </div>
+      <div style="padding:1rem 1.5rem;display:grid;grid-template-columns:1fr 200px;gap:1.5rem;align-items:center;">
+
+        <!-- Info fields -->
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:0.65rem 2rem;min-width:0;">
           <?php
           $info_rows = [
-            ['Full Name',     $client['full_name']],
-            [' Contact',       $client['contact_number']],
-            [' Email',         $client['email'] ?: 'Not provided'],
-            ['Address',       $client['address']],
-            ['Date Added',    date('F d, Y', strtotime($client['created_at']))],
+            ['Full Name',  $client['full_name']],
+            ['Contact',    $client['contact_number']],
+            ['Email',      $client['email'] ?: 'Not provided'],
+            ['Address',    $client['address']],
+            ['Date Added', date('F d, Y', strtotime($client['created_at']))],
           ];
           foreach ($info_rows as $r): ?>
-          <div style="display:flex;flex-direction:column;gap:0.15rem;">
-            <div style="font-size:0.62rem;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);font-weight:700;"><?= $r[0] ?></div>
-            <div style="font-size:0.88rem;font-weight:600;color:var(--text-primary);"><?= htmlspecialchars($r[1]) ?></div>
+          <div style="display:flex;flex-direction:column;gap:0.12rem;min-width:0;">
+            <div style="font-size:0.6rem;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);font-weight:700;"><?= $r[0] ?></div>
+            <div style="font-size:0.83rem;font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?= htmlspecialchars($r[1]) ?></div>
           </div>
           <?php endforeach; ?>
         </div>
-      </div>
 
-      <!-- QUICK STATS -->
-      <div style="display:flex;flex-direction:column;gap:1rem;">
-        <?php
-        $vehicle_count = $conn->prepare("SELECT COUNT(*) as c FROM vehicles WHERE client_id = ?");
-        $vehicle_count->bind_param('i', $client_id);
-        $vehicle_count->execute();
-        $vc = $vehicle_count->get_result()->fetch_assoc()['c'];
-
-        $policy_count = $conn->prepare("SELECT COUNT(*) as c FROM insurance_policies WHERE client_id = ?");
-        $policy_count->bind_param('i', $client_id);
-        $policy_count->execute();
-        $pc = $policy_count->get_result()->fetch_assoc()['c'];
-
-        $active_policy = $conn->prepare("SELECT COUNT(*) as c FROM insurance_policies WHERE client_id = ? AND policy_end >= CURDATE()");
-        $active_policy->bind_param('i', $client_id);
-        $active_policy->execute();
-        $apc = $active_policy->get_result()->fetch_assoc()['c'];
-
-        $claim_count = $conn->prepare("SELECT COUNT(*) as c FROM claims WHERE client_id = ?");
-        $claim_count->bind_param('i', $client_id);
-        $claim_count->execute();
-        $clc = $claim_count->get_result()->fetch_assoc()['c'];
-
-        $quick_stats = [
-          [icon('vehicle', 16),        $vc,  'Registered Vehicles', 'badge-gold'],
-          [icon('document', 16),       $pc,  'Total Policies',      'badge-green'],
-          [icon('check-circle', 16),   $apc, 'Active Policies',     'badge-green'],
-          [icon('clipboard-list', 16), $clc, 'Total Claims',        'badge-gold'],
-        ];
-        foreach ($quick_stats as $qs): ?>
-        <div class="card" style="margin-bottom:0;display:flex;align-items:center;gap:1rem;padding:1rem 1.25rem;">
-          <div class="card-icon" style="width:42px;height:42px;border-radius:10px;font-size:1.1rem;flex-shrink:0;"><?= $qs[0] ?></div>
-          <div>
-            <div style="font-size:1.5rem;font-weight:800;color:var(--text-primary);line-height:1;letter-spacing:-0.5px;"><?= $qs[1] ?></div>
-            <div style="font-size:0.7rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-top:0.15rem;"><?= $qs[2] ?></div>
+        <!-- QR Code -->
+        <div style="border-left:1px solid var(--border);padding-left:0.75rem;display:flex;align-items:center;gap:0.5rem;">
+          <div style="position:relative;background:#fff;padding:6px;border-radius:8px;border:1px solid var(--border);box-shadow:var(--shadow);flex-shrink:0;line-height:0;">
+            <div id="qr-canvas-wrap" style="width:90px;height:90px;display:block;"></div>
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px #fff;">
+              <img src="<?= $base_path ?>assets/img/tg_logo.png" style="width:16px;height:16px;object-fit:contain;border-radius:50%;"/>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:0.35rem;min-width:0;">
+            <div style="font-size:0.6rem;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;font-weight:700;">Digital ID</div>
+            <div style="font-size:0.58rem;color:var(--text-muted);">Scan for profile</div>
+            <a href="<?= htmlspecialchars($public_url) ?>" target="_blank" class="btn-ghost" style="font-size:0.68rem;padding:0.28rem 0.5rem;display:flex;align-items:center;gap:0.25rem;white-space:nowrap;">
+              <?= icon('arrow-top-right-on-square', 11) ?> Preview
+            </a>
+            <button type="button" onclick="downloadQr()" class="btn-ghost" style="font-size:0.68rem;padding:0.28rem 0.5rem;display:flex;align-items:center;gap:0.25rem;white-space:nowrap;">
+              <?= icon('arrow-down-tray', 11) ?> Download
+            </button>
           </div>
         </div>
-        <?php endforeach; ?>
-      </div>
 
+      </div>
     </div>
+
+    <!-- STATS ROW -->
+    <?php
+    $quick_stats = [
+      [icon('vehicle', 16),        $vc,  'Registered Vehicles'],
+      [icon('document', 16),       $pc,  'Total Policies'],
+      [icon('check-circle', 16),   $apc, 'Active Policies'],
+      [icon('clipboard-list', 16), $clc, 'Total Claims'],
+    ];
+    ?>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.25rem;">
+      <?php foreach ($quick_stats as $qs): ?>
+      <div class="card" style="margin-bottom:0;display:flex;align-items:center;gap:1rem;padding:1rem 1.25rem;">
+        <div class="card-icon" style="width:42px;height:42px;border-radius:10px;flex-shrink:0;"><?= $qs[0] ?></div>
+        <div>
+          <div style="font-size:1.5rem;font-weight:800;color:var(--text-primary);line-height:1;letter-spacing:-0.5px;"><?= $qs[1] ?></div>
+          <div style="font-size:0.7rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-top:0.15rem;"><?= $qs[2] ?></div>
+        </div>
+      </div>
+      <?php endforeach; ?></div>
 
     <!-- VEHICLES -->
     <div class="card">
@@ -589,7 +627,7 @@ require_once '../../includes/topbar.php';
               };
               $view_url = '../../modules/renewal/view_policy.php?id=' . $p['policy_id'];
             ?>
-            <tr style="cursor:pointer;" onclick="window.location='<?= $view_url ?>'">
+            <tr <?= !$is_mechanic ? "style=\"cursor:pointer;\" onclick=\"window.location='" . $view_url . "'\"" : '' ?>>
               <td style="font-weight:700;color:var(--text-primary);font-size:0.78rem;text-align:center;"><?= htmlspecialchars($p['policy_number']) ?></td>
               <td style="text-align:center;">
                 <span class="badge-dark"><?= htmlspecialchars($p['plate_number']) ?></span>
@@ -663,7 +701,7 @@ require_once '../../includes/topbar.php';
               <th>Incident Date</th>
               <th>Filed</th>
               <th>Type / Status</th>
-              <th>Actions</th>
+              <?php if (!$is_mechanic): ?><th>Actions</th><?php endif; ?>
             </tr>
           </thead>
           <tbody>
@@ -682,19 +720,21 @@ require_once '../../includes/topbar.php';
               <td style="font-size:0.72rem;color:var(--text-muted);white-space:nowrap;"><?= date('M d, Y', strtotime($cl['created_at'])) ?></td>
               <td>
                 <div style="display:flex;flex-direction:column;align-items:center;gap:0.3rem;">
-                  <?php if ($cl['claim_type'] === 'major'): ?>
-                    <span class="badge badge-red">Major / 3rd Party</span>
+                  <?php if ($cl['claim_type'] === 'repair'): ?>
+                    <span class="badge badge-danger">Repair</span>
                   <?php else: ?>
-                    <span class="badge badge-info">Minor</span>
+                    <span class="badge badge-info">Cash</span>
                   <?php endif; ?>
                   <span class="badge <?= $cs['class'] ?>"><?= $cs['label'] ?></span>
                 </div>
               </td>
+              <?php if (!$is_mechanic): ?>
               <td>
                 <a href="../claims/view_claim.php?id=<?= $cl['claim_id'] ?>" class="btn-sm-gold" title="View Claim" style="padding:0.35rem 0.55rem;">
                   <?= icon('eye', 14) ?>
                 </a>
               </td>
+              <?php endif; ?>
             </tr>
             <?php endwhile; ?>
           </tbody>
@@ -737,7 +777,11 @@ require_once '../../includes/topbar.php';
             <div class="card-sub">Repair history for this client</div>
           </div>
         </div>
-        <a href="../repair/repair_list.php" class="btn-primary" style="margin-left:auto;padding:0.5rem 1rem;font-size:0.78rem;"><?= icon('wrench', 14) ?> All Jobs</a>
+        <?php
+          $_repair_prefill = '../repair/add_repair.php?prefill_client=' . $client_id;
+          if (count($_client_vehicle_ids) === 1) $_repair_prefill .= '&prefill_vehicle=' . $_client_vehicle_ids[0];
+        ?>
+        <a href="<?= htmlspecialchars($_repair_prefill) ?>" class="btn-primary" style="margin-left:auto;padding:0.5rem 1rem;font-size:0.78rem;"><?= icon('plus', 14) ?> Add Repair Job</a>
       </div>
       <?php if ($repair_jobs->num_rows > 0): ?>
       <table class="tg-table mob-card mob-client-repairs-table">
@@ -792,5 +836,60 @@ require_once '../../includes/topbar.php';
 
 <script src="../../assets/js/shared/view_client.js?v=<?= filemtime(__DIR__.'/../../assets/js/shared/view_client.js') ?>"></script>
 <script src="../../assets/js/shared/vehicle_3d_rotation.js?v=<?= filemtime(__DIR__.'/../../assets/js/shared/vehicle_3d_rotation.js') ?>"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+(function(){
+  var wrap = document.getElementById('qr-canvas-wrap');
+  if (wrap && typeof QRCode !== 'undefined') {
+    new QRCode(wrap, {
+      text: <?= json_encode($public_url) ?>,
+      width: 90,
+      height: 90,
+      colorDark: '#1C1A17',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  }
+
+  window.downloadQr = function() {
+    var canvas = document.querySelector('#qr-canvas-wrap canvas');
+    if (!canvas) return;
+    // Scale up to 400px for a crisp download
+    var scale  = Math.ceil(400 / canvas.width);
+    var out    = document.createElement('canvas');
+    out.width  = canvas.width  * scale;
+    out.height = canvas.height * scale;
+    var ctx = out.getContext('2d');
+    ctx.imageSmoothingEnabled = false;  // keep QR pixels sharp
+    ctx.drawImage(canvas, 0, 0, out.width, out.height);
+    // Draw TG logo in center
+    var logo = new Image();
+    logo.src = '<?= $base_path ?>assets/img/tg_logo.png';
+    logo.onload = function() {
+      var size = Math.round(out.width * 0.18);
+      var x    = Math.round((out.width  - size) / 2);
+      var y    = Math.round((out.height - size) / 2);
+      var pad  = Math.round(size * 0.2);
+      // White circle background
+      ctx.beginPath();
+      ctx.arc(x + size/2, y + size/2, size/2 + pad, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      // Draw logo
+      ctx.drawImage(logo, x, y, size, size);
+      var link = document.createElement('a');
+      link.download = 'QR-<?= addslashes(htmlspecialchars($client['full_name'])) ?>.png';
+      link.href = out.toDataURL('image/png');
+      link.click();
+    };
+    logo.onerror = function() {
+      var link = document.createElement('a');
+      link.download = 'QR-<?= addslashes(htmlspecialchars($client['full_name'])) ?>.png';
+      link.href = out.toDataURL('image/png');
+      link.click();
+    };
+  };
+})();
+</script>
 
 <?php require_once '../../includes/footer.php'; ?>

@@ -182,10 +182,10 @@ $pay_status_labels = ['unpaid' => 'Unpaid', 'partial' => 'Partial', 'paid' => 'P
 
   /* ── PRINT STYLES ── */
   @media print {
-    body { background: #fff; padding: 0; }
+    body { background: #fff; padding: 1.5cm; margin: 0; }
     .print-bar { display: none; }
     .receipt { box-shadow: none; border: none; border-radius: 0; max-width: 100%; }
-    @page { margin: 1cm; size: A4; }
+    @page { margin: 0; size: A4 portrait; }
   }
 
   /* ── MOBILE ── */

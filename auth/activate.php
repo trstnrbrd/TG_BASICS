@@ -60,7 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user && !$user['is_active']) {
 <body>
 <div class="wrap">
 
-  <div class="brand">
+  <a href="login.php" class="brand" style="text-decoration:none;">
     <div class="brand-logos">
       <div class="brand-logo-ring">
         <img src="../assets/img/tg_logo.png" alt="TG Customworks"/>
@@ -72,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user && !$user['is_active']) {
     </div>
     <div class="brand-name">TG<span>-BASICS</span></div>
     <div class="brand-tag">Account Activation</div>
-  </div>
+  </a>
 
   <div class="card">
 
@@ -143,7 +143,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user && !$user['is_active']) {
             <label class="field-label">New Password</label>
             <div class="field-input-wrap">
               <span class="field-icon"><?= icon('lock-closed', 14) ?></span>
-              <input type="password" name="new_password" id="new_password" class="field-input" placeholder="Minimum 8 characters" required/>
+              <input type="password" name="new_password" id="new_password" class="field-input field-input--eye" placeholder="Minimum 8 characters" required/>
+              <button type="button" class="field-eye" data-target="new_password" tabindex="-1" aria-label="Show password">
+                <?= icon('eye', 15) ?>
+              </button>
             </div>
             <div class="pw-strength"><div class="pw-strength-bar" id="pw-bar"></div></div>
             <span class="field-hint" id="pw-hint">At least 8 characters.</span>
@@ -152,7 +155,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user && !$user['is_active']) {
             <label class="field-label">Confirm Password</label>
             <div class="field-input-wrap">
               <span class="field-icon"><?= icon('lock-closed', 14) ?></span>
-              <input type="password" name="confirm_password" class="field-input" placeholder="Re-enter your password" required/>
+              <input type="password" name="confirm_password" id="confirm_password" class="field-input field-input--eye" placeholder="Re-enter your password" required/>
+              <button type="button" class="field-eye" data-target="confirm_password" tabindex="-1" aria-label="Show password">
+                <?= icon('eye', 15) ?>
+              </button>
             </div>
           </div>
           <button type="submit" class="btn-submit">
@@ -164,8 +170,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user && !$user['is_active']) {
     </div>
 
     <div class="card-foot">
-      <span>Need help? Contact <strong>Gerald Peterson Carpio</strong> &mdash; TG Customworks<br/><a href="mailto:tgcustomworks@gmail.com" style="color:var(--gold);font-size:0.75rem;">tgcustomworks@gmail.com</a></span>
-      <a href="login.php"><?= icon('arrow-left', 12) ?> Back to Login</a>
+      <span>Need help? Contact <strong>Gerald Peterson Carpio</strong> &mdash; TG Customworks<br/><a href="mailto:tgcustomworksbulacan@gmail.com" style="color:var(--gold);font-size:0.75rem;">tgcustomworksbulacan@gmail.com</a></span>
     </div>
 
   </div>

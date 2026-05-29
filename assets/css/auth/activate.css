@@ -378,6 +378,26 @@ body::after {
     box-shadow 0.15s,
     background 0.15s;
 }
+/* extra right padding when eye button present */
+.field-input--eye { padding-right: 2.6rem; }
+
+/* eye toggle button */
+.field-eye {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  padding: 0.2rem;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+.field-eye:hover { color: var(--gold); }
 
 .field-input:focus {
   border-color: var(--border-focus);

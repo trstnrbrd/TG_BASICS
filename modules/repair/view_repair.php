@@ -2,6 +2,7 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
+require_once '../../config/mailer.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin', 'mechanic'])) {
     header("Location: ../../auth/login.php");
@@ -106,6 +107,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' updated repair job ' . $job['job_number'] . ' status to ' . $new_status . '.';
             $log->bind_param('is', $_SESSION['user_id'], $desc);
             $log->execute();
+
+            if ($new_status === 'completed' && !empty($job['email'])) {
+                $tok_row = $conn->prepare("SELECT public_token FROM clients WHERE client_id = ?");
+                $tok_row->bind_param('i', $job['client_id']);
+                $tok_row->execute();
+                $tok_data = $tok_row->get_result()->fetch_assoc();
+                $pub_token = $tok_data['public_token'] ?? '';
+                $pub_url   = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
+                           . '://' . $_SERVER['HTTP_HOST']
+                           . '/TG-BASICS/modules/public/client.php?token=' . urlencode($pub_token);
+
+                $svc_labels = [
+                    'repair_panel' => 'Per Panel Repair', 'repair_full' => 'Full Body Repair',
+                    'paint_panel'  => 'Per Panel Paint',  'paint_full'  => 'Full Body Paint',
+                    'washover_basic' => 'Basic Wash Over','washover_full'  => 'Fully Wash Over',
+                    'custom'       => 'Custom / Mixed',
+                ];
+                $svc = $svc_labels[$job['service_type']] ?? $job['service_type'];
+                sendRepairCompletedEmail(
+                    $job['email'],
+                    $job['full_name'],
+                    $job['job_number'],
+                    $job['plate_number'],
+                    $job['make'] . ' ' . $job['model'] . ' ' . $job['year_model'],
+                    $svc,
+                    $job['release_date'] ?: null,
+                    $pub_url
+                );
+            }
+
             header("Location: view_repair.php?id=$job_id&success=Status updated.");
             exit;
         }
@@ -198,9 +229,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   <!-- BACK + HEADER ROW -->
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:0.75rem;">
-    <a href="repair_list.php" style="display:inline-flex;align-items:center;gap:0.4rem;font-size:0.82rem;color:var(--text-muted);text-decoration:none;" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--text-muted)'">
-      <?= icon('chevron-left', 14) ?> Back to Repair Jobs
-    </a>
+    <a href="repair_list.php" class="back-link" onclick="goBack('repair_list.php'); return false;" style="margin-bottom:0;"><?= icon('arrow-left', 14) ?></a>
     <div style="display:flex;align-items:center;gap:0.5rem;">
       <span class="badge <?= $sb[1] ?>"><?= $sb[0] ?></span>
       <?php if (in_array($role, ['admin','super_admin','mechanic'])): ?>
@@ -208,7 +237,6 @@ document.addEventListener('DOMContentLoaded', function() {
         <?= icon('arrow-right', 13) ?> Update Status
       </button>
       <?php endif; ?>
-      <?php if (in_array($role, ['admin','super_admin'])): ?>
       <?php
         $qt_chk = $conn->prepare("SELECT quotation_id FROM quotations WHERE job_id = ? LIMIT 1");
         $qt_chk->bind_param('i', $job_id);
@@ -219,7 +247,6 @@ document.addEventListener('DOMContentLoaded', function() {
         <a href="../quotations/view_quotation.php?id=<?= $existing_qt['quotation_id'] ?>" class="btn-primary" style="padding:0.45rem 1rem;font-size:0.8rem;"><?= icon('receipt', 13) ?> View Quotation</a>
       <?php else: ?>
         <a href="../quotations/add_quotation.php?job_id=<?= $job_id ?>" class="btn-primary" style="padding:0.45rem 1rem;font-size:0.8rem;"><?= icon('receipt', 13) ?> Generate Quotation</a>
-      <?php endif; ?>
       <?php endif; ?>
     </div>
   </div>

@@ -1117,6 +1117,20 @@ function _mob_icon(string $name): string {
 </div>
 
 <script>
+  function goBack(fallback) {
+    var ref = document.referrer;
+    var sameApp = ref && ref.indexOf(location.hostname) !== -1
+                      && ref.toLowerCase().indexOf('/tg-basics/') !== -1
+                      && ref.indexOf('login.php') === -1;
+    if (sameApp) {
+      location.href = ref;
+    } else if (history.length > 1) {
+      history.back();
+    } else {
+      location.href = fallback;
+    }
+  }
+
   function toggleSidebar() {
     const sidebar   = document.getElementById('tg-sidebar');
     const overlay   = document.getElementById('sidebar-overlay');

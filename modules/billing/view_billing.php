@@ -143,7 +143,7 @@ require_once '../../includes/topbar.php';
     <!-- PAGE HEADER -->
     <div class="vb-header">
       <div class="vb-header-left">
-        <a href="billing_list.php" class="btn-ghost" style="padding:0.4rem 0.7rem;"><?= icon('arrow-left', 14) ?></a>
+        <a href="billing_list.php" class="btn-ghost" style="padding:0.4rem 0.7rem;" onclick="goBack('billing_list.php'); return false;"><?= icon('arrow-left', 14) ?></a>
         <div>
           <div style="display:flex;align-items:center;gap:0.6rem;">
             <span style="font-size:1.1rem;font-weight:800;color:var(--text-primary);"><?= htmlspecialchars($billing['billing_number']) ?></span>
@@ -172,6 +172,15 @@ require_once '../../includes/topbar.php';
       <!-- LEFT: STATEMENT + TIMELINE -->
       <div style="display:flex;flex-direction:column;gap:1rem;">
         <div class="card vb-statement" id="printable-statement" style="margin-bottom:0;">
+
+          <!-- Print-only logo header -->
+          <div class="vb-print-logo">
+            <img src="../../assets/img/tg_logo.png" alt="TG Customworks"/>
+            <div class="vb-print-logo-divider"></div>
+            <img src="../../assets/img/LogoBasicCar.png" alt="Basic Car Insurance"/>
+            <div class="vb-print-logo-divider"></div>
+            <div class="vb-print-logo-text">TG Customworks &amp; Basic Car Insurance<br>Official Billing Statement</div>
+          </div>
 
           <!-- Statement header -->
           <div class="vb-stmt-top">

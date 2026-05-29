@@ -15,7 +15,7 @@ document.querySelectorAll('.js-delete-client-profile').forEach(function(btn) {
     });
     if (!confirmed.isConfirmed) return;
     const ok = await requirePin();
-    if (ok) form.submit();
+    if (ok) (form.requestSubmit ? form.requestSubmit() : form.submit());
   });
 });
 
@@ -30,7 +30,7 @@ function confirmDeleteDoc(btn, name) {
     confirmButtonColor: '#C0392B',
     cancelButtonColor: '#6B7280',
     confirmButtonText: 'Yes, remove',
-  }).then(async function(r) { if (r.isConfirmed) { var ok = await requirePin(); if (ok) form.submit(); } });
+  }).then(async function(r) { if (r.isConfirmed) { var ok = await requirePin(); if (ok) (form.requestSubmit ? form.requestSubmit() : form.submit()); } });
 }
 
 // Delete vehicle
@@ -51,6 +51,6 @@ document.querySelectorAll('.js-delete-vehicle-form').forEach(function(form) {
     });
     if (!confirmed.isConfirmed) return;
     const ok = await requirePin();
-    if (ok) self.submit();
+    if (ok) (self.requestSubmit ? self.requestSubmit() : self.submit());
   });
 });

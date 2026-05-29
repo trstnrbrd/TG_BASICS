@@ -281,9 +281,9 @@ require_once '../../includes/topbar.php';
   <div class="content">
 
     <?php if ($renew_policy): ?>
-    <a href="../renewal/view_policy.php?id=<?= $renew_from ?>" class="back-link"><?= icon('arrow-left', 14) ?> Back to Policy</a>
+    <a href="../renewal/view_policy.php?id=<?= $renew_from ?>" class="back-link" onclick="goBack('../renewal/view_policy.php?id=<?= $renew_from ?>'); return false;"><?= icon('arrow-left', 14) ?> Back to Policy</a>
     <?php else: ?>
-    <a href="eligibility_check.php" class="back-link"><?= icon('arrow-left', 14) ?> Back to Eligibility Check</a>
+    <a href="eligibility_check.php" class="back-link" onclick="goBack('eligibility_check.php'); return false;"><?= icon('arrow-left', 14) ?> Back to Eligibility Check</a>
     <?php endif; ?>
 
 

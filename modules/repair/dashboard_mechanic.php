@@ -235,7 +235,12 @@ require_once '../../includes/topbar.php';
           </div>
           <div style="min-width:0;">
             <div style="font-size:0.78rem;font-weight:700;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px;"><?= htmlspecialchars($tm['full_name']) ?></div>
-            <span class="badge <?= $tm_rb ?>" style="font-size:0.6rem;padding:0.1rem 0.45rem;"><?= $tm_rl ?></span>
+            <div style="display:flex;align-items:center;gap:0.3rem;margin-top:0.15rem;">
+              <span class="badge <?= $tm_rb ?>" style="font-size:0.6rem;padding:0.1rem 0.45rem;"><?= $tm_rl ?></span>
+              <?php if ($tm['user_id'] == $_SESSION['user_id']): ?>
+              <span style="font-size:0.6rem;font-weight:700;color:var(--gold);background:rgba(212,160,23,0.12);border:1px solid rgba(212,160,23,0.3);border-radius:4px;padding:0.1rem 0.4rem;line-height:1.4;">You</span>
+              <?php endif; ?>
+            </div>
           </div>
         </div>
         <?php endwhile; ?>

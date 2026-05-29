@@ -18,7 +18,8 @@ $results = [];
 $r = $conn->prepare("
     SELECT client_id, full_name, contact_number, email
     FROM clients
-    WHERE full_name LIKE ? OR contact_number LIKE ? OR email LIKE ?
+    WHERE deleted_at IS NULL
+      AND (full_name LIKE ? OR contact_number LIKE ? OR email LIKE ?)
     LIMIT 4
 ");
 $r->bind_param('sss', $like, $like, $like);

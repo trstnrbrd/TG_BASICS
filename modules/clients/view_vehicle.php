@@ -266,7 +266,7 @@ require_once '../../includes/topbar.php';
 
   <div class="content">
 
-    <a href="view_client.php?id=<?= $client_id ?>" class="back-link"><?= icon('arrow-left', 14) ?> Back to <?= htmlspecialchars($v['client_name']) ?></a>
+    <a href="view_client.php?id=<?= $client_id ?>" class="back-link" onclick="goBack('view_client.php?id=<?= $client_id ?>'); return false;"><?= icon('arrow-left', 14) ?> Back to <?= htmlspecialchars($v['client_name']) ?></a>
 
     <!-- ── BIG 3D STAGE ── -->
     <div class="vv-stage">

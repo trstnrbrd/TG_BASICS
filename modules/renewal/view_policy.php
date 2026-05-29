@@ -399,7 +399,7 @@ require_once '../../includes/topbar.php';
   <div class="content">
 
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
-      <a href="renewal_list.php" class="back-link" style="margin-bottom:0;"><?= icon('arrow-left', 14) ?> Back to Renewal Tracking</a>
+      <a href="renewal_list.php" class="back-link" style="margin-bottom:0;" onclick="goBack('renewal_list.php'); return false;"><?= icon('arrow-left', 14) ?> Back to Renewal Tracking</a>
       <div style="display:flex;gap:0.5rem;align-items:center;">
         <?php if ($expired || $days <= $exp_days): ?>
         <a href="../insurance/add_policy.php?renew_from=<?= $policy_id ?>"

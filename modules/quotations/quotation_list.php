@@ -37,18 +37,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 $filter = san_enum($_GET['filter'] ?? 'all', ['all','draft','pending_approval','approved','converted','cancelled']);
 $search = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
 
-// ── SUMMARY COUNTS ──
-$counts = $conn->query("
-    SELECT
-        COUNT(*) AS total,
-        SUM(status='draft')            AS draft,
-        SUM(status='pending_approval') AS pending,
-        SUM(status='approved')         AS approved,
-        SUM(status='converted')        AS converted,
-        SUM(status='cancelled')        AS cancelled
-    FROM quotations
-")->fetch_assoc();
-
 // ── BUILD QUERY ──
 $where = [];
 $params = [];
@@ -133,30 +121,6 @@ document.addEventListener('DOMContentLoaded',function(){
 </script>
 <?php endif; ?>
 
-<!-- STAT CARDS -->
-<div class="qt-stats">
-  <?php
-  $stat_rows = [
-    ['all',      'document-text',  'Total',           $counts['total'],    'linear-gradient(90deg,#D4A017,#E8D5A3)', 'var(--gold-light)',  'var(--gold)'],
-    ['pending_approval','clock',   'Pending Approval',$counts['pending'],  'linear-gradient(90deg,#9A6B00,#D4A017)', 'var(--warning-bg)', 'var(--warning)'],
-    ['approved', 'check-circle',   'Approved',        $counts['approved'], 'linear-gradient(90deg,#2E7D52,#52B788)', 'var(--success-bg)', 'var(--success)'],
-    ['converted','receipt',        'Converted',       $counts['converted'],'linear-gradient(90deg,#1A3A5C,#1A6B9A)', 'rgba(26,107,154,0.12)','#1A6B9A'],
-  ];
-  foreach ($stat_rows as [$key, $ico, $lbl, $val, $grad, $ibg, $icol]):
-    $active_style = $filter === $key ? 'border-color:var(--gold-bright);background:var(--gold-pale);' : '';
-  ?>
-  <a href="?filter=<?= $key ?><?= $search ? '&search='.urlencode($search) : '' ?>" style="text-decoration:none;">
-    <div class="qt-stat" style="<?= $active_style ?>">
-      <div class="qt-stat-accent" style="background:<?= $grad ?>;"></div>
-      <div class="qt-stat-icon" style="background:<?= $ibg ?>;color:<?= $icol ?>;"><?= icon($ico, 18) ?></div>
-      <div class="qt-stat-body">
-        <div class="qt-stat-value"><?= (int)$val ?></div>
-        <div class="qt-stat-label"><?= $lbl ?></div>
-      </div>
-    </div>
-  </a>
-  <?php endforeach; ?>
-</div>
 
 <!-- FILTER TABS + SEARCH -->
 <form method="GET" action="">

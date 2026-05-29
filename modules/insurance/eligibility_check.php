@@ -14,9 +14,10 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === '1') {
                v.vehicle_id, v.plate_number, v.make, v.model, v.year_model
         FROM clients c
         INNER JOIN vehicles v ON c.client_id = v.client_id
-        WHERE c.full_name LIKE ? OR v.plate_number LIKE ? OR v.make LIKE ?
+        WHERE c.deleted_at IS NULL
+          AND (c.full_name LIKE ? OR v.plate_number LIKE ? OR v.make LIKE ?
            OR v.model LIKE ? OR c.contact_number LIKE ? OR v.motor_number LIKE ?
-           OR v.serial_number LIKE ? OR CONCAT(v.make,' ',v.model) LIKE ?
+           OR v.serial_number LIKE ? OR CONCAT(v.make,' ',v.model) LIKE ?)
         ORDER BY c.full_name ASC
         LIMIT 8
     ");
@@ -63,9 +64,10 @@ if ($search !== '') {
                v.vehicle_id, v.plate_number, v.make, v.model, v.year_model, v.color
         FROM clients c
         INNER JOIN vehicles v ON c.client_id = v.client_id
-        WHERE c.full_name LIKE ? OR v.plate_number LIKE ? OR v.make LIKE ?
+        WHERE c.deleted_at IS NULL
+          AND (c.full_name LIKE ? OR v.plate_number LIKE ? OR v.make LIKE ?
            OR v.model LIKE ? OR c.contact_number LIKE ? OR v.motor_number LIKE ?
-           OR v.serial_number LIKE ? OR CONCAT(v.make,' ',v.model) LIKE ?
+           OR v.serial_number LIKE ? OR CONCAT(v.make,' ',v.model) LIKE ?)
         ORDER BY c.full_name ASC
     ");
     $stmt->bind_param('ssssssss', $like, $like, $like, $like, $like, $like, $like, $like);
@@ -81,7 +83,7 @@ if ($selected_vid > 0) {
                v.year_model, v.color, v.motor_number, v.serial_number
         FROM vehicles v
         INNER JOIN clients c ON v.client_id = c.client_id
-        WHERE v.vehicle_id = ?
+        WHERE v.vehicle_id = ? AND c.deleted_at IS NULL
     ");
     $stmt->bind_param('i', $selected_vid);
     $stmt->execute();
@@ -133,7 +135,7 @@ require_once '../../includes/topbar.php';
 
   <div class="content">
 
-    <a href="../admin/dashboard_admin.php" class="back-link"><?= icon('arrow-left', 14) ?> Back to Dashboard</a>
+    <a href="../admin/dashboard_admin.php" class="back-link" onclick="goBack('../admin/dashboard_admin.php'); return false;"><?= icon('arrow-left', 14) ?> Back to Dashboard</a>
 
 
     <!-- INFO BOX -->

@@ -223,6 +223,26 @@ require_once '../../includes/header.php';
 require_once '../../includes/navbar.php';
 ?>
 
+<style>
+@media (max-width: 768px) {
+  /* Filter form: 2-col grid on mobile */
+  .al-filter-form {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.6rem !important;
+    align-items: end !important;
+  }
+  .al-filter-form .al-f-user  { grid-column: 1; }
+  .al-filter-form .al-f-action { grid-column: 2; }
+  .al-filter-form .al-f-dates {
+    grid-column: 1 / -1;
+    min-width: 0 !important;
+  }
+  .al-filter-form .al-f-search { grid-column: 1 / -1; min-width: 0 !important; }
+  .al-filter-form .al-f-btns  { grid-column: 1 / -1; }
+}
+</style>
+
 <div class="main">
 <?php
 $topbar_title      = 'Activity Log';

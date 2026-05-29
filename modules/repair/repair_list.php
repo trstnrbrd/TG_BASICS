@@ -39,20 +39,6 @@ $search        = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
 $filter_status = san_enum($_GET['status'] ?? 'all', ['all', 'pending', 'in_progress', 'for_pickup', 'completed', 'cancelled']);
 $sort_by       = san_enum($_GET['sort'] ?? 'newest', ['newest', 'oldest']);
 
-// ── STATS ──
-$count_stmt = $conn->prepare("SELECT
-    SUM(status = 'in_progress') AS active,
-    SUM(status = 'pending')     AS pending,
-    SUM(status = 'completed')   AS completed,
-    SUM(status = 'for_pickup')  AS pickup
-FROM repair_jobs");
-$count_stmt->execute();
-$counts = $count_stmt->get_result()->fetch_assoc();
-$stat_active    = (int)($counts['active']    ?? 0);
-$stat_pending   = (int)($counts['pending']   ?? 0);
-$stat_completed = (int)($counts['completed'] ?? 0);
-$stat_pickup    = (int)($counts['pickup']    ?? 0);
-
 // ── BUILD QUERY ──
 $where  = ["1=1"];
 $params = [];
@@ -133,30 +119,6 @@ require_once '../../includes/topbar.php';
     });
     </script>
     <?php endif; ?>
-
-    <!-- STAT CARDS -->
-    <?php
-    $stats = [
-        ['icon' => 'wrench',       'icon_bg' => 'var(--info-bg)',    'icon_color' => 'var(--info)',    'label' => 'In Progress', 'value' => $stat_active,    'trend' => 'Active jobs'],
-        ['icon' => 'clock',        'icon_bg' => 'var(--warning-bg)', 'icon_color' => 'var(--warning)', 'label' => 'Pending',     'value' => $stat_pending,   'trend' => 'Awaiting start'],
-        ['icon' => 'truck',        'icon_bg' => 'var(--gold-light)', 'icon_color' => 'var(--gold)',    'label' => 'For Pickup',  'value' => $stat_pickup,    'trend' => 'Ready for client'],
-        ['icon' => 'check-circle', 'icon_bg' => 'var(--success-bg)', 'icon_color' => 'var(--success)', 'label' => 'Completed',   'value' => $stat_completed, 'trend' => 'All time'],
-    ];
-    ?>
-    <div class="rl-stats">
-      <?php foreach ($stats as $s): ?>
-      <div class="rl-stat">
-        <div class="rl-stat-icon" style="background:<?= $s['icon_bg'] ?>;color:<?= $s['icon_color'] ?>;">
-          <?= icon($s['icon'], 20) ?>
-        </div>
-        <div class="rl-stat-body">
-          <div class="rl-stat-value"><?= $s['value'] ?></div>
-          <div class="rl-stat-label"><?= $s['label'] ?></div>
-          <div class="rl-stat-trend"><?= $s['trend'] ?></div>
-        </div>
-      </div>
-      <?php endforeach; ?>
-    </div>
 
     <!-- FILTERS -->
     <form method="GET" action="" class="rl-filter-form" style="margin-bottom:1rem;">

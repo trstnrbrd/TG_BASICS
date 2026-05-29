@@ -16,7 +16,7 @@ $success = false;
 if (isset($_GET['ajax_clients']) && isset($_GET['q'])) {
     header('Content-Type: application/json');
     $q    = '%' . san_str($_GET['q'], 100) . '%';
-    $stmt = $conn->prepare("SELECT client_id, full_name FROM clients WHERE full_name LIKE ? ORDER BY full_name ASC LIMIT 20");
+    $stmt = $conn->prepare("SELECT client_id, full_name FROM clients WHERE deleted_at IS NULL AND full_name LIKE ? ORDER BY full_name ASC LIMIT 20");
     $stmt->bind_param('s', $q);
     $stmt->execute();
     echo json_encode($stmt->get_result()->fetch_all(MYSQLI_ASSOC));
@@ -84,7 +84,7 @@ $prefill_client_name = '';
 if (isset($_GET['client_id']) && !$_POST) {
     $prefill_client_id = (int)$_GET['client_id'];
     if ($prefill_client_id > 0) {
-        $pfc = $conn->prepare("SELECT client_id, full_name FROM clients WHERE client_id = ?");
+        $pfc = $conn->prepare("SELECT client_id, full_name FROM clients WHERE client_id = ? AND deleted_at IS NULL");
         $pfc->bind_param('i', $prefill_client_id);
         $pfc->execute();
         $pfc_row = $pfc->get_result()->fetch_assoc();

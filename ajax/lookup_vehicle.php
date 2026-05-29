@@ -23,7 +23,7 @@ $stmt = $conn->prepare("
            v.year_model, v.color, v.motor_number, v.serial_number
     FROM vehicles v
     INNER JOIN clients c ON v.client_id = c.client_id
-    WHERE v.plate_number = ?
+    WHERE v.plate_number = ? AND c.deleted_at IS NULL
     LIMIT 1
 ");
 $stmt->bind_param('s', $plate);

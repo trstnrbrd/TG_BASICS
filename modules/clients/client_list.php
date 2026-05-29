@@ -17,7 +17,8 @@ if (isset($_GET['ajax_ac']) && isset($_GET['q'])) {
                v.plate_number, v.make, v.model
         FROM clients c
         LEFT JOIN vehicles v ON c.client_id = v.client_id
-        WHERE c.full_name LIKE ? OR c.contact_number LIKE ? OR v.plate_number LIKE ? OR v.make LIKE ? OR v.model LIKE ?
+        WHERE c.deleted_at IS NULL
+          AND (c.full_name LIKE ? OR c.contact_number LIKE ? OR v.plate_number LIKE ? OR v.make LIKE ? OR v.model LIKE ?)
         GROUP BY c.client_id, v.vehicle_id
         ORDER BY c.full_name ASC
         LIMIT 8
@@ -32,12 +33,12 @@ if (isset($_GET['ajax_ac']) && isset($_GET['q'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) {
     csrf_verify();
     $del_id = (int)$_POST['delete_client_id'];
-    $cstmt  = $conn->prepare("SELECT full_name FROM clients WHERE client_id = ?");
+    $cstmt  = $conn->prepare("SELECT full_name FROM clients WHERE client_id = ? AND deleted_at IS NULL");
     $cstmt->bind_param('i', $del_id);
     $cstmt->execute();
     $cdata = $cstmt->get_result()->fetch_assoc();
     if ($cdata) {
-        // Check for linked records before deleting
+        // Check for linked records before soft-deleting
         $chk = $conn->prepare("
             SELECT
               (SELECT COUNT(*) FROM claims       WHERE client_id = ?) AS claims_count,
@@ -62,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) 
             exit;
         }
 
-        $dstmt = $conn->prepare("DELETE FROM clients WHERE client_id = ?");
+        $dstmt = $conn->prepare("UPDATE clients SET deleted_at = NOW() WHERE client_id = ?");
         $dstmt->bind_param('i', $del_id);
         $dstmt->execute();
         $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'CLIENT_DELETED', ?)");
@@ -130,6 +131,12 @@ if ($filter_type === 'insurance') {
     $type_having = 'HAVING has_policy = 0';
 }
 
+// Merge soft-delete filter into WHERE
+$soft_del_cond = "c.deleted_at IS NULL";
+$where_with_sd = $where === ''
+    ? "WHERE $soft_del_cond"
+    : $where . " AND $soft_del_cond";
+
 $sql = "
     SELECT c.client_id, c.full_name, c.contact_number, c.email,
            COUNT(DISTINCT v.vehicle_id) AS vehicle_count, c.created_at,
@@ -137,7 +144,7 @@ $sql = "
     FROM clients c
     LEFT JOIN vehicles v            ON c.client_id = v.client_id
     LEFT JOIN insurance_policies ip ON c.client_id = ip.client_id
-    $where
+    $where_with_sd
     GROUP BY c.client_id
     $type_having
     ORDER BY $order
@@ -149,9 +156,9 @@ $stmt->execute();
 $result = $stmt->get_result();
 $rows = $result->fetch_all(MYSQLI_ASSOC);
 
-$total_clients  = $conn->query("SELECT COUNT(*) as c FROM clients")->fetch_assoc()['c'];
+$total_clients  = $conn->query("SELECT COUNT(*) as c FROM clients WHERE deleted_at IS NULL")->fetch_assoc()['c'];
 $total_vehicles = $conn->query("SELECT COUNT(*) as c FROM vehicles")->fetch_assoc()['c'];
-$recent         = $conn->query("SELECT COUNT(*) as c FROM clients WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)")->fetch_assoc()['c'];
+$recent         = $conn->query("SELECT COUNT(*) as c FROM clients WHERE deleted_at IS NULL AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)")->fetch_assoc()['c'];
 
 $page_title  = 'Client Records';
 $active_page = 'clients';
@@ -161,6 +168,40 @@ require_once '../../includes/navbar.php';
 ?>
 
 <link rel="stylesheet" href="../../assets/css/shared/clients.css?v=<?= filemtime(__DIR__ . '/../../assets/css/shared/clients.css') ?>"/>
+<style>
+@media (max-width: 768px) {
+  /* Stats — keep 3-col, compact */
+  .client-stats-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 0.5rem !important;
+    margin-bottom: 0.85rem !important;
+  }
+  .client-stats-grid .card {
+    padding: 0.6rem 0.75rem !important;
+    gap: 0.5rem !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+  .client-stats-grid .card-icon {
+    width: 28px !important; height: 28px !important;
+    border-radius: 7px !important;
+  }
+  .client-stats-grid .card-icon svg { width: 13px !important; height: 13px !important; }
+  .client-stats-grid [style*="1.6rem"] { font-size: 1.2rem !important; }
+  .client-stats-grid [style*="0.7rem"] { font-size: 0.58rem !important; }
+
+  /* Toolbar — keep filters in a 3-col row, search full width */
+  .client-toolbar > div {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr 1fr !important;
+    gap: 0.5rem !important;
+  }
+  .client-toolbar > div > div:first-child { grid-column: 1 / -1; }  /* search full width */
+  .client-toolbar > div > button[type="submit"],
+  .client-toolbar > div > a[href*="add_client"] { grid-column: span 1; justify-content: center; }
+  .client-toolbar > div > a[href*="client_list"] { grid-column: span 1; justify-content: center; }
+}
+</style>
 
 <div class="main">
 

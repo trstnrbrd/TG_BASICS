@@ -14,8 +14,8 @@ if ($client_id === 0) {
     exit;
 }
 
-// Load client
-$stmt = $conn->prepare("SELECT * FROM clients WHERE client_id = ?");
+// Load client (exclude soft-deleted)
+$stmt = $conn->prepare("SELECT * FROM clients WHERE client_id = ? AND deleted_at IS NULL");
 $stmt->bind_param('i', $client_id);
 $stmt->execute();
 $client = $stmt->get_result()->fetch_assoc();

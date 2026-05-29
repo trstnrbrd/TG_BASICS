@@ -9,13 +9,20 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'supe
 }
 
 // ── FILTER: year (default current year) ──
-$available_years = [];
-$yr = $conn->query("SELECT DISTINCT YEAR(created_at) as y FROM clients ORDER BY y DESC");
-while ($r = $yr->fetch_assoc()) $available_years[] = (int)$r['y'];
-if (empty($available_years)) $available_years = [(int)date('Y')];
+// Build year range: from earliest data year (or current-2) up to current year
+$current_year = (int)date('Y');
+$earliest_row = $conn->query("SELECT MIN(YEAR(created_at)) as y FROM clients")->fetch_assoc();
+$earliest_year = (int)($earliest_row['y'] ?? $current_year);
+$range_start   = min($earliest_year, $current_year - 2);
 
-$sel_year = san_int($_GET['year'] ?? date('Y'), 2000, 2100);
-if (!in_array($sel_year, $available_years)) $sel_year = $available_years[0];
+$available_years = [];
+for ($y = $current_year; $y >= $range_start; $y--) {
+    $available_years[] = $y;
+}
+
+$sel_year = san_int($_GET['year'] ?? $current_year, 2000, 2100);
+// Allow any year in valid range, not just data-bearing years
+if ($sel_year < $range_start || $sel_year > $current_year) $sel_year = $current_year;
 
 // ── BUILD MONTHLY DATA for selected year ──
 $months_data = [];
@@ -23,17 +30,20 @@ for ($m = 1; $m <= 12; $m++) {
     $label = date('F', mktime(0,0,0,$m,1));
     $short = date('M',  mktime(0,0,0,$m,1));
 
+    // Stats rule: include client if not deleted, OR deleted in a different month/year than added
+    $sc = "(c.deleted_at IS NULL OR (YEAR(c.deleted_at) != YEAR(c.created_at) OR MONTH(c.deleted_at) != MONTH(c.created_at)))";
+
     $ins = (int)$conn->query("
         SELECT COUNT(DISTINCT c.client_id) as c FROM clients c
         INNER JOIN insurance_policies ip ON ip.client_id = c.client_id
-        WHERE YEAR(c.created_at)='$sel_year' AND MONTH(c.created_at)='$m'
+        WHERE YEAR(c.created_at)='$sel_year' AND MONTH(c.created_at)='$m' AND $sc
     ")->fetch_assoc()['c'];
 
     $wk = (int)$conn->query("
         SELECT COUNT(*) as c FROM clients c
         LEFT JOIN insurance_policies ip ON ip.client_id = c.client_id
         WHERE ip.policy_id IS NULL
-        AND YEAR(c.created_at)='$sel_year' AND MONTH(c.created_at)='$m'
+        AND YEAR(c.created_at)='$sel_year' AND MONTH(c.created_at)='$m' AND $sc
     ")->fetch_assoc()['c'];
 
     $policies = (int)$conn->query("
@@ -71,7 +81,125 @@ $base_path   = '../../';
 $extra_css   = '<link rel="stylesheet" href="' . $base_path . 'assets/css/dashboard.css?v=' . filemtime(__DIR__ . '/../../assets/css/dashboard.css') . '"/>';
 require_once '../../includes/header.php';
 require_once '../../includes/navbar.php';
+$company_name    = 'TG Customworks & Basic Car Insurance';
+$company_address = '49 Villa Tierra St., San Roque, Pandi, Bulacan';
 ?>
+
+<style>
+/* ── PRINT ── */
+@media print {
+  @page { size: A4 portrait; margin: 1cm 1.5cm; }
+
+  /* Hide all chrome */
+  .mob-nav, .mob-topbar, .mob-more-overlay, .mob-more-sheet,
+  .sidebar-overlay, #page-loader, .sidebar, .topbar,
+  .mr-year-wrap, .mr-print-btn, .mr-year-filter-row, .mr-no-print { display: none !important; }
+
+  /* Base */
+  body  { background: #fff !important; color: #111 !important; margin: 0 !important; font-size: 0.72rem !important; }
+  .main { padding-left: 0 !important; background: #fff !important; }
+  .content { padding: 0 !important; max-width: 100% !important; }
+
+  /* Print header */
+  .mr-print-header {
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.75rem !important;
+    margin-bottom: 0.5rem !important;
+    padding-bottom: 0.4rem !important;
+    border-bottom: 2px solid #B8860B !important;
+  }
+  .mr-print-header img { height: 32px !important; }
+  .mr-print-header > div[style*="font-size:1rem"] { font-size: 0.85rem !important; font-weight: 800 !important; }
+  .mr-print-header > div[style*="font-size:0.75rem"] { font-size: 0.62rem !important; }
+  .mr-print-header > div[style*="font-size:0.9rem"] { font-size: 0.78rem !important; font-weight: 700 !important; }
+  .mr-print-header > div[style*="font-size:0.7rem"] { font-size: 0.6rem !important; }
+
+  /* ── STAT SUMMARY — flex row, always inline ── */
+  .mr-stat-grid {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 0 !important;
+    margin-bottom: 0.5rem !important;
+    border: 1px solid #ccc !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .dash-stat {
+    flex: 1 !important;
+    background: #fff !important;
+    border: none !important;
+    border-right: 1px solid #ccc !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 0.35rem 0.75rem !important;
+  }
+  .dash-stat:last-child { border-right: none !important; }
+  .dash-stat-accent { display: none !important; }
+  .dash-stat-icon   { display: none !important; }
+  .dash-stat-top    { margin-bottom: 0.1rem !important; }
+  .dash-stat-badge  {
+    background: none !important; border: none !important; padding: 0 !important;
+    color: #888 !important; font-size: 0.55rem !important; font-weight: 500 !important;
+  }
+  .dash-stat-value {
+    font-size: 1.5rem !important; font-weight: 800 !important;
+    color: #111 !important; line-height: 1 !important; margin-bottom: 0.1rem !important;
+  }
+  .dash-stat-label {
+    font-size: 0.52rem !important; font-weight: 700 !important;
+    text-transform: uppercase !important; letter-spacing: 1.2px !important; color: #555 !important;
+  }
+
+  /* ── CHARTS — side by side, compact ── */
+  .mr-charts-row {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.6rem !important;
+    margin-bottom: 0.5rem !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .mr-charts-row .card > div[style] { padding: 0.3rem 0.5rem !important; }
+
+  /* ── CARDS — strip digital styling ── */
+  .card {
+    border: none !important; box-shadow: none !important;
+    border-radius: 0 !important; background: #fff !important; margin-bottom: 0 !important;
+  }
+  .card-header {
+    padding: 0 0 0.25rem 0 !important;
+    border-bottom: 1px solid #ccc !important;
+    margin-bottom: 0 !important;
+    background: none !important;
+  }
+  .card-icon  { display: none !important; }
+  .card-title {
+    font-size: 0.62rem !important; font-weight: 700 !important;
+    color: #111 !important; text-transform: uppercase !important; letter-spacing: 0.8px !important;
+  }
+  .card-sub { font-size: 0.55rem !important; color: #666 !important; }
+
+  /* ── TABLE ── */
+  table { border-collapse: collapse !important; width: 100% !important; font-size: 0.65rem !important; }
+  th {
+    background: #f4f4f4 !important; color: #333 !important;
+    border: 1px solid #bbb !important; padding: 0.2rem 0.5rem !important; text-align: center !important;
+    print-color-adjust: exact; -webkit-print-color-adjust: exact;
+  }
+  td { color: #111 !important; border: 1px solid #d0d0d0 !important; padding: 0.15rem 0.5rem !important; }
+  /* Override inline td padding from the table */
+  td[style*="padding:0.75rem"] { padding: 0.15rem 0.5rem !important; }
+  tfoot td {
+    background: #f0f0f0 !important; font-weight: 700 !important;
+    print-color-adjust: exact; -webkit-print-color-adjust: exact;
+  }
+  /* Current month highlight — subtle */
+  tr[style*="background:rgba(212"] td { background: #fdf8ea !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  /* Hide "Current" badge inline style overflow */
+  span[style*="font-size:0.62rem"] { display: none !important; }
+}
+</style>
 
 <div class="main">
 
@@ -83,24 +211,72 @@ require_once '../../includes/topbar.php';
 
 <div class="content">
 
+  <a href="../admin/dashboard_admin.php" class="back-link mr-no-print" onclick="goBack('../admin/dashboard_admin.php'); return false;">
+    <?= icon('arrow-left', 14) ?> Back to Dashboard
+  </a>
+
+  <!-- PRINT HEADER (hidden on screen, visible on print) -->
+  <div class="mr-print-header" style="display:none;align-items:center;gap:1rem;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:2px solid #B8860B;">
+    <img src="../../assets/img/tg_logo.png" style="height:44px;width:auto;object-fit:contain;" alt="TG">
+    <div style="width:1px;height:40px;background:#ddd;"></div>
+    <img src="../../assets/img/LogoBasicCar.png" style="height:44px;width:auto;object-fit:contain;" alt="Basic Car">
+    <div style="width:1px;height:40px;background:#ddd;"></div>
+    <div>
+      <div style="font-size:1rem;font-weight:800;color:#1a1710;"><?= htmlspecialchars($company_name) ?></div>
+      <div style="font-size:0.75rem;color:#555;"><?= htmlspecialchars($company_address) ?></div>
+    </div>
+    <div style="margin-left:auto;text-align:right;">
+      <div style="font-size:0.9rem;font-weight:700;color:#B8860B;">Monthly Report — <?= $sel_year ?></div>
+      <div style="font-size:0.7rem;color:#888;">Generated: <?= date('F d, Y  h:i A') ?> &nbsp;|&nbsp; By: <?= htmlspecialchars($_SESSION['full_name'] ?? '') ?></div>
+    </div>
+  </div>
+
   <!-- YEAR FILTER -->
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
+  <div class="mr-year-filter-row" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
     <div>
       <div style="font-size:1rem;font-weight:700;color:var(--text-primary);">Annual Overview</div>
       <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.1rem;">Client types, policies, and repairs by month</div>
     </div>
-    <form method="GET" style="display:flex;align-items:center;gap:0.5rem;">
-      <label style="font-size:0.8rem;color:var(--text-muted);font-weight:500;">Year</label>
-      <select name="year" onchange="this.form.submit()" style="padding:0.4rem 0.75rem;border:1px solid var(--border);border-radius:8px;background:var(--bg-2);color:var(--text-primary);font-size:0.82rem;cursor:pointer;">
+    <div style="display:flex;align-items:center;gap:0.6rem;">
+    <button class="mr-print-btn btn-ghost" onclick="window.print()" style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.38rem 0.85rem;font-size:0.8rem;">
+      <?= icon('printer', 13) ?> Print
+    </button>
+    <!-- Custom year dropdown -->
+    <div class="mr-year-wrap" style="position:relative;">
+      <button id="mr-year-btn" type="button"
+              style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.38rem 0.85rem;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);font-size:0.82rem;font-weight:600;cursor:pointer;">
+        <?= icon('calendar', 13) ?>
+        <?= $sel_year ?>
+        <?= icon('chevron-down', 11) ?>
+      </button>
+      <div id="mr-year-dd"
+           style="display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:200;background:var(--bg-2);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-lg);min-width:110px;overflow:hidden;">
         <?php foreach ($available_years as $y): ?>
-        <option value="<?= $y ?>" <?= $y === $sel_year ? 'selected' : '' ?>><?= $y ?></option>
+        <a href="?year=<?= $y ?>"
+           style="display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0.9rem;font-size:0.8rem;font-weight:<?= $y === $sel_year ? '700' : '500' ?>;text-decoration:none;color:<?= $y === $sel_year ? 'var(--gold)' : 'var(--text-secondary)' ?>;transition:background 0.1s;"
+           onmouseover="this.style.background='var(--gold-pale)'" onmouseout="this.style.background=''">
+          <?= $y ?>
+          <?php if ($y === $sel_year): ?><?= icon('check', 11) ?><?php endif; ?>
+        </a>
         <?php endforeach; ?>
-      </select>
-    </form>
-  </div>
+      </div>
+    </div>
+    <script>
+    (function(){
+      var btn = document.getElementById('mr-year-btn');
+      var dd  = document.getElementById('mr-year-dd');
+      btn.addEventListener('click', function(e){
+        e.stopPropagation();
+        dd.style.display = dd.style.display === 'block' ? 'none' : 'block';
+      });
+      document.addEventListener('click', function(){ dd.style.display = 'none'; });
+    })();
+    </script>
+    </div><!-- end print+year flex -->
+  </div><!-- end year filter row -->
 
   <!-- YEAR SUMMARY CARDS -->
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.25rem;">
+  <div class="mr-stat-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.25rem;">
     <?php
     $summary = [
       ['Total Clients',    $year_clients,  'user',         'gold',  $sel_year . ' total'],
@@ -130,7 +306,7 @@ require_once '../../includes/topbar.php';
   </div>
 
   <!-- CHARTS ROW -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;">
+  <div class="mr-charts-row" style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;">
 
     <!-- Client Types Bar Chart -->
     <div class="card" style="margin-bottom:0;">
@@ -258,6 +434,7 @@ require_once '../../includes/topbar.php';
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
+var chartCT, chartPR;
 (function () {
   Chart.defaults.font.family = "'Plus Jakarta Sans', sans-serif";
   Chart.defaults.color = '#888';
@@ -270,86 +447,61 @@ require_once '../../includes/topbar.php';
   const polData  = <?= json_encode(array_column($months_data, 'policies')) ?>;
   const repData  = <?= json_encode(array_column($months_data, 'repairs')) ?>;
 
-  // ── Client Types grouped bar ──
-  new Chart(document.getElementById('chart-ct-monthly'), {
-    type: 'bar',
-    data: {
-      labels: labels,
-      datasets: [
-        {
-          label: 'Insurance',
-          data: insData,
-          backgroundColor: 'rgba(46,125,82,0.8)',
-          borderColor: '#2E7D52',
-          borderWidth: 1.5,
-          borderRadius: 5,
-        },
-        {
-          label: 'Walk-in',
-          data: wkData,
-          backgroundColor: 'rgba(184,134,11,0.8)',
-          borderColor: '#B8860B',
-          borderWidth: 1.5,
-          borderRadius: 5,
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      animation: barAnim,
-      plugins: {
-        legend: {
-          display: true,
-          position: 'bottom',
-          labels: { boxWidth: 10, padding: 16, font: { size: 11 } }
-        }
-      },
-      scales: {
-        y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 }, grid: { color: gridColor } },
-        x: { grid: { display: false }, ticks: { maxRotation: 0, font: { size: 10 } } }
+  const sharedOptions = (extraDatasets) => ({
+    responsive: true,
+    maintainAspectRatio: true,
+    animation: barAnim,
+    plugins: {
+      legend: {
+        display: true,
+        position: 'bottom',
+        labels: { boxWidth: 10, padding: 12, font: { size: 11 } }
       }
+    },
+    scales: {
+      y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 }, grid: { color: gridColor } },
+      x: { grid: { display: false }, ticks: { maxRotation: 0, font: { size: 10 } } }
     }
   });
 
-  // ── Policies + Repairs grouped bar ──
-  new Chart(document.getElementById('chart-pr-monthly'), {
+  chartCT = new Chart(document.getElementById('chart-ct-monthly'), {
     type: 'bar',
     data: {
-      labels: labels,
+      labels,
       datasets: [
-        {
-          label: 'Policies',
-          data: polData,
-          backgroundColor: 'rgba(26,107,154,0.8)',
-          borderColor: '#1A6B9A',
-          borderWidth: 1.5,
-          borderRadius: 5,
-        },
-        {
-          label: 'Repairs',
-          data: repData,
-          backgroundColor: 'rgba(123,63,160,0.8)',
-          borderColor: '#7B3FA0',
-          borderWidth: 1.5,
-          borderRadius: 5,
-        }
+        { label: 'Insurance', data: insData, backgroundColor: 'rgba(46,125,82,0.8)',  borderColor: '#2E7D52', borderWidth: 1.5, borderRadius: 5 },
+        { label: 'Walk-in',   data: wkData,  backgroundColor: 'rgba(184,134,11,0.8)', borderColor: '#B8860B', borderWidth: 1.5, borderRadius: 5 }
       ]
     },
-    options: {
-      responsive: true,
-      animation: barAnim,
-      plugins: {
-        legend: {
-          display: true,
-          position: 'bottom',
-          labels: { boxWidth: 10, padding: 16, font: { size: 11 } }
-        }
-      },
-      scales: {
-        y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 }, grid: { color: gridColor } },
-        x: { grid: { display: false }, ticks: { maxRotation: 0, font: { size: 10 } } }
-      }
-    }
+    options: sharedOptions()
+  });
+
+  chartPR = new Chart(document.getElementById('chart-pr-monthly'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Policies', data: polData, backgroundColor: 'rgba(26,107,154,0.8)',  borderColor: '#1A6B9A', borderWidth: 1.5, borderRadius: 5 },
+        { label: 'Repairs',  data: repData, backgroundColor: 'rgba(123,63,160,0.8)',  borderColor: '#7B3FA0', borderWidth: 1.5, borderRadius: 5 }
+      ]
+    },
+    options: sharedOptions()
+  });
+
+  // Resize charts to a clean fixed size before printing so canvas renders correctly
+  const PRINT_H = 120;
+  window.addEventListener('beforeprint', function () {
+    [chartCT, chartPR].forEach(c => {
+      c.options.animation = false;
+      const w = c.canvas.parentNode.offsetWidth || 320;
+      c.resize(w, PRINT_H);
+    });
+  });
+  window.addEventListener('afterprint', function () {
+    [chartCT, chartPR].forEach(c => {
+      c.options.animation = barAnim;
+      c.resize();
+    });
   });
 })();
 </script>

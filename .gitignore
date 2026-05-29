@@ -23,9 +23,10 @@ uploads/receipts/*
 !uploads/receipts/.gitkeep
 
 # ── VENDOR / DEPENDENCIES ────────────────────────────────────────────────────
-# PHPMailer is in vendor/src/ — keep it tracked since there's no composer.json.
-# If you add Composer later, uncomment the line below and delete vendor/ from git.
-# vendor/
+vendor/
+
+# ── PHPUNIT ───────────────────────────────────────────────────────────────────
+.phpunit.result.cache
 
 # ── XAMPP / OS FILES ─────────────────────────────────────────────────────────
 .DS_Store

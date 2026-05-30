@@ -25,6 +25,9 @@
 ![PHPMailer](https://img.shields.io/badge/PHPMailer-Gmail_SMTP-D14836?style=for-the-badge&logo=gmail&logoColor=white)
 ![XAMPP](https://img.shields.io/badge/XAMPP-FB7A24?style=for-the-badge&logo=xampp&logoColor=white)
 ![Git](https://img.shields.io/badge/Git-F05032?style=for-the-badge&logo=git&logoColor=white)
+![OCR.space](https://img.shields.io/badge/OCR.space-API-6366f1?style=for-the-badge&logo=amazonaws&logoColor=white)
+![QRCodeJS](https://img.shields.io/badge/QRCodeJS-QR_Generator-22c55e?style=for-the-badge&logo=qrcode&logoColor=white)
+![Imagin Studio](https://img.shields.io/badge/Imagin_Studio-3D_Car_Viewer-0ea5e9?style=for-the-badge&logo=autodesk&logoColor=white)
 
 <br/>
 
@@ -123,6 +126,9 @@ TG Customworks operates as both an **auto repair shop** and a **PhilBritish Insu
 | **Alerts** | SweetAlert2 | Toast notifications, confirmation dialogs, PIN prompt |
 | **Icons** | Heroicons (inline SVG via PHP helper) | Consistent icon system across all pages |
 | **Email** | PHPMailer + Gmail SMTP | Account activation, 2FA OTP, password reset, e-receipt delivery |
+| **OCR** | OCR.space API | Scan OR/CR and license plate text from uploaded images |
+| **QR Code** | QRCodeJS | Generate scannable digital ID QR codes on client profiles |
+| **3D Car Viewer** | Imagin Studio API | Drag-to-spin 360° vehicle preview on vehicle profile pages |
 | **Environment** | XAMPP (Apache + MySQL) | Local development server |
 | **Version Control** | Git + GitHub | Source control and collaboration |
 

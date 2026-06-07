@@ -54,7 +54,9 @@ body {
 }
 
 /* Prevent mobile auto-linking */
-a[href^="tel"], a[href^="sms"], a[x-apple-data-detectors] {
+a[href^="tel"],
+a[href^="sms"],
+a[x-apple-data-detectors] {
   color: inherit !important;
   text-decoration: none !important;
   pointer-events: none;
@@ -66,11 +68,25 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background-image: radial-gradient(circle, rgba(200, 150, 28, 0.14) 1px, transparent 1px);
+  background-image: radial-gradient(
+    circle,
+    rgba(200, 150, 28, 0.14) 1px,
+    transparent 1px
+  );
   background-size: 26px 26px;
   /* Only show dots in the dark lower half */
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, transparent 48%, black 48%);
-  mask-image: linear-gradient(to bottom, transparent 0%, transparent 48%, black 48%);
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    transparent 48%,
+    black 48%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    transparent 48%,
+    black 48%
+  );
 }
 
 /* Amber gradient sheen on top half + decorative rings */
@@ -80,8 +96,17 @@ body::after {
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(150deg, rgba(255, 230, 100, 0.2) 0%, rgba(160, 110, 5, 0.22) 100%) top / 100% 48% no-repeat,
-    radial-gradient(ellipse 500px 300px at 50% 25%, rgba(255, 220, 80, 0.12) 0%, transparent 70%);
+    linear-gradient(
+        150deg,
+        rgba(255, 230, 100, 0.2) 0%,
+        rgba(160, 110, 5, 0.22) 100%
+      )
+      top / 100% 48% no-repeat,
+    radial-gradient(
+      ellipse 500px 300px at 50% 25%,
+      rgba(255, 220, 80, 0.12) 0%,
+      transparent 70%
+    );
 }
 
 .wrap {
@@ -151,7 +176,7 @@ body::after {
   color: #fff;
   letter-spacing: -0.3px;
   margin-bottom: 0.2rem;
-  text-shadow: 0 1px 4px rgba(0,0,0,0.18);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
 }
 
 .brand-name span {
@@ -379,7 +404,9 @@ body::after {
     background 0.15s;
 }
 /* extra right padding when eye button present */
-.field-input--eye { padding-right: 2.6rem; }
+.field-input--eye {
+  padding-right: 2.6rem;
+}
 
 /* eye toggle button */
 .field-eye {
@@ -397,7 +424,9 @@ body::after {
   border-radius: 4px;
   transition: color 0.15s;
 }
-.field-eye:hover { color: var(--gold); }
+.field-eye:hover {
+  color: var(--gold);
+}
 
 .field-input:focus {
   border-color: var(--border-focus);
@@ -407,6 +436,25 @@ body::after {
 .field-input::placeholder {
   color: var(--text-muted);
   font-size: 0.82rem;
+}
+.field-input.is-error {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.04);
+  box-shadow: none;
+}
+.field-input.is-error:focus {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+  background: rgba(239, 68, 68, 0.03);
+}
+.field-error-msg {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #ef4444;
+  line-height: 1.4;
 }
 .field-hint {
   font-size: 0.67rem;
@@ -586,13 +634,38 @@ body::after {
 }
 
 @media (max-width: 480px) {
-  body { padding: 1rem 0; align-items: flex-start; padding-top: 2rem; }
-  .wrap { padding: 1rem; max-width: 100%; }
-  .brand { margin-bottom: 1.25rem; }
-  .brand-logo-ring { width: 56px; height: 56px; margin-bottom: 0.7rem; }
-  .brand-name { font-size: 1.2rem; }
-  .card-head { padding: 1.1rem 1.25rem; }
-  .card-body { padding: 1.25rem; }
-  .card-foot { padding: 0.85rem 1.25rem 1rem; }
-  .code-inputs input { width: 40px; height: 48px; font-size: 1.2rem; }
+  body {
+    padding: 1rem 0;
+    align-items: flex-start;
+    padding-top: 2rem;
+  }
+  .wrap {
+    padding: 1rem;
+    max-width: 100%;
+  }
+  .brand {
+    margin-bottom: 1.25rem;
+  }
+  .brand-logo-ring {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 0.7rem;
+  }
+  .brand-name {
+    font-size: 1.2rem;
+  }
+  .card-head {
+    padding: 1.1rem 1.25rem;
+  }
+  .card-body {
+    padding: 1.25rem;
+  }
+  .card-foot {
+    padding: 0.85rem 1.25rem 1rem;
+  }
+  .code-inputs input {
+    width: 40px;
+    height: 48px;
+    font-size: 1.2rem;
+  }
 }

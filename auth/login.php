@@ -258,9 +258,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
-<script type="text/babel" src="../assets/js/auth/login.react.js"></script>
+<script type="text/babel" src="../assets/js/auth/login.react.js?v=<?= filemtime(__DIR__.'/../assets/js/auth/login.react.js') ?>"></script>
 
-<script src="../assets/js/auth/login.js"></script>
+<script src="../assets/js/auth/login.js?v=<?= filemtime(__DIR__.'/../assets/js/auth/login.js') ?>"></script>
 
 </body>
 </html>

@@ -36,8 +36,11 @@ function Toast({ message, type, onDone }) {
         lineHeight: "1.4",
       }}
     >
-      <span style={{ flexShrink: 0, display: "flex", alignItems: "center" }}
-        dangerouslySetInnerHTML={{ __html: type === "lockout" ? iconLockout : iconWarning }}
+      <span
+        style={{ flexShrink: 0, display: "flex", alignItems: "center" }}
+        dangerouslySetInnerHTML={{
+          __html: type === "lockout" ? iconLockout : iconWarning,
+        }}
       />
       <span>{message}</span>
     </div>
@@ -69,6 +72,37 @@ function SubmitButton() {
 
   const handleSubmit = () => {
     if (loadingRef.current) return;
+
+    var usernameEl = document.getElementById("username");
+    var passwordEl = document.getElementById("password");
+
+    // Clear previous inline errors (helpers from login.js)
+    if (typeof clearFieldError === "function") {
+      clearFieldError(usernameEl);
+      clearFieldError(passwordEl);
+    }
+
+    var username = usernameEl ? usernameEl.value.trim() : "";
+    var password = passwordEl ? passwordEl.value.trim() : "";
+    var valid = true;
+
+    if (!username) {
+      if (typeof showFieldError === "function")
+        showFieldError(usernameEl, "Please enter your username.");
+      valid = false;
+    }
+    if (!password) {
+      if (typeof showFieldError === "function")
+        showFieldError(passwordEl, "Please enter your password.");
+      valid = false;
+    }
+
+    if (!valid) {
+      if (!username && usernameEl) usernameEl.focus();
+      else if (passwordEl) passwordEl.focus();
+      return;
+    }
+
     var form = document.getElementById("login-form");
     loadingRef.current = true;
     setLoading(true);
@@ -112,11 +146,11 @@ ReactDOM.createRoot(document.getElementById("submit-root")).render(
 );
 
 // Toast for lockout - injected via PHP data attributes
-const toastRoot    = document.getElementById("toast-root");
-const lockoutData  = toastRoot ? toastRoot.dataset.lockout : null;
-const lockoutMsg   = toastRoot ? toastRoot.dataset.message : null;
-const iconLockout  = toastRoot ? toastRoot.dataset.iconLockout : '';
-const iconWarning  = toastRoot ? toastRoot.dataset.iconWarning : '';
+const toastRoot = document.getElementById("toast-root");
+const lockoutData = toastRoot ? toastRoot.dataset.lockout : null;
+const lockoutMsg = toastRoot ? toastRoot.dataset.message : null;
+const iconLockout = toastRoot ? toastRoot.dataset.iconLockout : "";
+const iconWarning = toastRoot ? toastRoot.dataset.iconWarning : "";
 
 if (lockoutData === "1" && lockoutMsg) {
   ReactDOM.createRoot(toastRoot).render(

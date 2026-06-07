@@ -152,7 +152,11 @@ body {
 ══════════════════════════════ */
 .auth-right {
   background:
-    radial-gradient(ellipse 580px 480px at center, rgba(200, 150, 28, 0.07) 0%, transparent 70%),
+    radial-gradient(
+      ellipse 580px 480px at center,
+      rgba(200, 150, 28, 0.07) 0%,
+      transparent 70%
+    ),
     var(--bg);
   border-left: 2px solid rgba(200, 150, 28, 0.28);
   display: flex;
@@ -167,24 +171,32 @@ body {
   animation: fadeUp 0.4s ease both;
   /* Gold L-shaped corner accents */
   background-image:
-    linear-gradient(rgba(200,150,28,0.35), rgba(200,150,28,0.35)),
-    linear-gradient(rgba(200,150,28,0.35), rgba(200,150,28,0.35)),
-    linear-gradient(rgba(200,150,28,0.35), rgba(200,150,28,0.35)),
-    linear-gradient(rgba(200,150,28,0.35), rgba(200,150,28,0.35)),
-    linear-gradient(rgba(200,150,28,0.35), rgba(200,150,28,0.35)),
-    linear-gradient(rgba(200,150,28,0.35), rgba(200,150,28,0.35)),
-    linear-gradient(rgba(200,150,28,0.35), rgba(200,150,28,0.35)),
-    linear-gradient(rgba(200,150,28,0.35), rgba(200,150,28,0.35));
+    linear-gradient(rgba(200, 150, 28, 0.35), rgba(200, 150, 28, 0.35)),
+    linear-gradient(rgba(200, 150, 28, 0.35), rgba(200, 150, 28, 0.35)),
+    linear-gradient(rgba(200, 150, 28, 0.35), rgba(200, 150, 28, 0.35)),
+    linear-gradient(rgba(200, 150, 28, 0.35), rgba(200, 150, 28, 0.35)),
+    linear-gradient(rgba(200, 150, 28, 0.35), rgba(200, 150, 28, 0.35)),
+    linear-gradient(rgba(200, 150, 28, 0.35), rgba(200, 150, 28, 0.35)),
+    linear-gradient(rgba(200, 150, 28, 0.35), rgba(200, 150, 28, 0.35)),
+    linear-gradient(rgba(200, 150, 28, 0.35), rgba(200, 150, 28, 0.35));
   background-position:
-    0 0,       0 0,
-    100% 0,    100% 0,
-    0 100%,    0 100%,
-    100% 100%, 100% 100%;
+    0 0,
+    0 0,
+    100% 0,
+    100% 0,
+    0 100%,
+    0 100%,
+    100% 100%,
+    100% 100%;
   background-size:
-    22px 2px,  2px 22px,
-    22px 2px,  2px 22px,
-    22px 2px,  2px 22px,
-    22px 2px,  2px 22px;
+    22px 2px,
+    2px 22px,
+    22px 2px,
+    2px 22px,
+    22px 2px,
+    2px 22px,
+    22px 2px,
+    2px 22px;
   background-repeat: no-repeat;
 }
 
@@ -309,6 +321,25 @@ body {
 .field-input::placeholder {
   color: var(--text-muted);
   font-size: 0.82rem;
+}
+.field-input.is-error {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.04);
+  box-shadow: none;
+}
+.field-input.is-error:focus {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+  background: rgba(239, 68, 68, 0.03);
+}
+.field-error-msg {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #ef4444;
+  line-height: 1.4;
 }
 
 .pw-toggle {

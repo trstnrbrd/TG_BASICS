@@ -173,13 +173,13 @@ $invalid = !$record || $record['used'] || strtotime($record['expires_at']) < tim
           </div>
         </div>
 
-        <form method="POST" action="">
+        <form method="POST" action="" novalidate>
           <div class="field">
             <label class="field-label">New Password</label>
             <div class="field-input-wrap">
               <span class="field-icon"><?= icon('lock-closed', 14) ?></span>
               <input type="password" name="new_password" id="new_password" class="field-input"
-                placeholder="Minimum 8 characters" required autofocus/>
+                placeholder="Minimum 8 characters" autofocus/>
             </div>
             <div class="pw-strength"><div class="pw-strength-bar" id="pw-bar"></div></div>
             <span class="field-hint" id="pw-hint">At least 8 characters.</span>
@@ -189,7 +189,7 @@ $invalid = !$record || $record['used'] || strtotime($record['expires_at']) < tim
             <div class="field-input-wrap">
               <span class="field-icon"><?= icon('lock-closed', 14) ?></span>
               <input type="password" name="confirm_password" class="field-input"
-                placeholder="Re-enter your password" required/>
+                placeholder="Re-enter your password"/>
             </div>
           </div>
           <button type="submit" class="btn-submit">
@@ -210,7 +210,7 @@ $invalid = !$record || $record['used'] || strtotime($record['expires_at']) < tim
 
 </div>
 
-<script src="../assets/js/auth/activate.js"></script>
+<script src="../assets/js/auth/activate.js?v=<?= filemtime(__DIR__.'/../assets/js/auth/activate.js') ?>"></script>
 
 </body>
 </html>

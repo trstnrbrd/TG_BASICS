@@ -603,8 +603,20 @@ require_once '../../includes/topbar.php';
         <?php endif; ?>
 
         <!-- PAYMENT FORM -->
+        <?php $fully_paid = $policy['payment_status'] === 'Paid' || (float)$policy['balance'] <= 0; ?>
         <div style="border-top:1px solid var(--border);padding-top:1.25rem;">
           <div class="field-section"><?= icon('banknotes', 14) ?> <?= $has_installments ? 'Payment Schedule' : 'Record Payment' ?></div>
+
+          <?php if ($fully_paid && $has_installments): ?>
+          <!-- Fully paid notice -->
+          <div style="display:flex;align-items:center;gap:0.75rem;background:var(--success-bg);border:1.5px solid var(--success-border);border-radius:10px;padding:0.9rem 1.1rem;margin-bottom:1rem;">
+            <?= icon('check-circle', 18) ?>
+            <div>
+              <div style="font-size:0.85rem;font-weight:700;color:var(--success);">Payment Complete</div>
+              <div style="font-size:0.72rem;color:var(--success);opacity:0.85;margin-top:0.1rem;">All installments have been settled. No further payments are required.</div>
+            </div>
+          </div>
+          <?php endif; ?>
 
           <?php if (!empty($pay_errors)): ?>
           <script>document.addEventListener('DOMContentLoaded',function(){ Swal.fire({ icon:'error', title:'Payment Error', html:<?= json_encode('<ul style="text-align:left;margin:0;padding-left:1.2rem;">' . implode('', array_map(fn($e) => '<li>' . htmlspecialchars($e) . '</li>', $pay_errors)) . '</ul>') ?>, confirmButtonColor:'#B8860B' }); });</script>
@@ -640,7 +652,11 @@ require_once '../../includes/topbar.php';
                     $amt_paid   = (float)$inst['amount_paid'];
                     $due_date   = $inst['due_date'] ?? '';
                     $paid_at    = $inst['paid_at'] ?? '';
-                    $is_locked  = $amt_paid > 0;  // already paid — lock inputs
+
+                    // When policy is fully paid, hide rows with zero payment (they're irrelevant)
+                    if ($fully_paid && $amt_paid <= 0) continue;
+
+                    $is_locked  = $fully_paid || $amt_paid > 0;  // lock all when fully paid
                     $is_overdue = $due_date && $due_date < date('Y-m-d') && $amt_paid < $amt_due;
 
                     if ($amt_paid >= $amt_due && $amt_due > 0) {
@@ -764,9 +780,11 @@ require_once '../../includes/topbar.php';
             </div>
             <?php endif; ?>
 
+            <?php if (!$fully_paid): ?>
             <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
               <button type="submit" id="btn-save-payment" class="btn-primary"><?= icon('check-circle', 14) ?> Save Payment</button>
             </div>
+            <?php endif; ?>
           </form>
         </div>
       </div>

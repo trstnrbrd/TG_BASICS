@@ -38,9 +38,10 @@ if ($filter_action !== '') {
     $types   .= 's';
 }
 if ($filter_search !== '') {
-    $where[]  = 'a.description LIKE ?';
+    $where[]  = '(a.description LIKE ? OR a.action LIKE ?)';
     $params[] = '%' . $filter_search . '%';
-    $types   .= 's';
+    $params[] = '%' . $filter_search . '%';
+    $types   .= 'ss';
 }
 if ($filter_from !== '') {
     $where[]  = 'a.created_at >= ?';
@@ -99,9 +100,10 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
         $exp_types   .= 's';
     }
     if ($filter_search !== '') {
-        $exp_where[]  = 'a.description LIKE ?';
+        $exp_where[]  = '(a.description LIKE ? OR a.action LIKE ?)';
         $exp_params[] = '%' . $filter_search . '%';
-        $exp_types   .= 's';
+        $exp_params[] = '%' . $filter_search . '%';
+        $exp_types   .= 'ss';
     }
 
     $exp_where_sql = 'WHERE ' . implode(' AND ', $exp_where);
@@ -176,17 +178,28 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
   </tr>
     <?php
     $action_colors = [
-        'LOGIN'            => '#e8f5e9', 'LOGOUT'           => '#f0f0f0',
-        'ACCOUNT_CREATED'  => '#fff8e1', 'ACCOUNT_DELETED'  => '#ffebee',
-        'PASSWORD_RESET'   => '#fff8e1', 'CLIENT_ADDED'     => '#e8f5e9',
-        'CLIENT_UPDATED'   => '#fff8e1', 'CLIENT_DELETED'   => '#ffebee',
-        'VEHICLE_ADDED'    => '#e8f5e9', 'VEHICLE_UPDATED'  => '#fff8e1',
-        'POLICY_CREATED'   => '#fff8e1', 'POLICY_RENEWED'   => '#e8f5e9',
-        'POLICY_DELETED'   => '#ffebee', 'CLAIM_ADDED'      => '#fff8e1',
-        'CLAIM_UPDATED'    => '#fff8e1', 'CLAIM_DELETED'    => '#ffebee',
-        'REPAIR_CREATED'   => '#fff8e1', 'REPAIR_UPDATED'   => '#fff8e1',
-        'BILLING_UPDATED'  => '#fff8e1', 'BILLING_DELETED'  => '#ffebee',
-        'PAYMENT_RECORDED' => '#e8f5e9',
+        'LOGIN'                  => '#e8f5e9', 'LOGOUT'                 => '#f0f0f0',
+        'ACCOUNT_CREATED'        => '#fff8e1', 'ACCOUNT_DELETED'        => '#ffebee',
+        'PROFILE_UPDATED'        => '#fff8e1', 'PASSWORD_CHANGED'       => '#fff8e1',
+        'SECURITY_UPDATED'       => '#fff8e1', 'TOTP_ENABLED'           => '#e8f5e9',
+        'TOTP_DISABLED'          => '#f0f0f0', 'SETTINGS_UPDATED'       => '#fff8e1',
+        'CLIENT_ADDED'           => '#e8f5e9', 'CLIENT_UPDATED'         => '#fff8e1',
+        'CLIENT_DELETED'         => '#ffebee',
+        'VEHICLE_ADDED'          => '#e8f5e9', 'VEHICLE_UPDATED'        => '#fff8e1',
+        'VEHICLE_UNREGISTERED'   => '#ffebee',
+        'POLICY_CREATED'         => '#fff8e1', 'POLICY_RENEWED'         => '#e8f5e9',
+        'POLICY_DELETED'         => '#ffebee', 'PAYMENT_RECORDED'       => '#e8f5e9',
+        'RECEIPT_UPLOADED'       => '#fff8e1',
+        'CLAIM_FILED'            => '#fff8e1', 'CLAIM_UPDATED'          => '#fff8e1',
+        'CLAIM_DELETED'          => '#ffebee',
+        'REPAIR_JOB_CREATED'     => '#fff8e1', 'REPAIR_JOB_DELETED'     => '#ffebee',
+        'REPAIR_STATUS_UPDATED'  => '#fff8e1',
+        'BILLING_CREATED'        => '#fff8e1', 'BILLING_UPDATED'        => '#fff8e1',
+        'BILLING_DELETED'        => '#ffebee', 'BILLING_STATUS_UPDATED' => '#fff8e1',
+        'BILLING_DOCS_UPDATED'   => '#fff8e1',
+        'QUOTATION_CREATED'      => '#fff8e1', 'QUOTATION_UPDATED'      => '#fff8e1',
+        'QUOTATION_DELETED'      => '#ffebee', 'QUOTATION_APPROVED'     => '#e8f5e9',
+        'RECEIPT_CREATED'        => '#e8f5e9',
     ];
     $n = 1; $stripe = false;
     while ($r = $exp_rows->fetch_assoc()):
@@ -328,7 +341,9 @@ require_once '../../includes/topbar.php';
         unset($export_qs['page']);
         $export_qs['export'] = 'csv';
       ?>
-      <a href="?<?= http_build_query($export_qs) ?>" class="btn-sm-gold" title="Export to Excel">
+      <a href="?<?= http_build_query($export_qs) ?>" id="export-excel-btn"
+         data-filename="TG-BASICS_Activity_Log_<?= date('Y-m-d') ?>.xls"
+         class="btn-sm-gold" title="Export to Excel">
         <?= icon('floppy-disk', 14) ?> Export Excel
       </a>
       <?php endif; ?>
@@ -354,21 +369,52 @@ require_once '../../includes/topbar.php';
             while ($log = $logs->fetch_assoc()):
               $row_num++;
               $action_badges = [
-                'LOGIN'            => ['badge-green',  'arrow-right-on-rectangle'],
-                'LOGOUT'           => ['badge-gray',   'arrow-left-on-rectangle'],
-                'ACCOUNT_CREATED'  => ['badge-gold',   'user-plus'],
-                'ACCOUNT_DELETED'  => ['badge-red',    'trash'],
-                'PASSWORD_RESET'   => ['badge-yellow', 'lock-closed'],
-                'CLIENT_ADDED'     => ['badge-green',  'user-plus'],
-                'CLIENT_UPDATED'   => ['badge-yellow', 'pencil'],
-                'VEHICLE_ADDED'    => ['badge-green',  'plus'],
-                'VEHICLE_UPDATED'  => ['badge-yellow', 'pencil'],
-                'POLICY_CREATED'   => ['badge-gold',   'shield-check'],
-                'POLICY_SAVED'     => ['badge-green',  'shield-check'],
-                'CLAIM_ADDED'      => ['badge-gold',   'clipboard-list'],
-                'CLAIM_UPDATED'    => ['badge-yellow', 'clipboard-list'],
-                'REPAIR_CREATED'   => ['badge-gold',   'wrench'],
-                'REPAIR_UPDATED'   => ['badge-yellow', 'wrench'],
+                // Auth
+                'LOGIN'                  => ['badge-green',  'arrow-right-on-rectangle'],
+                'LOGOUT'                 => ['badge-gray',   'arrow-left-on-rectangle'],
+                // Account
+                'ACCOUNT_CREATED'        => ['badge-gold',   'user-plus'],
+                'ACCOUNT_DELETED'        => ['badge-red',    'trash'],
+                'PROFILE_UPDATED'        => ['badge-yellow', 'pencil'],
+                'PASSWORD_CHANGED'       => ['badge-yellow', 'lock-closed'],
+                'SECURITY_UPDATED'       => ['badge-yellow', 'lock-closed'],
+                'TOTP_ENABLED'           => ['badge-green',  'shield-check'],
+                'TOTP_DISABLED'          => ['badge-gray',   'shield-check'],
+                'SETTINGS_UPDATED'       => ['badge-yellow', 'cog-6-tooth'],
+                // Clients
+                'CLIENT_ADDED'           => ['badge-green',  'user-plus'],
+                'CLIENT_UPDATED'         => ['badge-yellow', 'pencil'],
+                'CLIENT_DELETED'         => ['badge-red',    'trash'],
+                // Vehicles
+                'VEHICLE_ADDED'          => ['badge-green',  'plus'],
+                'VEHICLE_UPDATED'        => ['badge-yellow', 'pencil'],
+                'VEHICLE_UNREGISTERED'   => ['badge-red',    'trash'],
+                // Policies
+                'POLICY_CREATED'         => ['badge-gold',   'shield-check'],
+                'POLICY_RENEWED'         => ['badge-green',  'shield-check'],
+                'POLICY_DELETED'         => ['badge-red',    'trash'],
+                'PAYMENT_RECORDED'       => ['badge-green',  'banknotes'],
+                'RECEIPT_UPLOADED'       => ['badge-yellow', 'arrow-up-tray'],
+                // Claims
+                'CLAIM_FILED'            => ['badge-gold',   'clipboard-list'],
+                'CLAIM_UPDATED'          => ['badge-yellow', 'clipboard-list'],
+                'CLAIM_DELETED'          => ['badge-red',    'trash'],
+                // Repair
+                'REPAIR_JOB_CREATED'     => ['badge-gold',   'wrench'],
+                'REPAIR_JOB_DELETED'     => ['badge-red',    'trash'],
+                'REPAIR_STATUS_UPDATED'  => ['badge-yellow', 'wrench'],
+                // Billing
+                'BILLING_CREATED'        => ['badge-gold',   'receipt'],
+                'BILLING_UPDATED'        => ['badge-yellow', 'receipt'],
+                'BILLING_DELETED'        => ['badge-red',    'trash'],
+                'BILLING_STATUS_UPDATED' => ['badge-yellow', 'receipt'],
+                'BILLING_DOCS_UPDATED'   => ['badge-yellow', 'document'],
+                // Quotations
+                'QUOTATION_CREATED'      => ['badge-gold',   'receipt'],
+                'QUOTATION_UPDATED'      => ['badge-yellow', 'receipt'],
+                'QUOTATION_DELETED'      => ['badge-red',    'trash'],
+                'QUOTATION_APPROVED'     => ['badge-green',  'check-circle'],
+                'RECEIPT_CREATED'        => ['badge-green',  'receipt'],
               ];
               $ab   = $action_badges[$log['action']][0] ?? 'badge-gray';
               $aico = $action_badges[$log['action']][1] ?? 'clipboard-list';
@@ -479,4 +525,32 @@ require_once '../../includes/topbar.php';
   </div>
 </div>
 
-<?php require_once '../../includes/footer.php'; ?>
+<?php
+$footer_scripts = '';
+$footer_extra_scripts = <<<'ACTLOG_SCRIPTS'
+<script>
+(function() {
+  var btn = document.getElementById('export-excel-btn');
+  if (!btn) return;
+  btn.addEventListener('click', function(e) {
+    e.preventDefault();
+    var url = this.href;
+    var filename = this.getAttribute('data-filename') || 'export.xls';
+    fetch(url)
+      .then(function(res) { return res.blob(); })
+      .then(function(blob) {
+        var blobUrl = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = filename;
+        a.addEventListener('click', function(ev) { ev.stopPropagation(); });
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function() { URL.revokeObjectURL(blobUrl); }, 1000);
+      });
+  });
+})();
+</script>
+ACTLOG_SCRIPTS;
+require_once '../../includes/footer.php'; ?>

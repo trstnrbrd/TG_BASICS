@@ -16,9 +16,9 @@ $first_name = explode(' ', $full_name)[0];
 
 // ── STATS QUERIES ──
 $total_clients  = $conn->query("SELECT COUNT(*) as c FROM clients WHERE deleted_at IS NULL")->fetch_assoc()['c'];
-$total_vehicles = $conn->query("SELECT COUNT(*) as c FROM vehicles")->fetch_assoc()['c'];
+$total_vehicles = $conn->query("SELECT COUNT(*) as c FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id WHERE c.deleted_at IS NULL")->fetch_assoc()['c'];
 $recent_clients  = $conn->query("SELECT COUNT(*) as c FROM clients WHERE deleted_at IS NULL AND YEAR(created_at)=YEAR(NOW()) AND MONTH(created_at)=MONTH(NOW())")->fetch_assoc()['c'];
-$recent_vehicles = $conn->query("SELECT COUNT(*) as c FROM vehicles WHERE YEAR(created_at)=YEAR(NOW()) AND MONTH(created_at)=MONTH(NOW())")->fetch_assoc()['c'];
+$recent_vehicles = $conn->query("SELECT COUNT(*) as c FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id WHERE c.deleted_at IS NULL AND YEAR(v.created_at)=YEAR(NOW()) AND MONTH(v.created_at)=MONTH(NOW())")->fetch_assoc()['c'];
 
 $total_policies   = $conn->query("SELECT COUNT(*) as c FROM insurance_policies WHERE is_renewed = 0")->fetch_assoc()['c'];
 $active_policies  = $conn->query("SELECT COUNT(*) as c FROM insurance_policies WHERE is_renewed = 0 AND policy_end >= CURDATE()")->fetch_assoc()['c'];

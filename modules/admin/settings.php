@@ -567,14 +567,17 @@ require_once '../../includes/topbar.php';
     <!-- ═══ HORIZONTAL TABS ═══ -->
     <div class="settings-tabs-bar">
       <button class="settings-tab-btn active" data-tab="account">
-        <?= icon('user', 16) ?> My Account
+        <?= icon('user', 16) ?>
+        <span class="tab-label">My Account</span>
       </button>
       <button class="settings-tab-btn" data-tab="design">
-        <?= icon('swatch', 16) ?> Design Preferences
+        <?= icon('swatch', 16) ?>
+        <span class="tab-label">Design Preferences</span>
       </button>
       <?php if ($is_super): ?>
       <button class="settings-tab-btn" data-tab="system_settings">
-        <?= icon('cog', 16) ?> System Settings
+        <?= icon('cog', 16) ?>
+        <span class="tab-label">System Settings</span>
         <span class="tab-owner">Owner</span>
       </button>
       <?php endif; ?>
@@ -585,43 +588,6 @@ require_once '../../includes/topbar.php';
     <!-- ── MY ACCOUNT ── -->
     <div class="settings-panel active" id="panel-account">
 
-      <!-- Profile Photo -->
-      <div class="card" style="margin-bottom:1.5rem;">
-        <div class="card-header">
-          <div class="card-icon"><?= icon('camera', 16) ?></div>
-          <div>
-            <div class="card-title">Profile Photo</div>
-            <div class="card-sub">Upload a photo to personalize your account</div>
-          </div>
-        </div>
-        <div class="card-body">
-          <div class="avatar-upload-area">
-            <div class="avatar-preview" id="avatar-preview">
-              <?php if ($has_photo): ?>
-              <img src="<?= $photo_url ?>" alt="Profile" id="avatar-img"/>
-              <?php else: ?>
-              <span class="avatar-initials" id="avatar-initials"><?= htmlspecialchars($initials) ?></span>
-              <?php endif; ?>
-            </div>
-            <div class="avatar-actions">
-              <div class="avatar-actions-title"><?= htmlspecialchars($current_user['full_name']) ?></div>
-              <div class="avatar-actions-hint">JPG, PNG, or WebP. Max 2 MB.</div>
-              <div class="avatar-buttons">
-                <label class="btn-secondary btn-sm" id="avatar-upload-label">
-                  <?= icon('camera', 14) ?> Upload Photo
-                  <input type="file" accept="image/jpeg,image/png,image/webp" id="avatar-file-input" hidden/>
-                </label>
-                <?php if ($has_photo): ?>
-                <button type="button" class="btn-outline-danger btn-sm" id="avatar-remove-btn">
-                  <?= icon('x-circle', 14) ?> Remove
-                </button>
-                <?php endif; ?>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <form class="settings-form" data-section="account">
         <input type="hidden" name="section" value="account"/>
         <?= csrf_field() ?>
@@ -631,10 +597,35 @@ require_once '../../includes/topbar.php';
             <div class="card-icon"><?= icon('user', 16) ?></div>
             <div>
               <div class="card-title">Profile Information</div>
-              <div class="card-sub">Update your display name and email address</div>
+              <div class="card-sub">Update your photo, display name, and email address</div>
             </div>
           </div>
           <div class="card-body">
+            <div class="avatar-upload-area" style="margin-bottom:1.25rem;">
+              <div class="avatar-preview" id="avatar-preview">
+                <?php if ($has_photo): ?>
+                <img src="<?= $photo_url ?>" alt="Profile" id="avatar-img"/>
+                <?php else: ?>
+                <span class="avatar-initials" id="avatar-initials"><?= htmlspecialchars($initials) ?></span>
+                <?php endif; ?>
+              </div>
+              <div class="avatar-actions">
+                <div class="avatar-actions-title"><?= htmlspecialchars($current_user['full_name']) ?></div>
+                <div class="avatar-actions-hint">JPG, PNG, or WebP. Max 2 MB.</div>
+                <div class="avatar-buttons">
+                  <label class="btn-secondary btn-sm" id="avatar-upload-label">
+                    <?= icon('camera', 14) ?> Upload Photo
+                    <input type="file" accept="image/jpeg,image/png,image/webp" id="avatar-file-input" hidden/>
+                  </label>
+                  <?php if ($has_photo): ?>
+                  <button type="button" class="btn-outline-danger btn-sm" id="avatar-remove-btn">
+                    <?= icon('x-circle', 14) ?> Remove
+                  </button>
+                  <?php endif; ?>
+                </div>
+              </div>
+            </div>
+            <div style="height:1px;background:var(--border);margin-bottom:1.25rem;"></div>
             <div class="form-grid">
               <div class="field">
                 <label class="field-label">First Name <span class="req">*</span></label>
@@ -665,6 +656,9 @@ require_once '../../includes/topbar.php';
               <span>Changing your email will require verification.</span>
             </div>
             <?php endif; ?>
+            <div style="display:flex;justify-content:flex-end;margin-top:1.25rem;">
+              <button type="button" class="btn-primary js-settings-save"><?= icon('check', 14) ?> Save Profile</button>
+            </div>
           </div>
         </div>
 
@@ -739,13 +733,12 @@ require_once '../../includes/topbar.php';
                   placeholder="Re-enter new password"/>
               </div>
             </div>
+            <div style="display:flex;justify-content:flex-end;margin-top:1.25rem;">
+              <button type="button" class="btn-primary" id="save-password-btn"><?= icon('check', 14) ?> Save Password</button>
+            </div>
           </div>
         </div>
 
-        <!-- Bottom save button for profile/password section -->
-        <div class="panel-save-bar" style="margin-bottom:2.5rem;">
-          <button type="button" class="btn-primary js-settings-save"><?= icon('check', 14) ?> Save Changes</button>
-        </div>
       </form>
 
       <!-- ── SECURITY SECTION ── -->

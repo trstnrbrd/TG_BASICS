@@ -44,6 +44,13 @@ error_log
 *.swo
 
 
+# ── DATABASE DUMPS (never commit real data) ──────────────────────────────────
+database/*.sql
+*.sql
+
 # ── TESTS / DOCUMENTATION (internal only) ────────────────────────────────────
 data_gathering (documentation)/Full interview transcript.txt
 data_gathering (documentation)/MANUSCRIPT.txt
+selenium_tests/
+tools/
+

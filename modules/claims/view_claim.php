@@ -943,7 +943,9 @@ const xIcon      = `<?= icon('x-mark', 10) ?>`;
       if (!result.isConfirmed) return;
 
       btn.disabled = true;
-      btn.innerHTML = '<?= icon("clock", 14) ?> Sending...';
+      btn.classList.add('btn-sending');
+      btn.innerHTML = '<span class="tg-spinner"></span> Sending...';
+      if (window.TGLoader) window.TGLoader.start();
 
       var fd = new FormData();
       fd.append('ajax_send_admin_email', '1');
@@ -951,7 +953,9 @@ const xIcon      = `<?= icon('x-mark', 10) ?>`;
       fetch('view_claim.php?id=<?= $claim_id ?>', { method: 'POST', body: fd })
         .then(function(r) { return r.json(); })
         .then(function(data) {
+          if (window.TGLoader) window.TGLoader.done();
           btn.disabled = false;
+          btn.classList.remove('btn-sending');
           btn.innerHTML = '<?= icon("envelope", 14) ?> Send Requirements to Admin';
           if (data.ok) {
             Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Email sent to admin.', showConfirmButton: false, timer: 3000, timerProgressBar: true });
@@ -960,7 +964,9 @@ const xIcon      = `<?= icon('x-mark', 10) ?>`;
           }
         })
         .catch(function() {
+          if (window.TGLoader) window.TGLoader.done();
           btn.disabled = false;
+          btn.classList.remove('btn-sending');
           btn.innerHTML = '<?= icon("envelope", 14) ?> Send Requirements to Admin';
           Swal.fire({ icon: 'error', title: 'Error', text: 'An unexpected error occurred.' });
         });

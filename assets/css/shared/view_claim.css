@@ -134,6 +134,26 @@
   pointer-events: none;
 }
 
+@keyframes tg-spin {
+  to { transform: rotate(360deg); }
+}
+.tg-spinner {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: tg-spin 0.65s linear infinite;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.btn-sending {
+  opacity: 0.75;
+  cursor: not-allowed !important;
+  pointer-events: none;
+}
+
 /* ── MOBILE RESPONSIVE ── */
 @media (max-width: 768px) {
   .claim-top-grid {

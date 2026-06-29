@@ -24,6 +24,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) 
     $cstmt->execute();
     $cdata = $cstmt->get_result()->fetch_assoc();
     if ($cdata) {
+        // Remove vehicles first before soft-deleting the client
+        $conn->query("DELETE FROM vehicles WHERE client_id = " . $del_id);
+
         $dstmt = $conn->prepare("UPDATE clients SET deleted_at = NOW() WHERE client_id = ?");
         $dstmt->bind_param('i', $del_id);
         $dstmt->execute();
@@ -469,7 +472,7 @@ require_once '../../includes/topbar.php';
                   data-plate="<?= htmlspecialchars($v['plate_number'], ENT_QUOTES) ?>">
               <?= csrf_field() ?>
               <input type="hidden" name="vehicle_id" value="<?= $v['vehicle_id'] ?>"/>
-              <button type="submit" class="btn-sm-danger" title="Delete" style="padding:0.35rem 0.55rem;">
+              <button type="submit" class="btn-sm-danger" title="Unregister Vehicle" style="padding:0.35rem 0.55rem;">
                 <?= icon('trash', 13) ?>
               </button>
             </form>

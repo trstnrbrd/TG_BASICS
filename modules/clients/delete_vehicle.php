@@ -45,14 +45,14 @@ $del->bind_param('i', $vehicle_id);
 
 if ($del->execute() && $del->affected_rows > 0) {
     $uid  = $_SESSION['user_id'];
-    $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'VEHICLE_DELETED', ?)");
-    $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' deleted vehicle ' . $vehicle['plate_number'] . ' (' . $vehicle['make'] . ' ' . $vehicle['model'] . ') from client "' . $vehicle['client_name'] . '".';
+    $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'VEHICLE_UNREGISTERED', ?)");
+    $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' unregistered vehicle ' . $vehicle['plate_number'] . ' (' . $vehicle['make'] . ' ' . $vehicle['model'] . ') from client "' . $vehicle['client_name'] . '".';
     $log->bind_param('is', $uid, $desc);
     $log->execute();
 
-    header("Location: view_client.php?id=" . $client_id . "&success=" . urlencode('Vehicle ' . $vehicle['plate_number'] . ' and its associated policies have been deleted.'));
+    header("Location: view_client.php?id=" . $client_id . "&success=" . urlencode('Vehicle ' . $vehicle['plate_number'] . ' has been unregistered.'));
     exit;
 } else {
-    header("Location: view_client.php?id=" . $client_id . "&error=Failed to delete vehicle. Please try again.");
+    header("Location: view_client.php?id=" . $client_id . "&error=Failed to unregister vehicle. Please try again.");
     exit;
 }

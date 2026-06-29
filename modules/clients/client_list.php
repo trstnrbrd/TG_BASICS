@@ -38,23 +38,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) 
     $cstmt->execute();
     $cdata = $cstmt->get_result()->fetch_assoc();
     if ($cdata) {
-        // Check for linked records before soft-deleting
+        // Block deletion only if active policies, repair jobs, or claims exist
+        // Vehicles alone are NOT a blocker — they are removed on client deletion
         $chk = $conn->prepare("
             SELECT
-              (SELECT COUNT(*) FROM claims       WHERE client_id = ?) AS claims_count,
-              (SELECT COUNT(*) FROM vehicles     WHERE client_id = ?) AS vehicles_count,
+              (SELECT COUNT(*) FROM claims             WHERE client_id = ?) AS claims_count,
               (SELECT COUNT(*) FROM insurance_policies WHERE client_id = ?) AS policies_count,
-              (SELECT COUNT(*) FROM repair_jobs  WHERE client_id = ?) AS repairs_count
+              (SELECT COUNT(*) FROM repair_jobs        WHERE client_id = ?) AS repairs_count
         ");
-        $chk->bind_param('iiii', $del_id, $del_id, $del_id, $del_id);
+        $chk->bind_param('iii', $del_id, $del_id, $del_id);
         $chk->execute();
-        $counts = $chk->get_result()->fetch_assoc();
-        $total_linked = ($counts['claims_count'] ?? 0) + ($counts['vehicles_count'] ?? 0)
-                      + ($counts['policies_count'] ?? 0) + ($counts['repairs_count'] ?? 0);
+        $counts   = $chk->get_result()->fetch_assoc();
+        $blocking = ($counts['claims_count'] ?? 0) + ($counts['policies_count'] ?? 0) + ($counts['repairs_count'] ?? 0);
 
-        if ($total_linked > 0) {
+        if ($blocking > 0) {
             $parts = [];
-            if ($counts['vehicles_count'])  $parts[] = $counts['vehicles_count']  . ' vehicle(s)';
             if ($counts['policies_count'])  $parts[] = $counts['policies_count']  . ' policy(s)';
             if ($counts['repairs_count'])   $parts[] = $counts['repairs_count']   . ' repair job(s)';
             if ($counts['claims_count'])    $parts[] = $counts['claims_count']    . ' claim(s)';
@@ -62,6 +60,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) 
             header("Location: client_list.php?error=" . urlencode('"' . $cdata['full_name'] . '" cannot be deleted — they still have ' . $linked_msg . ' on record.'));
             exit;
         }
+
+        // Remove vehicles first (no blocking records remain)
+        $conn->query("DELETE FROM vehicles WHERE client_id = " . $del_id);
 
         $dstmt = $conn->prepare("UPDATE clients SET deleted_at = NOW() WHERE client_id = ?");
         $dstmt->bind_param('i', $del_id);
@@ -157,7 +158,7 @@ $result = $stmt->get_result();
 $rows = $result->fetch_all(MYSQLI_ASSOC);
 
 $total_clients  = $conn->query("SELECT COUNT(*) as c FROM clients WHERE deleted_at IS NULL")->fetch_assoc()['c'];
-$total_vehicles = $conn->query("SELECT COUNT(*) as c FROM vehicles")->fetch_assoc()['c'];
+$total_vehicles = $conn->query("SELECT COUNT(*) as c FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id WHERE c.deleted_at IS NULL")->fetch_assoc()['c'];
 $recent         = $conn->query("SELECT COUNT(*) as c FROM clients WHERE deleted_at IS NULL AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)")->fetch_assoc()['c'];
 
 $page_title  = 'Client Records';

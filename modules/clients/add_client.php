@@ -11,8 +11,9 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'supe
 $full_name_user = $_SESSION['full_name'];
 $initials       = substr(implode('', array_map(fn($w) => strtoupper($w[0]), explode(' ', $full_name_user))), 0, 2);
 
-$errors  = [];
-$success = false;
+$errors      = [];
+$fieldErrors = [];
+$success     = false;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
@@ -28,26 +29,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $motor_number   = san_str($_POST['motor_number'] ?? '', MAX_MOTOR_SN);
     $serial_number  = san_str($_POST['serial_number'] ?? '', MAX_MOTOR_SN);
 
-    if ($full_name === '')                          $errors[] = 'Full name is required.';
-    elseif (!validate_name($full_name))             $errors[] = 'Full name contains invalid characters.';
-    if ($contact_number === '')                     $errors[] = 'Contact number is required.';
-    elseif (!validate_phone($contact_number))       $errors[] = 'Contact number must be a valid PH mobile number (09XXXXXXXXX).';
-    if ($email !== '' && !validate_email($email))   $errors[] = 'Please enter a valid email address.';
-    if ($address === '')                            $errors[] = 'Address is required.';
-    if ($plate_number === '')                       $errors[] = 'Plate number is required.';
-    elseif (!validate_plate($plate_number))         $errors[] = 'Plate number contains invalid characters.';
-    if ($make === '')                               $errors[] = 'Vehicle make is required.';
-    if ($model === '')                              $errors[] = 'Vehicle model is required.';
-    if ($year_model === 0)                          $errors[] = 'Year model must be a valid year (1960–' . ((int)date('Y') + 1) . ').';
-    if ($motor_number === '')                       $errors[] = 'Engine number is required.';
-    if ($serial_number === '')                      $errors[] = 'Chassis number is required.';
+    $addError = function(string $field, string $msg) use (&$errors, &$fieldErrors) {
+        $errors[] = $msg;
+        if (!isset($fieldErrors[$field])) $fieldErrors[$field] = $msg;
+    };
+
+    if ($full_name === '')                          $addError('full_name', 'Full name is required.');
+    elseif (!validate_name($full_name))             $addError('full_name', 'Full name contains invalid characters.');
+    if ($contact_number === '')                     $addError('contact_number', 'Contact number is required.');
+    elseif (!validate_phone($contact_number))       $addError('contact_number', 'Contact number must be a valid PH mobile number (09XXXXXXXXX).');
+    if ($email !== '' && !validate_email($email))   $addError('email', 'Please enter a valid email address.');
+    if ($address === '')                            $addError('address', 'Address is required.');
+    if ($plate_number === '')                       $addError('plate_number', 'Plate number is required.');
+    elseif (!validate_plate($plate_number))         $addError('plate_number', 'Plate number contains invalid characters.');
+    if ($make === '')                               $addError('make', 'Vehicle make is required.');
+    if ($model === '')                              $addError('model', 'Vehicle model is required.');
+    if ($year_model === 0)                          $addError('year_model', 'Year model must be a valid year (1960–' . ((int)date('Y') + 1) . ').');
+    if ($motor_number === '')                       $addError('motor_number', 'Engine number is required.');
+    if ($serial_number === '')                      $addError('serial_number', 'Chassis number is required.');
 
     if ($plate_number !== '') {
-        $check = $conn->prepare("SELECT vehicle_id FROM vehicles WHERE plate_number = ?");
+        $check = $conn->prepare("SELECT v.vehicle_id FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id WHERE v.plate_number = ? AND c.deleted_at IS NULL");
         $check->bind_param('s', $plate_number);
         $check->execute();
         if ($check->get_result()->num_rows > 0)
-            $errors[] = 'Plate number ' . $plate_number . ' already exists in the system.';
+            $addError('plate_number', 'Plate number ' . $plate_number . ' already exists in the system.');
     }
 
     if (empty($errors)) {
@@ -96,16 +102,6 @@ require_once '../../includes/topbar.php';
     <a href="client_list.php" class="back-link"><?= icon('arrow-left', 14) ?> Back to Client Records</a>
 
 
-    <?php if (!empty($errors)): ?>
-    <div class="alert alert-danger">
-      <div>
-        <div style="font-weight:700;margin-bottom:0.35rem;">Please fix the following:</div>
-        <?php foreach ($errors as $e): ?>
-        <div style="font-size:0.78rem;">&#8226; <?= htmlspecialchars($e) ?></div>
-        <?php endforeach; ?>
-      </div>
-    </div>
-    <?php endif; ?>
 
     <!-- OCR MODAL -->
     <div id="ocr-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.55);backdrop-filter:blur(2px);align-items:center;justify-content:center;padding:1rem;" onclick="if(event.target===this)ocrModalClose()">
@@ -306,11 +302,118 @@ require_once '../../includes/topbar.php';
   </div>
 </div>
 
+<script>var _ACServerErrors = <?= json_encode($fieldErrors) ?>;</script>
+
 <?php
 $footer_scripts = '';
 $footer_extra_scripts = <<<'ADDCLIENT_SCRIPT'
 <script>
+var _EXCL_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+
+function showFieldError(el, message) {
+  if (!el) return;
+  el.classList.add('is-error');
+  var wrap = el.closest('.field');
+  if (!wrap) return;
+  var old = wrap.querySelector('.field-error-msg');
+  if (old) old.remove();
+  var d = document.createElement('div');
+  d.className = 'field-error-msg';
+  d.innerHTML = _EXCL_ICON + '<span>' + message + '</span>';
+  wrap.appendChild(d);
+}
+
+function clearFieldError(el) {
+  if (!el) return;
+  el.classList.remove('is-error');
+  var wrap = el.closest('.field');
+  if (!wrap) return;
+  var m = wrap.querySelector('.field-error-msg');
+  if (m) m.remove();
+}
+
+function validateAddClientForm() {
+  var required = [
+    { name: 'full_name',      msg: 'Full name is required.' },
+    { name: 'contact_number', msg: 'Contact number is required.' },
+    { name: 'address',        msg: 'Address is required.' },
+    { name: 'plate_number',   msg: 'Plate number is required.' },
+    { name: 'make',           msg: 'Vehicle make is required.' },
+    { name: 'model',          msg: 'Vehicle model is required.' },
+    { name: 'year_model',     msg: 'Year model is required.' },
+    { name: 'motor_number',   msg: 'Engine number is required.' },
+    { name: 'serial_number',  msg: 'Chassis number is required.' }
+  ];
+  var ok = true;
+  var firstErrEl = null;
+
+  required.forEach(function(f) {
+    var el = document.querySelector('[name="' + f.name + '"]');
+    if (!el) return;
+    clearFieldError(el);
+    if (!el.value.trim()) {
+      showFieldError(el, f.msg);
+      if (!firstErrEl) firstErrEl = el;
+      ok = false;
+    }
+  });
+
+  var phoneEl = document.querySelector('[name="contact_number"]');
+  if (phoneEl && phoneEl.value.trim() && !/^09\d{9}$/.test(phoneEl.value.trim())) {
+    clearFieldError(phoneEl);
+    showFieldError(phoneEl, 'Contact number must be a valid PH mobile number (09XXXXXXXXX).');
+    if (!firstErrEl) firstErrEl = phoneEl;
+    ok = false;
+  }
+
+  var emailEl = document.querySelector('[name="email"]');
+  if (emailEl) {
+    clearFieldError(emailEl);
+    var ev = emailEl.value.trim();
+    if (ev && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ev)) {
+      showFieldError(emailEl, 'Please enter a valid email address.');
+      if (!firstErrEl) firstErrEl = emailEl;
+      ok = false;
+    }
+  }
+
+  var yearEl = document.querySelector('[name="year_model"]');
+  if (yearEl && yearEl.value.trim()) {
+    var yr = parseInt(yearEl.value.trim());
+    var curYear = new Date().getFullYear();
+    if (isNaN(yr) || yr < 1960 || yr > curYear + 1) {
+      clearFieldError(yearEl);
+      showFieldError(yearEl, 'Year model must be between 1960 and ' + (curYear + 1) + '.');
+      if (!firstErrEl) firstErrEl = yearEl;
+      ok = false;
+    }
+  }
+
+  if (firstErrEl) firstErrEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  return ok;
+}
+
 (function() {
+  // Apply server-side errors on page load
+  document.addEventListener('DOMContentLoaded', function() {
+    if (typeof _ACServerErrors === 'object') {
+      var first = null;
+      Object.keys(_ACServerErrors).forEach(function(name) {
+        var el = document.querySelector('[name="' + name + '"]');
+        if (el) {
+          showFieldError(el, _ACServerErrors[name]);
+          if (!first) first = el;
+        }
+      });
+      if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  });
+
+  // Clear error on input/change
+  document.querySelectorAll('.field-input, .field-select').forEach(function(el) {
+    el.addEventListener('input', function() { clearFieldError(this); });
+    el.addEventListener('change', function() { clearFieldError(this); });
+  });
   var fileInput = document.getElementById("ocr-file-input");
   var idleEl    = document.getElementById("ocr-idle");
   var previewEl = document.getElementById("ocr-preview");
@@ -668,7 +771,7 @@ $footer_extra_scripts = <<<'ADDCLIENT_SCRIPT'
           var fieldNames = ["full_name","contact_number","email","address","plate_number","make","model","year_model","color","motor_number","serial_number"];
           fieldNames.forEach(function(name) {
             var el = document.querySelector("[name=" + name + "]");
-            if (el) { el.value = ""; el.classList.remove("ocr-filled"); }
+            if (el) { el.value = ""; el.classList.remove("ocr-filled"); clearFieldError(el); }
           });
           document.querySelectorAll(".ocr-filled").forEach(function(el) { el.classList.remove("ocr-filled"); });
         }
@@ -680,6 +783,7 @@ $footer_extra_scripts = <<<'ADDCLIENT_SCRIPT'
   if (theForm) {
     theForm.addEventListener("submit", function(e) {
       e.preventDefault();
+      if (!validateAddClientForm()) return;
       var form = this;
       var name    = (document.querySelector("[name=full_name]")      || {}).value || "—";
       var plate   = (document.querySelector("[name=plate_number]")   || {}).value || "—";

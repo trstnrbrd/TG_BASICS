@@ -53,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Duplicate plate check — exclude current vehicle
     if ($plate_number !== '') {
-        $check = $conn->prepare("SELECT vehicle_id FROM vehicles WHERE plate_number = ? AND vehicle_id != ?");
+        $check = $conn->prepare("SELECT v.vehicle_id FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id WHERE v.plate_number = ? AND v.vehicle_id != ? AND c.deleted_at IS NULL");
         $check->bind_param('si', $plate_number, $vehicle_id);
         $check->execute();
         if ($check->get_result()->num_rows > 0)

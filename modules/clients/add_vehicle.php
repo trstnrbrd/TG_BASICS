@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($serial_number === '') $errors[] = 'Chassis number is required.';
 
     if ($plate_number !== '') {
-        $check = $conn->prepare("SELECT vehicle_id FROM vehicles WHERE plate_number = ?");
+        $check = $conn->prepare("SELECT v.vehicle_id FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id WHERE v.plate_number = ? AND c.deleted_at IS NULL");
         $check->bind_param('s', $plate_number);
         $check->execute();
         if ($check->get_result()->num_rows > 0)

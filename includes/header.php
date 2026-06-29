@@ -441,6 +441,9 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
   .field-select { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239C9286' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.9rem center; background-color: var(--bg); padding-right: 2.5rem; }
   .field-textarea { resize: vertical; min-height: 90px; }
   .field-hint { font-size: 0.67rem; color: var(--text-muted); line-height: 1.4; }
+  .field-input.is-error, .field-select.is-error { border-color: #ef4444 !important; background: rgba(239,68,68,0.04) !important; box-shadow: none !important; }
+  .field-input.is-error:focus, .field-select.is-error:focus { box-shadow: 0 0 0 3px rgba(239,68,68,0.1) !important; }
+  .field-error-msg { display: flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; font-weight: 500; color: #ef4444; line-height: 1.4; }
 
   .form-grid   { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem 1.25rem; }
   .form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem 1.25rem; }
@@ -963,6 +966,7 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
   @media (max-width: 768px) {
     .gs-wrap { display: none; }
   }
+
 </style>
 <link rel="stylesheet" href="<?= $base_path ?>assets/css/shared/mobile_tables.css?v=<?= filemtime(__DIR__ . '/../assets/css/shared/mobile_tables.css') ?>"/>
 <?= $extra_css ?? '' ?>
@@ -973,28 +977,42 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
 (function(){
   var bar = document.getElementById('page-loader');
   var w = 0, tid;
+
   function advance() {
     if (w < 85) { w += (85 - w) * 0.18 + 1; bar.style.width = w + '%'; }
     tid = setTimeout(advance, 180);
+  }
+  function start() {
+    clearTimeout(tid);
+    bar.style.opacity = '1'; w = 0; bar.style.width = '0%';
+    setTimeout(function(){ w = 20; bar.style.width = '20%'; advance(); }, 10);
   }
   function complete() {
     clearTimeout(tid);
     bar.style.width = '100%';
     setTimeout(function(){ bar.style.opacity = '0'; }, 220);
   }
+
+  // Expose globally so any page can call window.TGLoader.start() / .done()
+  window.TGLoader = { start: start, done: complete };
+
+  // Initial page load
   advance();
   window.addEventListener('load', complete);
+
+  // Link clicks (navigation)
   document.addEventListener('click', function(e){
     var a = e.target.closest('a[href]');
     if (!a) return;
     var href = a.getAttribute('href');
     if (!href || href.startsWith('#') || href.startsWith('javascript') || a.target === '_blank') return;
-    bar.style.opacity = '1'; w = 0; bar.style.width = '0%';
-    setTimeout(function(){ w = 30; bar.style.width = '30%'; advance(); }, 10);
+    if (e.defaultPrevented) return;
+    start();
   });
+
+  // Form submits
   document.addEventListener('submit', function(){
-    bar.style.opacity = '1'; w = 0; bar.style.width = '0%';
-    setTimeout(function(){ w = 20; bar.style.width = '20%'; advance(); }, 10);
+    start();
   });
 })();
 </script>
@@ -1021,7 +1039,7 @@ if ($_mob_is_admin) {
     $_mob_policy_pages = ['renewal', 'insurance', 'claims', 'billing', 'quotations'];
     if (in_array($_mob_active, $_mob_policy_pages)) $_mob_active = 'policy';
     // More tab active for settings/admin pages
-    $_mob_more_pages = ['settings', 'manage_users', 'activity_log', 'monthly_report', 'my_account'];
+    $_mob_more_pages = ['settings', 'manage_users', 'activity_log', 'monthly_report'];
     if (in_array($_mob_active, $_mob_more_pages)) $_mob_active = 'more';
 } else {
     $_mob_nav = [
@@ -1233,6 +1251,7 @@ function _mob_icon(string $name): string {
       const a = e.target.closest('a[href]');
       if (a && !a.target && !a.href.startsWith('#') && !a.href.startsWith('javascript')) {
         if (a.closest('.user-dropdown')) return;
+        if (e.defaultPrevented) return;
         document.documentElement.classList.add('tg-loading');
       }
     });

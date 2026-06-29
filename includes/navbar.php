@@ -128,4 +128,36 @@ $dash_url = $role === 'mechanic'
 
   </nav>
 
+  <button type="button" class="sidebar-collapse-btn" id="sidebar-collapse-btn" title="Collapse sidebar">
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19l-7-7 7-7"/></svg>
+  </button>
+
 </aside>
+
+<button type="button" class="sidebar-expand-tab" id="sidebar-expand-tab" title="Expand sidebar">
+  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+</button>
+
+<script>
+(function () {
+  var KEY  = 'tg-sidebar-collapsed';
+  var body = document.body;
+
+  if (localStorage.getItem(KEY) === '1') {
+    body.classList.add('sidebar-collapsed');
+  }
+
+  var colBtn = document.getElementById('sidebar-collapse-btn');
+  var expTab = document.getElementById('sidebar-expand-tab');
+
+  if (colBtn) colBtn.addEventListener('click', function () {
+    body.classList.add('sidebar-collapsed');
+    localStorage.setItem(KEY, '1');
+  });
+
+  if (expTab) expTab.addEventListener('click', function () {
+    body.classList.remove('sidebar-collapsed');
+    localStorage.setItem(KEY, '0');
+  });
+})();
+</script>

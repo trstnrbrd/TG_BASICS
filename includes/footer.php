@@ -337,7 +337,7 @@ $footer_extra_scripts  = $footer_extra_scripts  ?? '';
     var root = document.getElementById('user-dropdown-root');
     document.getElementById('ep-first-name').value = root ? (root.dataset.firstname || '') : '';
     document.getElementById('ep-last-name').value  = root ? (root.dataset.lastname  || '') : '';
-    document.getElementById('ep-email').value = '';
+    document.getElementById('ep-email').value = root ? (root.dataset.email || '') : '';
     document.getElementById('ep-error').style.display = 'none';
     document.getElementById('ep-avatar-input').value = '';
     renderAvatarPreview();

@@ -16,7 +16,7 @@ $_profile_photo_url = '';
 $_first_name_display = '';
 $_last_name_display  = '';
 if (isset($_SESSION['user_id'], $conn)) {
-    $_pq = $conn->prepare("SELECT profile_photo, first_name, last_name FROM users WHERE user_id = ?");
+    $_pq = $conn->prepare("SELECT profile_photo, first_name, last_name, email FROM users WHERE user_id = ?");
     $_pq->bind_param('i', $_SESSION['user_id']);
     $_pq->execute();
     $_pr = $_pq->get_result()->fetch_assoc();
@@ -25,6 +25,7 @@ if (isset($_SESSION['user_id'], $conn)) {
     }
     $_first_name_display = $_pr['first_name'] ?? '';
     $_last_name_display  = $_pr['last_name']  ?? '';
+    $_email_display      = $_pr['email']       ?? '';
 }
 ?>
 <div class="mob-topbar" id="mob-topbar">
@@ -78,7 +79,8 @@ if (isset($_SESSION['user_id'], $conn)) {
       data-role="<?= $role_label ?>"
       data-username="<?= htmlspecialchars($_SESSION['username'] ?? '') ?>"
       data-base="<?= $base_path ?>"
-      data-photo="<?= htmlspecialchars($_profile_photo_url) ?>">
+      data-photo="<?= htmlspecialchars($_profile_photo_url) ?>"
+      data-email="<?= htmlspecialchars($_email_display ?? '') ?>">
       <!-- Pre-rendered placeholder — React replaces this on mount (no flash) -->
       <div class="user-dropdown-wrap">
         <div class="user-chip">

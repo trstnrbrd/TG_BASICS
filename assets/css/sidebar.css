@@ -247,8 +247,82 @@
   color: #000;
 }
 
+/* ── COLLAPSE TOGGLE BUTTON ── */
+.sidebar-collapse-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.72rem 1.1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-left: 3px solid transparent;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  background: none;
+  border-right: none;
+  border-bottom: none;
+  width: 100%;
+  font-family: inherit;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.sidebar-collapse-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.65);
+}
+.sidebar-collapse-btn svg {
+  flex-shrink: 0;
+  opacity: 0.5;
+  transition: opacity 0.15s;
+}
+.sidebar-collapse-btn:hover svg {
+  opacity: 1;
+}
+
+/* ── EXPAND TAB (shown on left edge when collapsed) ── */
+.sidebar-expand-tab {
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  z-index: 49;
+  background: var(--sidebar-bg, #1C1A17);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  padding: 0.75rem 0.45rem;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.35);
+  flex-direction: column;
+  align-items: center;
+  transition: color 0.15s, background 0.15s;
+}
+.sidebar-expand-tab:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* ── COLLAPSED STATE ── */
+.main { transition: margin-left 0.25s ease; }
+
+body.sidebar-collapsed .sidebar {
+  transform: translateX(-100%);
+}
+body.sidebar-collapsed .main {
+  margin-left: 0 !important;
+}
+body.sidebar-collapsed .sidebar-expand-tab {
+  display: flex;
+}
+
 /* ── MOBILE ── */
 @media (max-width: 768px) {
+  .sidebar-collapse-btn,
+  .sidebar-expand-tab { display: none !important; }
+
   .sidebar {
     transform: translateX(-100%);
     overflow: hidden;

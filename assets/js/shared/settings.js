@@ -233,5 +233,53 @@ if (saveUsernameBtn) {
     });
 }
 
+// ── Change Password ──
+const savePasswordBtn = document.getElementById('save-password-btn');
+if (savePasswordBtn) {
+    savePasswordBtn.addEventListener('click', async function () {
+        const curPw = document.querySelector('[name="current_password"]')?.value;
+        const newPw = document.querySelector('[name="new_password"]')?.value;
+        const cfmPw = document.querySelector('[name="confirm_password"]')?.value;
+
+        if (!curPw) {
+            Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter your current password.', confirmButtonColor: '#B8860B' });
+            return;
+        }
+        if (!newPw) {
+            Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter a new password.', confirmButtonColor: '#B8860B' });
+            return;
+        }
+        if (!cfmPw) {
+            Swal.fire({ icon: 'warning', title: 'Required', text: 'Please confirm your new password.', confirmButtonColor: '#B8860B' });
+            return;
+        }
+
+        const form = savePasswordBtn.closest('.settings-form');
+        const originalHTML = this.innerHTML;
+        this.disabled = true;
+        this.style.opacity = '0.6';
+        this.textContent = 'Saving...';
+
+        let data = null;
+        try {
+            const res = await fetch('settings.php', { method: 'POST', body: new FormData(form) });
+            data = await res.json();
+        } catch (e) { data = null; }
+
+        this.disabled = false;
+        this.style.opacity = '';
+        this.innerHTML = originalHTML;
+
+        if (!data) {
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Something went wrong. Please try again.', confirmButtonColor: '#B8860B' });
+        } else if (data.ok) {
+            Swal.fire({ icon: 'success', title: 'Saved!', text: data.message, confirmButtonColor: '#B8860B', timer: 2000, timerProgressBar: true });
+            form.querySelectorAll('input[type="password"]').forEach(p => p.value = '');
+        } else {
+            Swal.fire({ icon: 'error', title: 'Error', text: data.error, confirmButtonColor: '#B8860B' });
+        }
+    });
+}
+
 // Transaction PIN handlers are inline in settings.php
 // TOTP handlers are inline in settings.php (load-order dependency on QRCode CDN)

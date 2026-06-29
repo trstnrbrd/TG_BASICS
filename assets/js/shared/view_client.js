@@ -33,24 +33,24 @@ function confirmDeleteDoc(btn, name) {
   }).then(async function(r) { if (r.isConfirmed) { var ok = await requirePin(); if (ok) (form.requestSubmit ? form.requestSubmit() : form.submit()); } });
 }
 
-// Delete vehicle
+// Unregister vehicle
 document.querySelectorAll('.js-delete-vehicle-form').forEach(function(form) {
   form.addEventListener('submit', async function(e) {
     e.preventDefault();
     var plate = this.dataset.plate;
     var self  = this;
     var confirmed = await Swal.fire({
-      title: 'Delete vehicle?',
-      text: 'Delete ' + plate + '? This will also permanently delete all associated insurance policies. This cannot be undone.',
+      title: 'Unregister Vehicle?',
+      text: 'Unregister ' + plate + '? This will also permanently remove all associated insurance policies. This cannot be undone.',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#C0392B',
       cancelButtonColor: '#6c757d',
-      confirmButtonText: 'Yes, delete',
+      confirmButtonText: 'Yes, unregister',
       cancelButtonText: 'Cancel'
     });
     if (!confirmed.isConfirmed) return;
     const ok = await requirePin();
-    if (ok) (self.requestSubmit ? self.requestSubmit() : self.submit());
+    if (ok) self.submit();
   });
 });

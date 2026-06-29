@@ -55,6 +55,28 @@
     display: none !important;
   }
 
+  /* Flatten the outer .card wrapper when it contains a mob-card table —
+     the individual row cards already provide visual structure */
+  .card:has(.tg-table.mob-card) {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+  }
+  .card:has(.tg-table.mob-card) .card-header {
+    padding: 0.25rem 0.25rem 0.5rem !important;
+    border: none !important;
+    background: transparent !important;
+  }
+  .card:has(.tg-table.mob-card) .tg-table-wrap {
+    overflow: visible !important;
+    padding: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
   /* ══════════════════════════════════
      CLAIMS LIST — 4 cols
      col1: client+vehicle  col2: filed  col3: status  col4: actions

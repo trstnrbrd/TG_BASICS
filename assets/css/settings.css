@@ -60,6 +60,9 @@
 .settings-tab-btn svg {
   flex-shrink: 0;
 }
+.settings-tab-btn .tab-label {
+  min-width: 0;
+}
 
 /* ── SETTINGS PANEL ── */
 .settings-panel {
@@ -518,7 +521,32 @@
 /* ── RESPONSIVE ── */
 @media (max-width: 768px) {
   .settings-tabs-bar {
+    flex-direction: row;
+    padding: 0.25rem;
+    gap: 0.15rem;
+    margin-bottom: 1.25rem;
+  }
+  .settings-tab-btn {
     flex-direction: column;
+    padding: 0.55rem 0.25rem;
+    gap: 0.3rem;
+    font-size: 0.6rem;
+    font-weight: 600;
+    min-width: 0;
+  }
+  .settings-tab-btn svg {
+    width: 17px;
+    height: 17px;
+  }
+  .settings-tab-btn .tab-label {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    display: block;
+  }
+  .settings-tab-btn .tab-owner {
+    display: none;
   }
   .settings-form .form-grid {
     grid-template-columns: 1fr;
@@ -544,7 +572,34 @@
     justify-content: center;
   }
   .theme-picker {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: 1fr;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .theme-option {
+    border: none;
+    border-radius: 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-2);
+    transform: none !important;
+    box-shadow: none !important;
+  }
+  .theme-option:last-child {
+    border-bottom: none;
+  }
+  .theme-option.active {
+    background: var(--gold-pale);
+    border-color: var(--border);
+    box-shadow: none !important;
+  }
+  .theme-preview {
+    display: none;
+  }
+  .theme-label {
+    border-top: none;
+    padding: 0.75rem 1rem;
   }
 }
 

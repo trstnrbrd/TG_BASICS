@@ -57,9 +57,10 @@ TG Customworks runs both an **auto repair shop** and a **PhilBritish Insurance b
 | 3 | **Policy Renewal Tracking** | Color-coded expiry status (Stable / Expiring / Urgent). Balance tracking and urgent renewal badge in nav. |
 | 4 | **Claims Document Tracking** | Claims logging with status flow. Document checklist (OR/CR, license, police report, damage photos). |
 | 5 | **Repair Job Management** | Digital vehicle inspection checklist. Stage tracking: Pending → In Progress → For Pickup → Completed. Mechanic portal. |
-| 6 | **Quotation & E-Receipt Generator** | Quotation builder from a service catalog. Auto-converts to e-receipt on payment. Email delivery. |
-| 7 | **Monthly Reports & Analytics** | Year-over-year charts for clients, policies, and repairs. Printable A4 layout. |
-| 8 | **User & Account Management** | Role-based accounts, profile management, PIN protection, 2FA, and activity logs. |
+| 6 | **Billing** | Linked to claims and repair jobs. Itemized cost breakdown — parts, labor, and deductible computation. Generates final billing record for settlement. |
+| 7 | **Quotation & E-Receipt Generator** | Quotation builder from a service catalog. Auto-converts to e-receipt on payment. Email delivery. |
+| 8 | **Monthly Reports & Analytics** | Year-over-year charts for clients, policies, and repairs. Printable A4 layout. |
+| 9 | **User & Account Management** | Role-based accounts, profile management, PIN protection, 2FA, and activity logs. |
 
 ---
 

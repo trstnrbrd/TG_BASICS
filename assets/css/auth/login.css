@@ -4,7 +4,7 @@
   --gold-muted: #f0dc9a;
   --panel-bg: #252118;
   --bg: #faf9f6;
-  --bg-field: #f4f2ee;
+  --bg-field: #ffffff;
   --text-primary: #1a1814;
   --text-secondary: #5c5648;
   --text-muted: #9c9286;
@@ -40,7 +40,7 @@ body {
 ══════════════════════════════ */
 .auth-split {
   display: grid;
-  grid-template-columns: 900px 1fr;
+  grid-template-columns: min(900px, 58%) 1fr;
   min-height: 100vh;
 }
 
@@ -228,16 +228,17 @@ body {
   background-repeat: no-repeat;
   overflow: hidden;
   flex-shrink: 0;
-  transition: border-color 0.15s;
-}
-.auth-brand-link:hover .auth-right-logo {
-  border-color: var(--gold-bright);
+  transition:
+    transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+    border-color 0.2s,
+    box-shadow 0.3s;
 }
 .auth-brand-sep {
   width: 1px;
   height: 28px;
   background: var(--border);
   flex-shrink: 0;
+  transition: transform 0.3s ease, opacity 0.3s ease;
 }
 .auth-right-logo-basic {
   width: 54px;
@@ -246,6 +247,22 @@ body {
   background-position: center;
   background-repeat: no-repeat;
   flex-shrink: 0;
+  transition:
+    transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.04s;
+}
+
+/* Hover: logos tilt outward with spring bounce */
+.auth-brand-link:hover .auth-right-logo {
+  transform: scale(1.14) rotate(-8deg);
+  border-color: var(--gold-bright);
+  box-shadow: 0 4px 18px rgba(200, 150, 28, 0.35);
+}
+.auth-brand-link:hover .auth-right-logo-basic {
+  transform: scale(1.14) rotate(8deg);
+}
+.auth-brand-link:hover .auth-brand-sep {
+  transform: scaleY(1.25);
+  opacity: 0.4;
 }
 .auth-right-name {
   font-size: 1.1rem;
@@ -448,6 +465,20 @@ body {
   gap: 0.5rem;
 }
 
+/* ══ TABLET — hide left panel, center the form ══ */
+@media (max-width: 900px) and (min-width: 701px) {
+  .auth-split {
+    grid-template-columns: 1fr;
+  }
+  .auth-left {
+    display: none;
+  }
+  .auth-right {
+    border-left: none;
+    min-height: 100vh;
+  }
+}
+
 /* ══ MOBILE ══ */
 @media (max-width: 700px) {
   .auth-split {
@@ -461,6 +492,7 @@ body {
     font-size: 1.7rem;
   }
   .auth-right {
+    border-left: none;
     padding: 2rem 1.5rem 3rem;
     align-items: flex-start;
   }
@@ -503,6 +535,47 @@ body {
     transform: translateY(-8px) scale(0.96);
   }
 }
+/* ══════════════════════════════
+   LEFT PANEL — interactive animations
+══════════════════════════════ */
+
+/* Gold shimmer sweep across the top section */
+@keyframes goldShimmer {
+  0%   { background-position: -120% center; }
+  100% { background-position: 220% center; }
+}
+.auth-left-img::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgba(255, 240, 120, 0.22) 50%,
+    transparent 65%
+  );
+  background-size: 250% 100%;
+  animation: goldShimmer 4.5s linear infinite;
+  pointer-events: none;
+}
+
+/* Staggered entrance for left panel text */
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.auth-headline {
+  animation: slideUpFade 0.85s cubic-bezier(0.22, 1, 0.36, 1) both 0.2s;
+}
+.auth-sub {
+  animation: slideUpFade 0.85s cubic-bezier(0.22, 1, 0.36, 1) both 0.42s;
+}
+
+/* Rings — JS will drive transform; transition handles smooth lerp on mouseleave */
+.auth-deco {
+  will-change: transform;
+}
+
 ::-webkit-scrollbar {
   width: 4px;
 }

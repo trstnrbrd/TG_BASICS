@@ -226,163 +226,383 @@
   </div>
 </section>
 
-<!-- ROLES -->
-<section id="roles" class="page-section page-section--alt">
+<!-- ROLES + SECURITY (unified container) -->
+<section id="roles" class="page-section rs-combo">
+  <span class="fl-glow fl-gw1"></span>
+  <span class="fl-glow fl-gw2"></span>
+  <span class="fl-beam fl-b1"></span>
+  <span class="fl-beam fl-b2"></span>
+  <span class="fl-beam fl-b3"></span>
+  <span class="fl-beam fl-b4"></span>
+  <span class="fl-beam fl-b5"></span>
+  <span class="fl-beam fl-b6"></span>
+  <span class="fl-corner fl-tl"></span>
+  <span class="fl-corner fl-tr"></span>
+  <span class="fl-corner fl-bl"></span>
+  <span class="fl-corner fl-br"></span>
+  <span class="fl-gem fl-g1"></span>
+  <span class="fl-gem fl-g2"></span>
+  <span class="fl-gem fl-g3"></span>
+  <span class="fl-gem fl-g4"></span>
+  <span class="fl-gem fl-g5"></span>
+  <span class="fl-gem fl-g6"></span>
+
   <div class="section-container js-reveal-container">
-    <div class="section-head js-reveal">
-      <div class="section-label">Access Levels</div>
-      <h2 class="section-title">The right access<br><span>for every role.</span></h2>
-      <p class="section-desc">Each user is redirected to their own dashboard after login. No self-registration. Accounts are created by the administrator.</p>
+
+    <!-- ACCESS LEVELS -->
+    <div class="rs-part js-reveal">
+      <div class="section-head">
+        <div class="section-label">Access Levels</div>
+        <h2 class="section-title">The right access<br><span>for every role.</span></h2>
+        <p class="section-desc">Each user is redirected to their own dashboard after login. No self-registration. Accounts are created by the administrator.</p>
+      </div>
+      <div class="roles-matrix">
+        <div class="rm-header">
+          <div class="rm-perm-col">Module / Permission</div>
+          <div class="rm-role-col">
+            <div class="rm-role-badge"><?= icon('shield-check', 15) ?></div>
+            <div class="rm-role-name">Super Admin</div>
+          </div>
+          <div class="rm-role-col">
+            <div class="rm-role-badge"><?= icon('users', 15) ?></div>
+            <div class="rm-role-name">Admin</div>
+          </div>
+          <div class="rm-role-col">
+            <div class="rm-role-badge"><?= icon('wrench', 15) ?></div>
+            <div class="rm-role-name">Mechanic</div>
+          </div>
+        </div>
+        <div class="rm-row">
+          <div class="rm-perm">Client &amp; Vehicle Records</div>
+          <div class="rm-cell rm-full">Full</div>
+          <div class="rm-cell rm-full">Full</div>
+          <div class="rm-cell rm-none">&mdash;</div>
+        </div>
+        <div class="rm-row">
+          <div class="rm-perm">Insurance &amp; Renewals</div>
+          <div class="rm-cell rm-full">Full</div>
+          <div class="rm-cell rm-full">Full</div>
+          <div class="rm-cell rm-none">&mdash;</div>
+        </div>
+        <div class="rm-row">
+          <div class="rm-perm">Claims Management</div>
+          <div class="rm-cell rm-full">Full</div>
+          <div class="rm-cell rm-full">Full</div>
+          <div class="rm-cell rm-none">&mdash;</div>
+        </div>
+        <div class="rm-row">
+          <div class="rm-perm">Repair Jobs</div>
+          <div class="rm-cell rm-full">Full</div>
+          <div class="rm-cell rm-full">Full</div>
+          <div class="rm-cell rm-limited">View &amp; Update</div>
+        </div>
+        <div class="rm-row">
+          <div class="rm-perm">Billing</div>
+          <div class="rm-cell rm-full">Full</div>
+          <div class="rm-cell rm-full">Full</div>
+          <div class="rm-cell rm-none">&mdash;</div>
+        </div>
+        <div class="rm-row">
+          <div class="rm-perm">User &amp; Account Management</div>
+          <div class="rm-cell rm-full">Full</div>
+          <div class="rm-cell rm-none">&mdash;</div>
+          <div class="rm-cell rm-none">&mdash;</div>
+        </div>
+        <div class="rm-row">
+          <div class="rm-perm">Audit Logs &amp; System Settings</div>
+          <div class="rm-cell rm-full">Full</div>
+          <div class="rm-cell rm-none">&mdash;</div>
+          <div class="rm-cell rm-none">&mdash;</div>
+        </div>
+      </div>
     </div>
-    <div class="roles-matrix js-reveal">
-      <div class="rm-header">
-        <div class="rm-perm-col">Module / Permission</div>
-        <div class="rm-role-col">
-          <div class="rm-role-badge"><?= icon('shield-check', 15) ?></div>
-          <div class="rm-role-name">Super Admin</div>
+
+    <!-- Gold divider -->
+    <div class="rs-divider"></div>
+
+    <!-- SECURITY & TECH — anchor for nav link -->
+    <span id="security" class="rs-anchor"></span>
+    <div class="rs-part js-reveal">
+      <div class="sec-split">
+        <div class="sec-left">
+          <div class="section-label">Security &amp; Technology</div>
+          <h2 class="section-title">Built secure.<br><span>Built to last.</span></h2>
+          <p class="section-desc">Enterprise-grade security features protecting every transaction and record in the system.</p>
         </div>
-        <div class="rm-role-col">
-          <div class="rm-role-badge"><?= icon('users', 15) ?></div>
-          <div class="rm-role-name">Admin</div>
+        <div class="sec-right">
+          <div class="sec-cards-grid">
+            <div class="sec-card">
+              <div class="sec-card-top">
+                <div class="sec-card-icon"><?= icon('lock-closed', 20) ?></div>
+                <span class="sec-card-num">01</span>
+              </div>
+              <div class="sec-card-name">Two-Factor Authentication</div>
+              <p class="sec-card-desc">Email-based 2FA codes plus TOTP authenticator app support for every login with 2FA enabled.</p>
+            </div>
+            <div class="sec-card">
+              <div class="sec-card-top">
+                <div class="sec-card-icon"><?= icon('shield-check', 20) ?></div>
+                <span class="sec-card-num">02</span>
+              </div>
+              <div class="sec-card-name">Account Lockout Protection</div>
+              <p class="sec-card-desc">Automatic lockout after configurable failed attempts with IP-based rate limiting to block brute-force attacks.</p>
+            </div>
+            <div class="sec-card">
+              <div class="sec-card-top">
+                <div class="sec-card-icon"><?= icon('clipboard-list', 20) ?></div>
+                <span class="sec-card-num">03</span>
+              </div>
+              <div class="sec-card-name">Full Audit Trail</div>
+              <p class="sec-card-desc">Every login, data change, and system action logged with timestamps and user identity for full accountability.</p>
+            </div>
+            <div class="sec-card">
+              <div class="sec-card-top">
+                <div class="sec-card-icon"><?= icon('cog', 20) ?></div>
+                <span class="sec-card-num">04</span>
+              </div>
+              <div class="sec-card-name">Role-Based Access Control</div>
+              <p class="sec-card-desc">Three distinct roles with strict permission boundaries. No cross-role data access or unauthorized module entry.</p>
+            </div>
+          </div>
         </div>
-        <div class="rm-role-col">
-          <div class="rm-role-badge"><?= icon('wrench', 15) ?></div>
-          <div class="rm-role-name">Mechanic</div>
-        </div>
-      </div>
-      <div class="rm-row">
-        <div class="rm-perm">Client &amp; Vehicle Records</div>
-        <div class="rm-cell rm-full">Full</div>
-        <div class="rm-cell rm-full">Full</div>
-        <div class="rm-cell rm-none">&mdash;</div>
-      </div>
-      <div class="rm-row">
-        <div class="rm-perm">Insurance &amp; Renewals</div>
-        <div class="rm-cell rm-full">Full</div>
-        <div class="rm-cell rm-full">Full</div>
-        <div class="rm-cell rm-none">&mdash;</div>
-      </div>
-      <div class="rm-row">
-        <div class="rm-perm">Claims Management</div>
-        <div class="rm-cell rm-full">Full</div>
-        <div class="rm-cell rm-full">Full</div>
-        <div class="rm-cell rm-none">&mdash;</div>
-      </div>
-      <div class="rm-row">
-        <div class="rm-perm">Repair Jobs</div>
-        <div class="rm-cell rm-full">Full</div>
-        <div class="rm-cell rm-full">Full</div>
-        <div class="rm-cell rm-limited">View &amp; Update</div>
-      </div>
-      <div class="rm-row">
-        <div class="rm-perm">Billing</div>
-        <div class="rm-cell rm-full">Full</div>
-        <div class="rm-cell rm-full">Full</div>
-        <div class="rm-cell rm-none">&mdash;</div>
-      </div>
-      <div class="rm-row">
-        <div class="rm-perm">User &amp; Account Management</div>
-        <div class="rm-cell rm-full">Full</div>
-        <div class="rm-cell rm-none">&mdash;</div>
-        <div class="rm-cell rm-none">&mdash;</div>
-      </div>
-      <div class="rm-row">
-        <div class="rm-perm">Audit Logs &amp; System Settings</div>
-        <div class="rm-cell rm-full">Full</div>
-        <div class="rm-cell rm-none">&mdash;</div>
-        <div class="rm-cell rm-none">&mdash;</div>
       </div>
     </div>
+
   </div>
 </section>
 
-<!-- SECURITY & TECH -->
-<section id="security" class="page-section">
-  <span class="sec-ring sec-r1"></span>
-  <span class="sec-ring sec-r2"></span>
-  <span class="sec-ring sec-r3"></span>
-  <div class="section-container js-reveal-container">
-    <div class="sec-split">
-      <div class="sec-left js-reveal">
-        <div class="section-label">Security &amp; Technology</div>
-        <h2 class="section-title">Built secure.<br><span>Built to last.</span></h2>
-        <p class="section-desc">Enterprise-grade security features protecting every transaction and record in the system.</p>
-      </div>
-      <div class="sec-right js-reveal">
-        <div class="sec-item">
-          <div class="sec-item-head">
-            <span class="sec-num">01</span>
-            <span class="sec-item-icon"><?= icon('lock-closed', 15) ?></span>
-            <span class="sec-item-name">Two-Factor Authentication</span>
-          </div>
-          <p class="sec-item-desc">Email-based 2FA verification codes on every login for accounts with 2FA enabled.</p>
-        </div>
-        <div class="sec-item">
-          <div class="sec-item-head">
-            <span class="sec-num">02</span>
-            <span class="sec-item-icon"><?= icon('shield-check', 15) ?></span>
-            <span class="sec-item-name">Account Lockout Protection</span>
-          </div>
-          <p class="sec-item-desc">Automatic lockout after multiple failed login attempts to prevent brute-force attacks.</p>
-        </div>
-        <div class="sec-item">
-          <div class="sec-item-head">
-            <span class="sec-num">03</span>
-            <span class="sec-item-icon"><?= icon('clipboard-list', 15) ?></span>
-            <span class="sec-item-name">Full Audit Trail</span>
-          </div>
-          <p class="sec-item-desc">Every login, record change, and system action is logged with timestamps and user details.</p>
-        </div>
-        <div class="sec-item">
-          <div class="sec-item-head">
-            <span class="sec-num">04</span>
-            <span class="sec-item-icon"><?= icon('cog', 15) ?></span>
-            <span class="sec-item-name">Role-Based Access Control</span>
-          </div>
-          <p class="sec-item-desc">Three distinct user roles with strict permission boundaries. No unauthorized module access.</p>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
+<div class="section-bridge"></div>
+
+<div class="bottom-combined">
 
 <!-- BRAND PANEL -->
 <section class="brand-panel js-reveal">
-  <span class="bp-ring bp-r1"></span>
-  <span class="bp-ring bp-r2"></span>
-  <span class="bp-ring bp-r3"></span>
-  <span class="bp-ring bp-r4"></span>
   <div class="bp-inner">
-    <div class="bp-system-name">TG<span>-BASICS</span></div>
-    <p class="bp-desc">Brokerage and Auto Shop Integrated Central System &mdash; a unified platform purpose-built for TG Customworks and Basic Car Insurance.</p>
     <div class="bp-flow">
+
+      <!-- REGISTER -->
       <div class="bp-step">
-        <div class="bp-step-num">01</div>
-        <div class="bp-step-icon"><?= icon('user-plus', 18) ?></div>
-        <div class="bp-step-title">Register</div>
-        <div class="bp-step-text">Client and vehicle details recorded into the central database.</div>
+        <div class="bp-step-inner">
+          <div class="bp-step-front">
+            <div class="bp-step-icon"><?= icon('user-plus', 26) ?></div>
+            <div class="bp-step-title">Register</div>
+            <div class="bp-step-text">Client and vehicle details recorded into the central database.</div>
+          </div>
+          <div class="bp-step-back">
+            <div class="bp-mock-screen">
+              <div class="bm-topbar">
+                <div class="bm-breadcrumb">Records <span class="bm-sep">›</span> <strong>Add Client</strong></div>
+                <div class="bm-topbar-right"><div class="bm-avatar">AJ</div></div>
+              </div>
+              <div class="bm-content">
+                <div class="bm-back-link">← Back to Client Records</div>
+                <div class="bm-card">
+                  <div class="bm-card-header">
+                    <div class="bm-card-icon"><?= icon('user', 12) ?></div>
+                    <div>
+                      <div class="bm-card-title">Client Information</div>
+                      <div class="bm-card-sub">Fields marked <span class="bm-req">*</span> are required</div>
+                    </div>
+                    <div class="bm-card-btn"><?= icon('camera', 10) ?> Scan Document</div>
+                  </div>
+                  <div class="bm-card-body">
+                    <div class="bm-section">Personal Details</div>
+                    <div class="bm-form-grid">
+                      <div class="bm-field"><div class="bm-label">Full Name <span class="bm-req">*</span></div><div class="bm-input bm-input-filled">DELA CRUZ, JUAN M.</div></div>
+                      <div class="bm-field"><div class="bm-label">Contact Number <span class="bm-req">*</span></div><div class="bm-input bm-input-filled">09171234567</div></div>
+                      <div class="bm-field"><div class="bm-label">Email Address</div><div class="bm-input">jdelacruz@email.com</div></div>
+                      <div class="bm-field"><div class="bm-label">Address <span class="bm-req">*</span></div><div class="bm-input bm-input-filled">San Roque, Pandi, Bulacan</div></div>
+                    </div>
+                    <div class="bm-section">Vehicle Details</div>
+                    <div class="bm-form-grid-3">
+                      <div class="bm-field"><div class="bm-label">Plate Number <span class="bm-req">*</span></div><div class="bm-input bm-input-filled">ABC 1234</div></div>
+                      <div class="bm-field"><div class="bm-label">Make <span class="bm-req">*</span></div><div class="bm-input bm-input-filled">Toyota</div></div>
+                      <div class="bm-field"><div class="bm-label">Model <span class="bm-req">*</span></div><div class="bm-input bm-input-filled">Vios</div></div>
+                      <div class="bm-field"><div class="bm-label">Year Model <span class="bm-req">*</span></div><div class="bm-input bm-input-filled">2019</div></div>
+                      <div class="bm-field bm-span2"><div class="bm-label">Color</div><div class="bm-input">Pearl White</div></div>
+                    </div>
+                  </div>
+                  <div class="bm-footer">
+                    <div class="bm-btn-ghost">Cancel</div>
+                    <div class="bm-btn-primary"><?= icon('user-plus', 10) ?> Save Client Record</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="bp-step-arrow"><?= icon('arrow-right', 14) ?></div>
+
+      <!-- INSURE -->
       <div class="bp-step">
-        <div class="bp-step-num">02</div>
-        <div class="bp-step-icon"><?= icon('document', 18) ?></div>
-        <div class="bp-step-title">Insure</div>
-        <div class="bp-step-text">Policy filed. OR/CR renewal and PhilBritish premium computed.</div>
+        <div class="bp-step-inner">
+          <div class="bp-step-front">
+            <div class="bp-step-icon"><?= icon('document', 26) ?></div>
+            <div class="bp-step-title">Insure</div>
+            <div class="bp-step-text">Policy filed. OR/CR renewal and PhilBritish premium computed.</div>
+          </div>
+          <div class="bp-step-back">
+            <div class="bp-mock-screen">
+              <div class="bm-topbar">
+                <div class="bm-breadcrumb">Insurance <span class="bm-sep">›</span> <strong>Add Policy</strong></div>
+                <div class="bm-topbar-right"><div class="bm-avatar">AJ</div></div>
+              </div>
+              <div class="bm-content">
+                <div class="bm-back-link">← Back to Renewal List</div>
+                <div class="bm-vehicle-bar">
+                  <span class="bm-vehicle-plate">ABC 1234</span>
+                  <span class="bm-vehicle-info">Toyota Vios 2019 · DELA CRUZ, JUAN M.</span>
+                </div>
+                <div class="bm-card">
+                  <div class="bm-card-header">
+                    <div class="bm-card-icon"><?= icon('document', 12) ?></div>
+                    <div>
+                      <div class="bm-card-title">Policy Details</div>
+                      <div class="bm-card-sub">PhilBritish Insurance Corporation</div>
+                    </div>
+                  </div>
+                  <div class="bm-card-body">
+                    <div class="bm-form-grid">
+                      <div class="bm-field"><div class="bm-label">Policy Number <span class="bm-req">*</span></div><div class="bm-input bm-input-filled">PB-2026-08491</div></div>
+                      <div class="bm-field"><div class="bm-label">Coverage Type <span class="bm-req">*</span></div><div class="bm-input bm-input-filled">Comprehensive</div></div>
+                      <div class="bm-field"><div class="bm-label">Sum Insured <span class="bm-req">*</span></div><div class="bm-input bm-input-filled">₱600,000.00</div></div>
+                      <div class="bm-field"><div class="bm-label">Basic Premium <span class="bm-req">*</span></div><div class="bm-input bm-input-filled">₱8,450.00</div></div>
+                      <div class="bm-field"><div class="bm-label">Inception Date <span class="bm-req">*</span></div><div class="bm-input bm-input-filled">Jul 14, 2026</div></div>
+                      <div class="bm-field"><div class="bm-label">Expiry Date <span class="bm-req">*</span></div><div class="bm-input bm-input-filled">Jul 14, 2027</div></div>
+                    </div>
+                  </div>
+                  <div class="bm-footer">
+                    <div class="bm-btn-ghost">Cancel</div>
+                    <div class="bm-btn-primary"><?= icon('document', 10) ?> File Policy</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="bp-step-arrow"><?= icon('arrow-right', 14) ?></div>
+
+      <!-- REPAIR -->
       <div class="bp-step">
-        <div class="bp-step-num">03</div>
-        <div class="bp-step-icon"><?= icon('wrench', 18) ?></div>
-        <div class="bp-step-title">Repair</div>
-        <div class="bp-step-text">Repair job opened, assigned to mechanic, and tracked to completion.</div>
+        <div class="bp-step-inner">
+          <div class="bp-step-front">
+            <div class="bp-step-icon"><?= icon('wrench', 26) ?></div>
+            <div class="bp-step-title">Repair</div>
+            <div class="bp-step-text">Repair job opened, assigned to mechanic, and tracked to completion.</div>
+          </div>
+          <div class="bp-step-back">
+            <div class="bp-mock-screen">
+              <div class="bm-topbar">
+                <div class="bm-breadcrumb">Repair <span class="bm-sep">›</span> <strong>Add Repair Job</strong></div>
+                <div class="bm-topbar-right"><div class="bm-avatar">AJ</div></div>
+              </div>
+              <div class="bm-content">
+                <div class="bm-back-link">← Back to Repair List</div>
+                <div class="bm-search-bar">
+                  <span class="bm-search-icon"><?= icon('magnifying-glass', 10) ?></span>
+                  DELA CRUZ, JUAN M.
+                  <span class="bm-search-clear">×</span>
+                </div>
+                <div class="bm-card">
+                  <div class="bm-card-header">
+                    <div class="bm-card-icon"><?= icon('wrench', 12) ?></div>
+                    <div>
+                      <div class="bm-card-title">Repair Job Details</div>
+                      <div class="bm-card-sub">RJ-20260714-0001</div>
+                    </div>
+                  </div>
+                  <div class="bm-card-body">
+                    <div class="bm-form-grid">
+                      <div class="bm-field"><div class="bm-label">Client <span class="bm-req">*</span></div><div class="bm-input bm-input-filled">DELA CRUZ, JUAN M.</div></div>
+                      <div class="bm-field"><div class="bm-label">Vehicle / Plate <span class="bm-req">*</span></div><div class="bm-input bm-input-filled">ABC 1234 – Vios 2019</div></div>
+                      <div class="bm-field"><div class="bm-label">Service Type <span class="bm-req">*</span></div><div class="bm-input bm-input-filled">Repair (Full)</div></div>
+                      <div class="bm-field"><div class="bm-label">Repair Date <span class="bm-req">*</span></div><div class="bm-input bm-input-filled">Jul 14, 2026</div></div>
+                      <div class="bm-field"><div class="bm-label">Release Date</div><div class="bm-input">Jul 17, 2026</div></div>
+                      <div class="bm-field"><div class="bm-label">Additional Damages</div><div class="bm-input">Front bumper scratch</div></div>
+                    </div>
+                  </div>
+                  <div class="bm-footer">
+                    <div class="bm-btn-ghost">Cancel</div>
+                    <div class="bm-btn-primary"><?= icon('wrench', 10) ?> Open Repair Job</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="bp-step-arrow"><?= icon('arrow-right', 14) ?></div>
+
+      <!-- SETTLE -->
       <div class="bp-step">
-        <div class="bp-step-num">04</div>
-        <div class="bp-step-icon"><?= icon('receipt', 18) ?></div>
-        <div class="bp-step-title">Settle</div>
-        <div class="bp-step-text">Billing finalized, claims resolved, and records updated.</div>
+        <div class="bp-step-inner">
+          <div class="bp-step-front">
+            <div class="bp-step-icon"><?= icon('receipt', 26) ?></div>
+            <div class="bp-step-title">Settle</div>
+            <div class="bp-step-text">Billing finalized, claims resolved, and records updated.</div>
+          </div>
+          <div class="bp-step-back">
+            <div class="bp-mock-screen">
+              <div class="bm-topbar">
+                <div class="bm-breadcrumb">Insurance <span class="bm-sep">›</span> Billing <span class="bm-sep">›</span> <strong>New</strong></div>
+                <div class="bm-topbar-right"><div class="bm-avatar">AJ</div></div>
+              </div>
+              <div class="bm-content">
+                <div class="bm-two-col">
+                  <div>
+                    <div class="bm-card">
+                      <div class="bm-card-header">
+                        <div class="bm-card-icon"><?= icon('clipboard-list', 12) ?></div>
+                        <div>
+                          <div class="bm-card-title">Linked Claim</div>
+                          <div class="bm-card-sub">Select approved claim</div>
+                        </div>
+                      </div>
+                      <div class="bm-card-body">
+                        <div class="bm-claim-sel">#12 — DELA CRUZ, JUAN M. (ABC 1234 · PB-2026-08491)</div>
+                      </div>
+                    </div>
+                    <div class="bm-card">
+                      <div class="bm-card-header">
+                        <div class="bm-card-icon"><?= icon('document-text', 12) ?></div>
+                        <div>
+                          <div class="bm-card-title">Billing Details</div>
+                          <div class="bm-card-sub">Insurance company &amp; dates</div>
+                        </div>
+                      </div>
+                      <div class="bm-card-body">
+                        <div class="bm-field bm-field-solo"><div class="bm-label">Billed To <span class="bm-req">*</span></div><div class="bm-input bm-input-filled">PhilBritish Insurance Corp.</div></div>
+                        <div class="bm-form-grid">
+                          <div class="bm-field"><div class="bm-label">Incident Date</div><div class="bm-input bm-input-filled">Jul 10, 2026</div></div>
+                          <div class="bm-field"><div class="bm-label">Repair Date</div><div class="bm-input bm-input-filled">Jul 14, 2026</div></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="bm-card">
+                      <div class="bm-card-header">
+                        <div class="bm-card-icon"><?= icon('receipt', 12) ?></div>
+                        <div><div class="bm-card-title">Cost Summary</div></div>
+                      </div>
+                      <div class="bm-card-body">
+                        <div class="bm-field bm-field-solo"><div class="bm-label">Parts Cost</div><div class="bm-input bm-input-filled">₱3,200.00</div></div>
+                        <div class="bm-field bm-field-solo"><div class="bm-label">Labor Cost</div><div class="bm-input bm-input-filled">₱1,500.00</div></div>
+                        <div class="bm-field bm-field-solo"><div class="bm-label">Other Cost</div><div class="bm-input bm-input-filled">₱350.00</div></div>
+                        <div class="bm-field bm-field-solo"><div class="bm-label">Deductible</div><div class="bm-input bm-input-filled">₱500.00</div></div>
+                        <div class="bm-total-row"><span>Total</span><span>₱4,550.00</span></div>
+                      </div>
+                      <div class="bm-footer">
+                        <div class="bm-btn-primary"><?= icon('receipt', 10) ?> Save Billing</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
+
     </div>
   </div>
 </section>
@@ -403,6 +623,8 @@
     </div>
   </div>
 </section>
+
+</div><!-- /.bottom-combined -->
 
 <!-- FOOTER -->
 <footer>

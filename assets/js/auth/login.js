@@ -46,3 +46,53 @@ document.getElementById("pw-toggle").addEventListener("click", function () {
       clearFieldError(this);
     });
 });
+
+// ── Left panel: floating rings + mouse parallax ──
+(function () {
+  var panel = document.querySelector(".auth-left");
+  var rings = document.querySelectorAll(".auth-deco");
+  if (!panel || !rings.length) return;
+
+  var mx = 0, my = 0, lx = 0, ly = 0, hovering = false;
+  var t0 = performance.now();
+
+  // Per-ring config: [float amplitude, float speed, x-ratio, phase offset]
+  var cfg = [
+    [14, 0.00080, 0.35, 0.0],
+    [10, 0.00055, 0.45, 2.1],
+    [ 8, 0.00095, 0.30, 4.2],
+    [ 6, 0.00065, 0.50, 1.0],
+  ];
+  // Parallax depth (px shift at full mouse deflection)
+  var depth = [28, 18, 12, 36];
+
+  panel.addEventListener("mousemove", function (e) {
+    var r = panel.getBoundingClientRect();
+    mx = (e.clientX - r.left  - r.width  / 2) / (r.width  / 2);
+    my = (e.clientY - r.top   - r.height / 2) / (r.height / 2);
+    hovering = true;
+  });
+  panel.addEventListener("mouseleave", function () { hovering = false; });
+
+  function tick(now) {
+    var t  = now - t0;
+    var tx = hovering ? mx : 0;
+    var ty = hovering ? my : 0;
+    // Smooth lerp toward target
+    lx += (tx - lx) * 0.07;
+    ly += (ty - ly) * 0.07;
+
+    rings.forEach(function (ring, i) {
+      var c  = cfg[i];
+      var fy = Math.sin(t * c[1] + c[3]) * c[0];
+      var fx = Math.cos(t * c[1] * c[2] + c[3]) * (c[0] * 0.4);
+      var px = lx * depth[i];
+      var py = ly * depth[i];
+      ring.style.transform =
+        "translate(" + (fx + px).toFixed(2) + "px," + (fy + py).toFixed(2) + "px)";
+    });
+
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+})();

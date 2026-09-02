@@ -172,7 +172,7 @@ document.addEventListener('DOMContentLoaded',function(){
           <th style="text-align:center;">Service</th>
           <th style="text-align:center;">Status</th>
           <th style="text-align:right;">Total</th>
-          <th style="text-align:center;">Receipt</th>
+          <th style="text-align:center;">Statement</th>
           <th style="text-align:center;">Date</th>
           <th style="text-align:center;">Action</th>
         </tr>

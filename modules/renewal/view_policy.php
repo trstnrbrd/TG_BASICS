@@ -41,6 +41,11 @@ if (!$policy) {
     exit;
 }
 
+// Payable = total premium - commission (must match add_policy.php).
+// Installments are split against this, so balance and payment status track it too.
+$payable_amount = (float)$policy['total_premium'] - (float)$policy['markup'];
+if ($payable_amount < 0) $payable_amount = 0;
+
 // ── HANDLE DELETE ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_policy'])) {
     csrf_verify();
@@ -115,7 +120,7 @@ if ($has_installments && $_SERVER['REQUEST_METHOD'] !== 'POST') {
     } elseif (!$auto_overdue && $current_status === 'Overdue') {
         // Recalculate back to correct status
         $total_paid_check = array_sum(array_column($installments, 'amount_paid'));
-        $bal_check = (float)$policy['total_premium'] - $total_paid_check;
+        $bal_check = $payable_amount - $total_paid_check;
         $revert = $bal_check <= 0 ? 'Paid' : ($total_paid_check > 0 ? 'Partial' : 'Unpaid');
         $rv_upd = $conn->prepare("UPDATE insurance_policies SET payment_status = ? WHERE policy_id = ?");
         $rv_upd->bind_param('si', $revert, $policy_id);
@@ -238,8 +243,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
             foreach ($installments as $row) {
                 $check_total += (float)($amounts[$row['installment_no'] - 1] ?? 0);
             }
-            if ($check_total > (float)$policy['total_premium']) {
-                $pay_errors[] = 'Total amount paid (₱' . number_format($check_total, 2) . ') cannot exceed the total premium (₱' . number_format($policy['total_premium'], 2) . ').';
+            if ($check_total > $payable_amount) {
+                $pay_errors[] = 'Total amount paid (₱' . number_format($check_total, 2) . ') cannot exceed the total payable (₱' . number_format($payable_amount, 2) . ').';
                 $valid = false;
             }
         }
@@ -260,7 +265,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
                 $upd_pp->execute();
             }
 
-            $new_balance  = (float)$policy['total_premium'] - $total_paid;
+            $new_balance  = $payable_amount - $total_paid;
             $today        = date('Y-m-d');
             $due_past = 0; $paid_past = 0;
             foreach ($installments as $row) {
@@ -310,7 +315,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
 
         if (empty($pay_errors)) {
             $new_amount_paid = (float)$policy['amount_paid'] + $payment_amount;
-            $new_balance     = (float)$policy['total_premium'] - $new_amount_paid;
+            $new_balance     = $payable_amount - $new_amount_paid;
             $new_status      = ($new_balance <= 0) ? 'Paid' : 'Partial';
 
             $new_notes = $policy['notes'];
@@ -536,7 +541,7 @@ require_once '../../includes/topbar.php';
           <?php
           $breakdown = [
             ['Sum Insured',       $policy['sum_insured']],
-            ['Markup',            $policy['markup']],
+            ['Commission',        $policy['markup']],
             ['Participation Fee', $policy['participation_fee']],
           ];
           foreach ($breakdown as [$label, $amount]):
@@ -576,11 +581,11 @@ require_once '../../includes/topbar.php';
         </span>
       </div>
       <div style="padding:1.5rem;">
-        <!-- Top row: Total Premium + Amount Paid -->
+        <!-- Top row: Total Payable + Amount Paid -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
           <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1rem;text-align:center;">
-            <div style="font-size:0.62rem;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);font-weight:700;margin-bottom:0.35rem;">Total Premium</div>
-            <div style="font-size:1.2rem;font-weight:800;color:var(--text-primary);">&#8369;<?= number_format($policy['total_premium'], 2) ?></div>
+            <div style="font-size:0.62rem;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);font-weight:700;margin-bottom:0.35rem;">Total Payable</div>
+            <div style="font-size:1.2rem;font-weight:800;color:var(--text-primary);">&#8369;<?= number_format($payable_amount, 2) ?></div>
           </div>
           <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1rem;text-align:center;">
             <div style="font-size:0.62rem;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);font-weight:700;margin-bottom:0.35rem;">Amount Paid</div>

@@ -113,8 +113,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_admin) {
         $balance       = max(0, $qt['total'] - $amount_paid);
         $pay_status    = $amount_paid <= 0 ? 'unpaid' : ($balance > 0 ? 'partial' : 'paid');
 
-        // Generate receipt number: OR-YYYYMMDD-XXXX (find next unused)
-        $rc_prefix = 'OR-' . date('Ymd') . '-';
+        // Generate billing statement number: BS-YYYYMMDD-XXXX (find next unused)
+        $rc_prefix = 'BS-' . date('Ymd') . '-';
         $rc_seq_stmt = $conn->prepare("SELECT receipt_number FROM receipts WHERE receipt_number LIKE ? ORDER BY receipt_number DESC LIMIT 1");
         $rc_like = $rc_prefix . '%';
         $rc_seq_stmt->bind_param('s', $rc_like);
@@ -241,7 +241,7 @@ document.addEventListener('DOMContentLoaded',function(){
         <button type="submit" class="btn-primary" style="font-size:0.82rem;"><?= icon('check-circle', 13) ?> Mark Approved</button>
       </form>
     <?php elseif ($is_admin && $qt['status'] === 'approved' && !$qt['receipt_id']): ?>
-      <button onclick="document.getElementById('convert-modal').style.display='flex'" class="btn-primary" style="font-size:0.82rem;"><?= icon('document-text', 13) ?> Convert to Receipt</button>
+      <button onclick="document.getElementById('convert-modal').style.display='flex'" class="btn-primary" style="font-size:0.82rem;"><?= icon('document-text', 13) ?> Convert to Billing Statement</button>
     <?php endif; ?>
     <?php if ($is_admin && in_array($qt['status'], ['draft','pending_approval'])): ?>
       <form method="POST" style="display:inline;" onsubmit="return confirm('Cancel this quotation?')">
@@ -250,7 +250,7 @@ document.addEventListener('DOMContentLoaded',function(){
       </form>
     <?php endif; ?>
     <?php if ($qt['receipt_id']): ?>
-    <a href="print_receipt.php?id=<?= $qt_id ?>" target="_blank" class="btn-ghost" style="font-size:0.82rem;"><?= icon('printer', 13) ?> Print Receipt</a>
+    <a href="print_receipt.php?id=<?= $qt_id ?>" target="_blank" class="btn-ghost" style="font-size:0.82rem;"><?= icon('printer', 13) ?> Print Statement</a>
     <?php endif; ?>
     <a href="../repair/view_repair.php?id=<?= $qt['job_id'] ?>" class="btn-ghost" style="font-size:0.82rem;"><?= icon('wrench', 13) ?> View Job</a>
   </div>
@@ -369,7 +369,7 @@ document.addEventListener('DOMContentLoaded',function(){
   <div class="card-header">
     <div class="card-icon" style="background:var(--success-bg);color:var(--success);"><?= icon('document-text', 16) ?></div>
     <div>
-      <div class="card-title">E-Receipt Issued</div>
+      <div class="card-title">Billing Statement Issued</div>
       <div class="card-sub"><?= htmlspecialchars($qt['receipt_number']) ?></div>
     </div>
     <?php $pc = $pay_cfg[$qt['payment_status']] ?? ['Unknown','badge-gray']; ?>
@@ -377,7 +377,7 @@ document.addEventListener('DOMContentLoaded',function(){
   </div>
   <div style="padding:1rem 1.25rem;">
     <div class="receipt-info-grid">
-      <div class="receipt-info-row"><span class="receipt-info-label">Receipt #</span><span class="receipt-info-val"><?= htmlspecialchars($qt['receipt_number']) ?></span></div>
+      <div class="receipt-info-row"><span class="receipt-info-label">Statement #</span><span class="receipt-info-val"><?= htmlspecialchars($qt['receipt_number']) ?></span></div>
       <div class="receipt-info-row"><span class="receipt-info-label">Issued</span><span class="receipt-info-val"><?= date('F d, Y', strtotime($qt['issued_at'])) ?></span></div>
       <div class="receipt-info-row"><span class="receipt-info-label">Total</span><span class="receipt-info-val">PHP <?= number_format($qt['total'], 2) ?></span></div>
       <div class="receipt-info-row"><span class="receipt-info-label">Amount Paid</span><span class="receipt-info-val" style="color:var(--success);">PHP <?= number_format($qt['amount_paid'], 2) ?></span></div>
@@ -417,7 +417,7 @@ document.addEventListener('DOMContentLoaded',function(){
 <!-- CONVERT TO RECEIPT MODAL -->
 <div id="convert-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;align-items:center;justify-content:center;padding:1rem;">
   <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:18px;padding:1.75rem;width:100%;max-width:420px;box-shadow:var(--shadow-lg);">
-    <div style="font-size:1.05rem;font-weight:800;color:var(--text-primary);margin-bottom:0.2rem;"><?= icon('document-text', 18) ?> Convert to E-Receipt</div>
+    <div style="font-size:1.05rem;font-weight:800;color:var(--text-primary);margin-bottom:0.2rem;"><?= icon('document-text', 18) ?> Convert to Billing Statement</div>
     <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:1.25rem;">Total: <strong style="color:var(--text-primary);">PHP <?= number_format($qt['total'], 2) ?></strong></div>
     <form method="POST">
       <?= csrf_field() ?><input type="hidden" name="action" value="convert"/>
@@ -435,13 +435,13 @@ document.addEventListener('DOMContentLoaded',function(){
           </select>
         </div>
         <div class="field">
-          <label class="field-label">Receipt Notes</label>
-          <textarea name="receipt_notes" class="field-input" rows="2" placeholder="Optional notes on receipt..." style="resize:vertical;"></textarea>
+          <label class="field-label">Statement Notes</label>
+          <textarea name="receipt_notes" class="field-input" rows="2" placeholder="Optional notes on statement..." style="resize:vertical;"></textarea>
         </div>
       </div>
       <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
         <button type="button" onclick="document.getElementById('convert-modal').style.display='none'" class="btn-ghost">Cancel</button>
-        <button type="submit" class="btn-primary"><?= icon('document-text', 13) ?> Issue Receipt</button>
+        <button type="submit" class="btn-primary"><?= icon('document-text', 13) ?> Issue Billing Statement</button>
       </div>
     </form>
   </div>

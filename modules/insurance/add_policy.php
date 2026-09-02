@@ -77,9 +77,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $policy_number     = san_str($_POST['policy_number'] ?? '', MAX_POLICY_NUM);
     $coverage_type     = san_enum($_POST['coverage_type'] ?? '', ALLOWED_COVERAGE_TYPES);
     $sum_insured       = san_float($_POST['sum_insured'] ?? '');
-    $basic_premium     = san_float($_POST['basic_premium'] ?? ''); // stores markup
+    $basic_premium     = san_float($_POST['basic_premium'] ?? ''); // stores commission
     $total_premium     = san_float($_POST['total_premium'] ?? '');
-    $payable_amount    = $total_premium + $basic_premium; // total client must pay
+    $payable_amount    = $total_premium - $basic_premium; // total client must pay
     $participation_fee = san_float($_POST['participation_fee'] ?? '0');
     $policy_start      = san_str($_POST['policy_start'] ?? '', 10);
     $policy_end        = san_str($_POST['policy_end'] ?? '', 10);
@@ -104,8 +104,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif (!validate_policy_number($policy_number)) $errors[] = 'Policy number contains invalid characters.';
     if ($coverage_type === '')   $errors[] = 'Coverage type is required or invalid.';
     if ($sum_insured <= 0)       $errors[] = 'Sum insured must be a valid positive number.';
-    if ($basic_premium < 0)      $errors[] = 'Markup must be a valid number (0 or more).';
+    if ($basic_premium < 0)      $errors[] = 'Commission must be a valid number (0 or more).';
     if ($total_premium <= 0)     $errors[] = 'Total premium must be a valid positive number.';
+    if ($total_premium > 0 && $basic_premium > $total_premium)
+        $errors[] = 'Commission cannot exceed the total premium.';
     if ($policy_start === '' || !validate_date($policy_start)) $errors[] = 'Starting date is required and must be a valid date.';
     if ($policy_end === '' || !validate_date($policy_end))     $errors[] = 'Inception date is required and must be a valid date.';
     if ($policy_start !== '' && $policy_end !== '' && $policy_end <= $policy_start)
@@ -127,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Compute total paid and balance from installments
-    // Payable = total_premium + markup; installments split against payable
+    // Payable = total_premium - commission; installments split against payable
     $amount_paid = 0;
     foreach ($installment_amounts as $amt) {
         $amount_paid += (float)$amt;
@@ -205,11 +207,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $new_policy_id = $conn->insert_id;
 
             // Insert installment schedule into policy_payments
-            // Each installment = (total_premium + markup) / num_months
+            // Each installment = (total_premium - commission) / num_months
             $per_installment = round($payable_amount / $num_months, 2);
             for ($i = 0; $i < $num_months; $i++) {
                 $due_date   = date('Y-m-d', strtotime($policy_start . ' +' . $i . ' months'));
-                $amt_due    = $per_installment;
+                // Last installment absorbs the rounding remainder so the schedule
+                // sums to the payable exactly — otherwise paying in full trips the
+                // overpayment check by a few centavos and never reaches 'Paid'.
+                $amt_due    = ($payable_amount > 0 && $i === $num_months - 1)
+                    ? round($payable_amount - ($per_installment * ($num_months - 1)), 2)
+                    : $per_installment;
                 $amt_paid_i = (float)($installment_amounts[$i] ?? 0);
                 $paid_at    = $amt_paid_i > 0 ? date('Y-m-d H:i:s') : null;
                 $inst_mode  = !empty($installment_modes[$i])  ? trim($installment_modes[$i])  : null;
@@ -252,7 +259,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $uid  = $_SESSION['user_id'];
             $action = $renew_from > 0 ? 'POLICY_RENEWED' : 'POLICY_CREATED';
             $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, ?, ?)");
-            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ($renew_from > 0 ? ' renewed policy as ' : ' created policy ') . $policy_number . ' (' . $coverage_type . ') for vehicle ' . ($vehicle['plate_number'] ?? '') . ' — Payable: ₱' . number_format($payable_amount, 2) . ' (Premium: ₱' . number_format((float)$total_premium, 2) . ' + Markup: ₱' . number_format((float)$basic_premium, 2) . ').';
+            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ($renew_from > 0 ? ' renewed policy as ' : ' created policy ') . $policy_number . ' (' . $coverage_type . ') for vehicle ' . ($vehicle['plate_number'] ?? '') . ' — Payable: ₱' . number_format($payable_amount, 2) . ' (Premium: ₱' . number_format((float)$total_premium, 2) . ' − Commission: ₱' . number_format((float)$basic_premium, 2) . ').';
             $log->bind_param('iss', $uid, $action, $desc);
             $log->execute();
 
@@ -480,7 +487,7 @@ require_once '../../includes/topbar.php';
           <div class="field-section">Premium Breakdown</div>
           <div style="margin-bottom:0.75rem;">
             <div class="alert alert-info" style="margin-bottom:0;">
-              <?= icon('information-circle', 14) ?> Copy the figures from the PhilBritish policy document. The client pays Total Premium + Markup.
+              <?= icon('information-circle', 14) ?> Copy the figures from the PhilBritish policy document. The client pays Total Premium − Commission.
             </div>
           </div>
           <div class="form-grid" style="margin-bottom:1rem;">
@@ -497,16 +504,16 @@ require_once '../../includes/topbar.php';
               <span class="field-hint">Premium amount from PhilBritish.</span>
             </div>
             <div class="field">
-              <label class="field-label">Markup (PHP)</label>
-              <input type="number" step="0.01" min="0" name="basic_premium" id="markup_field" class="field-input" placeholder="0.00"
+              <label class="field-label">Commission (PHP)</label>
+              <input type="number" step="0.01" min="0" name="basic_premium" id="commission_field" class="field-input" placeholder="0.00"
                 value="<?= htmlspecialchars($_POST['basic_premium'] ?? ($renew_policy['markup'] ?? '0')) ?>"/>
-              <span class="field-hint">Additional charge on top of premium paid by client.</span>
+              <span class="field-hint">Broker commission deducted from the premium.</span>
             </div>
             <div class="field">
               <label class="field-label">Total Payable (PHP)</label>
               <input type="text" id="total_payable_display" class="field-input" placeholder="0.00" readonly
                 style="background:var(--bg-3);font-weight:700;color:var(--gold);cursor:default;"/>
-              <span class="field-hint">Total Premium + Markup — amount split into installments.</span>
+              <span class="field-hint">Total Premium − Commission — amount split into installments.</span>
             </div>
           </div>
           <div class="form-grid" style="margin-bottom:1rem;">
@@ -612,13 +619,13 @@ $footer_extra_scripts = <<<'ADDPOLICY_SCRIPT'
   (function () {
     const termsEl       = document.getElementById("payment_terms");
     const totalEl       = document.getElementById("total_premium");
-    const markupEl      = document.getElementById("markup_field");
+    const commissionEl  = document.getElementById("commission_field");
     const payableEl     = document.getElementById("total_payable_display");
     const startEl       = document.getElementById("policy_start");
     const tbody         = document.getElementById("installment-body");
     const balanceEl     = document.getElementById("balance-display");
 
-    if (!termsEl || !totalEl || !markupEl || !payableEl || !tbody) return;
+    if (!termsEl || !totalEl || !commissionEl || !payableEl || !tbody) return;
 
     const termsMap = { "1 time": 1, "3 months": 3, "4 months": 4, "6 months": 6 };
 
@@ -634,9 +641,9 @@ $footer_extra_scripts = <<<'ADDPOLICY_SCRIPT'
     }
 
     function getPayable() {
-      const total  = parseFloat(totalEl.value)  || 0;
-      const markup = parseFloat(markupEl.value) || 0;
-      return total + markup;
+      const total      = parseFloat(totalEl.value)      || 0;
+      const commission = parseFloat(commissionEl.value) || 0;
+      return total - commission;
     }
 
     function updatePayableDisplay() {
@@ -658,7 +665,10 @@ $footer_extra_scripts = <<<'ADDPOLICY_SCRIPT'
 
       for (let i = 0; i < numMonths; i++) {
         const dueDate    = addMonths(start, i);
-        const amtDue     = perInstallment;
+        // Last installment absorbs the rounding remainder — must match the PHP side
+        const amtDue     = (payable > 0 && i === numMonths - 1)
+          ? Math.round((payable - perInstallment * (numMonths - 1)) * 100) / 100
+          : perInstallment;
         const prefillAmt = 0;
         const tr        = document.createElement("tr");
         tr.dataset.idx  = i;
@@ -738,7 +748,7 @@ $footer_extra_scripts = <<<'ADDPOLICY_SCRIPT'
 
     termsEl.addEventListener("change", buildTable);
     totalEl.addEventListener("input",  buildTable);
-    markupEl.addEventListener("input", buildTable);
+    commissionEl.addEventListener("input", buildTable);
     if (startEl) {
       startEl.addEventListener("change", function() {
         const endEl = document.getElementById("policy_end");

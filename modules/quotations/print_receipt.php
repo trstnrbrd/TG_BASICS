@@ -53,7 +53,7 @@ $pay_status_labels = ['unpaid' => 'Unpaid', 'partial' => 'Partial', 'paid' => 'P
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Receipt <?= htmlspecialchars($d['receipt_number']) ?> | TG-BASICS</title>
+<title>Billing Statement <?= htmlspecialchars($d['receipt_number']) ?> | TG-BASICS</title>
 <link rel="icon" type="image/png" href="../../assets/img/tg_logo.png"/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <style>
@@ -228,7 +228,7 @@ $pay_status_labels = ['unpaid' => 'Unpaid', 'partial' => 'Partial', 'paid' => 'P
       </div>
     </div>
     <div class="receipt-title-block">
-      <div class="label">Official Receipt</div>
+      <div class="label">Billing Statement</div>
       <div class="num"><?= htmlspecialchars($d['receipt_number']) ?></div>
       <div class="date"><?= date('F d, Y', strtotime($d['issued_at'])) ?></div>
     </div>
@@ -330,7 +330,7 @@ $pay_status_labels = ['unpaid' => 'Unpaid', 'partial' => 'Partial', 'paid' => 'P
   <!-- FOOTER -->
   <div class="receipt-foot">
     <div class="note">
-      This is an official receipt issued by <strong><?= htmlspecialchars($company_name) ?></strong>.<br>
+      This is a billing statement issued by <strong><?= htmlspecialchars($company_name) ?></strong>.<br>
       Generated on <?= date('F d, Y \a\t h:i A') ?> via TG-BASICS.
     </div>
     <?php

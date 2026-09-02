@@ -249,7 +249,7 @@
 
   <div class="section-container js-reveal-container">
 
-    <!-- ACCESS LEVELS -->
+   <!-- ACCESS LEVELS -->
     <div class="rs-part js-reveal">
       <div class="section-head">
         <div class="section-label">Access Levels</div>
@@ -274,43 +274,43 @@
         </div>
         <div class="rm-row">
           <div class="rm-perm">Client &amp; Vehicle Records</div>
-          <div class="rm-cell rm-full">Full</div>
-          <div class="rm-cell rm-full">Full</div>
+          <div class="rm-cell rm-full"><?= icon('check-circle', 19) ?></div>
+          <div class="rm-cell rm-full"><?= icon('check-circle', 19) ?></div>
           <div class="rm-cell rm-none">&mdash;</div>
         </div>
         <div class="rm-row">
           <div class="rm-perm">Insurance &amp; Renewals</div>
-          <div class="rm-cell rm-full">Full</div>
-          <div class="rm-cell rm-full">Full</div>
+          <div class="rm-cell rm-full"><?= icon('check-circle', 19) ?></div>
+          <div class="rm-cell rm-full"><?= icon('check-circle', 19) ?></div>
           <div class="rm-cell rm-none">&mdash;</div>
         </div>
         <div class="rm-row">
           <div class="rm-perm">Claims Management</div>
-          <div class="rm-cell rm-full">Full</div>
-          <div class="rm-cell rm-full">Full</div>
+          <div class="rm-cell rm-full"><?= icon('check-circle', 19) ?></div>
+          <div class="rm-cell rm-full"><?= icon('check-circle', 19) ?></div>
           <div class="rm-cell rm-none">&mdash;</div>
         </div>
         <div class="rm-row">
           <div class="rm-perm">Repair Jobs</div>
-          <div class="rm-cell rm-full">Full</div>
-          <div class="rm-cell rm-full">Full</div>
-          <div class="rm-cell rm-limited">View &amp; Update</div>
+          <div class="rm-cell rm-full"><?= icon('check-circle', 19) ?></div>
+          <div class="rm-cell rm-full"><?= icon('check-circle', 19) ?></div>
+          <div class="rm-cell rm-full"><?= icon('check-circle', 19) ?></div>
         </div>
         <div class="rm-row">
           <div class="rm-perm">Billing</div>
-          <div class="rm-cell rm-full">Full</div>
-          <div class="rm-cell rm-full">Full</div>
+          <div class="rm-cell rm-full"><?= icon('check-circle', 19) ?></div>
+          <div class="rm-cell rm-full"><?= icon('check-circle', 19) ?></div>
           <div class="rm-cell rm-none">&mdash;</div>
         </div>
         <div class="rm-row">
           <div class="rm-perm">User &amp; Account Management</div>
-          <div class="rm-cell rm-full">Full</div>
+          <div class="rm-cell rm-full"><?= icon('check-circle', 19) ?></div>
           <div class="rm-cell rm-none">&mdash;</div>
           <div class="rm-cell rm-none">&mdash;</div>
         </div>
         <div class="rm-row">
           <div class="rm-perm">Audit Logs &amp; System Settings</div>
-          <div class="rm-cell rm-full">Full</div>
+          <div class="rm-cell rm-full"><?= icon('check-circle', 19) ?></div>
           <div class="rm-cell rm-none">&mdash;</div>
           <div class="rm-cell rm-none">&mdash;</div>
         </div>

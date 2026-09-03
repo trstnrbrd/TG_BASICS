@@ -1,4 +1,10 @@
 <?php
+// ── TIMEZONE ──
+// PHP has no default timezone of its own — without this, date()/time() fall
+// back to whatever the server happens to be configured with (UTC on
+// InfinityFree, which is why production timestamps were 8 hours off).
+date_default_timezone_set('Asia/Manila');
+
 // ── SECURE SESSION CONFIGURATION ──
 // Sets HttpOnly + SameSite=Strict cookie flags before session starts.
 // Included by every page instead of calling session_start() directly.

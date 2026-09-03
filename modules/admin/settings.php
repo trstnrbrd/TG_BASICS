@@ -221,7 +221,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                 $pw_upd->execute();
 
                 $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'PASSWORD_CHANGED', ?)");
-                $desc = $name . ' changed their password.';
+                $desc = $display_name . ' changed their password.';
                 $log->bind_param('is', $user_id, $desc);
                 $log->execute();
 

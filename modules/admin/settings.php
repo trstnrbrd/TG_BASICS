@@ -106,6 +106,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             $first  = san_str($_POST['first_name'] ?? '', MAX_NAME);
             $last   = san_str($_POST['last_name']  ?? '', MAX_NAME);
             $name   = trim($first . ' ' . $last);
+            // Hidden accounts keep the masked label in session/audit trail even after a
+            // profile name edit — only their real first_name/last_name columns change.
+            $display_name = !empty($_SESSION['is_hidden']) ? 'System Administrator' : $name;
             $email  = san_str($_POST['email'] ?? '', MAX_EMAIL);
             $cur_pw = san_str($_POST['current_password'] ?? '', MAX_PASSWORD);
             $new_pw = san_str($_POST['new_password'] ?? '', MAX_PASSWORD);
@@ -164,10 +167,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                 $upd = $conn->prepare("UPDATE users SET first_name = ?, last_name = ? WHERE user_id = ?");
                 $upd->bind_param('ssi', $first, $last, $user_id);
                 $upd->execute();
-                $_SESSION['full_name'] = $name;
+                $_SESSION['full_name'] = $display_name;
 
                 $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'PROFILE_UPDATED', ?)");
-                $desc = $name . ' updated their profile. Email verification sent to ' . $email . '.';
+                $desc = $display_name . ' updated their profile. Email verification sent to ' . $email . '.';
                 $log->bind_param('is', $user_id, $desc);
                 $log->execute();
 
@@ -177,10 +180,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                 $upd = $conn->prepare("UPDATE users SET first_name = ?, last_name = ?, email = ? WHERE user_id = ?");
                 $upd->bind_param('sssi', $first, $last, $email, $user_id);
                 $upd->execute();
-                $_SESSION['full_name'] = $name;
+                $_SESSION['full_name'] = $display_name;
 
                 $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'PROFILE_UPDATED', ?)");
-                $desc = $name . ' updated their profile.';
+                $desc = $display_name . ' updated their profile.';
                 $log->bind_param('is', $user_id, $desc);
                 $log->execute();
 

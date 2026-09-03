@@ -65,7 +65,8 @@ $total       = $count_stmt->get_result()->fetch_assoc()['total'];
 $total_pages = max(1, ceil($total / $per_page));
 
 // Fetch logs
-$sql  = "SELECT a.log_id, a.user_id, a.action, a.description, a.created_at, u.full_name
+$sql  = "SELECT a.log_id, a.user_id, a.action, a.description, a.created_at,
+                CASE WHEN u.is_hidden = 1 THEN 'System Administrator' ELSE u.full_name END AS full_name
          FROM audit_logs a
          LEFT JOIN users u ON a.user_id = u.user_id
          $where_clause
@@ -108,7 +109,9 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
 
     $exp_where_sql = 'WHERE ' . implode(' AND ', $exp_where);
 
-    $exp_sql  = "SELECT a.log_id, u.full_name, a.action, a.description, a.created_at
+    $exp_sql  = "SELECT a.log_id,
+                        CASE WHEN u.is_hidden = 1 THEN 'System Administrator' ELSE u.full_name END AS full_name,
+                        a.action, a.description, a.created_at
                  FROM audit_logs a
                  LEFT JOIN users u ON a.user_id = u.user_id
                  $exp_where_sql
@@ -226,7 +229,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
 }
 
 // For filter dropdowns
-$all_users   = $conn->query("SELECT user_id, full_name FROM users ORDER BY full_name ASC");
+$all_users   = $conn->query("SELECT user_id, full_name FROM users WHERE is_hidden = 0 ORDER BY full_name ASC");
 $all_actions = $conn->query("SELECT DISTINCT action FROM audit_logs ORDER BY action ASC");
 
 $page_title  = 'Activity Log';

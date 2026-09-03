@@ -66,13 +66,14 @@ $team = $conn->query("
            (last_active IS NOT NULL AND last_active >= NOW() - INTERVAL 5 MINUTE) AS is_online,
            last_active
     FROM users
-    WHERE is_active = 1
+    WHERE is_active = 1 AND is_hidden = 0
     ORDER BY FIELD(role,'super_admin','admin','mechanic'), full_name ASC
 ");
 
 // ── RECENT ACTIVITY (from audit_logs) ──
 $activity = $conn->query("
-    SELECT a.action, a.description, a.created_at, u.full_name as actor
+    SELECT a.action, a.description, a.created_at,
+           CASE WHEN u.is_hidden = 1 THEN 'System Administrator' ELSE u.full_name END AS actor
     FROM audit_logs a
     LEFT JOIN users u ON a.user_id = u.user_id
     ORDER BY a.created_at DESC

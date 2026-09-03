@@ -21,7 +21,7 @@ $stmt = $conn->prepare("
            ip.total_premium, ip.participation_fee, ip.payment_status,
            v.plate_number, v.make, v.model, v.year_model, v.color,
            v.motor_number, v.serial_number,
-           u.full_name as filed_by
+           CASE WHEN u.is_hidden = 1 THEN 'System Administrator' ELSE u.full_name END as filed_by
     FROM claims cl
     INNER JOIN clients c         ON cl.client_id  = c.client_id
     INNER JOIN insurance_policies ip ON cl.policy_id  = ip.policy_id

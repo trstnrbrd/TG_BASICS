@@ -11,14 +11,15 @@ if (!isset($_SESSION['totp_user_id'])) {
     exit;
 }
 
-$pending_uid  = $_SESSION['totp_user_id'];
-$pending_name = $_SESSION['totp_full_name'];
-$pending_role = $_SESSION['totp_role'];
-$pending_user = $_SESSION['totp_username'];
+$pending_uid    = $_SESSION['totp_user_id'];
+$pending_name   = $_SESSION['totp_full_name'];
+$pending_role   = $_SESSION['totp_role'];
+$pending_user   = $_SESSION['totp_username'];
+$pending_hidden = $_SESSION['totp_is_hidden'] ?? false;
 $error = '';
 
 if (isset($_GET['action']) && $_GET['action'] === 'cancel') {
-    unset($_SESSION['totp_user_id'], $_SESSION['totp_full_name'], $_SESSION['totp_role'], $_SESSION['totp_username']);
+    unset($_SESSION['totp_user_id'], $_SESSION['totp_full_name'], $_SESSION['totp_role'], $_SESSION['totp_username'], $_SESSION['totp_is_hidden']);
     header("Location: login.php");
     exit;
 }
@@ -80,7 +81,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $_SESSION['username']  = $pending_user;
     $_SESSION['role']      = $pending_role;
     $_SESSION['full_name'] = $pending_name;
-    unset($_SESSION['totp_user_id'], $_SESSION['totp_full_name'], $_SESSION['totp_role'], $_SESSION['totp_username']);
+    $_SESSION['is_hidden'] = $pending_hidden;
+    unset($_SESSION['totp_user_id'], $_SESSION['totp_full_name'], $_SESSION['totp_role'], $_SESSION['totp_username'], $_SESSION['totp_is_hidden']);
 
     if ($pending_role === 'mechanic') {
         header("Location: ../modules/repair/dashboard_mechanic.php");

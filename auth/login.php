@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $lockout = true;
             $error   = 'Account is locked due to too many failed attempts. Please try again later.';
         } else {
-            $stmt = $conn->prepare("SELECT user_id, username, password, role, full_name, is_active, two_factor_enabled, totp_enabled, email FROM users WHERE username = ?");
+            $stmt = $conn->prepare("SELECT user_id, username, password, role, full_name, is_active, is_hidden, two_factor_enabled, totp_enabled, email FROM users WHERE username = ?");
             $stmt->bind_param('s', $username);
             $stmt->execute();
             $user = $stmt->get_result()->fetch_assoc();
@@ -61,12 +61,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $reset->bind_param('s', $username);
                     $reset->execute();
 
+                    // Hidden accounts (developer/supervisory) never have their real name
+                    // written anywhere the app can display it — audit logs included.
+                    $display_name = !empty($user['is_hidden']) ? 'System Administrator' : $user['full_name'];
+
                     // Check if authenticator TOTP is enabled (takes priority over email 2FA)
                     if (!empty($user['totp_enabled'])) {
                         $_SESSION['totp_user_id']   = $user['user_id'];
                         $_SESSION['totp_username']  = $user['username'];
                         $_SESSION['totp_role']      = $user['role'];
-                        $_SESSION['totp_full_name'] = $user['full_name'];
+                        $_SESSION['totp_full_name'] = $display_name;
+                        $_SESSION['totp_is_hidden'] = !empty($user['is_hidden']);
                         header("Location: verify_totp.php");
                         exit;
                     }
@@ -86,15 +91,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $ins->bind_param('is', $user['user_id'], $code);
                         $ins->execute();
 
-                        // Send the code via email
+                        // Send the code via email — the OTP email is private to this account's
+                        // own inbox, so using the real name here is fine and not a display leak.
                         send2FACodeEmail($user['email'], $user['full_name'], $code);
 
                         // Store pending 2FA session
                         $_SESSION['2fa_user_id']   = $user['user_id'];
                         $_SESSION['2fa_username']  = $user['username'];
                         $_SESSION['2fa_role']      = $user['role'];
-                        $_SESSION['2fa_full_name'] = $user['full_name'];
+                        $_SESSION['2fa_full_name'] = $display_name;
                         $_SESSION['2fa_email']     = $user['email'];
+                        $_SESSION['2fa_is_hidden'] = !empty($user['is_hidden']);
 
                         header("Location: verify_2fa.php");
                         exit;
@@ -104,7 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     rate_limit_clear($conn, 'login');
                     session_regenerate_id(true);
                     $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'LOGIN', ?)");
-                    $desc = $user['full_name'] . ' logged in.';
+                    $desc = $display_name . ' logged in.';
                     $log->bind_param('is', $user['user_id'], $desc);
                     $log->execute();
 
@@ -115,7 +122,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $_SESSION['user_id']   = $user['user_id'];
                     $_SESSION['username']  = $user['username'];
                     $_SESSION['role']      = $user['role'];
-                    $_SESSION['full_name'] = $user['full_name'];
+                    $_SESSION['full_name'] = $display_name;
+                    $_SESSION['is_hidden'] = !empty($user['is_hidden']);
 
                     if ($user['role'] === 'mechanic') {
                         header("Location: ../modules/repair/dashboard_mechanic.php");

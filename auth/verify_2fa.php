@@ -13,15 +13,16 @@ if (!isset($_SESSION['2fa_user_id'])) {
     exit;
 }
 
-$pending_uid  = $_SESSION['2fa_user_id'];
-$pending_name = $_SESSION['2fa_full_name'];
-$pending_role = $_SESSION['2fa_role'];
-$pending_user = $_SESSION['2fa_username'];
+$pending_uid    = $_SESSION['2fa_user_id'];
+$pending_name   = $_SESSION['2fa_full_name'];
+$pending_role   = $_SESSION['2fa_role'];
+$pending_user   = $_SESSION['2fa_username'];
+$pending_hidden = $_SESSION['2fa_is_hidden'] ?? false;
 $error = '';
 
 // Handle cancel
 if (isset($_GET['action']) && $_GET['action'] === 'cancel') {
-    unset($_SESSION['2fa_user_id'], $_SESSION['2fa_full_name'], $_SESSION['2fa_role'], $_SESSION['2fa_username'], $_SESSION['2fa_email']);
+    unset($_SESSION['2fa_user_id'], $_SESSION['2fa_full_name'], $_SESSION['2fa_role'], $_SESSION['2fa_username'], $_SESSION['2fa_email'], $_SESSION['2fa_is_hidden']);
     header("Location: login.php");
     exit;
 }
@@ -91,9 +92,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['username']  = $pending_user;
             $_SESSION['role']      = $pending_role;
             $_SESSION['full_name'] = $pending_name;
+            $_SESSION['is_hidden'] = $pending_hidden;
 
             // Clean up 2FA session vars
-            unset($_SESSION['2fa_user_id'], $_SESSION['2fa_full_name'], $_SESSION['2fa_role'], $_SESSION['2fa_username'], $_SESSION['2fa_email']);
+            unset($_SESSION['2fa_user_id'], $_SESSION['2fa_full_name'], $_SESSION['2fa_role'], $_SESSION['2fa_username'], $_SESSION['2fa_email'], $_SESSION['2fa_is_hidden']);
 
             if ($pending_role === 'mechanic') {
                 header("Location: ../modules/repair/dashboard_mechanic.php");

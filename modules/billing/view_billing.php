@@ -18,7 +18,7 @@ function loadBilling($conn, $billing_id) {
                c.full_name, c.contact_number, c.client_id,
                v.plate_number, v.make, v.model, v.year_model,
                ip.policy_number, ip.coverage_type, ip.participation_fee,
-               u.full_name AS created_by_name
+               CASE WHEN u.is_hidden = 1 THEN 'System Administrator' ELSE u.full_name END AS created_by_name
         FROM billing b
         INNER JOIN claims cl          ON b.claim_id   = cl.claim_id
         INNER JOIN clients c          ON cl.client_id = c.client_id

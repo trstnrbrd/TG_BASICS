@@ -9,13 +9,14 @@ header('Content-Type: application/json');
 $uid = (int)($_GET['id'] ?? 0);
 if (!$uid) { echo json_encode(['ok' => false]); exit; }
 
+$own_id = (int)$_SESSION['user_id'];
 $stmt = $conn->prepare("
     SELECT user_id, full_name, username, role, email, profile_photo, last_active,
            (last_active IS NOT NULL AND last_active >= NOW() - INTERVAL 5 MINUTE) AS is_online
     FROM users
-    WHERE user_id = ? AND is_active = 1
+    WHERE user_id = ? AND is_active = 1 AND (is_hidden = 0 OR user_id = ?)
 ");
-$stmt->bind_param('i', $uid);
+$stmt->bind_param('ii', $uid, $own_id);
 $stmt->execute();
 $u = $stmt->get_result()->fetch_assoc();
 

@@ -107,12 +107,14 @@ $users = $conn->query("
     SELECT user_id, full_name, username, role, email, is_active, created_at, last_active, profile_photo,
            (last_active IS NOT NULL AND last_active >= NOW() - INTERVAL 5 MINUTE) AS is_online
     FROM users
+    WHERE is_hidden = 0
     ORDER BY FIELD(role, 'super_admin', 'admin', 'mechanic'), full_name ASC
 ");
 
 // ── LOAD RECENT AUDIT LOGS ──
 $logs = $conn->query("
-    SELECT a.log_id, a.action, a.description, a.created_at, u.full_name
+    SELECT a.log_id, a.action, a.description, a.created_at,
+           CASE WHEN u.is_hidden = 1 THEN 'System Administrator' ELSE u.full_name END AS full_name
     FROM audit_logs a
     LEFT JOIN users u ON a.user_id = u.user_id
     ORDER BY a.created_at DESC

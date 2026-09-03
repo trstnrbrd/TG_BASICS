@@ -31,7 +31,7 @@ $team = $conn->query("
     SELECT user_id, full_name, username, role, profile_photo,
            (last_active IS NOT NULL AND last_active >= NOW() - INTERVAL 5 MINUTE) AS is_online
     FROM users
-    WHERE is_active = 1
+    WHERE is_active = 1 AND is_hidden = 0
     ORDER BY FIELD(role,'super_admin','admin','mechanic'), full_name ASC
 ");
 

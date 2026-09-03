@@ -5,6 +5,18 @@
 // InfinityFree, which is why production timestamps were 8 hours off).
 date_default_timezone_set('Asia/Manila');
 
+// ── MYSQL TIMEZONE ──
+// MySQL's own NOW()/CURRENT_TIMESTAMP (used by column defaults and queries
+// across the app) run on MySQL's session timezone, which is separate from
+// PHP's and normally comes from config/db.php. That file is gitignored
+// (holds DB credentials) and never reaches production through deploy, so
+// its timezone line can silently go missing there. Setting it here instead
+// means every request that loads this file guarantees it, deployed or not.
+if (!isset($conn)) {
+    require_once __DIR__ . '/db.php';
+}
+$conn->query("SET time_zone = '+08:00'");
+
 // ── SECURE SESSION CONFIGURATION ──
 // Sets HttpOnly + SameSite=Strict cookie flags before session starts.
 // Included by every page instead of calling session_start() directly.

@@ -15,7 +15,10 @@ jobs:
       - name: FTP Deploy
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ftpupload.net
+          # Using the resolved IP instead of the hostname — GitHub's runners were
+          # failing to resolve ftpupload.net via DNS (EAI_AGAIN), even though the
+          # hostname resolves fine everywhere else. This skips that lookup entirely.
+          server: 185.27.134.11
           username: if0_41706299
           password: ${{ secrets.FTP_PASSWORD }}
           server-dir: /htdocs/TG-BASICS/

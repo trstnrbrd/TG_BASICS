@@ -1,0 +1,45 @@
+name: Deploy to InfinityFree
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  ftp-deploy:
+    name: FTP Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: FTP Deploy
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ftpupload.net
+          username: if0_41706299
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: /htdocs/TG-BASICS/
+          # Safety: never delete files that only exist on the live server
+          # (this is also the tool's default, set explicitly to be sure).
+          dangerous-clean-slate: false
+          # Excluded below, in order:
+          #   - git/CI internals that don't belong on a live server
+          #   - real credentials — never in git, so nothing to upload anyway,
+          #     listed here as a second layer of protection
+          #   - live user data that only exists on the server
+          #   - internal-only project folders not meant to be public
+          exclude: |
+            **/.git*
+            **/.git*/**
+            .github/**
+            vendor/**
+            node_modules/**
+            config/db.php
+            config/mailer.php
+            config/ocr.php
+            uploads/**
+            data_gathering (documentation)/**
+            selenium_tests/**
+            tools/**
+            tests/**
+            **/*.sql

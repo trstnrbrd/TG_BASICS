@@ -63,9 +63,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <link rel="icon" type="image/png" href="../assets/img/tg_logo.png"/>
 <link rel="apple-touch-icon" href="../assets/img/tg_logo.png"/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../assets/css/auth/auth-background.css?v=<?= filemtime(__DIR__.'/../assets/css/auth/auth-background.css') ?>"/>
 <link rel="stylesheet" href="../assets/css/auth/activate.css?v=<?= filemtime(__DIR__.'/../assets/css/auth/activate.css') ?>"/>
 </head>
 <body>
+<div class="auth-split">
+
+  <!-- LEFT: Standard auth background (no headline — login-only) -->
+  <div class="auth-left">
+    <div class="auth-left-img"></div>
+    <span class="auth-deco r1"></span>
+    <span class="auth-deco r2"></span>
+    <span class="auth-deco r3"></span>
+    <span class="auth-deco r4"></span>
+  </div>
+
+  <!-- RIGHT: Glass card -->
+  <div class="auth-right">
 <div class="wrap">
 
   <div class="brand">
@@ -160,6 +174,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
   </div>
 
+</div>
+
+  </div>
 </div>
 
 <script>

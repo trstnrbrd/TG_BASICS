@@ -100,6 +100,7 @@ render:
 <title>Authenticator Verification | TG-BASICS</title>
 <link rel="icon" type="image/png" href="../assets/img/tg_logo.png"/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../assets/css/auth/auth-background.css?v=<?= filemtime(__DIR__.'/../assets/css/auth/auth-background.css') ?>"/>
 <link rel="stylesheet" href="../assets/css/auth/activate.css?v=<?= filemtime(__DIR__.'/../assets/css/auth/activate.css') ?>"/>
 <style>
   .code-inputs { display:flex; gap:0.5rem; justify-content:center; margin-bottom:1.25rem; }
@@ -117,6 +118,19 @@ render:
 </head>
 <body>
 
+<div class="auth-split">
+
+  <!-- LEFT: Standard auth background (no headline — login-only) -->
+  <div class="auth-left">
+    <div class="auth-left-img"></div>
+    <span class="auth-deco r1"></span>
+    <span class="auth-deco r2"></span>
+    <span class="auth-deco r3"></span>
+    <span class="auth-deco r4"></span>
+  </div>
+
+  <!-- RIGHT: Glass card -->
+  <div class="auth-right">
 <div class="wrap">
   <div class="brand">
     <div class="brand-logos">
@@ -183,6 +197,9 @@ render:
       <span>Code refreshes every 30 seconds</span>
       <a href="verify_totp.php?action=cancel"><?= icon('arrow-left', 12) ?> Back to Login</a>
     </div>
+  </div>
+</div>
+
   </div>
 </div>
 

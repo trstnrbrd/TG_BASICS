@@ -133,9 +133,11 @@ function observeCounter(el, target, suffix, duration) {
   }
 
   revealGroup(".js-reveal",             24, 0);
-  revealGroup(".module-card",           28, 80);
-  revealGroup(".role-card",             24, 100);
+  revealGroup(".feat-row",              28, 0);
+  revealGroup(".sec-card",              24, 100);
   revealGroup(".tech-card",             24, 90);
+  revealGroup(".service-pillar",        24, 150);
+  revealGroup(".testimonial-card",      24, 90);
   revealGroup(".footer-inner > div",    20, 80);
   revealGroup(".js-reveal-item",        14, 0);
 })();
@@ -157,4 +159,32 @@ function observeCounter(el, target, suffix, duration) {
     el.appendChild(span);
     observeCounter(span, target, suffix, 1200);
   });
+})();
+
+// ── TESTIMONIAL CAROUSEL ──
+(function () {
+  const track = document.getElementById("testimonial-carousel");
+  const prevBtn = document.getElementById("testimonial-prev");
+  const nextBtn = document.getElementById("testimonial-next");
+  if (!track || !prevBtn || !nextBtn) return;
+
+  function cardStep() {
+    const card = track.querySelector(".testimonial-card");
+    if (!card) return track.clientWidth;
+    const style = getComputedStyle(track);
+    const gap = parseFloat(style.columnGap || style.gap) || 0;
+    return card.getBoundingClientRect().width + gap;
+  }
+
+  function updateButtons() {
+    const maxScroll = track.scrollWidth - track.clientWidth - 2;
+    prevBtn.disabled = track.scrollLeft <= 2;
+    nextBtn.disabled = maxScroll <= 2 || track.scrollLeft >= maxScroll;
+  }
+
+  prevBtn.addEventListener("click", () => track.scrollBy({ left: -cardStep(), behavior: "smooth" }));
+  nextBtn.addEventListener("click", () => track.scrollBy({ left: cardStep(), behavior: "smooth" }));
+  track.addEventListener("scroll", updateButtons, { passive: true });
+  window.addEventListener("resize", updateButtons);
+  updateButtons();
 })();

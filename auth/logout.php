@@ -34,50 +34,57 @@ $back      = ($role === 'mechanic') ? '../modules/repair/dashboard_mechanic.php'
 <link rel="icon" type="image/png" href="../assets/img/tg_logo.png"/>
 <link rel="apple-touch-icon" href="../assets/img/tg_logo.png"/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../assets/css/auth/auth-background.css?v=<?= filemtime(__DIR__.'/../assets/css/auth/auth-background.css') ?>"/>
 <link rel="stylesheet" href="../assets/css/auth/logout.css?v=<?= filemtime(__DIR__.'/../assets/css/auth/logout.css') ?>"/>
 </head>
 <body>
 
-<!-- Brand above card -->
-<div class="brand">
-  <div class="brand-logos">
-    <div class="brand-logo-ring">
-      <img src="../assets/img/tg_logo.png" alt="TG"/>
-    </div>
-    <div class="brand-logo-sep"></div>
-    <div class="brand-logo-basic">
-      <img src="../assets/img/LogoBasicCar.png" alt="Basic Car"/>
-    </div>
-  </div>
-  <div class="brand-name">TG<span>-BASICS</span></div>
-</div>
+<div class="auth-split">
 
-<div class="card">
-  <div class="card-top">
-    <div class="logout-icon-wrap"><?= icon('lock-closed', 28) ?></div>
-    <div class="card-top-title">Sign Out</div>
-    <div class="card-top-sub">Logged in as <span><?= htmlspecialchars($first) ?></span></div>
+  <!-- LEFT: Standard auth background (no headline — login-only) -->
+  <div class="auth-left">
+    <div class="auth-left-img"></div>
   </div>
 
-  <div class="card-body">
-    <p class="confirm-text">
-      Are you sure you want to sign out of <strong>TG-BASICS</strong>?
-      Your session will be ended and you will need to sign in again to continue.
-    </p>
-    <div class="btn-divider"></div>
-    <div class="btn-row">
-      <a href="<?= $back ?>" class="btn-cancel">
-        <?= icon('arrow-left', 14) ?> Stay
-      </a>
-      <form method="POST" action="logout.php" style="display:contents;">
-        <button type="submit" name="confirm_logout" class="btn-confirm">
-          <?= icon('lock-closed', 14) ?> Yes, Sign Out
-        </button>
-      </form>
+  <!-- RIGHT: Glass confirmation card -->
+  <div class="auth-right">
+    <div class="card">
+
+      <div class="auth-right-brand">
+        <a href="../" class="auth-brand-link">
+          <div class="auth-brand-logos">
+            <div class="auth-right-logo" style="background-image:url('../assets/img/tg_logo.png')"></div>
+            <div class="auth-brand-sep"></div>
+            <div class="auth-right-logo-basic" style="background-image:url('../assets/img/LogoBasicCar.png')"></div>
+          </div>
+        </a>
+        <div class="auth-right-name">TG<span>-BASICS</span></div>
+      </div>
+
+      <div class="logout-icon-wrap"><?= icon('lock-closed', 26) ?></div>
+      <div class="card-top-title">Sign Out</div>
+      <div class="card-top-sub">Logged in as <span><?= htmlspecialchars($first) ?></span></div>
+
+      <p class="confirm-text">
+        Are you sure you want to sign out of <strong>TG-BASICS</strong>?
+        Your session will be ended and you will need to sign in again to continue.
+      </p>
+      <div class="btn-divider"></div>
+      <div class="btn-row">
+        <a href="<?= $back ?>" class="btn-cancel">
+          <?= icon('arrow-left', 14) ?> Stay
+        </a>
+        <form method="POST" action="logout.php" style="display:contents;">
+          <button type="submit" name="confirm_logout" class="btn-confirm">
+            <?= icon('lock-closed', 14) ?> Yes, Sign Out
+          </button>
+        </form>
+      </div>
+
+      <div class="card-footer">TG-BASICS &mdash; Internal Use Only</div>
     </div>
   </div>
 
-  <div class="card-footer">TG-BASICS &mdash; Internal Use Only</div>
 </div>
 
 </body>

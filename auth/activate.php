@@ -55,9 +55,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user && !$user['is_active']) {
 <link rel="icon" type="image/png" href="../assets/img/tg_logo.png"/>
 <link rel="apple-touch-icon" href="../assets/img/tg_logo.png"/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../assets/css/auth/auth-background.css?v=<?= filemtime(__DIR__.'/../assets/css/auth/auth-background.css') ?>"/>
 <link rel="stylesheet" href="../assets/css/auth/activate.css?v=<?= filemtime(__DIR__.'/../assets/css/auth/activate.css') ?>"/>
 </head>
 <body>
+<div class="auth-split">
+
+  <!-- LEFT: Standard auth background (no headline — login-only) -->
+  <div class="auth-left">
+    <div class="auth-left-img"></div>
+  </div>
+
+  <!-- RIGHT: Glass card -->
+  <div class="auth-right">
 <div class="wrap">
 
   <a href="login.php" class="brand" style="text-decoration:none;">
@@ -175,6 +185,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user && !$user['is_active']) {
 
   </div>
 
+</div>
+
+  </div>
 </div>
 
 <script src="../assets/js/auth/activate.js"></script>

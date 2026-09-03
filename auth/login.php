@@ -160,6 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <link rel="icon" type="image/png" href="../assets/img/tg_logo.png"/>
 <link rel="apple-touch-icon" href="../assets/img/tg_logo.png"/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../assets/css/auth/auth-background.css?v=<?= filemtime(__DIR__.'/../assets/css/auth/auth-background.css') ?>"/>
 <link rel="stylesheet" href="../assets/css/auth/login.css?v=<?= filemtime(__DIR__.'/../assets/css/auth/login.css') ?>"/>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>

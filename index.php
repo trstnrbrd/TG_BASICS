@@ -27,6 +27,7 @@
     </div>
   </a>
   <div class="nav-links">
+    <a href="#services" class="nav-link">Services</a>
     <a href="#modules" class="nav-link">Modules</a>
     <a href="#roles" class="nav-link">Access</a>
     <a href="#security" class="nav-link">Security</a>
@@ -141,11 +142,19 @@
   </div>
 </section>
 
-<!-- SOCIAL PROOF STRIP -->
+<!-- SOCIAL PROOF / TRUST STRIP -->
 <section class="proof-section">
-  <div class="proof-inner js-reveal">
-    <div class="proof-tagline">&ldquo;Your Journey, Our Care&rdquo;</div>
-    <div class="proof-divider"></div>
+  <div class="trust-inner js-reveal">
+    <div class="section-label" style="justify-content:center;">Trusted</div>
+    <h3 class="trust-heading">&ldquo;Your Journey, Our Care.&rdquo;</h3>
+    <p class="trust-sub">PhilBritish-Accredited Broker &middot; Est. 2016</p>
+
+    <div class="trust-rule">
+      <span class="trust-rule-line"></span>
+      <span class="trust-rule-plus">+</span>
+      <span class="trust-rule-line"></span>
+    </div>
+
     <div class="proof-stats">
       <div class="proof-stat">
         <div class="proof-stat-num" id="stat-clients-root"></div>
@@ -167,213 +176,105 @@
         <div class="proof-stat-label">Years in Operation</div>
       </div>
     </div>
+
+    <div class="trust-rule">
+      <span class="trust-rule-line"></span>
+      <span class="trust-rule-plus">+</span>
+      <span class="trust-rule-line"></span>
+    </div>
   </div>
 </section>
 
-<!-- MODULES -->
-<section id="modules" class="page-section">
+<!-- SERVICES OFFERED -->
+<section id="services" class="page-section">
   <div class="section-container js-reveal-container">
     <div class="section-head js-reveal">
-      <div class="section-label">System Modules</div>
-      <h2 class="section-title">Six modules.<br><span>One platform.</span></h2>
-      <p class="section-desc">Every feature built around the actual workflow of the business, from the first inspection to the final e-receipt.</p>
+      <div class="section-label">Services Offered</div>
+      <h2 class="section-title">Two businesses.<br><span>One roof.</span></h2>
+      <p class="section-desc">TG Customworks and Basic Car Insurance operate side by side in Pandi, Bulacan &mdash; insurance brokerage and auto repair, both handled by the same team.</p>
     </div>
 
-    <div class="modules-grid">
-      <div class="module-card" data-mod="1">
-        <div class="module-num">01</div>
-        <div class="module-icon"><?= icon('users', 20) ?></div>
-        <div class="module-name">Client and Vehicle Records</div>
-        <div class="module-desc">Centralized client profiles and vehicle details in one searchable database. Find any record by name, plate number, or policy number instantly.</div>
-        <div class="module-tag">Records</div>
+    <div class="services-grid">
+      <!-- INSURANCE PILLAR -->
+      <div class="service-pillar service-pillar--insurance">
+        <div class="service-pillar-head">
+          <img src="assets/img/LogoBasicCar.png" alt="Basic Car Insurance" class="service-pillar-logo"/>
+          <div>
+            <div class="service-pillar-name">Basic Car Insurance</div>
+            <div class="service-pillar-tag">PhilBritish-Accredited Broker</div>
+          </div>
+        </div>
+        <div class="service-item">
+          <div class="service-item-icon"><?= icon('shield-check', 18) ?></div>
+          <div>
+            <div class="service-item-name">New Policy &amp; Eligibility Check</div>
+            <div class="service-item-desc">Vehicle eligibility checked against PhilBritish's 10-year coverage window before any application moves forward.</div>
+          </div>
+        </div>
+        <div class="service-item">
+          <div class="service-item-icon"><?= icon('banknotes', 18) ?></div>
+          <div>
+            <div class="service-item-name">Premium Computation &amp; Issuance</div>
+            <div class="service-item-desc">Coverage, participation fee, and total premium computed and explained before you sign anything.</div>
+          </div>
+        </div>
+        <div class="service-item">
+          <div class="service-item-icon"><?= icon('clipboard-list', 18) ?></div>
+          <div>
+            <div class="service-item-name">Claims Assistance</div>
+            <div class="service-item-desc">Document collection, submission to head office, and status updates handled from filing to resolution.</div>
+          </div>
+        </div>
+        <div class="service-item">
+          <div class="service-item-icon"><?= icon('calendar', 18) ?></div>
+          <div>
+            <div class="service-item-name">Renewal &amp; Installment Plans</div>
+            <div class="service-item-desc">Renewal reminders sent ahead of expiry, with 3, 4, or 6-month installment options on premium payments.</div>
+          </div>
+        </div>
       </div>
-      <div class="module-card" data-mod="2">
-        <div class="module-num">02</div>
-        <div class="module-icon"><?= icon('shield-check', 20) ?></div>
-        <div class="module-name">Insurance Eligibility and Policy Processing</div>
-        <div class="module-desc">Automatic 10-year eligibility check for PhilBritish coverage. Encode full policy details including premium, participation fee, and coverage type.</div>
-        <div class="module-tag">Insurance</div>
-      </div>
-      <div class="module-card" data-mod="3">
-        <div class="module-num">03</div>
-        <div class="module-icon"><?= icon('clock', 20) ?></div>
-        <div class="module-name">Policy Status and Renewal Tracker</div>
-        <div class="module-desc">Color-coded expiry dashboard. Green for stable, Yellow for expiring within 30 days, Red for urgent within 7 days. Full payment balance tracking.</div>
-        <div class="module-tag">Renewal</div>
-      </div>
-      <div class="module-card" data-mod="4">
-        <div class="module-num">04</div>
-        <div class="module-icon"><?= icon('clipboard-list', 20) ?></div>
-        <div class="module-name">Claims Document Tracker</div>
-        <div class="module-desc">Log every claim and track document completeness including OR/CR, driver's license, and damage photos. Admin manually updates status from collection to resolution.</div>
-        <div class="module-tag">Claims</div>
-      </div>
-      <div class="module-card" data-mod="5">
-        <div class="module-num">05</div>
-        <div class="module-icon"><?= icon('wrench', 20) ?></div>
-        <div class="module-name">Repair Job Management</div>
-        <div class="module-desc">Mechanic submits digital inspection checklist on arrival. Admin monitors job stages from Inspection through Repair, Paint, Curing, and Final Release.</div>
-        <div class="module-tag">Repair Shop</div>
-      </div>
-      <div class="module-card" data-mod="6">
-        <div class="module-num">06</div>
-        <div class="module-icon"><?= icon('receipt', 20) ?></div>
-        <div class="module-name">Quotation and E-Receipt Generator</div>
-        <div class="module-desc">Build quotations from the digital service catalog. Once payment is confirmed, the system converts the quotation directly into a formatted e-receipt. No double encoding.</div>
-        <div class="module-tag">Billing</div>
+
+      <!-- REPAIR PILLAR -->
+      <div class="service-pillar service-pillar--repair">
+        <div class="service-pillar-head">
+          <img src="assets/img/tg_logo.png" alt="TG Customworks" class="service-pillar-logo"/>
+          <div>
+            <div class="service-pillar-name">TG Customworks</div>
+            <div class="service-pillar-tag">Auto Repair &amp; Paint Shop</div>
+          </div>
+        </div>
+        <div class="service-item">
+          <div class="service-item-icon"><?= icon('vehicle', 18) ?></div>
+          <div>
+            <div class="service-item-name">Inspection &amp; Free Quotation</div>
+            <div class="service-item-desc">Every vehicle goes through a full external condition checklist before a no-obligation repair quotation is issued.</div>
+          </div>
+        </div>
+        <div class="service-item">
+          <div class="service-item-icon"><?= icon('swatch', 18) ?></div>
+          <div>
+            <div class="service-item-name">Dent Repair &amp; Paint</div>
+            <div class="service-item-desc">Per-panel dent repair and paint, from a single panel touch-up to a full wash over, with color-matched finishing.</div>
+          </div>
+        </div>
+        <div class="service-item">
+          <div class="service-item-icon"><?= icon('wrench', 18) ?></div>
+          <div>
+            <div class="service-item-name">Preventive Maintenance Service</div>
+            <div class="service-item-desc">Oil change, filter replacement, and brake cleaning scheduled around your vehicle's actual mileage.</div>
+          </div>
+        </div>
+        <div class="service-item">
+          <div class="service-item-icon"><?= icon('clock', 18) ?></div>
+          <div>
+            <div class="service-item-name">Real-Time Job Tracking</div>
+            <div class="service-item-desc">From inspection to final release, repair status is visible to admin and mechanic at every stage.</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </section>
-
-<!-- ROLES + SECURITY (unified container) -->
-<section id="roles" class="page-section rs-combo">
-  <span class="fl-glow fl-gw1"></span>
-  <span class="fl-glow fl-gw2"></span>
-  <span class="fl-beam fl-b1"></span>
-  <span class="fl-beam fl-b2"></span>
-  <span class="fl-beam fl-b3"></span>
-  <span class="fl-beam fl-b4"></span>
-  <span class="fl-beam fl-b5"></span>
-  <span class="fl-beam fl-b6"></span>
-  <span class="fl-corner fl-tl"></span>
-  <span class="fl-corner fl-tr"></span>
-  <span class="fl-corner fl-bl"></span>
-  <span class="fl-corner fl-br"></span>
-  <span class="fl-gem fl-g1"></span>
-  <span class="fl-gem fl-g2"></span>
-  <span class="fl-gem fl-g3"></span>
-  <span class="fl-gem fl-g4"></span>
-  <span class="fl-gem fl-g5"></span>
-  <span class="fl-gem fl-g6"></span>
-
-  <div class="section-container js-reveal-container">
-
-   <!-- ACCESS LEVELS -->
-    <div class="rs-part js-reveal">
-      <div class="section-head">
-        <div class="section-label">Access Levels</div>
-        <h2 class="section-title">The right access<br><span>for every role.</span></h2>
-        <p class="section-desc">Each user is redirected to their own dashboard after login. No self-registration. Accounts are created by the administrator.</p>
-      </div>
-      <div class="roles-matrix">
-        <div class="rm-header">
-          <div class="rm-perm-col">Module / Permission</div>
-          <div class="rm-role-col">
-            <div class="rm-role-badge"><?= icon('shield-check', 15) ?></div>
-            <div class="rm-role-name">Super Admin</div>
-          </div>
-          <div class="rm-role-col">
-            <div class="rm-role-badge"><?= icon('users', 15) ?></div>
-            <div class="rm-role-name">Admin</div>
-          </div>
-          <div class="rm-role-col">
-            <div class="rm-role-badge"><?= icon('wrench', 15) ?></div>
-            <div class="rm-role-name">Mechanic</div>
-          </div>
-        </div>
-        <div class="rm-row">
-          <div class="rm-perm">Client &amp; Vehicle Records</div>
-          <div class="rm-cell rm-full"><?= icon('check-circle', 19) ?></div>
-          <div class="rm-cell rm-full"><?= icon('check-circle', 19) ?></div>
-          <div class="rm-cell rm-none">&mdash;</div>
-        </div>
-        <div class="rm-row">
-          <div class="rm-perm">Insurance &amp; Renewals</div>
-          <div class="rm-cell rm-full"><?= icon('check-circle', 19) ?></div>
-          <div class="rm-cell rm-full"><?= icon('check-circle', 19) ?></div>
-          <div class="rm-cell rm-none">&mdash;</div>
-        </div>
-        <div class="rm-row">
-          <div class="rm-perm">Claims Management</div>
-          <div class="rm-cell rm-full"><?= icon('check-circle', 19) ?></div>
-          <div class="rm-cell rm-full"><?= icon('check-circle', 19) ?></div>
-          <div class="rm-cell rm-none">&mdash;</div>
-        </div>
-        <div class="rm-row">
-          <div class="rm-perm">Repair Jobs</div>
-          <div class="rm-cell rm-full"><?= icon('check-circle', 19) ?></div>
-          <div class="rm-cell rm-full"><?= icon('check-circle', 19) ?></div>
-          <div class="rm-cell rm-full"><?= icon('check-circle', 19) ?></div>
-        </div>
-        <div class="rm-row">
-          <div class="rm-perm">Billing</div>
-          <div class="rm-cell rm-full"><?= icon('check-circle', 19) ?></div>
-          <div class="rm-cell rm-full"><?= icon('check-circle', 19) ?></div>
-          <div class="rm-cell rm-none">&mdash;</div>
-        </div>
-        <div class="rm-row">
-          <div class="rm-perm">User &amp; Account Management</div>
-          <div class="rm-cell rm-full"><?= icon('check-circle', 19) ?></div>
-          <div class="rm-cell rm-none">&mdash;</div>
-          <div class="rm-cell rm-none">&mdash;</div>
-        </div>
-        <div class="rm-row">
-          <div class="rm-perm">Audit Logs &amp; System Settings</div>
-          <div class="rm-cell rm-full"><?= icon('check-circle', 19) ?></div>
-          <div class="rm-cell rm-none">&mdash;</div>
-          <div class="rm-cell rm-none">&mdash;</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Gold divider -->
-    <div class="rs-divider"></div>
-
-    <!-- SECURITY & TECH — anchor for nav link -->
-    <span id="security" class="rs-anchor"></span>
-    <div class="rs-part js-reveal">
-      <div class="sec-split">
-        <div class="sec-left">
-          <div class="section-label">Security &amp; Technology</div>
-          <h2 class="section-title">Built secure.<br><span>Built to last.</span></h2>
-          <p class="section-desc">Enterprise-grade security features protecting every transaction and record in the system.</p>
-        </div>
-        <div class="sec-right">
-          <div class="sec-cards-grid">
-            <div class="sec-card">
-              <div class="sec-card-top">
-                <div class="sec-card-icon"><?= icon('lock-closed', 20) ?></div>
-                <span class="sec-card-num">01</span>
-              </div>
-              <div class="sec-card-name">Two-Factor Authentication</div>
-              <p class="sec-card-desc">Email-based 2FA codes plus TOTP authenticator app support for every login with 2FA enabled.</p>
-            </div>
-            <div class="sec-card">
-              <div class="sec-card-top">
-                <div class="sec-card-icon"><?= icon('shield-check', 20) ?></div>
-                <span class="sec-card-num">02</span>
-              </div>
-              <div class="sec-card-name">Account Lockout Protection</div>
-              <p class="sec-card-desc">Automatic lockout after configurable failed attempts with IP-based rate limiting to block brute-force attacks.</p>
-            </div>
-            <div class="sec-card">
-              <div class="sec-card-top">
-                <div class="sec-card-icon"><?= icon('clipboard-list', 20) ?></div>
-                <span class="sec-card-num">03</span>
-              </div>
-              <div class="sec-card-name">Full Audit Trail</div>
-              <p class="sec-card-desc">Every login, data change, and system action logged with timestamps and user identity for full accountability.</p>
-            </div>
-            <div class="sec-card">
-              <div class="sec-card-top">
-                <div class="sec-card-icon"><?= icon('cog', 20) ?></div>
-                <span class="sec-card-num">04</span>
-              </div>
-              <div class="sec-card-name">Role-Based Access Control</div>
-              <p class="sec-card-desc">Three distinct roles with strict permission boundaries. No cross-role data access or unauthorized module entry.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-  </div>
-</section>
-
-<div class="section-bridge"></div>
-
-<div class="bottom-combined">
 
 <!-- BRAND PANEL -->
 <section class="brand-panel js-reveal">
@@ -384,6 +285,8 @@
       <div class="bp-step">
         <div class="bp-step-inner">
           <div class="bp-step-front">
+            <div class="bp-step-num">01</div>
+            <div class="bp-step-flip-hint"><?= icon('arrow-path', 12) ?></div>
             <div class="bp-step-icon"><?= icon('user-plus', 26) ?></div>
             <div class="bp-step-title">Register</div>
             <div class="bp-step-text">Client and vehicle details recorded into the central database.</div>
@@ -437,6 +340,8 @@
       <div class="bp-step">
         <div class="bp-step-inner">
           <div class="bp-step-front">
+            <div class="bp-step-num">02</div>
+            <div class="bp-step-flip-hint"><?= icon('arrow-path', 12) ?></div>
             <div class="bp-step-icon"><?= icon('document', 26) ?></div>
             <div class="bp-step-title">Insure</div>
             <div class="bp-step-text">Policy filed. OR/CR renewal and PhilBritish premium computed.</div>
@@ -486,6 +391,8 @@
       <div class="bp-step">
         <div class="bp-step-inner">
           <div class="bp-step-front">
+            <div class="bp-step-num">03</div>
+            <div class="bp-step-flip-hint"><?= icon('arrow-path', 12) ?></div>
             <div class="bp-step-icon"><?= icon('wrench', 26) ?></div>
             <div class="bp-step-title">Repair</div>
             <div class="bp-step-text">Repair job opened, assigned to mechanic, and tracked to completion.</div>
@@ -536,6 +443,8 @@
       <div class="bp-step">
         <div class="bp-step-inner">
           <div class="bp-step-front">
+            <div class="bp-step-num">04</div>
+            <div class="bp-step-flip-hint"><?= icon('arrow-path', 12) ?></div>
             <div class="bp-step-icon"><?= icon('receipt', 26) ?></div>
             <div class="bp-step-title">Settle</div>
             <div class="bp-step-text">Billing finalized, claims resolved, and records updated.</div>
@@ -607,6 +516,372 @@
   </div>
 </section>
 
+<!-- MODULES -->
+<section id="modules" class="page-section page-section--open">
+  <div class="section-open-inner js-reveal-container">
+    <div class="section-head js-reveal">
+      <div class="section-label">System Modules</div>
+      <h2 class="section-title">Six modules.<br><span>One platform.</span></h2>
+      <p class="section-desc">Every feature built around the actual workflow of the business, from the first inspection to the final e-receipt.</p>
+    </div>
+
+    <div class="feat-rows">
+      <div class="feat-rail"></div>
+
+      <!-- 01 — Client and Vehicle Records -->
+      <div class="feat-row" data-accent="1">
+        <div class="feat-visual">
+          <div class="feat-card">
+            <div class="feat-card-topbar">
+              <span class="feat-card-dot"></span><span class="feat-card-dot"></span><span class="feat-card-dot"></span>
+              <span class="feat-card-title">Client Records</span>
+            </div>
+            <div class="feat-list">
+              <div class="feat-list-row">
+                <div class="feat-list-avatar">MD</div>
+                <div class="feat-list-info">
+                  <div class="feat-list-name">Miguel Dela Cruz</div>
+                  <div class="feat-list-sub">945 RJCW &middot; 2021 Honda Civic</div>
+                </div>
+              </div>
+              <div class="feat-list-row">
+                <div class="feat-list-avatar">AS</div>
+                <div class="feat-list-info">
+                  <div class="feat-list-name">Andrea Santos</div>
+                  <div class="feat-list-sub">BCD 5678 &middot; 2019 Toyota Vios</div>
+                </div>
+              </div>
+              <div class="feat-list-row">
+                <div class="feat-list-avatar">JV</div>
+                <div class="feat-list-info">
+                  <div class="feat-list-name">Jose Villanueva</div>
+                  <div class="feat-list-sub">EFG 9012 &middot; 2020 Ford Ranger</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="feat-node"><span class="feat-node-dot"></span></div>
+        <div class="feat-text">
+          <div class="feat-num-row"><span class="feat-num">01</span><span class="feat-tag">Records</span></div>
+          <h3 class="feat-heading">Client and Vehicle Records</h3>
+          <p class="feat-desc">Centralized client profiles and vehicle details in one searchable database. Find any record by name, plate number, or policy number instantly.</p>
+        </div>
+      </div>
+
+      <!-- 02 — Insurance Eligibility and Policy Processing -->
+      <div class="feat-row feat-row--reverse" data-accent="2">
+        <div class="feat-text">
+          <div class="feat-num-row"><span class="feat-num">02</span><span class="feat-tag">Insurance</span></div>
+          <h3 class="feat-heading">Insurance Eligibility and Policy Processing</h3>
+          <p class="feat-desc">Automatic 10-year eligibility check for PhilBritish coverage, based on year model. Encode full policy details including premium, commission, and coverage type.</p>
+        </div>
+        <div class="feat-node"><span class="feat-node-dot"></span></div>
+        <div class="feat-visual">
+          <div class="feat-card">
+            <div class="feat-card-topbar">
+              <span class="feat-card-dot"></span><span class="feat-card-dot"></span><span class="feat-card-dot"></span>
+              <span class="feat-card-title">Eligibility Check</span>
+            </div>
+            <div class="feat-elig-body">
+              <div class="feat-elig-row"><span>Plate Number</span><strong>945 RJCW</strong></div>
+              <div class="feat-elig-row"><span>Year Model</span><strong>2021</strong></div>
+              <div class="feat-elig-row"><span>Vehicle Age</span><strong>5 years</strong></div>
+              <div class="feat-elig-result eligible"><?= icon('check-circle', 16) ?> Eligible for PhilBritish Coverage</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 03 — Policy Status and Renewal Tracker -->
+      <div class="feat-row" data-accent="3">
+        <div class="feat-visual">
+          <div class="feat-card">
+            <div class="feat-card-topbar">
+              <span class="feat-card-dot"></span><span class="feat-card-dot"></span><span class="feat-card-dot"></span>
+              <span class="feat-card-title">Renewal Tracker</span>
+            </div>
+            <div class="feat-policy-list">
+              <div class="feat-policy-row">
+                <div><div class="feat-policy-plate">AAB 1234</div><div class="feat-policy-sub">Expires Dec 10, 2026</div></div>
+                <span class="feat-badge green">Stable</span>
+              </div>
+              <div class="feat-policy-row">
+                <div><div class="feat-policy-plate">BCD 5678</div><div class="feat-policy-sub">Expires in 24 days</div></div>
+                <span class="feat-badge yellow">Expiring</span>
+              </div>
+              <div class="feat-policy-row">
+                <div><div class="feat-policy-plate">EFG 9012</div><div class="feat-policy-sub">Expires in 4 days</div></div>
+                <span class="feat-badge red">Urgent</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="feat-node"><span class="feat-node-dot"></span></div>
+        <div class="feat-text">
+          <div class="feat-num-row"><span class="feat-num">03</span><span class="feat-tag">Renewal</span></div>
+          <h3 class="feat-heading">Policy Status and Renewal Tracker</h3>
+          <p class="feat-desc">Color-coded expiry dashboard. Green for stable, yellow for expiring within 30 days, red for urgent within 7 days. Full payment balance tracking.</p>
+        </div>
+      </div>
+
+      <!-- 04 — Claims Document Tracker -->
+      <div class="feat-row feat-row--reverse" data-accent="4">
+        <div class="feat-text">
+          <div class="feat-num-row"><span class="feat-num">04</span><span class="feat-tag">Claims</span></div>
+          <h3 class="feat-heading">Claims Document Tracker</h3>
+          <p class="feat-desc">Log every claim and track document completeness &mdash; policy, OR/CR, driver&rsquo;s license, and damage photos. Admin manually updates status from collection to resolution.</p>
+        </div>
+        <div class="feat-node"><span class="feat-node-dot"></span></div>
+        <div class="feat-visual">
+          <div class="feat-card">
+            <div class="feat-card-topbar">
+              <span class="feat-card-dot"></span><span class="feat-card-dot"></span><span class="feat-card-dot"></span>
+              <span class="feat-card-title">Document Checklist</span>
+            </div>
+            <div class="feat-checklist">
+              <div class="feat-check-item checked"><span class="feat-check-box"><?= icon('check', 12) ?></span>Insurance Policy</div>
+              <div class="feat-check-item checked"><span class="feat-check-box"><?= icon('check', 12) ?></span>OR / CR</div>
+              <div class="feat-check-item checked"><span class="feat-check-box"><?= icon('check', 12) ?></span>Driver&rsquo;s License</div>
+              <div class="feat-check-item"><span class="feat-check-box"></span>Damage Photos</div>
+            </div>
+            <div class="feat-check-progress"><div class="feat-check-bar" style="width:75%"></div></div>
+            <div class="feat-check-label">3 of 4 documents received</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 05 — Repair Job Management -->
+      <div class="feat-row" data-accent="5">
+        <div class="feat-visual">
+          <div class="feat-card">
+            <div class="feat-card-topbar">
+              <span class="feat-card-dot"></span><span class="feat-card-dot"></span><span class="feat-card-dot"></span>
+              <span class="feat-card-title">Repair Jobs</span>
+            </div>
+            <div class="feat-policy-list">
+              <div class="feat-policy-row">
+                <div><div class="feat-policy-plate">RJ-0231</div><div class="feat-policy-sub">2021 Honda Civic</div></div>
+                <span class="feat-badge blue">In Progress</span>
+              </div>
+              <div class="feat-policy-row">
+                <div><div class="feat-policy-plate">RJ-0232</div><div class="feat-policy-sub">2019 Toyota Vios</div></div>
+                <span class="feat-badge gold">For Pickup</span>
+              </div>
+              <div class="feat-policy-row">
+                <div><div class="feat-policy-plate">RJ-0233</div><div class="feat-policy-sub">2020 Ford Ranger</div></div>
+                <span class="feat-badge yellow">Pending</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="feat-node"><span class="feat-node-dot"></span></div>
+        <div class="feat-text">
+          <div class="feat-num-row"><span class="feat-num">05</span><span class="feat-tag">Repair Shop</span></div>
+          <h3 class="feat-heading">Repair Job Management</h3>
+          <p class="feat-desc">Mechanic submits a digital inspection checklist on arrival. Admin monitors job stages from Pending through In Progress, For Pickup, and Completed.</p>
+        </div>
+      </div>
+
+      <!-- 06 — Quotation and E-Receipt Generator -->
+      <div class="feat-row feat-row--reverse" data-accent="6">
+        <div class="feat-text">
+          <div class="feat-num-row"><span class="feat-num">06</span><span class="feat-tag">Billing</span></div>
+          <h3 class="feat-heading">Quotation and E-Receipt Generator</h3>
+          <p class="feat-desc">Build quotations from the digital service catalog. Once payment is confirmed, the system converts the quotation directly into a formatted e-receipt &mdash; no double encoding.</p>
+        </div>
+        <div class="feat-node"><span class="feat-node-dot"></span></div>
+        <div class="feat-visual">
+          <div class="feat-card">
+            <div class="feat-card-topbar">
+              <span class="feat-card-dot"></span><span class="feat-card-dot"></span><span class="feat-card-dot"></span>
+              <span class="feat-card-title">Quotation Q-20260902-0001</span>
+            </div>
+            <div class="feat-receipt-body">
+              <div class="feat-receipt-row"><span>Minor Scratch Repair &mdash; Front Door</span><strong>PHP 3,500.00</strong></div>
+              <div class="feat-receipt-row"><span>Paint</span><strong>PHP 2,000.00</strong></div>
+              <div class="feat-receipt-total"><span>Total</span><strong>PHP 5,500.00</strong></div>
+            </div>
+            <div class="feat-receipt-stamp">PAID</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+<!-- ACCESS LEVELS -->
+<section id="roles" class="page-section">
+  <div class="section-container js-reveal-container">
+    <div class="section-head js-reveal">
+      <div class="section-label">Access Levels</div>
+      <h2 class="section-title">The right access<br><span>for every role.</span></h2>
+      <p class="section-desc">Each user is redirected to their own dashboard after login. No self-registration. Accounts are created by the administrator.</p>
+    </div>
+    <div class="roles-matrix js-reveal-item">
+      <div class="rm-header">
+        <div class="rm-perm-col">Module / Permission</div>
+        <div class="rm-role-col">
+          <div class="rm-role-badge"><?= icon('shield-check', 15) ?></div>
+          <div class="rm-role-name">Super Admin</div>
+        </div>
+        <div class="rm-role-col">
+          <div class="rm-role-badge"><?= icon('users', 15) ?></div>
+          <div class="rm-role-name">Admin</div>
+        </div>
+        <div class="rm-role-col">
+          <div class="rm-role-badge"><?= icon('wrench', 15) ?></div>
+          <div class="rm-role-name">Mechanic</div>
+        </div>
+      </div>
+      <div class="rm-row">
+        <div class="rm-perm">Client &amp; Vehicle Records</div>
+        <div class="rm-cell"><span class="rm-dot rm-full"><?= icon('check', 12) ?></span></div>
+        <div class="rm-cell"><span class="rm-dot rm-full"><?= icon('check', 12) ?></span></div>
+        <div class="rm-cell"><span class="rm-dot rm-none"></span></div>
+      </div>
+      <div class="rm-row">
+        <div class="rm-perm">Insurance &amp; Renewals</div>
+        <div class="rm-cell"><span class="rm-dot rm-full"><?= icon('check', 12) ?></span></div>
+        <div class="rm-cell"><span class="rm-dot rm-full"><?= icon('check', 12) ?></span></div>
+        <div class="rm-cell"><span class="rm-dot rm-none"></span></div>
+      </div>
+      <div class="rm-row">
+        <div class="rm-perm">Claims Management</div>
+        <div class="rm-cell"><span class="rm-dot rm-full"><?= icon('check', 12) ?></span></div>
+        <div class="rm-cell"><span class="rm-dot rm-full"><?= icon('check', 12) ?></span></div>
+        <div class="rm-cell"><span class="rm-dot rm-none"></span></div>
+      </div>
+      <div class="rm-row">
+        <div class="rm-perm">Repair Jobs</div>
+        <div class="rm-cell"><span class="rm-dot rm-full"><?= icon('check', 12) ?></span></div>
+        <div class="rm-cell"><span class="rm-dot rm-full"><?= icon('check', 12) ?></span></div>
+        <div class="rm-cell"><span class="rm-dot rm-full"><?= icon('check', 12) ?></span></div>
+      </div>
+      <div class="rm-row">
+        <div class="rm-perm">Billing</div>
+        <div class="rm-cell"><span class="rm-dot rm-full"><?= icon('check', 12) ?></span></div>
+        <div class="rm-cell"><span class="rm-dot rm-full"><?= icon('check', 12) ?></span></div>
+        <div class="rm-cell"><span class="rm-dot rm-none"></span></div>
+      </div>
+      <div class="rm-row">
+        <div class="rm-perm">User &amp; Account Management</div>
+        <div class="rm-cell"><span class="rm-dot rm-full"><?= icon('check', 12) ?></span></div>
+        <div class="rm-cell"><span class="rm-dot rm-none"></span></div>
+        <div class="rm-cell"><span class="rm-dot rm-none"></span></div>
+      </div>
+      <div class="rm-row">
+        <div class="rm-perm">Audit Logs &amp; System Settings</div>
+        <div class="rm-cell"><span class="rm-dot rm-full"><?= icon('check', 12) ?></span></div>
+        <div class="rm-cell"><span class="rm-dot rm-none"></span></div>
+        <div class="rm-cell"><span class="rm-dot rm-none"></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SECURITY & TECHNOLOGY -->
+<section id="security" class="page-section">
+  <div class="section-container js-reveal-container">
+    <div class="section-head js-reveal">
+      <div class="section-label">Security &amp; Technology</div>
+      <h2 class="section-title">Built secure.<br><span>Built to last.</span></h2>
+      <p class="section-desc">Enterprise-grade security features protecting every transaction and record in the system.</p>
+    </div>
+    <div class="sec-cards-grid">
+      <div class="sec-card" data-accent="1">
+        <div class="sec-card-top">
+          <div class="sec-card-icon"><?= icon('lock-closed', 20) ?></div>
+          <span class="sec-card-num">01</span>
+        </div>
+        <div class="sec-card-name">Two-Factor Authentication</div>
+        <p class="sec-card-desc">Email-based 2FA codes plus TOTP authenticator app support for every login with 2FA enabled.</p>
+      </div>
+      <div class="sec-card" data-accent="2">
+        <div class="sec-card-top">
+          <div class="sec-card-icon"><?= icon('shield-check', 20) ?></div>
+          <span class="sec-card-num">02</span>
+        </div>
+        <div class="sec-card-name">Account Lockout Protection</div>
+        <p class="sec-card-desc">Automatic lockout after configurable failed attempts with IP-based rate limiting to block brute-force attacks.</p>
+      </div>
+      <div class="sec-card" data-accent="3">
+        <div class="sec-card-top">
+          <div class="sec-card-icon"><?= icon('clipboard-list', 20) ?></div>
+          <span class="sec-card-num">03</span>
+        </div>
+        <div class="sec-card-name">Full Audit Trail</div>
+        <p class="sec-card-desc">Every login, data change, and system action logged with timestamps and user identity for full accountability.</p>
+      </div>
+      <div class="sec-card" data-accent="4">
+        <div class="sec-card-top">
+          <div class="sec-card-icon"><?= icon('cog', 20) ?></div>
+          <span class="sec-card-num">04</span>
+        </div>
+        <div class="sec-card-name">Role-Based Access Control</div>
+        <p class="sec-card-desc">Three distinct roles with strict permission boundaries. No cross-role data access or unauthorized module entry.</p>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- CLIENT TESTIMONIALS -->
+<section id="testimonials" class="page-section page-section--open">
+  <div class="section-open-inner js-reveal-container">
+    <div class="section-head js-reveal">
+      <div class="section-label">Client Testimonials</div>
+      <h2 class="section-title">What our clients<br><span>are saying.</span></h2>
+      <p class="section-desc">Feedback shared by TG Customworks and Basic Car Insurance clients, lightly rephrased for clarity.</p>
+    </div>
+
+    <?php
+    // 'year' is the review's actual posting year — the "X years ago" label is computed
+    // below so it stays correct without manual edits as time passes.
+    $testimonials = [
+      ['name' => 'Jjpot G.',         'source' => 'Facebook Review', 'year' => 2020, 'rating' => 5, 'quote' => 'Sobrang linis at maayos ang trabaho — makikita mo talaga ang kalidad sa sasakyan ko.'],
+      ['name' => 'John Jack D.',     'source' => 'Facebook Review', 'year' => 2020, 'rating' => 5, 'quote' => 'Napakagaling ng kalidad ng trabaho, mabilis pa at pulido ang resulta. Mabait din po ang may-ari, si Mr. Carpio, sa mga kliyente.'],
+      ['name' => 'Joseph Albert O.', 'source' => 'Google Review',   'year' => 2021, 'rating' => 5, 'quote' => 'The service was perfect, and the owner, Mr. Carpio, was very accommodating to his clients.'],
+      ['name' => 'John Michael A.',  'source' => 'Google Review',   'year' => 2021, 'rating' => 5, 'quote' => 'Their work is solid.'],
+      ['name' => 'Ana Katrina V.',   'source' => 'Google Review',   'year' => 2024, 'rating' => 5, 'quote' => 'Maayos ang serbisyo nila.'],
+    ];
+    $current_year = (int)date('Y');
+    foreach ($testimonials as &$t) {
+        $diff = max(0, $current_year - $t['year']);
+        $t['meta'] = $t['source'] . ' · ' . ($diff === 0 ? 'This year' : ($diff === 1 ? '1 year ago' : $diff . ' years ago'));
+    }
+    unset($t);
+    ?>
+
+    <div class="testimonial-carousel-wrap">
+      <div class="testimonial-carousel" id="testimonial-carousel">
+        <?php foreach ($testimonials as $t): ?>
+        <div class="testimonial-card<?= !empty($t['placeholder']) ? ' testimonial-card--placeholder' : '' ?>">
+          <?php if (!empty($t['placeholder'])): ?>
+          <div class="testimonial-placeholder-badge">Placeholder</div>
+          <?php endif; ?>
+          <div class="testimonial-stars">
+            <?php for ($i = 1; $i <= 5; $i++): ?>
+              <svg class="rating-star<?= $i <= $t['rating'] ? ' is-filled' : '' ?>" width="15" height="15" viewBox="0 0 20 20"><path d="M10 1.5l2.472 5.007 5.528.803-4 3.899.944 5.507L10 14.14l-4.944 2.576.944-5.507-4-3.899 5.528-.803z"/></svg>
+            <?php endfor; ?>
+          </div>
+          <p class="testimonial-quote">&ldquo;<?= htmlspecialchars($t['quote']) ?>&rdquo;</p>
+          <div class="testimonial-author">
+            <div class="testimonial-avatar"><?= strtoupper(substr(trim($t['name'], '[]'), 0, 1)) ?></div>
+            <div>
+              <div class="testimonial-name"><?= htmlspecialchars($t['name']) ?></div>
+              <div class="testimonial-meta"><?= htmlspecialchars($t['meta']) ?></div>
+            </div>
+          </div>
+        </div>
+        <?php endforeach; ?>
+      </div>
+      <div class="carousel-nav">
+        <button type="button" class="carousel-arrow" id="testimonial-prev" aria-label="Previous testimonial"><?= icon('chevron-left', 16) ?></button>
+        <button type="button" class="carousel-arrow" id="testimonial-next" aria-label="Next testimonial"><?= icon('chevron-right', 16) ?></button>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- CTA -->
 <section id="contact" class="cta-section js-reveal">
   <div class="cta-inner">
@@ -623,8 +898,6 @@
     </div>
   </div>
 </section>
-
-</div><!-- /.bottom-combined -->
 
 <!-- FOOTER -->
 <footer>

@@ -54,3 +54,4 @@ data_gathering (documentation)/MANUSCRIPT.txt
 selenium_tests/
 tools/
 tests/
+.claude/

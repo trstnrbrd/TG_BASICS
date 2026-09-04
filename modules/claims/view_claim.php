@@ -221,8 +221,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_damage_remove'])
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_send_admin_email'])) {
     header('Content-Type: application/json');
 
-    $notify_email = getSetting($conn, 'claim_notify_email', '');
-    if (!$notify_email) {
+    // Linked recipients use the user's CURRENT email (follows their account); raw entries use the stored email.
+    $notify_emails = [];
+    $cnr_res = $conn->query("
+        SELECT COALESCE(u.email, r.email) AS resolved_email
+        FROM claim_notify_recipients r
+        LEFT JOIN users u ON r.user_id = u.user_id
+        ORDER BY r.id ASC
+    ");
+    while ($cnr_row = $cnr_res->fetch_assoc()) {
+        if (!empty($cnr_row['resolved_email'])) {
+            $notify_emails[] = $cnr_row['resolved_email'];
+        }
+    }
+    if (empty($notify_emails)) {
         echo json_encode(['ok' => false, 'msg' => 'No admin email configured. Please set it in Settings.']);
         exit;
     }
@@ -277,7 +289,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_send_admin_email
     }
 
     $ok = sendClaimRequirementsEmail(
-        $notify_email,
+        $notify_emails,
         $claim['full_name'],
         $claim['policy_number'],
         $claim['plate_number'],

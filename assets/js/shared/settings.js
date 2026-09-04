@@ -54,6 +54,144 @@ document.querySelectorAll('.settings-form').forEach(form => {
     });
 });
 
+// ── Claim Notify Recipients (single field: search users or type a custom email, max 5) ──
+(function() {
+    const list    = document.getElementById('claim-notify-list');
+    const addBtn  = document.getElementById('claim-notify-add');
+    if (!list || !addBtn) return;
+    const MAX   = 5;
+    const users = window._claimNotifyUsers || [];
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+    }
+
+    function renderDropdown(row, query) {
+        const dd = row.querySelector('.claim-notify-dropdown');
+        const q  = (query || '').trim().toLowerCase().replace(/^@/, '');
+        const matches = users.filter(u =>
+            u.username.toLowerCase().includes(q) || u.label.toLowerCase().includes(q)
+        ).slice(0, 8);
+
+        if (!matches.length) {
+            dd.innerHTML = '<div style="padding:0.65rem 0.9rem;font-size:0.78rem;color:var(--text-muted);">No matching users — this will be saved as a custom email.</div>';
+        } else {
+            dd.innerHTML = matches.map(u =>
+                '<div class="claim-notify-option" data-id="' + u.id + '" data-username="' + escapeHtml(u.username) + '" ' +
+                'style="padding:0.6rem 0.9rem;font-size:0.82rem;cursor:pointer;color:var(--text-primary);">' + escapeHtml(u.label) + '</div>'
+            ).join('');
+        }
+        dd.style.display = 'block';
+    }
+
+    function hideDropdown(row) {
+        row.querySelector('.claim-notify-dropdown').style.display = 'none';
+    }
+
+    function setManual(row, value) {
+        row.querySelector('.claim-notify-uid').value   = '';
+        row.querySelector('.claim-notify-email').value = value.trim();
+    }
+
+    function selectUser(row, id, username) {
+        const input = row.querySelector('.claim-notify-input');
+        input.value = '@' + username;
+        row.querySelector('.claim-notify-uid').value   = id;
+        row.querySelector('.claim-notify-email').value = '';
+        hideDropdown(row);
+    }
+
+    function makeRow() {
+        const row = document.createElement('div');
+        row.className = 'claim-notify-row';
+        row.style.cssText = 'position:relative;display:flex;gap:0.5rem;align-items:center;';
+        row.innerHTML =
+            '<div style="position:relative;flex:1;">' +
+              '<input type="text" class="field-input claim-notify-input" autocomplete="off" placeholder="Type an email or search for a user...">' +
+              '<div class="claim-notify-dropdown" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:50;background:var(--bg-3);border:1px solid var(--border);border-radius:9px;box-shadow:var(--shadow-lg);max-height:220px;overflow-y:auto;"></div>' +
+            '</div>' +
+            '<input type="hidden" name="claim_notify_user_ids[]" class="claim-notify-uid" value="">' +
+            '<input type="hidden" name="claim_notify_emails[]" class="claim-notify-email" value="">' +
+            '<button type="button" class="btn-ghost claim-notify-remove" style="padding:0.55rem;flex-shrink:0;">' +
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+            '</button>';
+        return row;
+    }
+
+    function refreshAddBtn() {
+        addBtn.style.display = list.children.length >= MAX ? 'none' : '';
+    }
+
+    function clearRow(row) {
+        row.querySelector('.claim-notify-input').value = '';
+        row.querySelector('.claim-notify-uid').value   = '';
+        row.querySelector('.claim-notify-email').value = '';
+    }
+
+    addBtn.addEventListener('click', function() {
+        if (list.children.length >= MAX) return;
+        list.appendChild(makeRow());
+        refreshAddBtn();
+    });
+
+    // Typing → treat as a custom email + live-filter suggestions
+    list.addEventListener('input', function(e) {
+        if (!e.target.classList.contains('claim-notify-input')) return;
+        const row = e.target.closest('.claim-notify-row');
+        setManual(row, e.target.value);
+        renderDropdown(row, e.target.value);
+    });
+
+    // Focus → show suggestions
+    list.addEventListener('focusin', function(e) {
+        if (!e.target.classList.contains('claim-notify-input')) return;
+        renderDropdown(e.target.closest('.claim-notify-row'), e.target.value);
+    });
+
+    // Blur → hide suggestions shortly after (lets a click on an option register first)
+    list.addEventListener('focusout', function(e) {
+        if (!e.target.classList.contains('claim-notify-input')) return;
+        const row = e.target.closest('.claim-notify-row');
+        setTimeout(() => hideDropdown(row), 150);
+    });
+
+    // Picking a suggestion
+    list.addEventListener('mousedown', function(e) {
+        const opt = e.target.closest('.claim-notify-option');
+        if (!opt) return;
+        e.preventDefault(); // keep focus so 'focusout' doesn't fire before this handles
+        selectUser(opt.closest('.claim-notify-row'), opt.dataset.id, opt.dataset.username);
+    });
+
+    // Remove (with confirmation)
+    list.addEventListener('click', async function(e) {
+        const btn = e.target.closest('.claim-notify-remove');
+        if (!btn) return;
+        const row = btn.closest('.claim-notify-row');
+
+        const result = await Swal.fire({
+            title: 'Remove recipient?',
+            text: 'They will no longer receive claim requirement emails.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#C0392B',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, remove',
+            cancelButtonText: 'Cancel'
+        });
+        if (!result.isConfirmed) return;
+
+        if (list.children.length <= 1) {
+            clearRow(row);
+            return;
+        }
+        row.remove();
+        refreshAddBtn();
+    });
+
+    refreshAddBtn();
+})();
+
 // ── Avatar Upload ──
 const avatarInput = document.getElementById('avatar-file-input');
 if (avatarInput) {

@@ -415,8 +415,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                 setSetting($conn, $k, trim($_POST[$k] ?? ''));
             }
             // Email (simplified — no host/port/encryption)
-            foreach (['smtp_username', 'smtp_password', 'smtp_sender_name', 'smtp_sender_email', 'claim_notify_email'] as $k) {
+            foreach (['smtp_username', 'smtp_password', 'smtp_sender_name', 'smtp_sender_email'] as $k) {
                 setSetting($conn, $k, trim($_POST[$k] ?? ''));
+            }
+
+            // Claim notify recipients — each row is either a linked user_id or a raw email,
+            // aligned by index between the two submitted arrays. Replace with submitted list (max 5).
+            $cnr_user_ids = $_POST['claim_notify_user_ids'] ?? [];
+            $cnr_emails   = $_POST['claim_notify_emails']   ?? [];
+            $row_count    = max(count($cnr_user_ids), count($cnr_emails));
+
+            $new_recipients = []; // [ ['user_id' => int|null, 'email' => string|null], ... ]
+            for ($i = 0; $i < $row_count; $i++) {
+                $uid = trim($cnr_user_ids[$i] ?? '');
+                $em  = trim($cnr_emails[$i] ?? '');
+                if ($uid !== '' && ctype_digit($uid)) {
+                    $new_recipients[] = ['user_id' => (int)$uid, 'email' => null];
+                } elseif ($em !== '' && filter_var($em, FILTER_VALIDATE_EMAIL)) {
+                    $new_recipients[] = ['user_id' => null, 'email' => $em];
+                }
+                if (count($new_recipients) >= 5) break;
+            }
+
+            $conn->query("DELETE FROM claim_notify_recipients");
+            if (!empty($new_recipients)) {
+                $ins_cnr = $conn->prepare("INSERT INTO claim_notify_recipients (user_id, email) VALUES (?, ?)");
+                foreach ($new_recipients as $r) {
+                    $ins_cnr->bind_param('is', $r['user_id'], $r['email']);
+                    $ins_cnr->execute();
+                }
             }
             // Insurance
             foreach (['eligibility_max_age', 'renewal_urgent_days', 'renewal_expiring_days'] as $k) {
@@ -539,6 +566,26 @@ $pending_email = $pend_stmt->get_result()->fetch_assoc();
 
 // All system settings
 $settings = getAllSettings($conn);
+
+// Claim notify recipients (up to 5) — each is either a linked user (email follows their account)
+// or a raw typed email address.
+$claim_notify_rows = [];
+$cnr_res = $conn->query("
+    SELECT r.user_id, r.email AS raw_email, u.username, u.full_name, u.email AS user_email
+    FROM claim_notify_recipients r
+    LEFT JOIN users u ON r.user_id = u.user_id
+    ORDER BY r.id ASC
+");
+while ($cnr_row = $cnr_res->fetch_assoc()) {
+    $claim_notify_rows[] = $cnr_row;
+}
+
+// Users eligible to be picked as a linked recipient (must have an email on file)
+$claim_notify_pickable = [];
+$pick_res = $conn->query("SELECT user_id, username, full_name FROM users WHERE is_hidden = 0 AND email IS NOT NULL AND email != '' ORDER BY full_name ASC");
+while ($pick_row = $pick_res->fetch_assoc()) {
+    $claim_notify_pickable[] = $pick_row;
+}
 
 $page_title  = 'Settings';
 $active_page = 'settings';
@@ -1060,11 +1107,32 @@ require_once '../../includes/topbar.php';
                   value="<?= htmlspecialchars($settings['smtp_sender_email']) ?>"/>
                 <span class="field-hint">Email address shown in the "From" field.</span>
               </div>
-              <div class="field">
-                <label class="field-label">Claims Notify Email</label>
-                <input type="email" name="claim_notify_email" class="field-input"
-                  value="<?= htmlspecialchars($settings['claim_notify_email'] ?? '') ?>"/>
-                <span class="field-hint">Email where claim requirements updates are sent (admin / Jean Paolo).</span>
+              <div class="field span-2">
+                <label class="field-label">Claims Notify Recipients</label>
+                <div id="claim-notify-list" style="display:flex;flex-direction:column;gap:0.5rem;">
+                  <?php $cn_list = !empty($claim_notify_rows) ? $claim_notify_rows : [['user_id' => null, 'raw_email' => '', 'username' => null, 'full_name' => null]]; ?>
+                  <?php foreach ($cn_list as $cn_row):
+                    $cn_display = !empty($cn_row['user_id']) ? '@' . $cn_row['username'] : ($cn_row['raw_email'] ?? '');
+                  ?>
+                  <div class="claim-notify-row" style="position:relative;display:flex;gap:0.5rem;align-items:center;">
+                    <div style="position:relative;flex:1;">
+                      <input type="text" class="field-input claim-notify-input" autocomplete="off"
+                        placeholder="Type an email or search for a user..." value="<?= htmlspecialchars($cn_display) ?>"/>
+                      <div class="claim-notify-dropdown" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:50;background:var(--bg-3);border:1px solid var(--border);border-radius:9px;box-shadow:var(--shadow-lg);max-height:220px;overflow-y:auto;"></div>
+                    </div>
+                    <input type="hidden" name="claim_notify_user_ids[]" class="claim-notify-uid" value="<?= htmlspecialchars((string)($cn_row['user_id'] ?? '')) ?>"/>
+                    <input type="hidden" name="claim_notify_emails[]" class="claim-notify-email" value="<?= htmlspecialchars(empty($cn_row['user_id']) ? ($cn_row['raw_email'] ?? '') : '') ?>"/>
+                    <button type="button" class="btn-ghost claim-notify-remove" style="padding:0.55rem;flex-shrink:0;">
+                      <?= icon('x-mark', 14) ?>
+                    </button>
+                  </div>
+                  <?php endforeach; ?>
+                </div>
+                <button type="button" id="claim-notify-add" class="btn-ghost" style="margin-top:0.6rem;font-size:0.75rem;padding:0.4rem 0.9rem;">
+                  <?= icon('plus', 12) ?> Add Recipient
+                </button>
+                <span class="field-hint">Up to 5 people who receive claim requirement updates. Search for an existing user (their email always follows their account) or type a custom email.</span>
+                <script>window._claimNotifyUsers = <?= json_encode(array_map(fn($u) => ['id' => (int)$u['user_id'], 'username' => $u['username'], 'label' => $u['full_name'] . ' (@' . $u['username'] . ')'], $claim_notify_pickable)) ?>;</script>
               </div>
             </div>
           </div>
@@ -1207,7 +1275,7 @@ require_once '../../includes/topbar.php';
 <?php
 $footer_scripts = ''; // JS moved to assets/js/shared/settings.js
 $footer_extra_scripts = '<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>'
-    . '<script src="../../assets/js/shared/settings.js"></script>';
+    . '<script src="../../assets/js/shared/settings.js?v=' . filemtime(__DIR__ . '/../../assets/js/shared/settings.js') . '"></script>';
 /* REMOVED HEREDOC START
 // ── Tab switching ──
 document.querySelectorAll('.settings-tab-btn').forEach(tab => {

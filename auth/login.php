@@ -61,8 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $reset->bind_param('s', $username);
                     $reset->execute();
 
-                    // Hidden accounts (developer/supervisory) never have their real name
-                    // written anywhere the app can display it — audit logs included.
+                    // Hidden accounts never show their real name, even in audit logs.
                     $display_name = !empty($user['is_hidden']) ? 'System Administrator' : $user['full_name'];
 
                     // Check if authenticator TOTP is enabled (takes priority over email 2FA)
@@ -91,8 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $ins->bind_param('is', $user['user_id'], $code);
                         $ins->execute();
 
-                        // Send the code via email — the OTP email is private to this account's
-                        // own inbox, so using the real name here is fine and not a display leak.
+                        // OTP goes to the account's own inbox, so the real name here isn't a leak.
                         send2FACodeEmail($user['email'], $user['full_name'], $code);
 
                         // Store pending 2FA session

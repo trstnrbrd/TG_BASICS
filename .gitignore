@@ -50,8 +50,9 @@ database/*.sql
 
 # ── TESTS / DOCUMENTATION (internal only) ────────────────────────────────────
 data_gathering (documentation)/Full interview transcript.txt
-data_gathering (documentation)/MANUSCRIPT.txt
+data_gathering (documentation)/FT-CRD-191-00_IT_IS_Capstone_Project_Manuscript_Template(2).docx
 selenium_tests/
 tools/
 tests/
 .claude/
+CLAUDE.md

@@ -131,7 +131,7 @@ require_once '../../includes/topbar.php';
               <span style="font-weight:700;font-size:0.9rem;color:var(--text-primary);">Scan OR / CR Document</span>
               <span style="font-size:0.65rem;font-weight:700;color:var(--gold-bright);background:var(--gold-pale);border:1px solid var(--gold-bright);border-radius:6px;padding:0.1rem 0.4rem;">OCR</span>
             </div>
-            <button type="button" onclick="ocrModalClose()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0.25rem;"><?= icon('x-mark', 16) ?></button>
+            <button type="button" onclick="ocrModalClose()" aria-label="Close" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0.25rem;"><?= icon('x-mark', 16) ?></button>
           </div>
           <div style="padding:1.25rem;">
             <div id="ocr-upload-area" style="border:2px dashed var(--border);border-radius:12px;padding:1.5rem;text-align:center;cursor:pointer;transition:border-color 0.15s;" onclick="document.getElementById('ocr-file-input').click()">

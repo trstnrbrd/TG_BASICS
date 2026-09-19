@@ -139,7 +139,7 @@
   margin: 0 0 0 1.35rem;
   border-radius: 0 0 6px 0;
 }
-.nav-item-wrap:hover .nav-flyout {
+.nav-item-wrap:hover > .nav-flyout {
   max-height: 300px; /* tall enough for any sub-menu */
   opacity: 1;
 }
@@ -334,7 +334,7 @@ body.sidebar-collapsed .sidebar-expand-tab {
   }
 
   /* Mobile: disable hover, keep click-based accordion */
-  .nav-item-wrap:hover .nav-flyout {
+  .nav-item-wrap:hover > .nav-flyout {
     max-height: 0;
     opacity: 0;
   }
@@ -344,7 +344,7 @@ body.sidebar-collapsed .sidebar-expand-tab {
   }
 
   /* JS adds .mob-open on click */
-  .nav-item-wrap.mob-open .nav-flyout {
+  .nav-item-wrap.mob-open > .nav-flyout {
     max-height: 300px;
     opacity: 1;
   }

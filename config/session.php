@@ -9,11 +9,17 @@ if (!isset($conn)) {
 $conn->query("SET time_zone = '+08:00'");
 
 if (session_status() === PHP_SESSION_NONE) {
+    // Auto-detect HTTPS so the cookie is marked secure in production without
+    // breaking local XAMPP (plain HTTP) — checks both the direct HTTPS flag
+    // and the forwarded-proto header used by shared hosts that proxy SSL.
+    $_is_https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
+
     session_set_cookie_params([
         'lifetime' => 0,              // Cookie expires when browser closes
         'path'     => '/',
         'domain'   => '',
-        'secure'   => false,          // Set to true when deployed over HTTPS
+        'secure'   => $_is_https,     // true automatically once served over HTTPS
         'httponly' => true,           // JavaScript cannot read the session cookie
         'samesite' => 'Strict',       // Cookie not sent on cross-site requests
     ]);

@@ -2,6 +2,7 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
+require_once '../../config/settings.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
     header("Location: ../../auth/login.php");
@@ -31,8 +32,29 @@ if ($vehicle_id === 0 && $renew_policy) {
     $vehicle_id = (int)$renew_policy['vehicle_id'];
 }
 
+// Insurance company — from the Eligibility Check pick, a resubmitted form, or carried over on renewal
+$allowed_companies = ['PhilBritish', 'Alpha Insurance & Surety Company Inc.'];
+$insurance_company  = san_str($_GET['company'] ?? $_POST['insurance_company'] ?? '', 60);
+if (!in_array($insurance_company, $allowed_companies, true)) {
+    $insurance_company = $renew_policy['insurance_company'] ?? '';
+}
+
+// Per-admin scoping only applies to the fresh "new policy from Eligibility Check" path —
+// renewals stay unscoped since Renewal Tracking access is vault-gated, not ownership-gated.
+$is_scoped_admin = $_SESSION['role'] === 'admin' && $renew_from === 0;
+
+// Same as Eligibility Check: a vault-unlocked Admin has already proven elevated
+// trust, so lift the per-admin scoping here too.
+if ($is_scoped_admin) {
+    $vault_version = getSetting($conn, 'renewal_vault_updated_at', '0');
+    if (!empty($_SESSION['renewal_vault_unlocked_at']) && $_SESSION['renewal_vault_unlocked_at'] === $vault_version) {
+        $is_scoped_admin = false;
+    }
+}
+
 $vehicle = null;
 if ($vehicle_id > 0) {
+    $vp_scope_sql = $is_scoped_admin ? "AND c.created_by = ?" : '';
     $stmt = $conn->prepare("
         SELECT c.client_id, c.full_name, c.contact_number, c.address,
                v.vehicle_id, v.plate_number, v.make, v.model,
@@ -40,8 +62,13 @@ if ($vehicle_id > 0) {
         FROM vehicles v
         INNER JOIN clients c ON v.client_id = c.client_id
         WHERE v.vehicle_id = ?
+        $vp_scope_sql
     ");
-    $stmt->bind_param('i', $vehicle_id);
+    if ($is_scoped_admin) {
+        $stmt->bind_param('ii', $vehicle_id, $_SESSION['user_id']);
+    } else {
+        $stmt->bind_param('i', $vehicle_id);
+    }
     $stmt->execute();
     $vehicle = $stmt->get_result()->fetch_assoc();
 }
@@ -100,6 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $installment_ctrls   = array_map(fn($v) => san_str($v, 50), is_array($raw_ctrls) ? $raw_ctrls : []);
 
     // Validation
+    if (!in_array($insurance_company, $allowed_companies, true)) $errors[] = 'Please select which insurance company this policy is filed under.';
     if ($policy_number === '')   $errors[] = 'Policy number is required.';
     elseif (!validate_policy_number($policy_number)) $errors[] = 'Policy number contains invalid characters.';
     if ($coverage_type === '')   $errors[] = 'Coverage type is required or invalid.';
@@ -177,17 +205,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($errors)) {
         $ins = $conn->prepare("
             INSERT INTO insurance_policies (
-                client_id, vehicle_id, policy_number, coverage_type,
+                client_id, vehicle_id, policy_number, insurance_company, coverage_type,
                 sum_insured, markup, total_premium, participation_fee,
                 policy_start, policy_end, payment_terms, mortgagee, payment_status,
-                amount_paid, balance, notes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                amount_paid, balance, notes, created_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
+        $created_by = (int)$_SESSION['user_id'];
         $ins->bind_param(
-            'iissddddsssssdds',
+            'iisssddddsssssddsi',
             $vehicle['client_id'],
             $vehicle_id,
             $policy_number,
+            $insurance_company,
             $coverage_type,
             $sum_insured,
             $basic_premium,
@@ -200,7 +230,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $payment_status,
             $amount_paid,
             $balance,
-            $notes
+            $notes,
+            $created_by
         );
 
         if ($ins->execute()) {
@@ -365,7 +396,7 @@ require_once '../../includes/topbar.php';
             <span style="font-weight:700;font-size:0.9rem;color:var(--text-primary);">Scan Policy Document</span>
             <span style="font-size:0.65rem;font-weight:700;color:var(--gold-bright);background:var(--gold-pale);border:1px solid var(--gold-bright);border-radius:6px;padding:0.1rem 0.4rem;">OCR</span>
           </div>
-          <button type="button" onclick="ocrModalClose()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0.25rem;"><?= icon('x-mark', 16) ?></button>
+          <button type="button" onclick="ocrModalClose()" aria-label="Close" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0.25rem;"><?= icon('x-mark', 16) ?></button>
         </div>
         <div style="padding:1.25rem;">
           <div id="ocr-upload-area" style="border:2px dashed var(--border);border-radius:12px;padding:1.5rem;text-align:center;cursor:pointer;transition:border-color 0.15s;" onclick="document.getElementById('ocr-file-input').click()">
@@ -427,6 +458,7 @@ require_once '../../includes/topbar.php';
     <form method="POST" action="" enctype="multipart/form-data" id="policy-form" <?= !$vehicle ? 'style="display:none;"' : '' ?>>
       <?= csrf_field() ?>
       <input type="hidden" name="vehicle_id_resolved" id="vehicle-id-hidden" value="<?= $vehicle ? $vehicle['vehicle_id'] : '' ?>"/>
+      <input type="hidden" name="insurance_company" value="<?= htmlspecialchars($insurance_company) ?>"/>
       <div class="card">
         <div class="card-header">
           <div class="card-icon"><?= icon('document', 16) ?></div>
@@ -443,6 +475,12 @@ require_once '../../includes/topbar.php';
           <!-- POLICY IDENTIFICATION -->
           <div class="field-section">Policy Identification</div>
           <div class="form-grid" style="margin-bottom:1rem;">
+            <div class="field">
+              <label class="field-label">Insurance Company</label>
+              <input type="text" class="field-input" value="<?= htmlspecialchars($insurance_company) ?>" readonly
+                style="background:var(--bg-3);font-weight:700;color:var(--gold);cursor:default;"/>
+              <span class="field-hint">Selected during eligibility check — go back to change it.</span>
+            </div>
             <div class="field">
               <label class="field-label">Policy Number <span class="req">*</span></label>
               <input type="text" name="policy_number" class="field-input" placeholder="P-BLC-YY-X-XX-XXXX-XXXXXX"

@@ -28,6 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $color          = san_str($_POST['color'] ?? '', MAX_COLOR);
     $motor_number   = san_str($_POST['motor_number'] ?? '', MAX_MOTOR_SN);
     $serial_number  = san_str($_POST['serial_number'] ?? '', MAX_MOTOR_SN);
+    $consent_signed = isset($_POST['consent_signed']) && $_POST['consent_signed'] === '1';
 
     $addError = function(string $field, string $msg) use (&$errors, &$fieldErrors) {
         $errors[] = $msg;
@@ -47,6 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($year_model === 0)                          $addError('year_model', 'Year model must be a valid year (1960–' . ((int)date('Y') + 1) . ').');
     if ($motor_number === '')                       $addError('motor_number', 'Engine number is required.');
     if ($serial_number === '')                      $addError('serial_number', 'Chassis number is required.');
+    if (!$consent_signed)                           $addError('consent_signed', 'Please confirm that the client has signed the printed Data Privacy Consent Form.');
 
     if ($plate_number !== '') {
         $check = $conn->prepare("SELECT v.vehicle_id FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id WHERE v.plate_number = ? AND c.deleted_at IS NULL");
@@ -57,8 +59,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (empty($errors)) {
-        $ins_client = $conn->prepare("INSERT INTO clients (full_name, contact_number, email, address) VALUES (?, ?, ?, ?)");
-        $ins_client->bind_param('ssss', $full_name, $contact_number, $email, $address);
+        $created_by = (int)$_SESSION['user_id'];
+        $ins_client = $conn->prepare("INSERT INTO clients (full_name, contact_number, email, address, created_by, consent_signed_at, consent_recorded_by) VALUES (?, ?, ?, ?, ?, NOW(), ?)");
+        $ins_client->bind_param('ssssii', $full_name, $contact_number, $email, $address, $created_by, $created_by);
         $ins_client->execute();
         $client_id = $conn->insert_id;
 
@@ -112,7 +115,7 @@ require_once '../../includes/topbar.php';
             <span style="font-weight:700;font-size:0.9rem;color:var(--text-primary);">Scan OR / CR / Policy</span>
             <span style="font-size:0.65rem;font-weight:700;color:var(--gold-bright);background:var(--gold-pale);border:1px solid var(--gold-bright);border-radius:6px;padding:0.1rem 0.4rem;">OCR</span>
           </div>
-          <button type="button" onclick="ocrModalClose()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0.25rem;"><?= icon('x-mark', 16) ?></button>
+          <button type="button" onclick="ocrModalClose()" aria-label="Close" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0.25rem;"><?= icon('x-mark', 16) ?></button>
         </div>
         <div style="padding:1.25rem;">
           <div id="ocr-upload-area" style="border:2px dashed var(--border);border-radius:12px;padding:1.5rem;text-align:center;cursor:pointer;transition:border-color 0.15s;" onclick="document.getElementById('ocr-file-input').click()">
@@ -160,6 +163,19 @@ require_once '../../includes/topbar.php';
         </div>
       </div>
     </div>
+    <!-- PRIVACY NOTICE MODAL -->
+    <div id="privacy-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.55);backdrop-filter:blur(2px);align-items:center;justify-content:center;padding:1rem;" onclick="if(event.target===this)privacyModalClose()">
+      <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:16px;width:100%;max-width:640px;height:85vh;max-height:720px;box-shadow:var(--shadow-lg);animation:ocr-modal-in 0.18s ease;display:flex;flex-direction:column;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--border);flex-shrink:0;">
+          <div style="display:flex;align-items:center;gap:0.6rem;">
+            <span style="color:var(--gold-bright);"><?= icon('shield-check', 16) ?></span>
+            <span style="font-weight:700;font-size:0.9rem;color:var(--text-primary);">Privacy Notice</span>
+          </div>
+          <button type="button" onclick="privacyModalClose()" aria-label="Close" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0.25rem;"><?= icon('x-mark', 16) ?></button>
+        </div>
+        <iframe id="privacy-modal-iframe" src="" style="flex:1;width:100%;border:none;border-radius:0 0 16px 16px;background:#fff;"></iframe>
+      </div>
+    </div>
     <style>
     @keyframes spin { to { transform: rotate(360deg); } }
     @keyframes ocr-modal-in { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
@@ -169,6 +185,14 @@ require_once '../../includes/topbar.php';
     <script>
     function ocrModalOpen()  { var m = document.getElementById("ocr-modal"); if (m) m.style.display = "flex"; }
     function ocrModalClose() { var m = document.getElementById("ocr-modal"); if (m) m.style.display = "none"; }
+    var _privacyIframeLoaded = false;
+    function privacyModalOpen() {
+      var m = document.getElementById("privacy-modal");
+      var f = document.getElementById("privacy-modal-iframe");
+      if (f && !_privacyIframeLoaded) { f.src = "../public/privacy_notice.php"; _privacyIframeLoaded = true; }
+      if (m) m.style.display = "flex";
+    }
+    function privacyModalClose() { var m = document.getElementById("privacy-modal"); if (m) m.style.display = "none"; }
     function ocrClear() {
       var fi = document.getElementById("ocr-file-input");
       var img = document.getElementById("ocr-img");
@@ -291,6 +315,14 @@ require_once '../../includes/topbar.php';
 
           </div>
 
+          <div class="field-section">Data Privacy Consent</div>
+          <div class="field" style="margin-bottom:0;">
+            <label style="display:flex;align-items:flex-start;gap:0.6rem;cursor:pointer;font-size:0.82rem;color:var(--text-secondary);line-height:1.5;">
+              <input type="checkbox" name="consent_signed" value="1" id="consent-signed-checkbox" style="margin-top:0.2rem;width:16px;height:16px;flex-shrink:0;accent-color:var(--gold-bright);"/>
+              <span>The client has signed the printed Data Privacy Consent Form on file, authorizing TG Customworks &amp; Basic Car Insurance to collect and process their personal data in accordance with the <a href="#" onclick="event.preventDefault(); privacyModalOpen();" style="color:var(--gold-bright);font-weight:600;">Privacy Notice</a> (RA 10173). <span class="req">*</span></span>
+            </label>
+          </div>
+
         </div>
         <div class="form-actions">
           <button type="button" class="btn-ghost" id="clear-form-btn"><?= icon('x-mark', 14) ?> Clear</button>
@@ -389,6 +421,21 @@ function validateAddClientForm() {
     }
   }
 
+  var consentEl = document.getElementById('consent-signed-checkbox');
+  if (consentEl && !consentEl.checked) {
+    var consentWrap = consentEl.closest('.field');
+    if (consentWrap) {
+      var oldMsg = consentWrap.querySelector('.field-error-msg');
+      if (oldMsg) oldMsg.remove();
+      var msg = document.createElement('div');
+      msg.className = 'field-error-msg';
+      msg.innerHTML = _EXCL_ICON + '<span>Please confirm that the client has signed the printed Data Privacy Consent Form.</span>';
+      consentWrap.appendChild(msg);
+    }
+    if (!firstErrEl) firstErrEl = consentEl;
+    ok = false;
+  }
+
   if (firstErrEl) firstErrEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
   return ok;
 }
@@ -414,6 +461,8 @@ function validateAddClientForm() {
     el.addEventListener('input', function() { clearFieldError(this); });
     el.addEventListener('change', function() { clearFieldError(this); });
   });
+  var consentCb = document.getElementById('consent-signed-checkbox');
+  if (consentCb) consentCb.addEventListener('change', function() { clearFieldError(this); });
   var fileInput = document.getElementById("ocr-file-input");
   var idleEl    = document.getElementById("ocr-idle");
   var previewEl = document.getElementById("ocr-preview");
@@ -774,6 +823,8 @@ function validateAddClientForm() {
             if (el) { el.value = ""; el.classList.remove("ocr-filled"); clearFieldError(el); }
           });
           document.querySelectorAll(".ocr-filled").forEach(function(el) { el.classList.remove("ocr-filled"); });
+          var consentReset = document.getElementById("consent-signed-checkbox");
+          if (consentReset) { consentReset.checked = false; clearFieldError(consentReset); }
         }
       });
     });

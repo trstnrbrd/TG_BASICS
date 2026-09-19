@@ -106,7 +106,7 @@ require_once '../../includes/topbar.php';
     </div>
 
     <!-- REPAIR JOBS + QUICK ACTIONS -->
-    <div style="display:grid;grid-template-columns:2fr 1fr;gap:1.25rem;">
+    <div class="dash-mech-grid" style="display:grid;grid-template-columns:2fr 1fr;gap:1.25rem;">
 
       <!-- ACTIVE REPAIR JOBS -->
       <div class="card" style="margin-bottom:0;">

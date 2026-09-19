@@ -210,8 +210,8 @@ require_once '../../includes/topbar.php';
       <?php endforeach; ?>
     </div>
 
-    <!-- MAIN GRID: 3 equal columns -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;">
+    <!-- MAIN GRID: 3 equal columns (Recent Activity is Super Admin only, so Admins get 2) -->
+    <div class="dash-main-grid" style="display:grid;grid-template-columns:<?= $_SESSION['role'] === 'super_admin' ? '1fr 1fr 1fr' : '1fr 1fr' ?>;gap:1.25rem;margin-bottom:1.25rem;">
 
       <!-- COL 1: RENEWAL ALERTS -->
       <div class="card" style="margin-bottom:0;max-height:320px;overflow:hidden;display:flex;flex-direction:column;">
@@ -274,8 +274,8 @@ require_once '../../includes/topbar.php';
           $actions = [
             ['../clients/add_client.php',          'user-plus',        'Add New Client',       'Client and vehicle registration',  '#2E7D52', 'rgba(46,125,82,0.12)'],
             ['../insurance/eligibility_check.php', 'shield-check',     'New Insurance Policy', 'Check eligibility and encode',     '#1A6B9A', 'rgba(26,107,154,0.12)'],
-            ['../clients/client_list.php',         'magnifying-glass', 'Search Records',       'Find client, vehicle, or policy',  '#7B3FA0', 'rgba(123,63,160,0.12)'],
-            ['../renewal/renewal_list.php',        'clock',            'Renewal Tracking',     'View policy expiry status',        '#B8860B', 'rgba(184,134,11,0.12)'],
+            ['../renewal/renewal_list.php?company=PhilBritish', 'shield-check', 'PhilBritish', 'Renewal tracking & policy expiry', '#B8860B', 'rgba(184,134,11,0.12)'],
+            ['../renewal/renewal_list.php?company=' . urlencode('Alpha Insurance & Surety Company Inc.'), 'shield-check', 'Alpha Insurance', 'Renewal tracking & policy expiry', '#B8860B', 'rgba(184,134,11,0.12)'],
           ];
           foreach ($actions as $a): ?>
           <a href="<?= $a[0] ?>" class="quick-action">
@@ -289,7 +289,8 @@ require_once '../../includes/topbar.php';
         </div>
       </div>
 
-      <!-- COL 3: RECENT ACTIVITY -->
+      <?php if ($_SESSION['role'] === 'super_admin'): ?>
+      <!-- COL 3: RECENT ACTIVITY (Super Admin only — shows system-wide events across all staff) -->
       <div class="card" style="margin-bottom:0;max-height:320px;overflow:hidden;display:flex;flex-direction:column;">
         <div class="card-header" style="justify-content:space-between;">
           <div style="display:flex;align-items:center;gap:0.75rem;">
@@ -299,9 +300,7 @@ require_once '../../includes/topbar.php';
               <div class="card-sub">Latest system events</div>
             </div>
           </div>
-          <?php if ($_SESSION['role'] === 'super_admin'): ?>
           <a href="activity_log.php" class="btn-sm-gold">Full Log <?= icon('chevron-right', 12) ?></a>
-          <?php endif; ?>
         </div>
         <div style="overflow-y:auto;flex:1;">
         <?php if (empty($activity_items)): ?>
@@ -335,12 +334,13 @@ require_once '../../includes/topbar.php';
         <?php endif; ?>
         </div>
       </div>
+      <?php endif; ?>
 
     </div>
 
 
     <!-- CHARTS ROW: 3 equal columns -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;">
+    <div class="dash-charts-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;">
 
       <!-- Client Types PIE -->
       <div class="card" style="margin-bottom:0;">

@@ -442,7 +442,7 @@ require_once '../../includes/topbar.php';
   <div class="modal-box" style="max-width:400px;">
     <div class="modal-header">
       <div class="modal-title"><?= icon('arrow-path', 16) ?> Update Status</div>
-      <button class="modal-close" onclick="document.getElementById('status-modal').classList.remove('open')"><?= icon('x-mark', 14) ?></button>
+      <button class="modal-close" onclick="document.getElementById('status-modal').classList.remove('open')" aria-label="Close"><?= icon('x-mark', 14) ?></button>
     </div>
     <form method="POST" action="">
       <?= csrf_field() ?>

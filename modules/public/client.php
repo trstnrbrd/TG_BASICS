@@ -133,8 +133,8 @@ $svc_labels = [
 
 $company_name    = getSetting($conn, 'company_name',    'TG Customworks & Basic Car Insurance');
 $company_address = getSetting($conn, 'company_address', '49 Villa Tierra St., San Roque, Pandi, Bulacan');
-$company_phone   = getSetting($conn, 'company_phone',   '09657148314');
-$company_email   = getSetting($conn, 'company_email',   'tgcustomworks@gmail.com');
+$company_phone   = getSetting($conn, 'company_phone',   '09171453448');
+$company_email   = getSetting($conn, 'company_email',   'tgcustomworksbulacan@gmail.com');
 $fb_tg           = getSetting($conn, 'fb_tg',           'https://www.facebook.com/TGCustomworks');
 $fb_basiccar     = getSetting($conn, 'fb_basiccar',     'https://www.facebook.com/BasicCarInsurance');
 $words    = array_filter(explode(' ', $client['full_name']));
@@ -373,7 +373,10 @@ $initials = strtoupper(substr(implode('', array_map(fn($w) => $w[0], $words)), 0
           <?= htmlspecialchars($company_email) ?>
         </a>
       </div>
-      <div class="pub-footer-copy">&copy; <?= date('Y') ?> <strong><?= htmlspecialchars($company_name) ?></strong> &middot; Read-only client profile</div>
+      <div class="pub-footer-copy">
+        &copy; <?= date('Y') ?> <strong><?= htmlspecialchars($company_name) ?></strong> &middot; Read-only client profile
+        <br/><a href="privacy_notice.php" style="color:rgba(200,192,176,0.5);">Privacy Notice</a> &middot; <a href="terms.php" style="color:rgba(200,192,176,0.5);">Terms of Use</a>
+      </div>
     </div>
 
   </div>

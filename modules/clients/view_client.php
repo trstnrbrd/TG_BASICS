@@ -15,6 +15,29 @@ if ($client_id === 0) {
     exit;
 }
 
+// Admins can only open clients they personally added — Super Admin bypasses this
+if ($_SESSION['role'] === 'admin') {
+    $own_check = $conn->prepare("SELECT created_by FROM clients WHERE client_id = ?");
+    $own_check->bind_param('i', $client_id);
+    $own_check->execute();
+    $owner = $own_check->get_result()->fetch_assoc();
+    if (!$owner || (int)$owner['created_by'] !== (int)$_SESSION['user_id']) {
+        header("Location: client_list.php");
+        exit;
+    }
+}
+
+// Mechanics only see walk-in clients — insurance clients are out of scope for them
+if ($is_mechanic) {
+    $policy_check = $conn->prepare("SELECT COUNT(*) as c FROM insurance_policies WHERE client_id = ?");
+    $policy_check->bind_param('i', $client_id);
+    $policy_check->execute();
+    if ((int)$policy_check->get_result()->fetch_assoc()['c'] > 0) {
+        header("Location: client_list.php");
+        exit;
+    }
+}
+
 // Handle delete
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) {
     csrf_verify();
@@ -293,6 +316,7 @@ require_once '../../includes/topbar.php';
             ['Email',      $client['email'] ?: 'Not provided'],
             ['Address',    $client['address']],
             ['Date Added', date('F d, Y', strtotime($client['created_at']))],
+            ['Data Privacy Consent', !empty($client['consent_signed_at']) ? 'Signed — ' . date('F d, Y', strtotime($client['consent_signed_at'])) : 'Not on file'],
           ];
           foreach ($info_rows as $r): ?>
           <div style="display:flex;flex-direction:column;gap:0.12rem;min-width:0;">
@@ -307,7 +331,7 @@ require_once '../../includes/topbar.php';
           <div style="position:relative;background:#fff;padding:6px;border-radius:8px;border:1px solid var(--border);box-shadow:var(--shadow);flex-shrink:0;line-height:0;">
             <div id="qr-canvas-wrap" style="width:90px;height:90px;display:block;"></div>
             <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px #fff;">
-              <img src="<?= $base_path ?>assets/img/tg_logo.png" style="width:16px;height:16px;object-fit:contain;border-radius:50%;"/>
+              <img src="<?= $base_path ?>assets/img/tg_logo.png" alt="" style="width:16px;height:16px;object-fit:contain;border-radius:50%;"/>
             </div>
           </div>
           <div style="display:flex;flex-direction:column;gap:0.35rem;min-width:0;">
@@ -592,7 +616,7 @@ require_once '../../includes/topbar.php';
         <?php endif; ?>
       </div>
       <?php if ($policies->num_rows > 0): ?>
-      <div class="tg-table-wrap">
+      <div class="tg-table-wrap mob-card-wrap">
         <table class="tg-table mob-card mob-policy-table">
           <thead>
             <tr>
@@ -696,7 +720,7 @@ require_once '../../includes/topbar.php';
         <?php endif; ?>
       </div>
       <?php if ($claims->num_rows > 0): ?>
-      <div class="tg-table-wrap">
+      <div class="tg-table-wrap mob-card-wrap">
         <table class="tg-table mob-card mob-client-claims-table">
           <thead>
             <tr>

@@ -425,7 +425,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <?= csrf_field() ?>
             <input type="hidden" name="action" value="delete_image"/>
             <input type="hidden" name="image_id" value="<?= $img['image_id'] ?>"/>
-            <button type="button" onclick="confirmDeleteImg(this)"
+            <button type="button" onclick="confirmDeleteImg(this)" aria-label="Delete photo"
               style="background:rgba(192,57,43,0.85);border:none;border-radius:6px;padding:0.25rem 0.4rem;cursor:pointer;color:#fff;display:flex;align-items:center;">
               <?= icon('trash', 12) ?>
             </button>

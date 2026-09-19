@@ -162,7 +162,7 @@ document.addEventListener('DOMContentLoaded',function(){
   </div>
 
   <?php if ($rows->num_rows > 0): ?>
-  <div class="tg-table-wrap">
+  <div class="tg-table-wrap mob-card-wrap">
     <table class="tg-table mob-card mob-quotation-table">
       <thead>
         <tr>

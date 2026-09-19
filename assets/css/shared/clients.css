@@ -64,10 +64,10 @@
 /* ── MOBILE: switch to cards ── */
 @media (max-width: 768px) {
   .cl-mobile-list {
-    display: block;
+    display: block !important;
   }
   .cl-desktop-table {
-    display: none;
+    display: none !important;
   }
 
   /* Compact stat pills — 3-across, tiny */

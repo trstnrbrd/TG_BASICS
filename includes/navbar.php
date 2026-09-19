@@ -54,14 +54,27 @@ $dash_url = $role === 'mechanic'
         <?= $chevron ?>
       </a>
       <div class="nav-flyout">
-        <a href="<?= $base_path ?>modules/renewal/renewal_list.php"
-           class="nav-flyout-item <?= $active_page === 'renewal' ? 'active' : '' ?>">
-          <?= icon('clock', 13) ?> Renewal Tracking
-        </a>
         <a href="<?= $base_path ?>modules/insurance/eligibility_check.php"
            class="nav-flyout-item <?= $active_page === 'insurance' ? 'active' : '' ?>">
           <?= icon('shield-check', 13) ?> Eligibility &amp; Policy
         </a>
+        <div class="nav-item-wrap">
+          <a href="<?= $base_path ?>modules/renewal/renewal_list.php"
+             class="nav-flyout-item <?= $active_page === 'renewal' ? 'active' : '' ?>">
+            <?= icon('clock', 13) ?> Renewal Tracking
+            <?= $chevron ?>
+          </a>
+          <div class="nav-flyout">
+            <a href="<?= $base_path ?>modules/renewal/renewal_list.php?company=PhilBritish"
+               class="nav-flyout-item">
+              <?= icon('shield-check', 12) ?> PhilBritish
+            </a>
+            <a href="<?= $base_path ?>modules/renewal/renewal_list.php?company=<?= urlencode('Alpha Insurance & Surety Company Inc.') ?>"
+               class="nav-flyout-item">
+              <?= icon('shield-check', 12) ?> Alpha Insurance
+            </a>
+          </div>
+        </div>
       </div>
     </div>
 

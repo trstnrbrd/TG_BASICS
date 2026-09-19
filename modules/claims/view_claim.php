@@ -745,14 +745,15 @@ require_once '../../includes/topbar.php';
 
               <!-- Photo grid -->
               <div id="damage-photo-grid" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.6rem;">
-                <?php foreach ($damage_photos as $dp): ?>
+                <?php foreach ($damage_photos as $dp_i => $dp): ?>
                 <div class="dmg-photo-wrap" id="dmg-wrap-<?= $dp['photo_id'] ?>" style="position:relative;">
                   <a href="../../uploads/claims/<?= htmlspecialchars($dp['filename']) ?>" target="_blank">
                     <img src="../../uploads/claims/<?= htmlspecialchars($dp['filename']) ?>"
+                         alt="Damage evidence photo <?= $dp_i + 1 ?>"
                          style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border);display:block;"/>
                   </a>
                   <?php if (!$docs_locked): ?>
-                  <button type="button" class="dmg-remove-btn" data-id="<?= $dp['photo_id'] ?>"
+                  <button type="button" class="dmg-remove-btn" data-id="<?= $dp['photo_id'] ?>" aria-label="Remove photo"
                     style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--danger);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;line-height:1;">
                     <?= icon('x-mark',10) ?>
                   </button>

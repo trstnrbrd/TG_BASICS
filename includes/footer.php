@@ -325,7 +325,7 @@ $footer_extra_scripts  = $footer_extra_scripts  ?? '';
     var preview = document.getElementById('ep-avatar-preview');
     var removeBtn = document.getElementById('ep-avatar-remove-btn');
     if (photo) {
-      preview.innerHTML = '<img src="' + photo + '" style="width:100%;height:100%;object-fit:cover;"/>';
+      preview.innerHTML = '<img src="' + photo + '" alt="Profile photo preview" style="width:100%;height:100%;object-fit:cover;"/>';
       if (removeBtn) removeBtn.style.display = '';
     } else {
       preview.innerHTML = initials;
@@ -356,7 +356,7 @@ $footer_extra_scripts  = $footer_extra_scripts  ?? '';
     var reader = new FileReader();
     reader.onload = function(e) {
       var preview = document.getElementById('ep-avatar-preview');
-      preview.innerHTML = '<img src="' + e.target.result + '" style="width:100%;height:100%;object-fit:cover;"/>';
+      preview.innerHTML = '<img src="' + e.target.result + '" alt="Profile photo preview" style="width:100%;height:100%;object-fit:cover;"/>';
       document.getElementById('ep-avatar-remove-btn').style.display = '';
     };
     reader.readAsDataURL(file);
@@ -465,7 +465,7 @@ $footer_extra_scripts  = $footer_extra_scripts  ?? '';
       var avatar = document.querySelector('.user-avatar');
       if (avatar && root) {
         if (root.dataset.photo) {
-          avatar.innerHTML = '<img src="' + root.dataset.photo + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/>';
+          avatar.innerHTML = '<img src="' + root.dataset.photo + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/>';
         } else {
           avatar.innerHTML = root.dataset.initials || '?';
         }

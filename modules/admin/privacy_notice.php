@@ -101,7 +101,7 @@ require_once '../../includes/topbar.php';
         <!-- Section 7 -->
         <div>
           <div style="font-size:0.7rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);font-weight:700;margin-bottom:0.6rem;">7. Data Sharing</div>
-          <p>Personal data collected through TG-BASICS is <strong style="color:var(--text-primary);">not shared, sold, or disclosed</strong> to third parties except when required by law, or when necessary for the processing of insurance claims with the insuring company (PhilBritish Insurance Corporation).</p>
+          <p>Personal data collected through TG-BASICS is <strong style="color:var(--text-primary);">not shared, sold, or disclosed</strong> to third parties except when required by law, or when necessary for the processing of insurance policies and claims with the insuring company the client is enrolled under — either PhilBritish Insurance Corporation or Alpha Insurance &amp; Surety Company Inc.</p>
         </div>
 
         <!-- Section 8 -->
@@ -119,7 +119,7 @@ require_once '../../includes/topbar.php';
     </div>
 
     <div style="text-align:center;margin-top:0.5rem;margin-bottom:2rem;">
-      <a href="javascript:history.back()" class="btn-ghost" style="font-size:0.78rem;">
+      <a href="../admin/dashboard_admin.php" onclick="goBack('../admin/dashboard_admin.php'); return false;" class="btn-ghost" style="font-size:0.78rem;">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         Back
       </a>

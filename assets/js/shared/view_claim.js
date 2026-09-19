@@ -181,9 +181,9 @@ document.querySelectorAll('.dmg-file-input').forEach(function(input) {
             wrap.id = 'dmg-wrap-' + data.photo_id;
             wrap.style.position = 'relative';
             wrap.innerHTML = `<a href="${data.url}" target="_blank">
-              <img src="${data.url}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border);display:block;"/>
+              <img src="${data.url}" alt="Damage evidence photo" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border);display:block;"/>
             </a>
-            <button type="button" class="dmg-remove-btn" data-id="${data.photo_id}"
+            <button type="button" class="dmg-remove-btn" data-id="${data.photo_id}" aria-label="Remove photo"
               style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--danger);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;line-height:1;">
               ${xIcon}
             </button>`;

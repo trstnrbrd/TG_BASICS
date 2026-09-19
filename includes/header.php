@@ -486,7 +486,11 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
   .tg-table tbody td { padding: 0.8rem 1rem; font-size: 0.8rem; color: var(--text-secondary); vertical-align: middle; text-align: center; }
 
   @media (max-width: 768px) {
-    .tg-table-wrap,
+    /* .mob-card-wrap tables reflow into full-height stacked cards that scroll
+       with the page — they must NOT get this legacy height cap + inner
+       scrollbar, or the whole list gets trapped in a tiny 60vh box.
+       (:not() here, not :has(), so this works on older mobile browsers too.) */
+    .tg-table-wrap:not(.mob-card-wrap),
     .card > .tg-table,
     .card > div > .tg-table,
     .tg-table {
@@ -496,6 +500,10 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
       overflow-y: auto;
       max-height: 60vh;
       -webkit-overflow-scrolling: touch;
+    }
+    .mob-card-wrap {
+      overflow: visible !important;
+      max-height: none !important;
     }
     .tg-table thead th:last-child,
     .tg-table tbody td:last-child {
@@ -586,7 +594,8 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
     display: none;
     position: fixed;
     bottom: 0; left: 0; right: 0;
-    height: 62px;
+    height: calc(62px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
     background: var(--bg-3);
     border-top: 1px solid var(--border);
     z-index: 200;
@@ -782,7 +791,7 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
     .sidebar-overlay { display: none !important; }
     .mob-nav     { display: flex; }
     .mob-topbar  { display: flex; }
-    .content { padding: 1rem; padding-bottom: 80px; }
+    .content { padding: 1rem; padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
 
     /* Forms */
     .form-grid, .form-grid-3 { grid-template-columns: 1fr; }
@@ -1066,19 +1075,19 @@ function _mob_icon(string $name): string {
   <div class="mob-nav-inner">
     <?php foreach ($_mob_nav as $_n):
         $_active_class = ($_n['id'] === $_mob_active) ? ' active' : '';
-        $_is_btn       = in_array($_n['id'], ['more', 'profile']);
+        $_is_btn       = in_array($_n['id'], ['more', 'profile', 'policy']);
     ?>
     <?php if ($_is_btn): ?>
     <button type="button" class="mob-nav-item<?= $_active_class ?>" id="mob-nav-<?= $_n['id'] ?>-btn">
       <?= _mob_icon($_n['icon']) ?>
+      <?php if ($_n['id'] === 'policy'): ?>
+      <span id="mob-expiry-badge" class="mob-nav-badge"></span>
+      <?php endif; ?>
       <span><?= $_n['label'] ?></span>
     </button>
     <?php else: ?>
     <a href="<?= htmlspecialchars($_n['href']) ?>" class="mob-nav-item<?= $_active_class ?>">
       <?= _mob_icon($_n['icon']) ?>
-      <?php if ($_n['id'] === 'policy'): ?>
-      <span id="mob-expiry-badge" class="mob-nav-badge"></span>
-      <?php endif; ?>
       <span><?= $_n['label'] ?></span>
     </a>
     <?php endif; ?>
@@ -1134,6 +1143,42 @@ function _mob_icon(string $name): string {
   </a>
 </div>
 
+<?php if ($_mob_is_admin): ?>
+<!-- ── MOBILE POLICY SHEET (Eligibility, Renewal Tracking per company, Claims, Billing) ── -->
+<div class="mob-more-overlay" id="mob-policy-overlay"></div>
+<div class="mob-more-sheet" id="mob-policy-sheet">
+  <div class="mob-more-handle"></div>
+  <div class="mob-more-header">
+    <div>
+      <div class="mob-more-name">Policy &amp; Claims</div>
+      <div class="mob-more-role">Insurance, renewals, and claims</div>
+    </div>
+  </div>
+  <div class="mob-more-grid">
+    <a href="<?= $base_path ?>modules/insurance/eligibility_check.php" class="mob-more-item" onclick="mobPolicyClose()">
+      <div class="mob-more-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/></svg></div>
+      <span>Eligibility &amp; Policy</span>
+    </a>
+    <a href="<?= $base_path ?>modules/renewal/renewal_list.php?company=PhilBritish" class="mob-more-item" onclick="mobPolicyClose()">
+      <div class="mob-more-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/></svg></div>
+      <span>PhilBritish</span>
+    </a>
+    <a href="<?= $base_path ?>modules/renewal/renewal_list.php?company=<?= urlencode('Alpha Insurance & Surety Company Inc.') ?>" class="mob-more-item" onclick="mobPolicyClose()">
+      <div class="mob-more-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/></svg></div>
+      <span>Alpha Insurance</span>
+    </a>
+    <a href="<?= $base_path ?>modules/claims/claims_list.php" class="mob-more-item" onclick="mobPolicyClose()">
+      <div class="mob-more-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/></svg></div>
+      <span>Claims List</span>
+    </a>
+    <a href="<?= $base_path ?>modules/billing/billing_list.php" class="mob-more-item" onclick="mobPolicyClose()">
+      <div class="mob-more-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
+      <span>Billing</span>
+    </a>
+  </div>
+</div>
+<?php endif; ?>
+
 <script>
   function goBack(fallback) {
     var ref = document.referrer;
@@ -1171,6 +1216,18 @@ function _mob_icon(string $name): string {
   window.mobMoreOpen  = mobMoreOpen;
   window.mobMoreClose = mobMoreClose;
 
+  // ── Mobile Policy Sheet ──
+  function mobPolicyOpen() {
+    document.getElementById('mob-policy-overlay')?.classList.add('open');
+    document.getElementById('mob-policy-sheet')?.classList.add('open');
+  }
+  function mobPolicyClose() {
+    document.getElementById('mob-policy-overlay')?.classList.remove('open');
+    document.getElementById('mob-policy-sheet')?.classList.remove('open');
+  }
+  window.mobPolicyOpen  = mobPolicyOpen;
+  window.mobPolicyClose = mobPolicyClose;
+
   document.addEventListener('DOMContentLoaded', function () {
     const overlay = document.getElementById('sidebar-overlay');
     if (overlay) overlay.addEventListener('click', toggleSidebar);
@@ -1178,6 +1235,10 @@ function _mob_icon(string $name): string {
     // More button
     const moreBtn = document.getElementById('mob-nav-more-btn');
     if (moreBtn) moreBtn.addEventListener('click', mobMoreOpen);
+
+    // Policy button (opens Eligibility/Renewal-by-company/Claims/Billing sheet)
+    const policyBtn = document.getElementById('mob-nav-policy-btn');
+    if (policyBtn) policyBtn.addEventListener('click', mobPolicyOpen);
 
     // Profile button (mechanic)
     const profileBtn = document.getElementById('mob-nav-profile-btn');
@@ -1188,6 +1249,9 @@ function _mob_icon(string $name): string {
     // Overlay click closes sheet
     const moreOverlay = document.getElementById('mob-more-overlay');
     if (moreOverlay) moreOverlay.addEventListener('click', mobMoreClose);
+
+    const policyOverlay = document.getElementById('mob-policy-overlay');
+    if (policyOverlay) policyOverlay.addEventListener('click', mobPolicyClose);
 
     // Mobile: tap nav-item with chevron to toggle accordion flyout
     document.querySelectorAll('.nav-item-wrap').forEach(function(wrap) {

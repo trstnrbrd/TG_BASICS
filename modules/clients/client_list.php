@@ -11,13 +11,19 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'supe
 // AJAX autocomplete
 if (isset($_GET['ajax_ac']) && isset($_GET['q'])) {
     header('Content-Type: application/json');
-    $q    = '%' . san_str($_GET['q'], 100) . '%';
+    $q = '%' . san_str($_GET['q'], 100) . '%';
+
+    $ac_scope_sql = '';
+    if ($_SESSION['role'] === 'admin') $ac_scope_sql = "AND c.created_by = " . (int)$_SESSION['user_id'];
+    // Mechanics only ever see walk-in clients — exclude anyone with an insurance policy on record
+    if ($_SESSION['role'] === 'mechanic') $ac_scope_sql = "AND NOT EXISTS (SELECT 1 FROM insurance_policies ip WHERE ip.client_id = c.client_id)";
+
     $stmt = $conn->prepare("
         SELECT c.client_id, c.full_name, c.contact_number,
                v.plate_number, v.make, v.model
         FROM clients c
         LEFT JOIN vehicles v ON c.client_id = v.client_id
-        WHERE c.deleted_at IS NULL
+        WHERE c.deleted_at IS NULL $ac_scope_sql
           AND (c.full_name LIKE ? OR c.contact_number LIKE ? OR v.plate_number LIKE ? OR v.make LIKE ? OR v.model LIKE ?)
         GROUP BY c.client_id, v.vehicle_id
         ORDER BY c.full_name ASC
@@ -82,7 +88,9 @@ $initials  = substr(implode('', array_map(fn($w) => strtoupper($w[0]), explode('
 $search      = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
 $filter_by   = san_enum($_GET['filter_by'] ?? 'all', ['all', 'name', 'plate', 'contact', 'email']);
 $sort_by     = $_GET['sort'] ?? 'newest';
-$filter_type = san_enum($_GET['client_type'] ?? 'all', ['all', 'insurance', 'walkin']);
+$is_mechanic = $_SESSION['role'] === 'mechanic';
+// Mechanics only ever see walk-in clients — force this regardless of any ?client_type= in the URL
+$filter_type = $is_mechanic ? 'walkin' : san_enum($_GET['client_type'] ?? 'all', ['all', 'insurance', 'walkin']);
 $where       = '';
 $params      = [];
 $types       = '';
@@ -132,19 +140,33 @@ if ($filter_type === 'insurance') {
     $type_having = 'HAVING has_policy = 0';
 }
 
-// Merge soft-delete filter into WHERE
-$soft_del_cond = "c.deleted_at IS NULL";
+// Admins only see clients they personally added; Super Admin sees everything (plus who added each one)
+$is_scoped_admin = $_SESSION['role'] === 'admin';
+
+// Merge soft-delete + ownership scoping into WHERE
+$conditions = ["c.deleted_at IS NULL"];
+if ($is_scoped_admin) $conditions[] = "c.created_by = ?";
+$scope_sql = implode(' AND ', $conditions);
+
 $where_with_sd = $where === ''
-    ? "WHERE $soft_del_cond"
-    : $where . " AND $soft_del_cond";
+    ? "WHERE $scope_sql"
+    : $where . " AND $scope_sql";
+
+if ($is_scoped_admin) {
+    $params[] = $_SESSION['user_id'];
+    $types   .= 'i';
+}
 
 $sql = "
     SELECT c.client_id, c.full_name, c.contact_number, c.email,
            COUNT(DISTINCT v.vehicle_id) AS vehicle_count, c.created_at,
-           COUNT(DISTINCT ip.policy_id) > 0 AS has_policy
+           COUNT(DISTINCT ip.policy_id) > 0 AS has_policy,
+           CASE WHEN u.is_hidden = 1 THEN 'System Administrator' ELSE u.full_name END AS added_by_name,
+           CASE WHEN u.is_hidden = 1 THEN NULL ELSE u.profile_photo END AS added_by_photo
     FROM clients c
     LEFT JOIN vehicles v            ON c.client_id = v.client_id
     LEFT JOIN insurance_policies ip ON c.client_id = ip.client_id
+    LEFT JOIN users u               ON c.created_by = u.user_id
     $where_with_sd
     GROUP BY c.client_id
     $type_having
@@ -157,9 +179,13 @@ $stmt->execute();
 $result = $stmt->get_result();
 $rows = $result->fetch_all(MYSQLI_ASSOC);
 
-$total_clients  = $conn->query("SELECT COUNT(*) as c FROM clients WHERE deleted_at IS NULL")->fetch_assoc()['c'];
-$total_vehicles = $conn->query("SELECT COUNT(*) as c FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id WHERE c.deleted_at IS NULL")->fetch_assoc()['c'];
-$recent         = $conn->query("SELECT COUNT(*) as c FROM clients WHERE deleted_at IS NULL AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)")->fetch_assoc()['c'];
+$scope_cond_sql   = $is_scoped_admin ? "AND created_by = " . (int)$_SESSION['user_id'] : '';
+// Mechanics only ever see walk-in clients — exclude anyone with an insurance policy on record
+$walkin_cond_bare = $is_mechanic ? "AND NOT EXISTS (SELECT 1 FROM insurance_policies ip WHERE ip.client_id = clients.client_id)" : '';
+$walkin_cond_c    = $is_mechanic ? "AND NOT EXISTS (SELECT 1 FROM insurance_policies ip WHERE ip.client_id = c.client_id)" : '';
+$total_clients   = $conn->query("SELECT COUNT(*) as c FROM clients WHERE deleted_at IS NULL $scope_cond_sql $walkin_cond_bare")->fetch_assoc()['c'];
+$total_vehicles  = $conn->query("SELECT COUNT(*) as c FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id WHERE c.deleted_at IS NULL $scope_cond_sql $walkin_cond_c")->fetch_assoc()['c'];
+$recent          = $conn->query("SELECT COUNT(*) as c FROM clients WHERE deleted_at IS NULL AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) $scope_cond_sql $walkin_cond_bare")->fetch_assoc()['c'];
 
 $page_title  = 'Client Records';
 $active_page = 'clients';
@@ -184,12 +210,12 @@ require_once '../../includes/navbar.php';
     align-items: flex-start !important;
   }
   .client-stats-grid .card-icon {
-    width: 28px !important; height: 28px !important;
-    border-radius: 7px !important;
+    width: 26px !important; height: 26px !important;
+    border-radius: 6px !important;
   }
-  .client-stats-grid .card-icon svg { width: 13px !important; height: 13px !important; }
-  .client-stats-grid [style*="1.6rem"] { font-size: 1.2rem !important; }
-  .client-stats-grid [style*="0.7rem"] { font-size: 0.58rem !important; }
+  .client-stats-grid .card-icon svg { width: 12px !important; height: 12px !important; }
+  .client-stats-grid .stat-value { font-size: 1rem !important; }
+  .client-stats-grid .stat-label { font-size: 0.56rem !important; }
 
   /* Toolbar — keep filters in a 3-col row, search full width */
   .client-toolbar > div {
@@ -201,6 +227,19 @@ require_once '../../includes/navbar.php';
   .client-toolbar > div > button[type="submit"],
   .client-toolbar > div > a[href*="add_client"] { grid-column: span 1; justify-content: center; }
   .client-toolbar > div > a[href*="client_list"] { grid-column: span 1; justify-content: center; }
+}
+
+/* Row details open on hover, not click — no dead zone between the two <tr>s
+   since .tg-table uses border-collapse, so the adjacent-sibling hover chain
+   holds as the cursor moves from one row straight into the other. */
+.client-list-table .tg-expand-row { display: none; }
+.client-list-table .tg-expandable-row:hover + .tg-expand-row,
+.client-list-table .tg-expand-row:hover {
+  display: table-row !important;
+}
+.client-list-table .tg-expandable-row:hover .row-chevron {
+  transform: rotate(90deg);
+  opacity: 0.7 !important;
 }
 </style>
 
@@ -236,19 +275,19 @@ require_once '../../includes/topbar.php';
     <?php endif; ?>
 
     <!-- STATS -->
-    <div class="client-stats-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem;">
+    <div class="client-stats-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.75rem;margin-bottom:1.25rem;">
       <?php
       $stats = [
-        [icon('user', 16), $total_clients,  'Total Clients'],
-        [icon('vehicle', 16), $total_vehicles, 'Total Vehicles'],
-        [icon('calendar', 16), $recent,         'Added This Month'],
+        [icon('user', 14), $total_clients,  'Total Clients'],
+        [icon('vehicle', 14), $total_vehicles, 'Total Vehicles'],
+        [icon('calendar', 14), $recent,         'Added This Month'],
       ];
       foreach ($stats as $s): ?>
-      <div class="card" style="margin-bottom:0;display:flex;align-items:center;gap:0.9rem;padding:1.1rem 1.25rem;">
-        <div class="card-icon" style="width:42px;height:42px;border-radius:10px;flex-shrink:0;"><?= $s[0] ?></div>
+      <div class="card" style="margin-bottom:0;display:flex;align-items:center;gap:0.65rem;padding:0.75rem 1rem;">
+        <div class="card-icon" style="width:32px;height:32px;border-radius:8px;flex-shrink:0;"><?= $s[0] ?></div>
         <div>
-          <div style="font-size:1.6rem;font-weight:800;color:var(--text-primary);line-height:1;letter-spacing:-0.5px;"><?= $s[1] ?></div>
-          <div style="font-size:0.7rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-top:0.15rem;"><?= $s[2] ?></div>
+          <div class="stat-value" style="font-size:1.2rem;font-weight:800;color:var(--text-primary);line-height:1;letter-spacing:-0.5px;"><?= $s[1] ?></div>
+          <div class="stat-label" style="font-size:0.64rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-top:0.1rem;"><?= $s[2] ?></div>
         </div>
       </div>
       <?php endforeach; ?>
@@ -278,12 +317,14 @@ require_once '../../includes/topbar.php';
           <option value="email"   <?= $filter_by === 'email' ? 'selected' : '' ?>>Email</option>
         </select>
 
-        <!-- CLIENT TYPE -->
+        <!-- CLIENT TYPE (mechanics are locked to Walk-in, so there's nothing to switch) -->
+        <?php if (!$is_mechanic): ?>
         <select name="client_type" class="filter-input" style="min-width:150px;">
           <option value="all"       <?= $filter_type === 'all'       ? 'selected' : '' ?>>All Types</option>
           <option value="insurance" <?= $filter_type === 'insurance' ? 'selected' : '' ?>>Insurance</option>
           <option value="walkin"    <?= $filter_type === 'walkin'    ? 'selected' : '' ?>>Walk-in</option>
         </select>
+        <?php endif; ?>
 
         <!-- SORT BY -->
         <select name="sort" class="filter-input" style="min-width:150px;">
@@ -332,6 +373,20 @@ require_once '../../includes/topbar.php';
               &nbsp;·&nbsp;
               <?= $row['vehicle_count'] ?> vehicle<?= $row['vehicle_count'] != 1 ? 's' : '' ?>
             </div>
+            <?php if ($_SESSION['role'] === 'super_admin' && !empty($row['added_by_name'])):
+              $m_initials = substr(implode('', array_map(fn($w) => strtoupper($w[0] ?? ''), explode(' ', trim($row['added_by_name'])))), 0, 2);
+            ?>
+            <div class="cl-card-meta">
+              <div style="width:16px;height:16px;border-radius:50%;background:linear-gradient(135deg,var(--gold-bright),var(--gold));display:flex;align-items:center;justify-content:center;font-size:0.5rem;font-weight:800;color:#fff;flex-shrink:0;overflow:hidden;">
+                <?php if (!empty($row['added_by_photo'])): ?>
+                  <img src="<?= $base_path ?>uploads/avatars/<?= htmlspecialchars($row['added_by_photo']) ?>" alt="" style="width:100%;height:100%;object-fit:cover;"/>
+                <?php else: ?>
+                  <?= htmlspecialchars($m_initials) ?>
+                <?php endif; ?>
+              </div>
+              Added by <?= htmlspecialchars($row['added_by_name']) ?>
+            </div>
+            <?php endif; ?>
           </div>
           <div class="cl-card-right">
             <?= $badge ?>
@@ -339,7 +394,7 @@ require_once '../../includes/topbar.php';
             <form method="POST" action="" style="display:inline;" onclick="event.preventDefault();event.stopPropagation();">
               <?= csrf_field() ?>
               <input type="hidden" name="delete_client_id" value="<?= $row['client_id'] ?>"/>
-              <button type="button" class="btn-sm-danger js-delete-client cl-card-del" data-name="<?= htmlspecialchars($row['full_name'], ENT_QUOTES) ?>"><?= icon('trash', 13) ?></button>
+              <button type="button" class="btn-sm-danger js-delete-client cl-card-del" data-name="<?= htmlspecialchars($row['full_name'], ENT_QUOTES) ?>" aria-label="Delete <?= htmlspecialchars($row['full_name'], ENT_QUOTES) ?>"><?= icon('trash', 13) ?></button>
             </form>
             <?php endif; ?>
           </div>
@@ -367,6 +422,9 @@ require_once '../../includes/topbar.php';
                 </a>
               </th>
               <th>Contact</th>
+              <?php if ($_SESSION['role'] === 'super_admin'): ?>
+              <th>Added By</th>
+              <?php endif; ?>
               <th>Type</th>
               <th>Actions</th>
             </tr>
@@ -374,6 +432,10 @@ require_once '../../includes/topbar.php';
           <tbody>
             <?php foreach ($rows as $row):
               $cid = 'client-expand-' . $row['client_id'];
+              $aby_initials = '';
+              if (!empty($row['added_by_name'])) {
+                  $aby_initials = substr(implode('', array_map(fn($w) => strtoupper($w[0] ?? ''), explode(' ', trim($row['added_by_name'])))), 0, 2);
+              }
             ?>
             <tr class="tg-expandable-row" data-expand="<?= $cid ?>" style="cursor:pointer;">
               <td style="text-align:left;">
@@ -385,6 +447,24 @@ require_once '../../includes/topbar.php';
                 </div>
               </td>
               <td style="font-size:0.82rem;"><?= htmlspecialchars($row['contact_number']) ?></td>
+              <?php if ($_SESSION['role'] === 'super_admin'): ?>
+              <td style="font-size:0.78rem;color:var(--text-secondary);">
+                <?php if (!empty($row['added_by_name'])): ?>
+                <div style="display:inline-flex;align-items:center;gap:0.45rem;">
+                  <div style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,var(--gold-bright),var(--gold));display:flex;align-items:center;justify-content:center;font-size:0.56rem;font-weight:800;color:#fff;flex-shrink:0;overflow:hidden;">
+                    <?php if (!empty($row['added_by_photo'])): ?>
+                      <img src="<?= $base_path ?>uploads/avatars/<?= htmlspecialchars($row['added_by_photo']) ?>" alt="" style="width:100%;height:100%;object-fit:cover;"/>
+                    <?php else: ?>
+                      <?= htmlspecialchars($aby_initials) ?>
+                    <?php endif; ?>
+                  </div>
+                  <span><?= htmlspecialchars($row['added_by_name']) ?></span>
+                </div>
+                <?php else: ?>
+                  —
+                <?php endif; ?>
+              </td>
+              <?php endif; ?>
               <td>
                 <?php if ($row['has_policy']): ?>
                   <span class="badge badge-green" style="display:inline-flex;align-items:center;gap:0.25rem;"><?= icon('shield-check', 11) ?> Insurance</span>
@@ -406,7 +486,7 @@ require_once '../../includes/topbar.php';
               </td>
             </tr>
             <tr class="tg-expand-row" id="<?= $cid ?>" style="display:none;">
-              <td colspan="4" style="padding:0;">
+              <td colspan="<?= $_SESSION['role'] === 'super_admin' ? 5 : 4 ?>" style="padding:0;">
                 <div class="tg-expand-body">
                   <div class="tg-expand-grid">
                     <div class="tg-expand-item">
@@ -414,12 +494,12 @@ require_once '../../includes/topbar.php';
                       <span class="tg-expand-value"><?= date('M d, Y', strtotime($row['created_at'])) ?></span>
                     </div>
                     <div class="tg-expand-item">
-                      <span class="tg-expand-label">Vehicles</span>
-                      <span class="tg-expand-value"><span class="badge badge-gold"><?= $row['vehicle_count'] ?> vehicle<?= $row['vehicle_count'] != 1 ? 's' : '' ?></span></span>
-                    </div>
-                    <div class="tg-expand-item">
                       <span class="tg-expand-label">Email</span>
                       <span class="tg-expand-value"><?= htmlspecialchars($row['email'] ?? '—') ?></span>
+                    </div>
+                    <div class="tg-expand-item">
+                      <span class="tg-expand-label">Vehicles</span>
+                      <span class="tg-expand-value"><span class="badge badge-gold"><?= $row['vehicle_count'] ?> vehicle<?= $row['vehicle_count'] != 1 ? 's' : '' ?></span></span>
                     </div>
                   </div>
                 </div>
@@ -491,6 +571,14 @@ require_once '../../includes/topbar.php';
   input.addEventListener('focus', function() {
     if (this.value.trim().length >= 1) this.dispatchEvent(new Event('input'));
   });
+})();
+
+// Row details now open on hover (CSS-driven) instead of click — stop clicks
+// on this table from reaching the global click-to-toggle handler in footer.php
+// so it can't fight with the hover state or leave a row stuck open/closed.
+(function() {
+  var clTable = document.querySelector('.client-list-table');
+  if (clTable) clTable.addEventListener('click', function(e) { e.stopPropagation(); });
 })();
 </script>
 

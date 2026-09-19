@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
     }
 
     $section    = san_str($_POST['section'] ?? '', 30);
-    $admin_only = ['system_settings'];
+    $admin_only = ['system_settings', 'vault_password'];
 
     if (in_array($section, $admin_only) && !$is_super) {
         echo json_encode(['ok' => false, 'error' => 'Unauthorized.']);
@@ -464,6 +464,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             $log->execute();
 
             echo json_encode(['ok' => true, 'message' => 'All settings saved successfully.']);
+            break;
+
+        // ── RENEWAL TRACKING VAULT PASSWORD (Owner only — separate from the bulk settings save) ──
+        case 'vault_password':
+            $new_vault_pw = trim($_POST['renewal_vault_password'] ?? '');
+            if ($new_vault_pw === '') {
+                echo json_encode(['ok' => false, 'error' => 'Please enter a new vault password.']);
+                exit;
+            }
+            if (strlen($new_vault_pw) < 6) {
+                echo json_encode(['ok' => false, 'error' => 'Vault password must be at least 6 characters.']);
+                exit;
+            }
+
+            setSetting($conn, 'renewal_vault_password', password_hash($new_vault_pw, PASSWORD_DEFAULT));
+            // Bump the version stamp so every Admin session's cached unlock
+            // state is invalidated on next page load — re-locks the vault
+            // for everyone without needing to touch other sessions directly.
+            setSetting($conn, 'renewal_vault_updated_at', (string)time());
+
+            $changed_by = $_SESSION['full_name'] ?? 'System Administrator';
+
+            // Email the new plaintext password to the business owner only
+            $owner = $conn->query("SELECT email, full_name FROM users WHERE role = 'super_admin' AND is_hidden = 0 ORDER BY user_id LIMIT 1")->fetch_assoc();
+            if ($owner && !empty($owner['email'])) {
+                sendVaultPasswordChangeEmail($owner['email'], $owner['full_name'], $new_vault_pw, $changed_by);
+            }
+
+            // Notify Admin-role staff that the vault re-locked (no password included)
+            $admins = $conn->query("SELECT email, full_name FROM users WHERE role = 'admin' AND is_hidden = 0 AND email IS NOT NULL AND email != ''");
+            while ($adm = $admins->fetch_assoc()) {
+                sendVaultRelockedNotice($adm['email'], $adm['full_name']);
+            }
+
+            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'SETTINGS_UPDATED', ?)");
+            $desc = $changed_by . ' changed the Renewal Tracking vault password.';
+            $log->bind_param('is', $user_id, $desc);
+            $log->execute();
+
+            echo json_encode(['ok' => true, 'message' => 'Vault password updated. Admins have been re-locked and notified.']);
             break;
 
         // ── TRANSACTION PIN ──
@@ -1211,6 +1251,22 @@ require_once '../../includes/topbar.php';
                 <span class="field-hint">How long password reset links remain valid.</span>
               </div>
             </div>
+            <div class="field-section">Renewal Tracking Vault</div>
+            <div class="form-grid">
+              <div class="field">
+                <label class="field-label">Vault Password</label>
+                <div style="position:relative;">
+                  <input type="password" id="renewal_vault_password" name="renewal_vault_password" class="field-input" placeholder="<?= empty($settings['renewal_vault_password']) ? 'Not set yet' : 'Enter a new password to change it' ?>" style="padding-right:2.6rem;"/>
+                  <button type="button" class="field-eye-toggle" data-target="renewal_vault_password" title="Show/hide password" style="position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0.25rem;display:flex;">
+                    <?= icon('eye', 16) ?>
+                  </button>
+                </div>
+                <span class="field-hint">Admins must enter this password to view PhilBritish/Alpha renewal records. Changing it re-locks every Admin and emails Sir PG the new password.</span>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;margin-top:0.5rem;">
+              <button type="button" class="btn-primary" id="save-vault-password-btn"><?= icon('check', 14) ?> Change Vault Password</button>
+            </div>
           </div>
         </div>
 
@@ -1456,7 +1512,7 @@ REMOVED HEREDOC END */
   <div class="modal-box" style="max-width:400px;">
     <div class="modal-header">
       <div class="modal-title"><?= icon('key', 16) ?> <span id="pin-modal-title">Set Transaction PIN</span></div>
-      <button class="modal-close" onclick="closePinModal()"><?= icon('x-mark', 14) ?></button>
+      <button class="modal-close" onclick="closePinModal()" aria-label="Close"><?= icon('x-mark', 14) ?></button>
     </div>
     <div style="padding:1.25rem;display:flex;flex-direction:column;gap:1rem;">
       <div class="field">

@@ -419,5 +419,62 @@ if (savePasswordBtn) {
     });
 }
 
+// ── Password field eye-toggle (show/hide as you type) ──
+const EYE_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>';
+const EYE_SLASH_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"/></svg>';
+
+document.querySelectorAll('.field-eye-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const input = document.getElementById(btn.dataset.target);
+        if (!input) return;
+        const showing = input.type === 'text';
+        input.type = showing ? 'password' : 'text';
+        btn.innerHTML = showing ? EYE_ICON : EYE_SLASH_ICON;
+    });
+});
+
+// ── Renewal Tracking Vault — Change Password (separate from the bulk settings save) ──
+const saveVaultPwBtn = document.getElementById('save-vault-password-btn');
+if (saveVaultPwBtn) {
+    saveVaultPwBtn.addEventListener('click', async function () {
+        const pwInput = document.getElementById('renewal_vault_password');
+        const newPw   = pwInput?.value ?? '';
+
+        if (!newPw) {
+            Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter a new vault password.', confirmButtonColor: '#B8860B' });
+            return;
+        }
+
+        const originalHTML = this.innerHTML;
+        this.disabled = true;
+        this.style.opacity = '0.6';
+        this.textContent = 'Saving...';
+
+        const fd = new FormData();
+        fd.append('section', 'vault_password');
+        fd.append('csrf_token', csrfToken());
+        fd.append('renewal_vault_password', newPw);
+
+        let data = null;
+        try {
+            const res = await fetch('settings.php', { method: 'POST', body: fd });
+            data = await res.json();
+        } catch (e) { data = null; }
+
+        this.disabled = false;
+        this.style.opacity = '';
+        this.innerHTML = originalHTML;
+
+        if (!data) {
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Something went wrong. Please try again.', confirmButtonColor: '#B8860B' });
+        } else if (data.ok) {
+            Swal.fire({ icon: 'success', title: 'Vault Password Changed!', text: data.message, confirmButtonColor: '#B8860B' });
+            if (pwInput) pwInput.value = '';
+        } else {
+            Swal.fire({ icon: 'error', title: 'Error', text: data.error, confirmButtonColor: '#B8860B' });
+        }
+    });
+}
+
 // Transaction PIN handlers are inline in settings.php
 // TOTP handlers are inline in settings.php (load-order dependency on QRCode CDN)

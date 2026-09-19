@@ -14,12 +14,16 @@ $like   = '%' . $conn->real_escape_string($q) . '%';
 $role   = $_SESSION['role'] ?? '';
 $results = [];
 
-// ── CLIENTS ──
+// ── CLIENTS ── (mechanics only ever see walk-in clients, no insurance policy on record)
+$clients_walkin_sql = $role === 'mechanic'
+    ? "AND NOT EXISTS (SELECT 1 FROM insurance_policies ip WHERE ip.client_id = clients.client_id)"
+    : '';
 $r = $conn->prepare("
     SELECT client_id, full_name, contact_number, email
     FROM clients
     WHERE deleted_at IS NULL
       AND (full_name LIKE ? OR contact_number LIKE ? OR email LIKE ?)
+      $clients_walkin_sql
     LIMIT 4
 ");
 $r->bind_param('sss', $like, $like, $like);
@@ -35,12 +39,16 @@ while ($row = $rows->fetch_assoc()) {
     ];
 }
 
-// ── VEHICLES ──
+// ── VEHICLES ── (mechanics only ever see walk-in clients' vehicles)
+$vehicles_walkin_sql = $role === 'mechanic'
+    ? "AND NOT EXISTS (SELECT 1 FROM insurance_policies ip WHERE ip.client_id = c.client_id)"
+    : '';
 $r = $conn->prepare("
     SELECT v.vehicle_id, v.plate_number, v.make, v.model, v.year_model, c.full_name, c.client_id
     FROM vehicles v
     INNER JOIN clients c ON v.client_id = c.client_id
-    WHERE v.plate_number LIKE ? OR v.make LIKE ? OR v.model LIKE ?
+    WHERE (v.plate_number LIKE ? OR v.make LIKE ? OR v.model LIKE ?)
+      $vehicles_walkin_sql
     LIMIT 4
 ");
 $r->bind_param('sss', $like, $like, $like);

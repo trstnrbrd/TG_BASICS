@@ -506,6 +506,15 @@
     font-size: 0.58rem !important;
     letter-spacing: 0.5px !important;
   }
+
+  /* Main grid (Renewal Alerts / Quick Actions / Recent Activity) and Charts
+     row (Client Types / Policies Added / Repair Jobs) were rendering as 2-3
+     squished columns on phone width — stack them into one column instead. */
+  .dash-main-grid,
+  .dash-charts-grid,
+  .dash-mech-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
 @media (max-width: 480px) {
   .dash-stats {

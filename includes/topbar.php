@@ -30,7 +30,7 @@ if (isset($_SESSION['user_id'], $conn)) {
 ?>
 <div class="mob-topbar" id="mob-topbar">
   <div class="mob-topbar-title"><?= htmlspecialchars($topbar_title ?? '') ?></div>
-  <div class="mob-topbar-avatar" onclick="window.openEditProfileModal && window.openEditProfileModal()" id="mob-topbar-avatar">
+  <div class="mob-topbar-avatar" onclick="window.openEditProfileModal && window.openEditProfileModal()" id="mob-topbar-avatar" role="button" tabindex="0" aria-label="Edit profile" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();window.openEditProfileModal && window.openEditProfileModal();}">
     <?php if (!empty($_profile_photo_url)): ?>
     <img src="<?= htmlspecialchars($_profile_photo_url) ?>" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/>
     <?php else: ?>

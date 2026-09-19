@@ -152,7 +152,7 @@ require_once '../../includes/topbar.php';
       </div>
 
       <?php if ($result->num_rows > 0): ?>
-      <div class="tg-table-wrap">
+      <div class="tg-table-wrap mob-card-wrap">
         <table class="tg-table mob-card mob-claims-table">
           <thead>
             <tr>

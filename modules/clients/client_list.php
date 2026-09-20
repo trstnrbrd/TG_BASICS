@@ -38,11 +38,20 @@ if (isset($_GET['ajax_ac']) && isset($_GET['q'])) {
 // Handle delete
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) {
     csrf_verify();
+    // Mechanics never delete clients (the UI hides the button); admins only their own.
+    if ($_SESSION['role'] === 'mechanic') {
+        http_response_code(403);
+        exit('Not allowed.');
+    }
     $del_id = (int)$_POST['delete_client_id'];
-    $cstmt  = $conn->prepare("SELECT full_name FROM clients WHERE client_id = ? AND deleted_at IS NULL");
+    $cstmt  = $conn->prepare("SELECT full_name, created_by FROM clients WHERE client_id = ? AND deleted_at IS NULL");
     $cstmt->bind_param('i', $del_id);
     $cstmt->execute();
     $cdata = $cstmt->get_result()->fetch_assoc();
+    if ($cdata && $_SESSION['role'] === 'admin' && (int)$cdata['created_by'] !== (int)$_SESSION['user_id']) {
+        http_response_code(403);
+        exit('Not allowed.');
+    }
     if ($cdata) {
         // Block deletion only if active policies, repair jobs, or claims exist
         // Vehicles alone are NOT a blocker — they are removed on client deletion

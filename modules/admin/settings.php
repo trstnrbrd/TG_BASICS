@@ -4,6 +4,7 @@ require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/settings.php';
 require_once '../../config/mailer.php';
+require_once '../../config/rate_limit.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin', 'mechanic'])) {
     header("Location: ../../auth/login.php");
@@ -573,9 +574,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                 echo json_encode(['ok' => true, 'no_pin' => true]);
                 exit;
             }
+            // Same per-account bucket as ajax/verify_pin.php and config/verify_pin.php,
+            // so switching endpoints doesn't reset the attempt count.
+            $rl_key = 'uid:' . (int)$user_id;
+            if (rate_limit_blocked($conn, 'verify_pin', $rl_key)) {
+                http_response_code(429);
+                echo json_encode(['ok' => false, 'error' => 'Too many attempts. Please wait a few minutes before trying again.']);
+                exit;
+            }
             if (password_verify($pin, $pin_row['transaction_pin'])) {
+                rate_limit_clear($conn, 'verify_pin', $rl_key);
                 echo json_encode(['ok' => true]);
             } else {
+                rate_limit_record($conn, 'verify_pin', $rl_key);
                 echo json_encode(['ok' => false, 'error' => 'Incorrect PIN.']);
             }
             exit;

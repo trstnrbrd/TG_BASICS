@@ -24,7 +24,7 @@ $stmt = $conn->prepare("
     SELECT
         p.*,
         DATEDIFF(p.policy_end, CURDATE()) AS days_left,
-        c.full_name, c.contact_number, c.email, c.address,
+        c.full_name, c.contact_number, c.email, c.address, c.created_by AS client_created_by,
         v.plate_number, v.make, v.model, v.year_model, v.color,
         v.motor_number, v.serial_number
     FROM insurance_policies p
@@ -37,6 +37,13 @@ $stmt->execute();
 $policy = $stmt->get_result()->fetch_assoc();
 
 if (!$policy) {
+    header("Location: renewal_list.php");
+    exit;
+}
+
+// Vault gate — renewal_list.php enforces it for the list, so it must hold here too:
+// an admin outside the vault may only open policies of clients they created themselves.
+if (!renewal_vault_is_unlocked($conn) && (int)$policy['client_created_by'] !== (int)$_SESSION['user_id']) {
     header("Location: renewal_list.php");
     exit;
 }

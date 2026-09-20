@@ -4,6 +4,13 @@ require_once '../../config/ocr.php';
 
 header('Content-Type: application/json');
 
+// Every call spends the shop's OCR.space quota, so it needs a logged-in staff session.
+if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Unauthorized.']);
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || empty($_FILES['image'])) {
     echo json_encode(['error' => 'No image uploaded.']);
     exit;
@@ -15,8 +22,10 @@ if ($file['error'] !== UPLOAD_ERR_OK) {
     exit;
 }
 
+// Sniff the real content type — $file['type'] is whatever the client claims.
 $allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
-if (!in_array($file['type'], $allowed)) {
+$mime    = finfo_file(finfo_open(FILEINFO_MIME_TYPE), $file['tmp_name']);
+if (!in_array($mime, $allowed, true)) {
     echo json_encode(['error' => 'Invalid file type.']);
     exit;
 }
@@ -31,7 +40,7 @@ curl_setopt_array($ch, [
         'OCREngine'            => '2',
         'isTable'              => 'true',
         'isCreateSearchablePdf'=> 'false',
-        'file'                 => new CURLFile($file['tmp_name'], $file['type'], $file['name']),
+        'file'                 => new CURLFile($file['tmp_name'], $mime, $file['name']),
     ],
     CURLOPT_TIMEOUT        => 30,
 ]);

@@ -17,10 +17,22 @@ $renew_from   = isset($_GET['renew_from']) ? (int)$_GET['renew_from'] : (isset($
 $renew_policy = null;
 
 if ($renew_from > 0) {
-    $rs = $conn->prepare("SELECT * FROM insurance_policies WHERE policy_id = ?");
+    $rs = $conn->prepare("
+        SELECT p.*, c.created_by AS client_created_by
+        FROM insurance_policies p
+        INNER JOIN clients c ON p.client_id = c.client_id
+        WHERE p.policy_id = ?
+    ");
     $rs->bind_param('i', $renew_from);
     $rs->execute();
     $renew_policy = $rs->get_result()->fetch_assoc();
+
+    // Same vault rule as view_policy.php: outside the vault, an admin may only
+    // renew policies of clients they created themselves.
+    if (!$renew_policy || (!renewal_vault_is_unlocked($conn) && (int)$renew_policy['client_created_by'] !== (int)$_SESSION['user_id'])) {
+        header("Location: ../renewal/renewal_list.php");
+        exit;
+    }
 }
 
 // Get vehicle_id from URL, POST (lookup flow), or renew_from policy
@@ -29,6 +41,11 @@ if ($vehicle_id === 0 && isset($_POST['vehicle_id_resolved'])) {
     $vehicle_id = (int)$_POST['vehicle_id_resolved'];
 }
 if ($vehicle_id === 0 && $renew_policy) {
+    $vehicle_id = (int)$renew_policy['vehicle_id'];
+}
+// A renewal is always for the renewed policy's own vehicle — never a caller-supplied one,
+// since the unscoped vehicle lookup below would otherwise load any client's vehicle.
+if ($renew_policy) {
     $vehicle_id = (int)$renew_policy['vehicle_id'];
 }
 

@@ -38,10 +38,15 @@ if ($is_mechanic) {
     }
 }
 
-// Handle delete
+// Handle delete — only ever the client this page already passed the role/ownership
+// checks for above, and never for mechanics (the UI hides the button from them).
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) {
     csrf_verify();
-    $del_id = (int)$_POST['delete_client_id'];
+    if ($is_mechanic || (int)$_POST['delete_client_id'] !== $client_id) {
+        http_response_code(403);
+        exit('Not allowed.');
+    }
+    $del_id = $client_id;
     $cstmt  = $conn->prepare("SELECT full_name FROM clients WHERE client_id = ? AND deleted_at IS NULL");
     $cstmt->bind_param('i', $del_id);
     $cstmt->execute();

@@ -17,21 +17,16 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $user_id = $_SESSION['user_id'];
 
+// Attempts are counted per account (shared by every PIN-check endpoint), not per IP.
+$rl_key = 'uid:' . (int)$user_id;
+
 // If no pin sent, this is just an existence check — don't count it as an attempt.
 $pin = $_POST['pin'] ?? '';
 
-if ($pin !== '') {
-    $cutoff = date('Y-m-d H:i:s', time() - RL_WINDOW_SECS);
-    $prune  = $conn->prepare("DELETE FROM rate_limit_attempts WHERE attempted_at < ?");
-    $prune->bind_param('s', $cutoff);
-    $prune->execute();
-    $prune->close();
-
-    if (rl_count($conn, 'verify_pin') >= RL_MAX_ATTEMPTS) {
-        http_response_code(429);
-        echo json_encode(['ok' => false, 'error' => 'Too many attempts. Please wait a few minutes before trying again.']);
-        exit;
-    }
+if ($pin !== '' && rate_limit_blocked($conn, 'verify_pin', $rl_key)) {
+    http_response_code(429);
+    echo json_encode(['ok' => false, 'error' => 'Too many attempts. Please wait a few minutes before trying again.']);
+    exit;
 }
 
 $stmt = $conn->prepare("SELECT transaction_pin FROM users WHERE user_id = ?");
@@ -50,9 +45,9 @@ if ($pin === '') {
 }
 
 if (password_verify($pin, $row['transaction_pin'])) {
-    rate_limit_clear($conn, 'verify_pin');
+    rate_limit_clear($conn, 'verify_pin', $rl_key);
     echo json_encode(['ok' => true]);
 } else {
-    rate_limit_record($conn, 'verify_pin');
+    rate_limit_record($conn, 'verify_pin', $rl_key);
     echo json_encode(['ok' => false, 'error' => 'Incorrect PIN.']);
 }

@@ -1,1 +1,11 @@
 ErrorDocument 404 /TG-BASICS/404.php
+
+# Force HTTPS in production only — checks both the direct flag and the
+# forwarded-proto header (some shared hosts terminate SSL at a proxy in
+# front of Apache), and skips localhost/XAMPP so local dev is unaffected.
+RewriteEngine On
+RewriteCond %{HTTPS} off
+RewriteCond %{HTTP:X-Forwarded-Proto} !https
+RewriteCond %{HTTP_HOST} !^localhost [NC]
+RewriteCond %{HTTP_HOST} !^127\.0\.0\.1
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]

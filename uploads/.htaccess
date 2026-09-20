@@ -1,0 +1,3 @@
+# Prevent directory listing — files here are only meant to be reached by their
+# exact URL (as linked from within the app), never browsed as a folder listing.
+Options -Indexes

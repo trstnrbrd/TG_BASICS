@@ -264,10 +264,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $rf        = $_FILES['first_receipt'];
                     $mime      = mime_content_type($rf['tmp_name']);
                     $ext_map   = ['image/jpeg'=>'jpg','image/png'=>'png','image/webp'=>'webp','image/gif'=>'gif'];
-                    $ext       = $ext_map[$mime] ?? 'jpg';
+                    $ext       = $ext_map[$mime] ?? null;
                     $fname     = 'rcpt_' . $new_pp_id . '_' . time() . '.' . $ext;
                     $dest      = __DIR__ . '/../../uploads/receipts/' . $fname;
-                    if (move_uploaded_file($rf['tmp_name'], $dest)) {
+                    if ($ext !== null && move_uploaded_file($rf['tmp_name'], $dest)) {
                         $upd_rc = $conn->prepare("UPDATE policy_payments SET receipt_file = ? WHERE payment_id = ?");
                         $upd_rc->bind_param('si', $fname, $new_pp_id);
                         $upd_rc->execute();

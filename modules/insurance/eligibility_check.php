@@ -54,13 +54,13 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === '1') {
     }
     while ($r = $rows->fetch_assoc()) {
         echo '
-        <div class="live-result-item" onclick="window.location=\'?vehicle_id=' . $r['vehicle_id'] . '\'" style="padding:0.75rem 1rem;cursor:pointer;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);transition:background 0.1s;" onmouseover="this.style.background=\'var(--gold-pale)\'" onmouseout="this.style.background=\'\'">
+        <a class="live-result-item" href="?vehicle_id=' . $r['vehicle_id'] . '" style="padding:0.75rem 1rem;cursor:pointer;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);transition:background 0.1s;text-decoration:none;" onmouseover="this.style.background=\'var(--gold-pale)\'" onmouseout="this.style.background=\'\'">
           <div>
             <div style="font-weight:700;font-size:0.85rem;color:var(--text-primary);">' . htmlspecialchars($r['full_name']) . '</div>
             <div style="font-size:0.72rem;color:var(--text-muted);">' . htmlspecialchars($r['make'] . ' ' . $r['model'] . ' ' . $r['year_model']) . '</div>
           </div>
           <span class="badge-dark">' . htmlspecialchars($r['plate_number']) . '</span>
-        </div>';
+        </a>';
     }
     exit;
 }

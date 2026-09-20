@@ -116,6 +116,16 @@ $footer_extra_scripts  = $footer_extra_scripts  ?? '';
     row.classList.toggle('expanded', !isOpen);
   });
 
+  // Keyboard equivalent — Enter/Space on a focused expandable row triggers the same toggle.
+  // Checks e.target directly (not .closest) so Enter/Space on a link or button *inside*
+  // the row still does its own native action instead of also re-toggling the row.
+  document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    if (!e.target.classList || !e.target.classList.contains('tg-expandable-row')) return;
+    e.preventDefault();
+    e.target.click();
+  });
+
   // ── TOPBAR CLOCK ──
   (function() {
     function updateClock() {
@@ -776,6 +786,74 @@ $footer_extra_scripts  = $footer_extra_scripts  ?? '';
     }
   });
 
+})();
+</script>
+
+<script>
+// Escape key closes any open modal/lightbox on the page (keyboard-accessible alternative
+// to the mouse-only click-outside-to-close pattern used across modals).
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Escape') return;
+  [
+    ['edit-profile-modal', function() { window.closeEditProfileModal && window.closeEditProfileModal(); }],
+    ['user-profile-modal', function() { var m = document.getElementById('user-profile-modal'); if (m) m.style.display = 'none'; }],
+    ['ocr-modal',          function() { window.ocrModalClose && window.ocrModalClose(); }],
+    ['privacy-modal',      function() { window.privacyModalClose && window.privacyModalClose(); }],
+    ['pin-modal',          function() { window.closePinModal && window.closePinModal(); }]
+  ].forEach(function(pair) {
+    var el = document.getElementById(pair[0]);
+    if (el && getComputedStyle(el).display !== 'none') pair[1]();
+  });
+});
+</script>
+
+<script>
+// Focus trap — while any modal/lightbox on the page is open, Tab/Shift+Tab cycles
+// only among its own focusable elements instead of escaping into the page behind it.
+(function() {
+  var MODAL_IDS = [
+    'edit-profile-modal', 'user-profile-modal', 'ocr-modal', 'privacy-modal', 'pin-modal',
+    'status-modal', 'img-lightbox', 'receipt-lightbox', 'convert-modal'
+  ];
+  var FOCUSABLE_SEL = 'a[href], button:not([disabled]), textarea:not([disabled]), ' +
+    'input:not([disabled]):not([type="hidden"]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+  function isVisible(el) {
+    return !!el && getComputedStyle(el).display !== 'none' && el.offsetParent !== null;
+  }
+
+  function getOpenModal() {
+    var active = document.activeElement, i, el;
+    for (i = 0; i < MODAL_IDS.length; i++) {
+      el = document.getElementById(MODAL_IDS[i]);
+      if (isVisible(el) && el.contains(active)) return el;
+    }
+    for (i = 0; i < MODAL_IDS.length; i++) {
+      el = document.getElementById(MODAL_IDS[i]);
+      if (isVisible(el)) return el;
+    }
+    return null;
+  }
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Tab') return;
+    var modal = getOpenModal();
+    if (!modal) return;
+    var focusables = Array.prototype.filter.call(modal.querySelectorAll(FOCUSABLE_SEL), isVisible);
+    if (!focusables.length) return;
+    var first = focusables[0], last = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    } else if (!modal.contains(document.activeElement)) {
+      // Focus drifted outside the modal (e.g. it just opened) — pull it back in.
+      e.preventDefault();
+      first.focus();
+    }
+  });
 })();
 </script>
 

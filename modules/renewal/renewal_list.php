@@ -311,7 +311,7 @@ require_once '../../includes/topbar.php';
                   $aby_initials = substr(implode('', array_map(fn($w) => strtoupper($w[0] ?? ''), explode(' ', trim($row['added_by_name'])))), 0, 2);
               }
             ?>
-            <tr class="tg-expandable-row" data-expand="<?= $rid ?>" style="cursor:pointer;<?= $row_style ?>">
+            <tr class="tg-expandable-row" data-expand="<?= $rid ?>" tabindex="0" style="cursor:pointer;<?= $row_style ?>">
               <td style="text-align:center;">
                 <div style="display:flex;align-items:center;justify-content:center;gap:0.5rem;">
                   <svg class="row-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;opacity:0.35;transition:transform 0.2s;"><polyline points="9 18 15 12 9 6"/></svg>

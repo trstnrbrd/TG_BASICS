@@ -875,6 +875,7 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
   .tg-expandable-row:hover { background: var(--gold-pale); }
   .tg-expandable-row.expanded { background: var(--gold-pale); }
   .tg-expandable-row.expanded .row-chevron { transform: rotate(90deg); opacity: 0.7 !important; }
+  .tg-expandable-row:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: -2px; }
   .tg-expand-row td { background: var(--bg-2); }
   .tg-expand-body {
     padding: 0.85rem 1.25rem 0.85rem 2.9rem;

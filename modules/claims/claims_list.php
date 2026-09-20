@@ -172,7 +172,7 @@ require_once '../../includes/topbar.php';
               $is_finished = in_array($row['status'], ['resolved', 'denied', 'lack_of_requirements']);
               $cid = 'claim-expand-' . $row['claim_id'];
             ?>
-            <tr class="tg-expandable-row" data-expand="<?= $cid ?>" style="cursor:pointer;">
+            <tr class="tg-expandable-row" data-expand="<?= $cid ?>" tabindex="0" style="cursor:pointer;">
               <td style="text-align:left;">
                 <div style="display:flex;align-items:center;gap:0.6rem;">
                   <svg class="row-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;opacity:0.35;transition:transform 0.2s;"><polyline points="9 18 15 12 9 6"/></svg>

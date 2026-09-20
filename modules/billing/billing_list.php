@@ -207,6 +207,10 @@ require_once '../../includes/topbar.php';
   </div>
 </div>
 
+<form id="delete-billing-form" method="POST" style="display:none;">
+  <?= csrf_field() ?>
+  <input type="hidden" name="action" value="delete_billing"/>
+</form>
 <script>
 document.querySelectorAll('.js-delete-billing').forEach(function(btn) {
   btn.addEventListener('click', function() {
@@ -225,7 +229,10 @@ document.querySelectorAll('.js-delete-billing').forEach(function(btn) {
       if (result.isConfirmed) {
         const ok = await requirePin();
         if (!ok) return;
-        window.location = 'view_billing.php?id=' + id + '&do_delete=1';
+        // POST + CSRF token (the hidden form below), not a GET link.
+        const form = document.getElementById('delete-billing-form');
+        form.action = 'view_billing.php?id=' + encodeURIComponent(id);
+        form.submit();
       }
     });
   });

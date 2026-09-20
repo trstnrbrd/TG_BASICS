@@ -71,9 +71,12 @@ const ALLOWED_DOC_FIELDS = [
 
 /**
  * Trim and enforce max length. Returns string or '' if oversized.
+ * Takes mixed because it's fed raw request data — `?field[]=x` arrives as an array,
+ * which must come back as '' rather than crash the page with a TypeError.
  */
-function san_str(string $value, int $max = MAX_TEXT): string {
-    $v = trim($value);
+function san_str(mixed $value, int $max = MAX_TEXT): string {
+    if (!is_scalar($value)) return '';
+    $v = trim((string)$value);
     if (mb_strlen($v) > $max) return '';   // reject oversized
     return $v;
 }
@@ -100,8 +103,9 @@ function san_float(mixed $value, float $min = 0.0, float $max = 999_999_999.99):
 /**
  * Whitelist check — returns value if in list, '' otherwise.
  */
-function san_enum(string $value, array $allowed): string {
-    $v = trim($value);
+function san_enum(mixed $value, array $allowed): string {
+    if (!is_scalar($value)) return '';
+    $v = trim((string)$value);
     return in_array($v, $allowed, true) ? $v : '';
 }
 
@@ -224,9 +228,24 @@ function csrf_token(): string {
  */
 function csrf_verify(): void {
     $submitted = $_POST['csrf_token'] ?? '';
-    if (!isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $submitted)) {
+    // is_string(): hash_equals() throws a TypeError on an array-valued csrf_token field.
+    if (!is_string($submitted) || !isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $submitted)) {
         http_response_code(403);
         die('Invalid or missing CSRF token. Please go back and try again.');
+    }
+}
+
+/**
+ * Same check as csrf_verify(), for AJAX endpoints whose callers parse the reply as JSON —
+ * csrf_verify()'s plain-text die() would break them with a JSON parse error.
+ */
+function csrf_verify_json(): void {
+    $submitted = $_POST['csrf_token'] ?? '';
+    if (!is_string($submitted) || !isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $submitted)) {
+        http_response_code(403);
+        header('Content-Type: application/json');
+        echo json_encode(['ok' => false, 'msg' => 'Your session expired. Please refresh the page and try again.', 'error' => 'Invalid or missing CSRF token.']);
+        exit;
     }
 }
 

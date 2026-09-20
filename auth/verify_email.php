@@ -11,7 +11,7 @@ $token   = san_str($_GET['token'] ?? '', MAX_TOKEN);
 
 if ($token !== '') {
     $stmt = $conn->prepare("
-        SELECT v.id, v.user_id, v.new_email, u.full_name
+        SELECT v.id, v.user_id, v.new_email, u.full_name, u.is_hidden
         FROM email_verifications v
         JOIN users u ON u.user_id = v.user_id
         WHERE v.token = ? AND v.used = 0 AND v.expires_at > NOW()
@@ -43,7 +43,9 @@ if ($token !== '') {
 
             // Audit log
             $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'EMAIL_VERIFIED', ?)");
-            $desc = $row['full_name'] . ' verified new email address: ' . $row['new_email'];
+            // No session on this token-link page, so mask the hidden account's name here.
+            $actor = !empty($row['is_hidden']) ? 'System Administrator' : $row['full_name'];
+            $desc  = $actor . ' verified new email address: ' . $row['new_email'];
             $log->bind_param('is', $row['user_id'], $desc);
             $log->execute();
 

@@ -35,22 +35,22 @@ function loadBilling($conn, $billing_id) {
 $billing = loadBilling($conn, $billing_id);
 if (!$billing) { header("Location: billing_list.php"); exit; }
 
-// ── DELETE HANDLER ──
-if (isset($_GET['do_delete']) && (int)$_GET['do_delete'] === 1) {
-    $del = $conn->prepare("DELETE FROM billing WHERE billing_id = ?");
-    $del->bind_param('i', $billing_id);
-    $del->execute();
-    $log = $conn->prepare("INSERT INTO audit_logs (user_id,action,description) VALUES (?,'BILLING_DELETED',?)");
-    $desc = ($_SESSION['full_name'] ?? '') . ' deleted billing ' . $billing['billing_number'] . '.';
-    $log->bind_param('is', $_SESSION['user_id'], $desc);
-    $log->execute();
-    header("Location: billing_list.php?success=" . urlencode('Billing record deleted.')); exit;
-}
-
 // ── POST HANDLERS ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
     $action = san_str($_POST['action'] ?? '', 30);
+
+    // Delete is a POST with a CSRF token — it used to be a GET link, which any page could trigger.
+    if ($action === 'delete_billing') {
+        $del = $conn->prepare("DELETE FROM billing WHERE billing_id = ?");
+        $del->bind_param('i', $billing_id);
+        $del->execute();
+        $log = $conn->prepare("INSERT INTO audit_logs (user_id,action,description) VALUES (?,'BILLING_DELETED',?)");
+        $desc = ($_SESSION['full_name'] ?? '') . ' deleted billing ' . $billing['billing_number'] . '.';
+        $log->bind_param('is', $_SESSION['user_id'], $desc);
+        $log->execute();
+        header("Location: billing_list.php?success=" . urlencode('Billing record deleted.')); exit;
+    }
 
     if ($action === 'update_status') {
         $new_status = san_enum($_POST['status'] ?? '', ['draft', 'sent', 'paid', 'unpaid']);

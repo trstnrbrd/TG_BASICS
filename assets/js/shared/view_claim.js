@@ -43,6 +43,7 @@ function attachRemoveBtn(btn) {
       const field = this.dataset.field,
         fd = new FormData();
       (fd.append("ajax_remove_doc", "1"),
+        fd.append("csrf_token", CSRF_TOKEN),
         fd.append("doc_field", field),
         fetch(CLAIM_URL, { method: "POST", body: fd })
           .then((r) => r.json())
@@ -67,6 +68,7 @@ function attachDmgRemoveBtn(btn) {
         wrap = document.getElementById("dmg-wrap-" + photoId),
         fd = new FormData();
       (fd.append("ajax_damage_remove", "1"),
+        fd.append("csrf_token", CSRF_TOKEN),
         fd.append("photo_id", photoId),
         fetch(CLAIM_URL, { method: "POST", body: fd })
           .then((r) => r.json())
@@ -103,6 +105,7 @@ function attachDmgRemoveBtn(btn) {
     item.classList.add("doc-uploading");
     const fd = new FormData();
     (fd.append("ajax_upload", "1"),
+      fd.append("csrf_token", CSRF_TOKEN),
       fd.append("doc_field", field),
       fd.append("doc_file", file),
       fetch(CLAIM_URL, { method: "POST", body: fd })
@@ -147,6 +150,7 @@ function attachDmgRemoveBtn(btn) {
         (files.forEach(function (file) {
           const fd = new FormData();
           (fd.append("ajax_damage_upload", "1"),
+            fd.append("csrf_token", CSRF_TOKEN),
             fd.append("damage_file", file),
             fetch(CLAIM_URL, { method: "POST", body: fd })
               .then((r) => r.json())

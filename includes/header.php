@@ -1276,7 +1276,13 @@ function _mob_icon(string $name): string {
     // Check if user has a PIN (send empty pin = just checking existence)
     let chk;
     try { chk = await fetch(endpoint, { method:'POST', body: new FormData() }).then(r=>r.json()); } catch(e) { chk = null; }
-    if (!chk || chk?.no_pin) return true; // no PIN set or fetch failed — skip prompt
+    // Fail closed: if we can't tell whether a PIN is required (network error, expired session,
+    // server error), block the action — never treat "unknown" as "no PIN set".
+    if (!chk || chk.ok !== true) {
+      Swal.fire({ icon:'error', title:'Could not verify PIN', text: chk?.error || 'Please check your connection and try again.', confirmButtonColor:'#B8860B' });
+      return false;
+    }
+    if (chk.no_pin) return true; // account has no PIN set — nothing to ask for
 
     // Show PIN prompt
     const result = await Swal.fire({

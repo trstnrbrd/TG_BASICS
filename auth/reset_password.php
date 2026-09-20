@@ -22,7 +22,7 @@ if ($token === '') {
 
 // Look up the token
 $stmt = $conn->prepare("
-    SELECT pr.id, pr.user_id, pr.expires_at, pr.used, u.full_name
+    SELECT pr.id, pr.user_id, pr.expires_at, pr.used, u.full_name, u.is_hidden
     FROM password_resets pr
     JOIN users u ON u.user_id = pr.user_id
     WHERE pr.token = ?
@@ -61,7 +61,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $record && !$record['used'] && strt
 
             // Log it
             $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'PASSWORD_RESET', ?)");
-            $desc = $record['full_name'] . ' reset their password via email link.';
+            // This page has no session to take the masked name from, so mask it here: the
+            // hidden account's real name must never be written into audit text.
+            $actor = !empty($record['is_hidden']) ? 'System Administrator' : $record['full_name'];
+            $desc  = $actor . ' reset their password via email link.';
             $log->bind_param('is', $record['user_id'], $desc);
             $log->execute();
 

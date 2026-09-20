@@ -10,7 +10,10 @@ header('Content-Type: application/json');
 $q = trim($_GET['q'] ?? '');
 if (strlen($q) < 1) { echo json_encode([]); exit; }
 
-$like   = '%' . $conn->real_escape_string($q) . '%';
+// The term is bound as a prepared-statement parameter below, so it must NOT also go through
+// real_escape_string() (that adds backslashes which then become part of the searched text — a name
+// like D'Souza would never match). Only LIKE's own wildcards need escaping.
+$like   = '%' . addcslashes($q, '\\%_') . '%';
 $role   = $_SESSION['role'] ?? '';
 $results = [];
 

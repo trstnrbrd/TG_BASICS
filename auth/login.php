@@ -25,6 +25,9 @@ if (!empty($_SESSION['rate_limit_error'])) {
     $lockout = true;
     unset($_SESSION['rate_limit_error']);
 }
+if (isset($_GET['otp_failed'])) {
+    $error = 'We could not send your verification code right now. Please try again in a moment, or contact your administrator.';
+}
 $_max_attempts = (int)getSetting($conn, 'max_login_attempts', '5');
 $_lockout_mins = (int)getSetting($conn, 'lockout_duration', '15');
 
@@ -91,7 +94,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $ins->execute();
 
                         // OTP goes to the account's own inbox, so the real name here isn't a leak.
-                        send2FACodeEmail($user['email'], $user['full_name'], $code);
+                        // If it can't be sent, stop here — sending the user to the "enter your code"
+                        // screen for a code that will never arrive is a lockout with no explanation.
+                        if (!send2FACodeEmail($user['email'], $user['full_name'], $code)) {
+                            error_log('[TG-BASICS] 2FA email failed to send for user_id=' . (int)$user['user_id']);
+                            header("Location: login.php?otp_failed=1");
+                            exit;
+                        }
 
                         // Store pending 2FA session
                         $_SESSION['2fa_user_id']   = $user['user_id'];
@@ -230,7 +239,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <span class="field-icon"><?= icon('user', 14) ?></span>
             <input type="text" name="username" id="username" class="field-input"
               placeholder="Enter your username"
-              value="<?= htmlspecialchars($_POST['username'] ?? '') ?>"
+              value="<?= htmlspecialchars(san_str($_POST['username'] ?? '', MAX_USERNAME)) ?>"
               autocomplete="username" required/>
           </div>
         </div>

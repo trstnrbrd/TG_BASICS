@@ -257,6 +257,11 @@ require_once '../../includes/topbar.php';
   </div>
 </div>
 
+<!-- Deleting is a POST with a CSRF token (claims_list.js fills in the action) — never a GET link -->
+<form id="delete-claim-form" method="POST" style="display:none;">
+  <?= csrf_field() ?>
+  <input type="hidden" name="delete_claim" value="1"/>
+</form>
 <script src="../../assets/js/shared/claims_list.js?v=<?= filemtime(__DIR__.'/../../assets/js/shared/claims_list.js') ?>"></script>
 
 <?php require_once '../../includes/footer.php'; ?>

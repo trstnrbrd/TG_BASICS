@@ -1050,27 +1050,15 @@ require_once '../../includes/footer.php';
         icon: 'warning',
         title: 'Remove Receipt?',
         text: 'This will permanently delete the attached receipt image.',
-        input: 'password',
-        inputPlaceholder: 'Enter your PIN',
-        inputAttributes: { maxlength: 6, autocomplete: 'off' },
         showCancelButton: true,
         confirmButtonText: 'Yes, remove',
         confirmButtonColor: '#c0392b',
         cancelButtonText: 'Cancel',
-        cancelButtonColor: '#6b7280',
-        preConfirm: function(pin) {
-          if (!pin) { Swal.showValidationMessage('PIN is required'); return false; }
-          return fetch('/tg-basics/config/verify_pin.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pin: pin, csrf_token: csrf })
-          }).then(function(r){ return r.json(); }).then(function(d){
-            if (!d.ok) { Swal.showValidationMessage(d.error || 'Incorrect PIN'); return false; }
-            return true;
-          });
-        }
-      }).then(function(result){
+        cancelButtonColor: '#6b7280'
+      }).then(async function(result){
         if (!result.isConfirmed) return;
+        // Same global PIN check as every other destructive action (only asks if the account has a PIN).
+        if (!(await requirePin())) return;
         var cell = document.querySelector('.receipt-cell[data-pid="' + pid + '"]');
         var fd   = new FormData();
         fd.append('delete_receipt', '1');

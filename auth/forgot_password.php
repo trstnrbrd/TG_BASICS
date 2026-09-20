@@ -151,7 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               <span class="field-icon"><?= icon('envelope', 14) ?></span>
               <input type="email" name="email" class="field-input"
                 placeholder="Enter your registered email"
-                value="<?= htmlspecialchars($_POST['email'] ?? '') ?>"
+                value="<?= htmlspecialchars(san_str($_POST['email'] ?? '', MAX_EMAIL)) ?>"
                 autocomplete="email" autofocus/>
             </div>
           </div>

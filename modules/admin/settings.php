@@ -246,8 +246,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                 echo json_encode(['ok' => false, 'error' => 'Username cannot be empty.']);
                 exit;
             }
-            if (!preg_match('/^[a-zA-Z0-9._-]{3,50}$/', $new_username)) {
-                echo json_encode(['ok' => false, 'error' => 'Username may only contain letters, numbers, dots, underscores, and hyphens (3–50 characters).']);
+            // Same rule the login page enforces — if these disagree, a username saved here can
+            // never be typed in at login and the account is locked out of itself.
+            if (!validate_username($new_username)) {
+                echo json_encode(['ok' => false, 'error' => 'Username may only contain letters, numbers, and underscores (3–50 characters).']);
                 exit;
             }
             if ($cur_pw === '') {
@@ -422,15 +424,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
 
             // Claim notify recipients — each row is either a linked user_id or a raw email,
             // aligned by index between the two submitted arrays. Replace with submitted list (max 5).
-            $cnr_user_ids = $_POST['claim_notify_user_ids'] ?? [];
-            $cnr_emails   = $_POST['claim_notify_emails']   ?? [];
+            $cnr_user_ids = is_array($_POST['claim_notify_user_ids'] ?? null) ? $_POST['claim_notify_user_ids'] : [];
+            $cnr_emails   = is_array($_POST['claim_notify_emails']   ?? null) ? $_POST['claim_notify_emails']   : [];
             $row_count    = max(count($cnr_user_ids), count($cnr_emails));
+
+            // A linked recipient must be someone the picker could have offered: a visible
+            // (non-hidden) account with an email on file — never an arbitrary submitted id.
+            $cnr_valid_ids = [];
+            $vr = $conn->query("SELECT user_id FROM users WHERE is_hidden = 0 AND email IS NOT NULL AND email != ''");
+            while ($vrow = $vr->fetch_assoc()) $cnr_valid_ids[] = (int)$vrow['user_id'];
 
             $new_recipients = []; // [ ['user_id' => int|null, 'email' => string|null], ... ]
             for ($i = 0; $i < $row_count; $i++) {
-                $uid = trim($cnr_user_ids[$i] ?? '');
-                $em  = trim($cnr_emails[$i] ?? '');
-                if ($uid !== '' && ctype_digit($uid)) {
+                $uid = san_str($cnr_user_ids[$i] ?? '', 20);
+                $em  = san_str($cnr_emails[$i]   ?? '', MAX_EMAIL);
+                if ($uid !== '' && ctype_digit($uid) && in_array((int)$uid, $cnr_valid_ids, true)) {
                     $new_recipients[] = ['user_id' => (int)$uid, 'email' => null];
                 } elseif ($em !== '' && filter_var($em, FILTER_VALIDATE_EMAIL)) {
                     $new_recipients[] = ['user_id' => null, 'email' => $em];
@@ -574,8 +582,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                 echo json_encode(['ok' => true, 'no_pin' => true]);
                 exit;
             }
-            // Same per-account bucket as ajax/verify_pin.php and config/verify_pin.php,
-            // so switching endpoints doesn't reset the attempt count.
+            // Same per-account bucket as ajax/verify_pin.php, so switching endpoints
+            // doesn't reset the attempt count.
             $rl_key = 'uid:' . (int)$user_id;
             if (rate_limit_blocked($conn, 'verify_pin', $rl_key)) {
                 http_response_code(429);
@@ -622,7 +630,10 @@ $settings = getAllSettings($conn);
 // or a raw typed email address.
 $claim_notify_rows = [];
 $cnr_res = $conn->query("
-    SELECT r.user_id, r.email AS raw_email, u.username, u.full_name, u.email AS user_email
+    SELECT r.user_id, r.email AS raw_email,
+           CASE WHEN u.is_hidden = 1 THEN 'System Administrator' ELSE u.username  END AS username,
+           CASE WHEN u.is_hidden = 1 THEN 'System Administrator' ELSE u.full_name END AS full_name,
+           u.email AS user_email
     FROM claim_notify_recipients r
     LEFT JOIN users u ON r.user_id = u.user_id
     ORDER BY r.id ASC
@@ -791,7 +802,7 @@ require_once '../../includes/topbar.php';
               <div class="field">
                 <label class="field-label">New Username <span class="req">*</span></label>
                 <input type="text" id="new_username" name="new_username" class="field-input"
-                  placeholder="Letters, numbers, dots, underscores, hyphens"/>
+                  placeholder="Letters, numbers, underscores"/>
                 <span class="field-hint">3–50 characters. You can change this once every 60 days.</span>
               </div>
               <div class="field">

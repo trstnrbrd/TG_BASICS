@@ -26,7 +26,7 @@ $vault_error    = '';
 
 if (!$is_super && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['vault_password'])) {
     csrf_verify();
-    if (!empty($vault_hash) && password_verify($_POST['vault_password'], $vault_hash)) {
+    if (!empty($vault_hash) && is_string($_POST['vault_password']) && password_verify($_POST['vault_password'], $vault_hash)) {
         $_SESSION['renewal_vault_unlocked_at'] = $vault_version;
         $vault_unlocked = true;
     } else {

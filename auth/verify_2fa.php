@@ -35,6 +35,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'resend') {
     $em_stmt->execute();
     $em_row = $em_stmt->get_result()->fetch_assoc();
 
+    $sent = false;
     if ($em_row && $em_row['email']) {
         // Invalidate old codes
         $inv = $conn->prepare("UPDATE two_factor_codes SET used = 1 WHERE user_id = ? AND used = 0");
@@ -47,11 +48,20 @@ if (isset($_GET['action']) && $_GET['action'] === 'resend') {
         $ins->bind_param('is', $pending_uid, $code);
         $ins->execute();
 
-        send2FACodeEmail($em_row['email'], $pending_name, $code);
+        $sent = send2FACodeEmail($em_row['email'], $pending_name, $code);
     }
 
+    if (!$sent) {
+        error_log('[TG-BASICS] 2FA resend email failed for user_id=' . (int)$pending_uid);
+        header("Location: verify_2fa.php?resend_failed=1");
+        exit;
+    }
     header("Location: verify_2fa.php?resent=1");
     exit;
+}
+
+if (isset($_GET['resend_failed'])) {
+    $error = 'We could not send a new code right now. Please try again in a moment.';
 }
 
 // Handle form submission

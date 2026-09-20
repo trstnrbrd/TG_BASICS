@@ -34,6 +34,16 @@ $stmt->execute();
 $claim = $stmt->get_result()->fetch_assoc();
 if (!$claim) { header("Location: claims_list.php"); exit; }
 
+// Policy expiry + document progress. Computed here, before any POST handler runs, because the
+// status-update guards below read them (they used to be defined further down, after the handlers
+// had already returned, so those guards always saw an undefined value and never blocked anything).
+$policy_expired = strtotime($claim['policy_end']) < strtotime(date('Y-m-d'));
+$required_docs  = 7; // policy, OR, CR, license, affidavit, estimate, photos
+$docs_done      = (int)$claim['doc_insurance_policy'] + (int)$claim['doc_or'] + (int)$claim['doc_cr']
+                + (int)$claim['doc_drivers_license'] + (int)$claim['doc_affidavit']
+                + (int)$claim['doc_estimate'] + (int)$claim['doc_damage_photos'];
+$all_docs_complete = $docs_done === $required_docs;
+
 // Display number — sequential position, not raw ID
 $dn_stmt = $conn->prepare("SELECT COUNT(*) as pos FROM claims WHERE claim_id <= ?");
 $dn_stmt->bind_param('i', $claim_id);
@@ -57,6 +67,14 @@ function fetchDocCounts($conn, $claim_id) {
           + (int)$chk['doc_drivers_license'] + (int)$chk['doc_affidavit']
           + (int)$chk['doc_estimate'] + (int)$chk['doc_damage_photos'];
     return ['req' => $req, 'done' => $done, 'all_done' => $done === $req];
+}
+
+// Every AJAX branch below changes data (or sends email), so they all need the CSRF token.
+// Answered as JSON because the callers parse the reply as JSON.
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    foreach (['ajax_upload', 'ajax_remove_doc', 'ajax_damage_upload', 'ajax_damage_remove', 'ajax_send_admin_email'] as $ajax_key) {
+        if (isset($_POST[$ajax_key])) { csrf_verify_json(); break; }
+    }
 }
 
 // Handle AJAX file upload
@@ -346,20 +364,14 @@ function deleteClaim($conn, $claim_id, $display_num, $user_id, $actor_name) {
     $log->execute();
 }
 
-// Handle delete (GET trigger from claims_list)
-if (isset($_GET['do_delete']) && $_GET['do_delete'] === '1') {
-    if (!in_array($claim['status'], ['resolved', 'denied'])) {
-        header("Location: claims_list.php");
-        exit;
-    }
-    deleteClaim($conn, $claim_id, $display_num, $_SESSION['user_id'], $_SESSION['full_name'] ?? 'Unknown');
-    header("Location: claims_list.php?success=" . urlencode('Claim #' . $display_num . ' has been deleted.'));
-    exit;
-}
-
-// Handle delete (POST from view page)
+// Handle delete (POST, from this page or the claims list) — only in the statuses the Delete
+// button is offered for, so an in-progress claim can't be removed by a hand-made request.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_claim'])) {
     csrf_verify();
+    if (!in_array($claim['status'], ['resolved', 'denied', 'lack_of_requirements'])) {
+        header("Location: view_claim.php?id=$claim_id&error=" . urlencode('Only resolved, denied, or lack-of-requirements claims can be deleted.'));
+        exit;
+    }
     deleteClaim($conn, $claim_id, $display_num, $_SESSION['user_id'], $_SESSION['full_name'] ?? 'Unknown');
     header("Location: claims_list.php?success=" . urlencode('Claim #' . $display_num . ' has been deleted.'));
     exit;
@@ -431,9 +443,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
     }
 }
 
-// Policy expiry check — lock claim if policy is expired
-$policy_expired = strtotime($claim['policy_end']) < strtotime(date('Y-m-d'));
-
 $status_map = [
     'compiling'            => ['label' => 'Compiling Requirements', 'class' => 'badge-info'],
     'sent_admin'           => ['label' => 'Sent to Admin',          'class' => 'badge-info'],
@@ -446,12 +455,6 @@ $status_map = [
     'lack_of_requirements' => ['label' => 'Lack of Requirements',   'class' => 'badge-yellow'],
     'resolved'             => ['label' => 'Resolved',               'class' => 'badge-muted'],
 ];
-
-$required_docs = 7; // policy, OR, CR, license, affidavit, estimate, photos
-$docs_done = (int)$claim['doc_insurance_policy'] + (int)$claim['doc_or'] + (int)$claim['doc_cr']
-           + (int)$claim['doc_drivers_license'] + (int)$claim['doc_affidavit']
-           + (int)$claim['doc_estimate'] + (int)$claim['doc_damage_photos'];
-$all_docs_complete = $docs_done === $required_docs;
 
 $s = $status_map[$claim['status']] ?? ['label' => $claim['status'], 'class' => 'badge-muted'];
 
@@ -930,6 +933,7 @@ require_once '../../includes/topbar.php';
 const REQ_DOCS   = <?= $required_docs ?>;
 const DOCS_DONE  = <?= $docs_done ?>;
 const CLAIM_URL  = 'view_claim.php?id=<?= $claim_id ?>';
+const CSRF_TOKEN = <?= json_encode(csrf_token()) ?>;
 const checkIcon  = `<?= icon('check', 12) ?>`;
 const docIcon    = `<?= icon('document', 13) ?>`;
 const xIcon      = `<?= icon('x-mark', 10) ?>`;
@@ -962,6 +966,7 @@ const xIcon      = `<?= icon('x-mark', 10) ?>`;
 
       var fd = new FormData();
       fd.append('ajax_send_admin_email', '1');
+      fd.append('csrf_token', CSRF_TOKEN);
 
       fetch('view_claim.php?id=<?= $claim_id ?>', { method: 'POST', body: fd })
         .then(function(r) { return r.json(); })

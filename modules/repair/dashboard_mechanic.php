@@ -226,7 +226,7 @@ require_once '../../includes/topbar.php';
           <div style="position:relative;flex-shrink:0;">
             <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--gold-bright),var(--gold));display:flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:800;color:#fff;overflow:hidden;border:2px solid var(--border);">
               <?php if ($tm_photo): ?>
-                <img src="<?= $tm_photo ?>" style="width:100%;height:100%;object-fit:cover;" alt=""/>
+                <img src="<?= $tm_photo ?>" style="width:100%;height:100%;object-fit:cover;" alt="" loading="lazy"/>
               <?php else: ?>
                 <?= $tm_initials ?>
               <?php endif; ?>

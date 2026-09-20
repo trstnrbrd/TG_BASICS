@@ -442,7 +442,7 @@ require_once '../../includes/topbar.php';
                 <div style="display:flex;align-items:center;gap:0.5rem;">
                   <div style="width:26px;height:26px;border-radius:50%;background:<?= $log['full_name'] ? 'linear-gradient(135deg,var(--gold-bright),var(--gold))' : 'var(--border)' ?>;display:flex;align-items:center;justify-content:center;font-size:0.58rem;font-weight:800;color:#fff;flex-shrink:0;overflow:hidden;">
                     <?php if (!empty($log['profile_photo'])): ?>
-                      <img src="<?= $base_path ?>uploads/avatars/<?= htmlspecialchars($log['profile_photo']) ?>" alt="" style="width:100%;height:100%;object-fit:cover;"/>
+                      <img src="<?= $base_path ?>uploads/avatars/<?= htmlspecialchars($log['profile_photo']) ?>" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;"/>
                     <?php else: ?>
                       <?= $log['full_name'] ? strtoupper(substr($log['full_name'], 0, 1)) : '?' ?>
                     <?php endif; ?>

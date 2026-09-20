@@ -204,7 +204,7 @@ require_once '../../includes/topbar.php';
                 <div style="display:flex;align-items:center;gap:0.65rem;">
                   <div data-user-id="<?= $u['user_id'] ?>" title="View profile" style="position:relative;flex-shrink:0;cursor:pointer;">
                     <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--gold-bright),var(--gold));display:flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:800;color:#fff;overflow:hidden;border:2px solid var(--border);">
-                      <?php if ($u_photo): ?><img src="<?= $u_photo ?>" style="width:100%;height:100%;object-fit:cover;" alt=""/><?php else: ?><?= $u_initials ?><?php endif; ?>
+                      <?php if ($u_photo): ?><img src="<?= $u_photo ?>" style="width:100%;height:100%;object-fit:cover;" alt="" loading="lazy"/><?php else: ?><?= $u_initials ?><?php endif; ?>
                     </div>
                     <span style="position:absolute;bottom:0;right:0;width:9px;height:9px;border-radius:50%;background:<?= $is_online ? '#22c55e' : 'var(--border)' ?>;border:2px solid var(--bg-3);<?= $is_online ? 'box-shadow:0 0 0 2px rgba(34,197,94,0.25);' : '' ?>"></span>
                   </div>
@@ -245,7 +245,7 @@ require_once '../../includes/topbar.php';
             <!-- Avatar -->
             <div class="mu-card-avatar" data-user-id="<?= $u['user_id'] ?>">
               <div class="mu-card-avatar-inner">
-                <?php if ($u_photo): ?><img src="<?= $u_photo ?>" alt=""/><?php else: ?><?= $u_initials ?><?php endif; ?>
+                <?php if ($u_photo): ?><img src="<?= $u_photo ?>" alt="" loading="lazy"/><?php else: ?><?= $u_initials ?><?php endif; ?>
               </div>
               <span class="mu-card-dot" style="background:<?= $is_online ? '#22c55e' : 'var(--border)' ?>;<?= $is_online ? 'box-shadow:0 0 0 2px rgba(34,197,94,0.25);' : '' ?>"></span>
             </div>

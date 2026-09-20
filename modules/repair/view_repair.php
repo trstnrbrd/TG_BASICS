@@ -416,7 +416,7 @@ document.addEventListener('DOMContentLoaded', function() {
           $img_url = '../../uploads/repair_jobs/' . $job_id . '/' . htmlspecialchars($img['file_name']);
         ?>
         <div style="position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--border);aspect-ratio:4/3;background:var(--bg-2);">
-          <img src="<?= $img_url ?>" alt="Vehicle photo"
+          <img src="<?= $img_url ?>" alt="Vehicle photo" loading="lazy"
             style="width:100%;height:100%;object-fit:cover;cursor:pointer;transition:opacity 0.15s;"
             onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'"
             onclick="openLightbox('<?= $img_url ?>')"/>

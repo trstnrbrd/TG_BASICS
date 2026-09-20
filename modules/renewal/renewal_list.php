@@ -368,7 +368,7 @@ require_once '../../includes/topbar.php';
                         <div style="display:inline-flex;align-items:center;gap:0.45rem;">
                           <div style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,var(--gold-bright),var(--gold));display:flex;align-items:center;justify-content:center;font-size:0.56rem;font-weight:800;color:#fff;flex-shrink:0;overflow:hidden;">
                             <?php if (!empty($row['added_by_photo'])): ?>
-                              <img src="<?= $base_path ?>uploads/avatars/<?= htmlspecialchars($row['added_by_photo']) ?>" alt="" style="width:100%;height:100%;object-fit:cover;"/>
+                              <img src="<?= $base_path ?>uploads/avatars/<?= htmlspecialchars($row['added_by_photo']) ?>" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;"/>
                             <?php else: ?>
                               <?= htmlspecialchars($aby_initials) ?>
                             <?php endif; ?>

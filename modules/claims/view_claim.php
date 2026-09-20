@@ -700,7 +700,7 @@ require_once '../../includes/topbar.php';
                   </a>
                 <?php else: ?>
                   <a href="<?= $file_url ?>" target="_blank">
-                    <img src="<?= $file_url ?>" alt="<?= $d[1] ?>" class="doc-thumb"/>
+                    <img src="<?= $file_url ?>" alt="<?= $d[1] ?>" class="doc-thumb" loading="lazy"/>
                   </a>
                 <?php endif; ?>
                 <?php if (!$docs_locked): ?>
@@ -749,7 +749,7 @@ require_once '../../includes/topbar.php';
                 <div class="dmg-photo-wrap" id="dmg-wrap-<?= $dp['photo_id'] ?>" style="position:relative;">
                   <a href="../../uploads/claims/<?= htmlspecialchars($dp['filename']) ?>" target="_blank">
                     <img src="../../uploads/claims/<?= htmlspecialchars($dp['filename']) ?>"
-                         alt="Damage evidence photo <?= $dp_i + 1 ?>"
+                         alt="Damage evidence photo <?= $dp_i + 1 ?>" loading="lazy"
                          style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border);display:block;"/>
                   </a>
                   <?php if (!$docs_locked): ?>

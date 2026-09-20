@@ -147,7 +147,7 @@
   <div class="trust-inner js-reveal">
     <div class="section-label" style="justify-content:center;">Trusted</div>
     <h3 class="trust-heading">&ldquo;Your Journey, Our Care.&rdquo;</h3>
-    <p class="trust-sub">PhilBritish-Accredited Broker &middot; Est. 2016</p>
+    <p class="trust-sub">PhilBritish &amp; Alpha Insurance-Accredited Broker &middot; Est. 2016</p>
 
     <div class="trust-rule">
       <span class="trust-rule-line"></span>
@@ -201,14 +201,14 @@
           <img src="assets/img/LogoBasicCar.png" alt="Basic Car Insurance" class="service-pillar-logo"/>
           <div>
             <div class="service-pillar-name">Basic Car Insurance</div>
-            <div class="service-pillar-tag">PhilBritish-Accredited Broker</div>
+            <div class="service-pillar-tag">PhilBritish &amp; Alpha Insurance-Accredited Broker</div>
           </div>
         </div>
         <div class="service-item">
           <div class="service-item-icon"><?= icon('shield-check', 18) ?></div>
           <div>
             <div class="service-item-name">New Policy &amp; Eligibility Check</div>
-            <div class="service-item-desc">Vehicle eligibility checked against PhilBritish's 10-year coverage window before any application moves forward.</div>
+            <div class="service-item-desc">Vehicle eligibility checked against the shared 10-year coverage window for both PhilBritish and Alpha Insurance before any application moves forward.</div>
           </div>
         </div>
         <div class="service-item">
@@ -344,7 +344,7 @@
             <div class="bp-step-flip-hint"><?= icon('arrow-path', 12) ?></div>
             <div class="bp-step-icon"><?= icon('document', 26) ?></div>
             <div class="bp-step-title">Insure</div>
-            <div class="bp-step-text">Policy filed. OR/CR renewal and PhilBritish premium computed.</div>
+            <div class="bp-step-text">Policy filed. OR/CR renewal and insurer premium computed.</div>
           </div>
           <div class="bp-step-back">
             <div class="bp-mock-screen">
@@ -574,7 +574,7 @@
         <div class="feat-text">
           <div class="feat-num-row"><span class="feat-num">02</span><span class="feat-tag">Insurance</span></div>
           <h3 class="feat-heading">Insurance Eligibility and Policy Processing</h3>
-          <p class="feat-desc">Automatic 10-year eligibility check for PhilBritish coverage, based on year model. Encode full policy details including premium, commission, and coverage type.</p>
+          <p class="feat-desc">Automatic 10-year eligibility check for PhilBritish and Alpha Insurance coverage, based on year model. Encode full policy details including premium, commission, and coverage type.</p>
         </div>
         <div class="feat-node"><span class="feat-node-dot"></span></div>
         <div class="feat-visual">
@@ -587,7 +587,7 @@
               <div class="feat-elig-row"><span>Plate Number</span><strong>945 RJCW</strong></div>
               <div class="feat-elig-row"><span>Year Model</span><strong>2021</strong></div>
               <div class="feat-elig-row"><span>Vehicle Age</span><strong>5 years</strong></div>
-              <div class="feat-elig-result eligible"><?= icon('check-circle', 16) ?> Eligible for PhilBritish Coverage</div>
+              <div class="feat-elig-result eligible"><?= icon('check-circle', 16) ?> Eligible for Coverage</div>
             </div>
           </div>
         </div>

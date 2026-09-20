@@ -1,1 +1,85 @@
-function showFieldError(inputEl,message){inputEl.classList.add("is-error");var wrap=inputEl.closest(".field"),existing=wrap.querySelector(".field-error-msg");existing&&existing.remove();var msg=document.createElement("div");msg.className="field-error-msg",msg.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>'+message+"</span>",wrap.appendChild(msg)}function clearFieldError(inputEl){inputEl.classList.remove("is-error");var msg=inputEl.closest(".field").querySelector(".field-error-msg");msg&&msg.remove()}window.addEventListener("load",function(){var u=document.getElementById("username");u&&u.focus()}),document.getElementById("pw-toggle").addEventListener("click",function(){var pw=document.getElementById("password"),iconShow=document.getElementById("pw-icon-show"),iconHide=document.getElementById("pw-icon-hide"),visible="password"===pw.type;pw.type=visible?"text":"password",iconShow.style.display=visible?"none":"",iconHide.style.display=visible?"":"none"}),["username","password"].forEach(function(id){var el=document.getElementById(id);el&&el.addEventListener("input",function(){clearFieldError(this)})}),function(){var panel=document.querySelector(".auth-left"),rings=document.querySelectorAll(".auth-deco");if(panel&&rings.length){var mx=0,my=0,lx=0,ly=0,hovering=!1,t0=performance.now(),cfg=[[14,8e-4,.35,0],[10,55e-5,.45,2.1],[8,95e-5,.3,4.2],[6,65e-5,.5,1]],depth=[28,18,12,36];panel.addEventListener("mousemove",function(e){var r=panel.getBoundingClientRect();mx=(e.clientX-r.left-r.width/2)/(r.width/2),my=(e.clientY-r.top-r.height/2)/(r.height/2),hovering=!0}),panel.addEventListener("mouseleave",function(){hovering=!1}),requestAnimationFrame(function tick(now){var t=now-t0;lx+=.07*((hovering?mx:0)-lx),ly+=.07*((hovering?my:0)-ly),rings.forEach(function(ring,i){var c=cfg[i],fy=Math.sin(t*c[1]+c[3])*c[0],fx=Math.cos(t*c[1]*c[2]+c[3])*(.4*c[0]),px=lx*depth[i],py=ly*depth[i];ring.style.transform="translate("+(fx+px).toFixed(2)+"px,"+(fy+py).toFixed(2)+"px)"}),requestAnimationFrame(tick)})}}();
+function showFieldError(inputEl, message) {
+  inputEl.classList.add("is-error");
+  var wrap = inputEl.closest(".field"),
+    existing = wrap.querySelector(".field-error-msg");
+  existing && existing.remove();
+  var msg = document.createElement("div");
+  ((msg.className = "field-error-msg"),
+    (msg.innerHTML =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>' +
+      message +
+      "</span>"),
+    wrap.appendChild(msg));
+}
+function clearFieldError(inputEl) {
+  inputEl.classList.remove("is-error");
+  var msg = inputEl.closest(".field").querySelector(".field-error-msg");
+  msg && msg.remove();
+}
+(window.addEventListener("load", function () {
+  var u = document.getElementById("username");
+  u && u.focus();
+}),
+  document.getElementById("pw-toggle").addEventListener("click", function () {
+    var pw = document.getElementById("password"),
+      iconShow = document.getElementById("pw-icon-show"),
+      iconHide = document.getElementById("pw-icon-hide"),
+      visible = "password" === pw.type;
+    ((pw.type = visible ? "text" : "password"),
+      (iconShow.style.display = visible ? "none" : ""),
+      (iconHide.style.display = visible ? "" : "none"));
+  }),
+  ["username", "password"].forEach(function (id) {
+    var el = document.getElementById(id);
+    el &&
+      el.addEventListener("input", function () {
+        clearFieldError(this);
+      });
+  }),
+  (function () {
+    var panel = document.querySelector(".auth-left"),
+      rings = document.querySelectorAll(".auth-deco");
+    if (panel && rings.length) {
+      var mx = 0,
+        my = 0,
+        lx = 0,
+        ly = 0,
+        hovering = !1,
+        t0 = performance.now(),
+        cfg = [
+          [14, 8e-4, 0.35, 0],
+          [10, 55e-5, 0.45, 2.1],
+          [8, 95e-5, 0.3, 4.2],
+          [6, 65e-5, 0.5, 1],
+        ],
+        depth = [28, 18, 12, 36];
+      (panel.addEventListener("mousemove", function (e) {
+        var r = panel.getBoundingClientRect();
+        ((mx = (e.clientX - r.left - r.width / 2) / (r.width / 2)),
+          (my = (e.clientY - r.top - r.height / 2) / (r.height / 2)),
+          (hovering = !0));
+      }),
+        panel.addEventListener("mouseleave", function () {
+          hovering = !1;
+        }),
+        requestAnimationFrame(function tick(now) {
+          var t = now - t0;
+          ((lx += 0.07 * ((hovering ? mx : 0) - lx)),
+            (ly += 0.07 * ((hovering ? my : 0) - ly)),
+            rings.forEach(function (ring, i) {
+              var c = cfg[i],
+                fy = Math.sin(t * c[1] + c[3]) * c[0],
+                fx = Math.cos(t * c[1] * c[2] + c[3]) * (0.4 * c[0]),
+                px = lx * depth[i],
+                py = ly * depth[i];
+              ring.style.transform =
+                "translate(" +
+                (fx + px).toFixed(2) +
+                "px," +
+                (fy + py).toFixed(2) +
+                "px)";
+            }),
+            requestAnimationFrame(tick));
+        }));
+    }
+  })());

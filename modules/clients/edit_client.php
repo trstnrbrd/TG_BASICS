@@ -2,6 +2,7 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
+require_once '../../config/access.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
     header("Location: ../../auth/login.php");
@@ -10,6 +11,12 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'supe
 
 $client_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if ($client_id === 0) {
+    header("Location: client_list.php");
+    exit;
+}
+
+// Admins can only work with clients they personally added — same rule as the client list and profile
+if (!client_in_scope($conn, $client_id)) {
     header("Location: client_list.php");
     exit;
 }

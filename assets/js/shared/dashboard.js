@@ -15,48 +15,4 @@
         }));
     }
   });
-  var greetEl = document.getElementById("js-greeting"),
-    dateEl = document.getElementById("js-date"),
-    timeEl = document.getElementById("js-time");
-  function update() {
-    var now = new Date(),
-      h = now.getHours();
-    greetEl.textContent =
-      h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
-    dateEl.textContent =
-      [
-        "Sunday",
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday",
-        "Friday",
-        "Saturday",
-      ][now.getDay()] +
-      ", " +
-      [
-        "January",
-        "February",
-        "March",
-        "April",
-        "May",
-        "June",
-        "July",
-        "August",
-        "September",
-        "October",
-        "November",
-        "December",
-      ][now.getMonth()] +
-      " " +
-      now.getDate() +
-      ", " +
-      now.getFullYear();
-    var hr = h % 12 || 12,
-      min = now.getMinutes().toString().padStart(2, "0"),
-      sec = now.getSeconds().toString().padStart(2, "0");
-    timeEl.textContent =
-      hr + ":" + min + ":" + sec + " " + (h < 12 ? "AM" : "PM");
-  }
-  (update(), setInterval(update, 1e3));
 })();

@@ -2,6 +2,7 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
+require_once '../../config/access.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
     header("Location: ../../auth/login.php");
@@ -37,7 +38,20 @@ if (!$vehicle) {
     exit;
 }
 
+// Admins can only work with clients they personally added — same rule as the client list and profile
+if (!client_in_scope($conn, (int)$vehicle['client_id'])) {
+    header("Location: client_list.php");
+    exit;
+}
+
 $client_id = $vehicle['client_id'];
+
+// Repair jobs (with their quotations and e-receipts) and claims would be wiped or orphaned along with the vehicle
+$blockers = vehicle_unregister_blockers($conn, $vehicle_id);
+if ($blockers !== '') {
+    header("Location: view_client.php?id=" . $client_id . "&error=" . urlencode('Vehicle ' . $vehicle['plate_number'] . ' cannot be unregistered — it still has ' . $blockers . ' on record.'));
+    exit;
+}
 
 // Delete vehicle — CASCADE removes linked policies automatically
 $del = $conn->prepare("DELETE FROM vehicles WHERE vehicle_id = ?");

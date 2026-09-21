@@ -82,14 +82,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'update_costs') {
-        $parts  = (float)str_replace(',', '', $_POST['parts_cost'] ?? '0');
-        $labor  = (float)str_replace(',', '', $_POST['labor_cost'] ?? '0');
-        $other  = (float)str_replace(',', '', $_POST['other_cost'] ?? '0');
-        $deduct = (float)str_replace(',', '', $_POST['deductible'] ?? '0');
+        // Blank = 0; anything that is not a plain number comes back as -1 and is rejected below
+        $num = function ($v) { $v = is_string($v) ? str_replace(',', '', trim($v)) : ''; return $v === '' ? 0.0 : (is_numeric($v) ? (float)$v : -1.0); };
+        $parts  = $num($_POST['parts_cost'] ?? '0');
+        $labor  = $num($_POST['labor_cost'] ?? '0');
+        $other  = $num($_POST['other_cost'] ?? '0');
+        $deduct = $num($_POST['deductible'] ?? '0');
         $billed = san_str($_POST['billed_to']      ?? '', 255);
         $notes  = san_str($_POST['notes']           ?? '', 1000);
         $inc_d  = san_str($_POST['incident_date']   ?? '', 10) ?: null;
         $rep_d  = san_str($_POST['repair_date']     ?? '', 10) ?: null;
+
+        // The form already enforces min=0, but a hand-made request must not put negative or malformed values on a bill
+        $bad = null;
+        foreach (['Parts' => $parts, 'Labor' => $labor, 'Other' => $other, 'Deductible' => $deduct] as $label => $amt) {
+            if ($amt < 0 || $amt > 999999999.99) { $bad = $label . ' amount must be a number between 0 and 999,999,999.99.'; break; }
+        }
+        if (!$bad && $inc_d !== null && !validate_date($inc_d)) $bad = 'Incident date is not a valid date.';
+        if (!$bad && $rep_d !== null && !validate_date($rep_d)) $bad = 'Repair date is not a valid date.';
+        if ($bad) { header("Location: view_billing.php?id=$billing_id&error=" . urlencode($bad)); exit; }
+
         $upd = $conn->prepare("UPDATE billing SET billed_to=?,incident_date=?,repair_date=?,parts_cost=?,labor_cost=?,other_cost=?,deductible=?,notes=? WHERE billing_id=?");
         $upd->bind_param('sssddddsi', $billed, $inc_d, $rep_d, $parts, $labor, $other, $deduct, $notes, $billing_id);
         $upd->execute();
@@ -135,7 +147,14 @@ require_once '../../includes/topbar.php';
     <?php if (!empty($_GET['success'])): ?>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-      Swal.fire({ toast:true, position:'top-end', icon:'success', title:<?= json_encode(san_str($_GET['success'], 200)) ?>, showConfirmButton:false, timer:3000, timerProgressBar:true });
+      Swal.fire({ toast:true, position:'top-end', icon:'success', titleText:<?= json_encode(san_str($_GET['success'], 200)) ?>, showConfirmButton:false, timer:3000, timerProgressBar:true });
+    });
+    </script>
+    <?php endif; ?>
+    <?php if (!empty($_GET['error'])): ?>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      Swal.fire({ icon:'error', title:'Could not save', text:<?= json_encode(san_str($_GET['error'], 200)) ?>, confirmButtonColor:'#B8860B' });
     });
     </script>
     <?php endif; ?>

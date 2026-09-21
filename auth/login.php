@@ -25,6 +25,11 @@ if (!empty($_SESSION['rate_limit_error'])) {
     $lockout = true;
     unset($_SESSION['rate_limit_error']);
 }
+// Why the user was sent back here (idle timeout, account deactivated/changed — set by config/session.php)
+if (!empty($_SESSION['login_notice'])) {
+    $error = $_SESSION['login_notice'];
+    unset($_SESSION['login_notice']);
+}
 if (isset($_GET['otp_failed'])) {
     $error = 'We could not send your verification code right now. Please try again in a moment, or contact your administrator.';
 }
@@ -51,14 +56,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $lockout = true;
             $error   = 'Account is locked due to too many failed attempts. Please try again later.';
         } else {
-            $stmt = $conn->prepare("SELECT user_id, username, password, role, full_name, is_active, is_hidden, two_factor_enabled, totp_enabled, email FROM users WHERE username = ?");
+            $stmt = $conn->prepare("SELECT user_id, username, password, role, full_name, is_active, activation_token, is_hidden, two_factor_enabled, totp_enabled, email FROM users WHERE username = ?");
             $stmt->bind_param('s', $username);
             $stmt->execute();
             $user = $stmt->get_result()->fetch_assoc();
 
             if ($user && password_verify($password, $user['password'])) {
                 if (!$user['is_active']) {
-                    $error = 'Your account is not yet activated. Please check your email for the activation link.';
+                    // Still holding its activation token = invited but never activated; no token = an administrator switched it off
+                    $error = ($user['activation_token'] === null || $user['activation_token'] === '')
+                        ? 'Your account has been deactivated. Please contact your administrator.'
+                        : 'Your account is not yet activated. Please check your email for the activation link.';
                 } else {
                     $reset = $conn->prepare("UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE username = ?");
                     $reset->bind_param('s', $username);
@@ -258,7 +266,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           </div>
         </div>
 
-        <div id="submit-root"></div>
+        <!-- The animated button is drawn by React (loaded from a CDN). This plain button sits here first and is
+             replaced when React loads — so sign-in still works if the CDN is slow, blocked, or offline. -->
+        <div id="submit-root"><button type="submit" class="btn-submit" id="fallback-submit-btn">Sign In to TG-BASICS</button></div>
       </form>
 
       <div class="auth-form-note">

@@ -2,6 +2,7 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
+require_once '../../config/access.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin', 'mechanic'])) {
     header("Location: ../../auth/login.php");
@@ -28,6 +29,12 @@ $v = $stmt->get_result()->fetch_assoc();
 
 if (!$v) {
     header("Location: client_list.php?error=Vehicle not found.");
+    exit;
+}
+
+// Same scope as the client profile: admins their own clients, mechanics walk-in clients only
+if (!client_in_scope($conn, (int)$v['client_id'])) {
+    header("Location: client_list.php");
     exit;
 }
 

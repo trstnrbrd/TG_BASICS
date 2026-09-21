@@ -212,14 +212,14 @@ require_once '../../includes/topbar.php';
 <?php if (!empty($_GET['success'])): ?>
 <script>
 document.addEventListener('DOMContentLoaded',function(){
-  Swal.fire({toast:true,position:'top-end',icon:'success',title:<?= json_encode(san_str($_GET['success'],200)) ?>,showConfirmButton:false,timer:3000,timerProgressBar:true});
+  Swal.fire({toast:true,position:'top-end',icon:'success',titleText:<?= json_encode(san_str($_GET['success'],200)) ?>,showConfirmButton:false,timer:3000,timerProgressBar:true});
 });
 </script>
 <?php endif; ?>
 <?php if (!empty($_GET['msg'])): ?>
 <script>
 document.addEventListener('DOMContentLoaded',function(){
-  Swal.fire({toast:true,position:'top-end',icon:'info',title:<?= json_encode(san_str($_GET['msg'],200)) ?>,showConfirmButton:false,timer:3000,timerProgressBar:true});
+  Swal.fire({toast:true,position:'top-end',icon:'info',titleText:<?= json_encode(san_str($_GET['msg'],200)) ?>,showConfirmButton:false,timer:3000,timerProgressBar:true});
 });
 </script>
 <?php endif; ?>

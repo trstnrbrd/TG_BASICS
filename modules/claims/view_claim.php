@@ -480,7 +480,7 @@ require_once '../../includes/topbar.php';
     <?php if (isset($_GET['success'])): ?>
     <script>
       document.addEventListener('DOMContentLoaded', function() {
-        Swal.fire({ toast:true, position:'top-end', icon:'success', title:<?= json_encode($_GET['success']) ?>, showConfirmButton:false, timer:3000, timerProgressBar:true });
+        Swal.fire({ toast:true, position:'top-end', icon:'success', titleText:<?= json_encode($_GET['success']) ?>, showConfirmButton:false, timer:3000, timerProgressBar:true });
       });
     </script>
     <?php endif; ?>

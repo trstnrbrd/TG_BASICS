@@ -128,7 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_mechanic) {
             if ($edit_mode) {
                 // ── UPDATE existing draft ──
                 $upd = $conn->prepare("UPDATE quotations SET status=?, subtotal=?, discount=?, total=?, notes=? WHERE quotation_id=?");
-                $upd->bind_param('sddisi', $status, $subtotal, $discount, $total, $notes, $edit_qt_id);
+                $upd->bind_param('sdddsi', $status, $subtotal, $discount, $total, $notes, $edit_qt_id);
                 $upd->execute();
 
                 $del = $conn->prepare("DELETE FROM quotation_items WHERE quotation_id=?");

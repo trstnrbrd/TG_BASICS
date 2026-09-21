@@ -5,6 +5,14 @@ require_once __DIR__ . '/../../includes/icons.php';
 
 $token = isset($_GET['token']) ? trim($_GET['token']) : '';
 
+// This page is opened through a secret link (the client's QR code): keep it out of search engines and
+// caches, and don't hand the link (it contains the token) to other sites through the Referer header.
+header('X-Robots-Tag: noindex, nofollow, noarchive');
+header('Referrer-Policy: no-referrer');
+header('Cache-Control: private, no-store');
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: SAMEORIGIN');
+
 function pub_not_found(): never {
     http_response_code(404);
     ?>
@@ -145,6 +153,8 @@ $initials = strtoupper(substr(implode('', array_map(fn($w) => $w[0], $words)), 0
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="referrer" content="no-referrer">
 <title><?= htmlspecialchars($client['full_name']) ?> — <?= htmlspecialchars($company_name) ?></title>
 <link rel="icon" type="image/png" href="../../assets/img/tg_logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">

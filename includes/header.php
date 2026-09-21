@@ -423,6 +423,8 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
   .btn-sm-gold:hover { background: var(--gold-bright); color: #fff; }
   .btn-sm-danger { background: var(--danger); color: #fff; border: none; padding: 0.35rem 0.55rem; border-radius: 7px; font-size: 0.75rem; font-weight: 700; text-decoration: none; transition: all 0.15s; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.35rem; font-family: 'Plus Jakarta Sans', sans-serif; cursor: pointer; }
   .btn-sm-danger:hover { background: #a93226; color: #fff; }
+  .mu-act-group { display: flex; gap: 0.4rem; justify-content: center; }
+  .mu-act-form .btn-sm-gold, .mu-act-form .btn-sm-danger { padding: 0.35rem 0.55rem; }
 
   /* ── FORM FIELDS ── */
   .field { display: flex; flex-direction: column; gap: 0.4rem; }
@@ -852,8 +854,13 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
     .tg-table tbody td { font-size: 0.68rem; padding: 0.5rem; }
 
     .card-title        { font-size: 0.82rem; }
-    .card-header       { flex-direction: column; align-items: stretch; }
-    .card-header > * { margin-left: 0 !important; width: 100%; }
+    .card-header       { flex-direction: row; align-items: center; flex-wrap: wrap; }
+    .card-header > * { margin-left: 0 !important; }
+    .card-header > .card-icon { flex: 0 0 auto; }
+    .card-header > .card-icon + * { flex: 1 1 0; min-width: 0; }
+    .card-header > .card-icon + * ~ * { flex: 1 1 100%; }
+    .card-header > :first-child:not(.card-icon),
+    .card-header > :first-child:not(.card-icon) ~ * { flex: 1 1 100%; }
     .card-header .btn-primary,
     .card-header .btn-sm-gold { width: 100%; justify-content: center; }
 

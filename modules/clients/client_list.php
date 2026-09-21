@@ -2,6 +2,7 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
+require_once '../../config/access.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin', 'mechanic'])) {
     header("Location: ../../auth/login.php");
@@ -55,23 +56,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) 
     if ($cdata) {
         // Block deletion only if active policies, repair jobs, or claims exist
         // Vehicles alone are NOT a blocker — they are removed on client deletion
-        $chk = $conn->prepare("
-            SELECT
-              (SELECT COUNT(*) FROM claims             WHERE client_id = ?) AS claims_count,
-              (SELECT COUNT(*) FROM insurance_policies WHERE client_id = ?) AS policies_count,
-              (SELECT COUNT(*) FROM repair_jobs        WHERE client_id = ?) AS repairs_count
-        ");
-        $chk->bind_param('iii', $del_id, $del_id, $del_id);
-        $chk->execute();
-        $counts   = $chk->get_result()->fetch_assoc();
-        $blocking = ($counts['claims_count'] ?? 0) + ($counts['policies_count'] ?? 0) + ($counts['repairs_count'] ?? 0);
-
-        if ($blocking > 0) {
-            $parts = [];
-            if ($counts['policies_count'])  $parts[] = $counts['policies_count']  . ' policy(s)';
-            if ($counts['repairs_count'])   $parts[] = $counts['repairs_count']   . ' repair job(s)';
-            if ($counts['claims_count'])    $parts[] = $counts['claims_count']    . ' claim(s)';
-            $linked_msg = implode(', ', $parts);
+        $linked_msg = client_delete_blockers($conn, $del_id);
+        if ($linked_msg !== '') {
             header("Location: client_list.php?error=" . urlencode('"' . $cdata['full_name'] . '" cannot be deleted — they still have ' . $linked_msg . ' on record.'));
             exit;
         }
@@ -265,7 +251,7 @@ require_once '../../includes/topbar.php';
     <?php if (isset($_GET['success'])): ?>
     <script>
       document.addEventListener('DOMContentLoaded', function() {
-        Swal.fire({ toast:true, position:'top-end', icon:'success', title:<?= json_encode($_GET['success']) ?>, showConfirmButton:false, timer:3000, timerProgressBar:true });
+        Swal.fire({ toast:true, position:'top-end', icon:'success', titleText:<?= json_encode($_GET['success']) ?>, showConfirmButton:false, timer:3000, timerProgressBar:true });
       });
     </script>
     <?php endif; ?>

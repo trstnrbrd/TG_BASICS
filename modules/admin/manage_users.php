@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../config/session.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/mailer.php';
+require_once '../../config/access.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'super_admin') {
     header("Location: ../../auth/login.php");
@@ -11,32 +12,89 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'super_admin') {
 
 $full_name = $_SESSION['full_name'];
 $initials  = substr(implode('', array_map(fn($w) => strtoupper($w[0]), explode(' ', $full_name))), 0, 2);
-$admin_id  = $_SESSION['user_id'];
+$admin_id  = (int)$_SESSION['user_id'];
 
 $success = '';
 $errors  = [];
 
+// The account this POST is about — never the hidden oversight account
+function mu_load_target(mysqli $conn, int $user_id): ?array {
+    $st = $conn->prepare("SELECT user_id, full_name, role, is_active, activation_token FROM users WHERE user_id = ? AND is_hidden = 0");
+    $st->bind_param('i', $user_id);
+    $st->execute();
+    return $st->get_result()->fetch_assoc() ?: null;
+}
+
 // ── HANDLE DELETE ──
+// Only accounts that never did anything (e.g. created by mistake, never activated) can be deleted.
+// Everyone else is deactivated instead, so the audit trail and the "created by" links stay intact.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
     csrf_verify();
     $del_id = (int)($_POST['user_id'] ?? 0);
+    $target = mu_load_target($conn, $del_id);
 
-    // Cannot delete yourself
     if ($del_id === $admin_id) {
         $errors[] = 'You cannot delete your own account.';
+    } elseif (!$target) {
+        $errors[] = 'Account not found.';
+    } elseif ($target['role'] === 'super_admin') {
+        $errors[] = 'Could not delete account. Super admin accounts cannot be deleted.';
+    } elseif (user_has_history($conn, $del_id)) {
+        $errors[] = 'This account has activity on record (sign-ins, clients, repair jobs, …), so deleting it would erase that history. Deactivate it instead — they are locked out right away and the records stay intact.';
     } else {
-        $del = $conn->prepare("DELETE FROM users WHERE user_id = ? AND role != 'super_admin'");
-        $del->bind_param('i', $del_id);
-        if ($del->execute() && $del->affected_rows > 0) {
-            // Log it
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'ACCOUNT_DELETED', ?)");
-            $desc = $full_name . ' deleted user ID ' . $del_id . '.';
-            $log->bind_param('is', $admin_id, $desc);
-            $log->execute();
-            $success = 'Account deleted successfully.';
-        } else {
-            $errors[] = 'Could not delete account. Super admin accounts cannot be deleted.';
+        try {
+            $del = $conn->prepare("DELETE FROM users WHERE user_id = ? AND role != 'super_admin'");
+            $del->bind_param('i', $del_id);
+            $del->execute();
+            if ($del->affected_rows > 0) {
+                $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'ACCOUNT_DELETED', ?)");
+                $desc = $full_name . ' deleted account "' . $target['full_name'] . '" (' . $target['role'] . ').';
+                $log->bind_param('is', $admin_id, $desc);
+                $log->execute();
+                $success = 'Account deleted successfully.';
+            } else {
+                $errors[] = 'Could not delete account. Please try again.';
+            }
+        } catch (mysqli_sql_exception $e) {
+            error_log('[TG-BASICS] manage_users delete failed: ' . $e->getMessage());
+            $errors[] = 'Could not delete account — it is still linked to other records. Deactivate it instead.';
         }
+    }
+}
+
+// ── HANDLE DEACTIVATE / REACTIVATE ──
+// pending     = is_active 0 + activation token still set (invited, never signed up)
+// deactivated = is_active 0 + no token (an administrator switched it off)
+// A deactivated account is signed out within a minute (config/session.php re-checks the account) and cannot log in.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && in_array($_POST['action'], ['deactivate', 'reactivate'], true)) {
+    csrf_verify();
+    $act    = $_POST['action'];
+    $tid    = (int)($_POST['user_id'] ?? 0);
+    $target = mu_load_target($conn, $tid);
+
+    if ($tid === $admin_id) {
+        $errors[] = 'You cannot deactivate your own account.';
+    } elseif (!$target) {
+        $errors[] = 'Account not found.';
+    } elseif ($target['role'] === 'super_admin') {
+        $errors[] = 'Super admin accounts are protected.';
+    } elseif ($act === 'deactivate' && !(int)$target['is_active']) {
+        $errors[] = 'That account is not active.';
+    } elseif ($act === 'reactivate' && ((int)$target['is_active'] || $target['activation_token'] !== null)) {
+        $errors[] = 'That account is not deactivated.';
+    } else {
+        $new_state = $act === 'deactivate' ? 0 : 1;
+        $upd = $conn->prepare("UPDATE users SET is_active = ?, failed_attempts = 0, locked_until = NULL WHERE user_id = ? AND role != 'super_admin'");
+        $upd->bind_param('ii', $new_state, $tid);
+        $upd->execute();
+
+        $log_action = $act === 'deactivate' ? 'ACCOUNT_DEACTIVATED' : 'ACCOUNT_REACTIVATED';
+        $desc       = $full_name . ($act === 'deactivate' ? ' deactivated' : ' reactivated') . ' the account of "' . $target['full_name'] . '" (' . $target['role'] . ').';
+        $log = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, ?, ?)");
+        $log->bind_param('iss', $admin_id, $log_action, $desc);
+        $log->execute();
+
+        $success = $target['full_name'] . ($act === 'deactivate' ? ' was deactivated and can no longer sign in.' : ' was reactivated and can sign in again.');
     }
 }
 
@@ -95,7 +153,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $log->bind_param('is', $admin_id, $desc);
             $log->execute();
 
-            $success = 'Account created for ' . htmlspecialchars($new_name) . '. ' . ($sent ? 'Activation email sent.' : 'Account created but email failed to send. Share the activation link manually.');
+            $success = 'Account created for ' . $new_name . '. ' . ($sent ? 'Activation email sent.' : 'Account created but email failed to send. Share the activation link manually.');
         } else {
             $errors[] = 'Database error. Please try again.';
         }
@@ -105,11 +163,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 // ── LOAD USERS ──
 $users = $conn->query("
     SELECT user_id, full_name, username, role, email, is_active, created_at, last_active, profile_photo,
-           (last_active IS NOT NULL AND last_active >= NOW() - INTERVAL 5 MINUTE) AS is_online
+           (last_active IS NOT NULL AND last_active >= NOW() - INTERVAL 5 MINUTE) AS is_online,
+           CASE WHEN is_active = 1 THEN 'active' WHEN activation_token IS NULL THEN 'deactivated' ELSE 'pending' END AS acct_status
     FROM users
     WHERE is_hidden = 0
     ORDER BY FIELD(role, 'super_admin', 'admin', 'mechanic'), full_name ASC
 ");
+$users_with_history = users_with_history($conn);   // null = unknown → treated as "has history" below
+
+// Row action buttons: active → Deactivate, deactivated → Reactivate, and Delete only while the account has no history
+function mu_action_forms(array $u, ?array $history): void {
+    $has_history = $history === null || isset($history[(int)$u['user_id']]);
+    $forms = [];
+    if ($u['acct_status'] === 'active')      $forms[] = ['deactivate', 'btn-sm-gold',   'Deactivate', 'lock-closed',  'js-deactivate-user'];
+    if ($u['acct_status'] === 'deactivated') $forms[] = ['reactivate', 'btn-sm-gold',   'Reactivate', 'check-circle', 'js-reactivate-user'];
+    if (!$has_history)                       $forms[] = ['delete',     'btn-sm-danger', 'Delete',     'trash',        'js-delete-user'];
+    foreach ($forms as [$action, $cls, $title, $icon_name, $js]) { ?>
+                <form method="POST" action="" class="mu-act-form">
+                  <?= csrf_field() ?>
+                  <input type="hidden" name="action" value="<?= $action ?>"/>
+                  <input type="hidden" name="user_id" value="<?= (int)$u['user_id'] ?>"/>
+                  <button type="button" class="<?= $cls ?> <?= $js ?>" data-name="<?= htmlspecialchars($u['full_name'], ENT_QUOTES) ?>" title="<?= $title ?>" aria-label="<?= $title ?> <?= htmlspecialchars($u['full_name'], ENT_QUOTES) ?>"><?= icon($icon_name, 14) ?></button>
+                </form>
+<?php }
+}
+
+// Status badge: Active / Pending (invited, not yet activated) / Deactivated (switched off by an admin)
+function mu_status_badge(string $status): string {
+    return match ($status) {
+        'active'      => '<span class="badge badge-green">Active</span>',
+        'deactivated' => '<span class="badge badge-red">Deactivated</span>',
+        default       => '<span class="badge badge-yellow">Pending</span>',
+    };
+}
 
 // ── LOAD RECENT AUDIT LOGS ──
 $logs = $conn->query("
@@ -142,7 +228,7 @@ require_once '../../includes/topbar.php';
     <?php if ($success): ?>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-      Swal.fire({ toast:true, position:'top-end', icon:'success', title:<?= json_encode($success) ?>, showConfirmButton:false, timer:3000, timerProgressBar:true });
+      Swal.fire({ toast:true, position:'top-end', icon:'success', titleText:<?= json_encode($success) ?>, showConfirmButton:false, timer:3000, timerProgressBar:true });
     });
     </script>
     <?php endif; ?>
@@ -168,7 +254,7 @@ require_once '../../includes/topbar.php';
           <div class="card-icon"><?= icon('users', 16) ?></div>
           <div>
             <div class="card-title">System Users</div>
-            <div class="card-sub">All active accounts</div>
+            <div class="card-sub">All staff accounts</div>
           </div>
         </div>
         <?php
@@ -215,15 +301,10 @@ require_once '../../includes/topbar.php';
                 </div>
               </td>
               <td><span class="badge <?= $rl[1] ?>"><?= $rl[0] ?></span></td>
-              <td><?php if ($u['is_active']): ?><span class="badge badge-green">Active</span><?php else: ?><span class="badge badge-yellow">Pending</span><?php endif; ?></td>
+              <td><?= mu_status_badge($u['acct_status']) ?></td>
               <td>
                 <?php if ($u['role'] !== 'super_admin'): ?>
-                <form method="POST" action="">
-                  <?= csrf_field() ?>
-                  <input type="hidden" name="action" value="delete"/>
-                  <input type="hidden" name="user_id" value="<?= $u['user_id'] ?>"/>
-                  <button type="button" class="btn-sm-danger js-delete-user" data-name="<?= htmlspecialchars($u['full_name'], ENT_QUOTES) ?>" title="Delete"><?= icon('trash', 14) ?></button>
-                </form>
+                <div class="mu-act-group"><?php mu_action_forms($u, $users_with_history); ?></div>
                 <?php else: ?>
                 <span style="font-size:0.7rem;color:var(--text-muted);">Protected</span>
                 <?php endif; ?>
@@ -257,21 +338,12 @@ require_once '../../includes/topbar.php';
             <!-- Badges -->
             <div class="mu-card-badges">
               <span class="badge <?= $rl[1] ?>"><?= $rl[0] ?></span>
-              <?php if ($u['is_active']): ?>
-                <span class="badge badge-green">Active</span>
-              <?php else: ?>
-                <span class="badge badge-yellow">Pending</span>
-              <?php endif; ?>
+              <?= mu_status_badge($u['acct_status']) ?>
             </div>
             <!-- Action -->
             <div class="mu-card-action">
               <?php if ($u['role'] !== 'super_admin'): ?>
-              <form method="POST" action="">
-                <?= csrf_field() ?>
-                <input type="hidden" name="action" value="delete"/>
-                <input type="hidden" name="user_id" value="<?= $u['user_id'] ?>"/>
-                <button type="button" class="btn-sm-danger js-delete-user" data-name="<?= htmlspecialchars($u['full_name'], ENT_QUOTES) ?>" title="Delete"><?= icon('trash', 14) ?></button>
-              </form>
+              <?php mu_action_forms($u, $users_with_history); ?>
               <?php else: ?>
               <span class="mu-protected">Protected</span>
               <?php endif; ?>
@@ -374,6 +446,8 @@ require_once '../../includes/topbar.php';
               'LOGOUT'           => 'badge-gray',
               'ACCOUNT_CREATED'  => 'badge-gold',
               'ACCOUNT_DELETED'  => 'badge-red',
+              'ACCOUNT_DEACTIVATED' => 'badge-red',
+              'ACCOUNT_REACTIVATED' => 'badge-green',
               'PASSWORD_RESET'   => 'badge-yellow',
               'CLIENT_ADDED'     => 'badge-green',
               'CLIENT_UPDATED'   => 'badge-yellow',

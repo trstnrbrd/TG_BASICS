@@ -2,6 +2,7 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
+require_once '../../config/access.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
     header("Location: ../../auth/login.php");
@@ -27,6 +28,12 @@ $vehicle = $stmt->get_result()->fetch_assoc();
 
 if (!$vehicle) {
     header("Location: client_list.php?error=Vehicle not found.");
+    exit;
+}
+
+// Admins can only work with clients they personally added — same rule as the client list and profile
+if (!client_in_scope($conn, (int)$vehicle['client_id'])) {
+    header("Location: client_list.php");
     exit;
 }
 

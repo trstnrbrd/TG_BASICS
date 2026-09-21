@@ -262,7 +262,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
                 $inst_no  = $row['installment_no'];
                 $idx      = $inst_no - 1;
                 $amt_paid = $amounts[$idx] ?? 0.0;
-                $paid_at  = $amt_paid > 0 ? date('Y-m-d H:i:s') : null;
+                // Keep the original payment date when this installment's amount didn't change — only a new or
+                // edited payment is stamped "now" (otherwise saving installment 3 re-dates installments 1 and 2).
+                $unchanged = abs((float)$row['amount_paid'] - $amt_paid) < 0.005 && !empty($row['paid_at']);
+                $paid_at   = $amt_paid > 0 ? ($unchanged ? $row['paid_at'] : date('Y-m-d H:i:s')) : null;
                 $pay_mode = !empty($pay_modes[$idx])    ? $pay_modes[$idx]    : null;
                 $ctrl_num = !empty($ctrl_numbers[$idx]) ? $ctrl_numbers[$idx] : null;
                 $total_paid += $amt_paid;
@@ -427,7 +430,7 @@ require_once '../../includes/topbar.php';
     </div>
 
     <?php if (isset($_GET['success'])): ?>
-    <script>document.addEventListener('DOMContentLoaded',function(){ Swal.fire({ toast:true, position:'top-end', icon:'success', title:<?= json_encode($_GET['success']) ?>, showConfirmButton:false, timer:3000, timerProgressBar:true }); });</script>
+    <script>document.addEventListener('DOMContentLoaded',function(){ Swal.fire({ toast:true, position:'top-end', icon:'success', titleText:<?= json_encode($_GET['success']) ?>, showConfirmButton:false, timer:3000, timerProgressBar:true }); });</script>
     <?php endif; ?>
 
     <!-- POLICY STATUS BANNER -->
@@ -853,7 +856,8 @@ if ($has_inst_js) {
         }
 
         rows.forEach(function (tr) {
-          tr.querySelector("input.inst-paid-input").addEventListener("input", refresh);
+          const input = tr.querySelector("input.inst-paid-input");
+          if (input) input.addEventListener("input", refresh); // locked (already paid) rows have no input
         });
       })();
     ';

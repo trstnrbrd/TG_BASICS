@@ -52,6 +52,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($billed_to === '') $errors[] = 'Billed To (insurance company) is required.';
     if ($parts_cost < 0 || $labor_cost < 0 || $other_cost < 0) $errors[] = 'Costs must be 0 or positive.';
     if ($deductible < 0) $errors[] = 'Deductible must be 0 or positive.';
+    if ($incident_date !== '' && !validate_date($incident_date)) $errors[] = 'Incident date is not a valid date.';
+    if ($repair_date   !== '' && !validate_date($repair_date))   $errors[] = 'Repair date is not a valid date.';
+
+    // Only claims the dropdown offers (approved / in-progress) can be billed — the form is not the only way in
+    if (empty($errors)) {
+        $cs = $conn->prepare("SELECT status FROM claims WHERE claim_id = ?");
+        $cs->bind_param('i', $claim_id);
+        $cs->execute();
+        $crow = $cs->get_result()->fetch_assoc();
+        if (!$crow) {
+            $errors[] = 'The selected claim was not found.';
+        } elseif (!in_array($crow['status'], ['loa_received', 'pending', 'approved', 'resolved'], true)) {
+            $errors[] = 'Billing can only be created for approved claims.';
+        }
+    }
 
     // Check no duplicate billing for same claim
     if (empty($errors)) {
@@ -64,12 +79,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (empty($errors)) {
-        // Generate billing number: BILL-YYYYMMDD-XXXX
-        $seq_stmt = $conn->prepare("SELECT COUNT(*) FROM billing WHERE DATE(created_at) = CURDATE()");
+        $prefix   = 'BILL-' . date('Ymd') . '-';
+        $seq_stmt = $conn->prepare("SELECT billing_number FROM billing WHERE billing_number LIKE ? ORDER BY billing_number DESC LIMIT 1");
+        $like     = $prefix . '%';
+        $seq_stmt->bind_param('s', $like);
         $seq_stmt->execute();
-        $seq_row = $seq_stmt->get_result()->fetch_row();
-        $seq     = str_pad(($seq_row[0] + 1), 4, '0', STR_PAD_LEFT);
-        $bill_num = 'BILL-' . date('Ymd') . '-' . $seq;
+        $last     = $seq_stmt->get_result()->fetch_row();
+        $seq      = $last ? (int)substr($last[0], -4) + 1 : 1;
+        $bill_num = $prefix . str_pad($seq, 4, '0', STR_PAD_LEFT);
 
         $ins = $conn->prepare("
             INSERT INTO billing
@@ -164,7 +181,7 @@ require_once '../../includes/topbar.php';
                 <?php
                 $sel_claim = (int)($_POST['claim_id'] ?? $prefill_claim_id);
                 ?>
-                <select name="claim_id" id="claim_select" class="field-select" required style="width:100%;" onchange="this.form.submit()">
+                <select name="claim_id" id="claim_select" class="field-select" required style="width:100%;" onchange="if (this.value) window.location.href = 'add_billing.php?claim_id=' + encodeURIComponent(this.value)">
                   <option value="">— Select approved claim —</option>
                   <?php while ($cr = $claims_res->fetch_assoc()): ?>
                   <option value="<?= $cr['claim_id'] ?>" <?= $sel_claim == $cr['claim_id'] ? 'selected' : '' ?>>

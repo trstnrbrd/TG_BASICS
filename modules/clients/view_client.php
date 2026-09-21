@@ -2,6 +2,7 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
+require_once '../../config/access.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin', 'mechanic'])) {
     header("Location: ../../auth/login.php");
@@ -52,6 +53,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) 
     $cstmt->execute();
     $cdata = $cstmt->get_result()->fetch_assoc();
     if ($cdata) {
+        // Same rule as the client list: policies, repair jobs and claims block the delete. Removing the
+        // vehicles below cascades straight through them (policies, payments, repair jobs, quotations, receipts).
+        $blockers = client_delete_blockers($conn, $del_id);
+        if ($blockers !== '') {
+            header("Location: view_client.php?id=" . $del_id . "&error=" . urlencode('"' . $cdata['full_name'] . '" cannot be deleted — they still have ' . $blockers . ' on record.'));
+            exit;
+        }
+
         // Remove vehicles first before soft-deleting the client
         $conn->query("DELETE FROM vehicles WHERE client_id = " . $del_id);
 
@@ -213,7 +222,7 @@ require_once '../../includes/topbar.php';
     <?php if (!empty($_GET['success'])): ?>
     <script>
       document.addEventListener('DOMContentLoaded', function() {
-        Swal.fire({ toast:true, position:'top-end', icon:'success', title:<?= json_encode($_GET['success']) ?>, showConfirmButton:false, timer:3000, timerProgressBar:true });
+        Swal.fire({ toast:true, position:'top-end', icon:'success', titleText:<?= json_encode($_GET['success']) ?>, showConfirmButton:false, timer:3000, timerProgressBar:true });
       });
     </script>
     <?php endif; ?>

@@ -2,6 +2,7 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
+require_once '../../config/access.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin', 'mechanic'])) {
     header("Location: ../../auth/login.php");
@@ -21,7 +22,7 @@ $success = '';
 $prefill_data = null;
 $prefill_client_id  = (int)($_GET['prefill_client']  ?? 0);
 $prefill_vehicle_id = (int)($_GET['prefill_vehicle'] ?? 0);
-if ($prefill_client_id > 0) {
+if ($prefill_client_id > 0 && client_in_scope($conn, $prefill_client_id)) {
     $pc = $conn->prepare("SELECT client_id, full_name, contact_number FROM clients WHERE client_id = ? AND deleted_at IS NULL");
     $pc->bind_param('i', $prefill_client_id);
     $pc->execute();
@@ -60,15 +61,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($client_id  === 0) $errors[] = 'Client is required.';
     if ($vehicle_id === 0) $errors[] = 'Vehicle is required.';
     if ($repair_date === '') $errors[] = 'Repair date is required.';
+    elseif (!validate_date($repair_date)) $errors[] = 'Repair date is not a valid date.';
+    if ($release_date !== '' && !validate_date($release_date)) $errors[] = 'Release date is not a valid date.';
     if ($service_type === '') $errors[] = 'Service type is required.';
 
+    // The client must exist and be one this user may work with (mechanics: walk-in only, admins: their own),
+    // and the vehicle must actually belong to that client — the form only ever offers valid pairs.
     if (empty($errors)) {
-        // Generate job number: RJ-YYYYMMDD-XXXX
-        $seq_stmt = $conn->prepare("SELECT COUNT(*) FROM repair_jobs WHERE DATE(created_at) = CURDATE()");
+        if (!client_in_scope($conn, $client_id)) {
+            $errors[] = 'Selected client was not found.';
+        } else {
+            $vchk = $conn->prepare("SELECT 1 FROM vehicles WHERE vehicle_id = ? AND client_id = ?");
+            $vchk->bind_param('ii', $vehicle_id, $client_id);
+            $vchk->execute();
+            if ($vchk->get_result()->num_rows === 0) $errors[] = 'Selected vehicle does not belong to that client.';
+        }
+    }
+
+    if (empty($errors)) {
+        // Generate job number: RJ-YYYYMMDD-XXXX — continue from the highest number already used today.
+        // (Counting today's rows breaks after a delete: it hands out a number that still exists, and the
+        // unique key then rejects every new job for the rest of the day.)
+        $prefix   = 'RJ-' . date('Ymd') . '-';
+        $seq_stmt = $conn->prepare("SELECT job_number FROM repair_jobs WHERE job_number LIKE ? ORDER BY job_number DESC LIMIT 1");
+        $like     = $prefix . '%';
+        $seq_stmt->bind_param('s', $like);
         $seq_stmt->execute();
-        $seq_row = $seq_stmt->get_result()->fetch_row();
-        $seq     = str_pad(($seq_row[0] + 1), 4, '0', STR_PAD_LEFT);
-        $job_num = 'RJ-' . date('Ymd') . '-' . $seq;
+        $last     = $seq_stmt->get_result()->fetch_row();
+        $seq      = $last ? (int)substr($last[0], -4) + 1 : 1;
+        $job_num  = $prefix . str_pad($seq, 4, '0', STR_PAD_LEFT);
 
         $ins = $conn->prepare("
             INSERT INTO repair_jobs (client_id, vehicle_id, job_number, repair_date, release_date, service_type, additional_damages, created_by)

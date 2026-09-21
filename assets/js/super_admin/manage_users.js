@@ -63,3 +63,46 @@
             confirmButtonColor: "#B8860B",
           });
     }));
+
+// Deactivate: locks the account out but keeps every record (asks for the transaction PIN like Delete)
+document.querySelectorAll(".js-deactivate-user").forEach(function (btn) {
+  btn.addEventListener("click", async function () {
+    var name = this.dataset.name,
+      form = this.closest("form");
+    var res = await Swal.fire({
+      title: "Deactivate account?",
+      text:
+        name +
+        " will be signed out and cannot log in until you reactivate the account. Their records and history are kept.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#B8860B",
+      cancelButtonColor: "#6c757d",
+      confirmButtonText: "Yes, deactivate",
+      cancelButtonText: "Cancel",
+    });
+    if (!res.isConfirmed) return;
+    (await requirePin()) &&
+      (form.requestSubmit ? form.requestSubmit() : form.submit());
+  });
+});
+
+// Reactivate: lets a deactivated account sign in again (plain confirm — nothing is lost either way)
+document.querySelectorAll(".js-reactivate-user").forEach(function (btn) {
+  btn.addEventListener("click", async function () {
+    var name = this.dataset.name,
+      form = this.closest("form");
+    var res = await Swal.fire({
+      title: "Reactivate account?",
+      text: name + " will be able to sign in again.",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: "#B8860B",
+      cancelButtonColor: "#6c757d",
+      confirmButtonText: "Yes, reactivate",
+      cancelButtonText: "Cancel",
+    });
+    if (!res.isConfirmed) return;
+    form.requestSubmit ? form.requestSubmit() : form.submit();
+  });
+});

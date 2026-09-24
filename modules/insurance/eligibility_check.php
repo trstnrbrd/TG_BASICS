@@ -9,25 +9,13 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'supe
     exit;
 }
 
-$is_scoped_admin = $_SESSION['role'] === 'admin';
-
-// Unlocking the Renewal Tracking vault proves Sir PG authorized this Admin for
-// cross-company records — that same trust lifts the per-admin client scoping
-// here too, so a vault-unlocked Admin can search/find any client, not just
-// their own. Uses the same version-stamp check as the vault gate itself.
-if ($is_scoped_admin) {
-    $vault_version = getSetting($conn, 'renewal_vault_updated_at', '0');
-    if (!empty($_SESSION['renewal_vault_unlocked_at']) && $_SESSION['renewal_vault_unlocked_at'] === $vault_version) {
-        $is_scoped_admin = false;
-    }
-}
+// Every admin can look up any client here (owner's rule, 2026-09-24 — the old vault password is gone).
 
 // AJAX handler
 if (isset($_GET['ajax']) && $_GET['ajax'] === '1') {
     $q = san_str($_GET['search'] ?? '', 100);
     if ($q === '') { echo ''; exit; }
     $like = "%$q%";
-    $scope_sql = $is_scoped_admin ? "AND c.created_by = ?" : '';
     $stmt = $conn->prepare("
         SELECT c.client_id, c.full_name, c.contact_number,
                v.vehicle_id, v.plate_number, v.make, v.model, v.year_model
@@ -37,15 +25,10 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === '1') {
           AND (c.full_name LIKE ? OR v.plate_number LIKE ? OR v.make LIKE ?
            OR v.model LIKE ? OR c.contact_number LIKE ? OR v.motor_number LIKE ?
            OR v.serial_number LIKE ? OR CONCAT(v.make,' ',v.model) LIKE ?)
-          $scope_sql
         ORDER BY c.full_name ASC
         LIMIT 8
     ");
-    if ($is_scoped_admin) {
-        $stmt->bind_param('ssssssssi', $like, $like, $like, $like, $like, $like, $like, $like, $_SESSION['user_id']);
-    } else {
-        $stmt->bind_param('ssssssss', $like, $like, $like, $like, $like, $like, $like, $like);
-    }
+    $stmt->bind_param('ssssssss', $like, $like, $like, $like, $like, $like, $like, $like);
     $stmt->execute();
     $rows = $stmt->get_result();
     if ($rows->num_rows === 0) {
@@ -78,7 +61,6 @@ $eligibility    = null;
 // Search clients and vehicles
 if ($search !== '') {
     $like = "%$search%";
-    $scope_sql = $is_scoped_admin ? "AND c.created_by = ?" : '';
     $stmt = $conn->prepare("
         SELECT c.client_id, c.full_name, c.contact_number,
                v.vehicle_id, v.plate_number, v.make, v.model, v.year_model, v.color
@@ -88,21 +70,15 @@ if ($search !== '') {
           AND (c.full_name LIKE ? OR v.plate_number LIKE ? OR v.make LIKE ?
            OR v.model LIKE ? OR c.contact_number LIKE ? OR v.motor_number LIKE ?
            OR v.serial_number LIKE ? OR CONCAT(v.make,' ',v.model) LIKE ?)
-          $scope_sql
         ORDER BY c.full_name ASC
     ");
-    if ($is_scoped_admin) {
-        $stmt->bind_param('ssssssssi', $like, $like, $like, $like, $like, $like, $like, $like, $_SESSION['user_id']);
-    } else {
-        $stmt->bind_param('ssssssss', $like, $like, $like, $like, $like, $like, $like, $like);
-    }
+    $stmt->bind_param('ssssssss', $like, $like, $like, $like, $like, $like, $like, $like);
     $stmt->execute();
     $search_results = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 }
 
 // Load selected vehicle and compute eligibility
 if ($selected_vid > 0) {
-    $vid_scope_sql = $is_scoped_admin ? "AND c.created_by = ?" : '';
     $stmt = $conn->prepare("
         SELECT c.client_id, c.full_name, c.contact_number, c.address,
                v.vehicle_id, v.plate_number, v.make, v.model,
@@ -110,13 +86,8 @@ if ($selected_vid > 0) {
         FROM vehicles v
         INNER JOIN clients c ON v.client_id = c.client_id
         WHERE v.vehicle_id = ? AND c.deleted_at IS NULL
-        $vid_scope_sql
     ");
-    if ($is_scoped_admin) {
-        $stmt->bind_param('ii', $selected_vid, $_SESSION['user_id']);
-    } else {
-        $stmt->bind_param('i', $selected_vid);
-    }
+    $stmt->bind_param('i', $selected_vid);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
 
@@ -187,6 +158,14 @@ require_once '../../includes/topbar.php';
   <div class="content" style="padding-top:1rem;">
 
     <a href="../admin/dashboard_admin.php" class="back-link" onclick="goBack('../admin/dashboard_admin.php'); return false;" style="margin-bottom:0.5rem;"><?= icon('arrow-left', 14) ?> Back to Dashboard</a>
+
+    <?php if ($vehicle && isset($_GET['added'])): ?>
+    <!-- Arrived from Add Client's "Save & Check Eligibility" -->
+    <div class="alert alert-success">
+      <?= icon('check-circle', 16) ?>
+      <span><strong><?= htmlspecialchars($client['full_name']) ?></strong> has been added successfully. Check the vehicle's eligibility below, then proceed to create the policy.</span>
+    </div>
+    <?php endif; ?>
 
     <!-- INFO BOX -->
     <div class="info-box" style="margin-bottom:1.25rem;">

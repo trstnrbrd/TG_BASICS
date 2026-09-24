@@ -193,6 +193,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
         'VEHICLE_UNREGISTERED'   => '#ffebee',
         'POLICY_CREATED'         => '#fff8e1', 'POLICY_RENEWED'         => '#e8f5e9',
         'POLICY_DELETED'         => '#ffebee', 'PAYMENT_RECORDED'       => '#e8f5e9',
+        'PAYMENT_UNDONE'         => '#ffebee', 'POLICY_UPDATED'         => '#fff8e1',
         'RECEIPT_UPLOADED'       => '#fff8e1',
         'CLAIM_FILED'            => '#fff8e1', 'CLAIM_UPDATED'          => '#fff8e1',
         'CLAIM_DELETED'          => '#ffebee',
@@ -398,6 +399,8 @@ require_once '../../includes/topbar.php';
                 'POLICY_RENEWED'         => ['badge-green',  'shield-check'],
                 'POLICY_DELETED'         => ['badge-red',    'trash'],
                 'PAYMENT_RECORDED'       => ['badge-green',  'banknotes'],
+                'PAYMENT_UNDONE'         => ['badge-red',    'arrow-path'],
+                'POLICY_UPDATED'         => ['badge-yellow', 'pencil'],
                 'RECEIPT_UPLOADED'       => ['badge-yellow', 'arrow-up-tray'],
                 // Claims
                 'CLAIM_FILED'            => ['badge-gold',   'clipboard-list'],

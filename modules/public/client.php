@@ -59,6 +59,36 @@ body{font-family:"Plus Jakarta Sans","Segoe UI",sans-serif;background:linear-gra
     exit;
 }
 
+// ── Privacy masking (owner's request, 2026-09-24) ──
+// Anyone holding the QR code / link sees this page, so the client's contact details are only partly shown —
+// enough for the client to recognise them. They are masked HERE, so the full values never reach the browser.
+
+/** 09485283482 -> 0948•••••82 (first 4 and last 2 digits). */
+function pub_mask_phone(string $phone): string
+{
+    $d = preg_replace('/\D/', '', $phone);
+    if (strlen($d) < 7) return str_repeat('•', 4);
+    return substr($d, 0, 4) . str_repeat('•', strlen($d) - 6) . substr($d, -2);
+}
+
+/** kerby@gmail.com -> ke•••@gmail.com (first 2 letters of the name part; the provider stays). */
+function pub_mask_email(string $email): string
+{
+    $at = strrpos($email, '@');
+    if ($at === false || $at === 0) return '•••';
+    $name = substr($email, 0, $at);
+    return mb_substr($name, 0, min(2, max(1, mb_strlen($name) - 1))) . '•••' . substr($email, $at);
+}
+
+/** "Pulong Buhangin, Sta.Maria, Bulacan, 3022" -> "•••, Sta.Maria, Bulacan" (street/barangay and ZIP hidden). */
+function pub_mask_address(string $address): string
+{
+    $parts = array_values(array_filter(array_map('trim', explode(',', $address)), fn($p) => $p !== '' && !ctype_digit($p)));
+    if (count($parts) < 2) return '•••';
+    $keep = count($parts) >= 3 ? 2 : 1;   // town + province; the first part (street / barangay) is always hidden
+    return '•••, ' . implode(', ', array_slice($parts, -$keep));
+}
+
 if ($token === '' || strlen($token) !== 64 || !ctype_xdigit($token)) {
     pub_not_found();
 }
@@ -218,20 +248,26 @@ $initials = strtoupper(substr(implode('', array_map(fn($w) => $w[0], $words)), 0
       <div class="pub-id-fields" id="idFields" hidden>
         <div class="pub-id-field">
           <div class="pub-id-field-label">Contact Number</div>
-          <div class="pub-id-field-value"><?= htmlspecialchars($client['contact_number'] ?: '—') ?></div>
+          <div class="pub-id-field-value"><?= htmlspecialchars(!empty($client['contact_number']) ? pub_mask_phone($client['contact_number']) : '—') ?></div>
         </div>
         <?php if (!empty($client['email'])): ?>
         <div class="pub-id-field">
           <div class="pub-id-field-label">Email Address</div>
-          <div class="pub-id-field-value"><?= htmlspecialchars($client['email']) ?></div>
+          <div class="pub-id-field-value"><?= htmlspecialchars(pub_mask_email($client['email'])) ?></div>
         </div>
         <?php endif; ?>
         <?php if (!empty($client['address'])): ?>
         <div class="pub-id-field pub-id-field-full">
           <div class="pub-id-field-label">Address</div>
-          <div class="pub-id-field-value"><?= htmlspecialchars($client['address']) ?></div>
+          <div class="pub-id-field-value"><?= htmlspecialchars(pub_mask_address($client['address'])) ?></div>
         </div>
         <?php endif; ?>
+        <div class="pub-id-field pub-id-field-full" style="padding-top:0.55rem;padding-bottom:0.55rem;">
+          <div style="font-size:0.68rem;color:#9C9286;display:flex;align-items:center;gap:0.35rem;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Partly hidden to protect your privacy. To update your details, please contact our office.
+          </div>
+        </div>
       </div>
 
       <!-- 2-COL GRID: Vehicles + Policies -->

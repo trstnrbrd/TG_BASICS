@@ -1,0 +1,181 @@
+/* Insurance-agent filter (includes/agent_filter.php) — Client Records and Renewal Tracking.
+   The main filter on those pages (owner's request), so its button is solid gold, and its menu follows the
+   site's own dropdown look (the user menu in the top bar) instead of the browser's option list. */
+.cl-agent-wrap {
+  position: relative;
+  width: 180px;
+  flex-shrink: 0;
+}
+.cl-agent-native {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.cl-agent-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 9px;
+  border: 1px solid var(--gold);
+  background: linear-gradient(135deg, var(--gold-bright), var(--gold));
+  color: #fff;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: normal;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(184, 134, 11, 0.25);
+  transition:
+    filter 0.15s,
+    box-shadow 0.15s;
+}
+.cl-agent-btn svg {
+  flex-shrink: 0;
+}
+.cl-agent-btn:hover {
+  filter: brightness(1.06);
+}
+.cl-agent-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(212, 160, 23, 0.3);
+}
+.cl-agent-btn-label {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cl-agent-chev {
+  display: flex;
+  transition: transform 0.2s ease;
+}
+.cl-agent-wrap.open .cl-agent-chev {
+  transform: rotate(180deg);
+}
+
+.cl-agent-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 260px;
+  max-height: 340px;
+  overflow-y: auto;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  z-index: 150;
+  padding: 0.4rem;
+  animation: dropdownIn 0.18s ease forwards;
+}
+.cl-agent-menu-head {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--gold);
+  padding: 0.45rem 0.6rem 0.35rem;
+}
+.cl-agent-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 0.3rem 0.4rem;
+}
+.cl-agent-opt {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: none;
+  background: none;
+  border-radius: 8px;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+.cl-agent-opt:hover,
+.cl-agent-opt:focus-visible {
+  background: var(--gold-pale);
+  color: var(--gold);
+  outline: none;
+}
+.cl-agent-opt.is-selected {
+  background: var(--gold-pale);
+  color: var(--gold);
+  font-weight: 700;
+}
+.cl-agent-opt-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cl-agent-av {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.56rem;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(135deg, var(--gold-bright), var(--gold));
+}
+.cl-agent-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cl-agent-av.is-icon {
+  background: var(--bg-2);
+  color: var(--gold);
+  border: 1px solid var(--border);
+}
+.cl-agent-av.is-none {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px dashed var(--text-muted);
+}
+.cl-agent-tag {
+  flex-shrink: 0;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 0.1rem 0.45rem;
+}
+.cl-agent-check {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--gold);
+}
+
+/* Phones: the button spans the toolbar, and the open menu is as wide as the button */
+@media (max-width: 768px) {
+  .cl-agent-wrap {
+    width: 100%;
+  }
+  .cl-agent-wrap .cl-agent-menu {
+    width: auto;
+    right: 0;
+  }
+}

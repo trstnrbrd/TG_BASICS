@@ -2,6 +2,7 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
+require_once '../../config/access.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
     header("Location: ../../auth/login.php");
@@ -10,6 +11,11 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'supe
 
 $full_name_user = $_SESSION['full_name'];
 $initials       = substr(implode('', array_map(fn($w) => strtoupper($w[0]), explode(' ', $full_name_user))), 0, 2);
+
+// Insurance agent = whose client this is; it can differ from whoever encodes it ("added by").
+// Defaults to the person encoding, when they are an agent themselves.
+$agents           = insurance_agents($conn);
+$default_agent_id = isset($agents[(int)$_SESSION['user_id']]) ? (int)$_SESSION['user_id'] : 0;
 
 $errors      = [];
 $fieldErrors = [];
@@ -20,6 +26,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $full_name      = strtoupper(san_str($_POST['full_name'] ?? '', MAX_NAME));
     $contact_number = san_str($_POST['contact_number'] ?? '', MAX_PHONE);
     $email          = san_str($_POST['email'] ?? '', MAX_EMAIL);
+    $fb_raw         = is_string($_POST['facebook_name'] ?? null) ? trim($_POST['facebook_name']) : '';
+    $facebook_name  = san_str($fb_raw, MAX_FACEBOOK);   // optional (owner's request, 2026-09-24)
     $address        = san_str($_POST['address'] ?? '', MAX_ADDRESS);
     $plate_number   = strtoupper(san_str($_POST['plate_number'] ?? '', MAX_PLATE));
     $make           = san_str($_POST['make'] ?? '', MAX_MAKE_MODEL);
@@ -29,25 +37,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $motor_number   = san_str($_POST['motor_number'] ?? '', MAX_MOTOR_SN);
     $serial_number  = san_str($_POST['serial_number'] ?? '', MAX_MOTOR_SN);
     $consent_signed = isset($_POST['consent_signed']) && $_POST['consent_signed'] === '1';
+    $agent_id       = san_int($_POST['agent_id'] ?? 0, 1);
+    // "Save & Check Eligibility" button: after saving, go straight to the eligibility check for the new vehicle
+    $then_policy    = ($_POST['after_save'] ?? '') === 'policy';
 
     $addError = function(string $field, string $msg) use (&$errors, &$fieldErrors) {
         $errors[] = $msg;
         if (!isset($fieldErrors[$field])) $fieldErrors[$field] = $msg;
     };
 
+    // Contact, engine and chassis numbers are optional (owner's request, 2026-09-24) — a contact number
+    // that IS given must still be a valid PH mobile number.
+    if ($agent_id === 0)                            $addError('agent_id', 'Please select the insurance agent.');
+    elseif (!isset($agents[$agent_id]))             $addError('agent_id', 'The selected insurance agent is not available. Please choose another.');
     if ($full_name === '')                          $addError('full_name', 'Full name is required.');
     elseif (!validate_name($full_name))             $addError('full_name', 'Full name contains invalid characters.');
-    if ($contact_number === '')                     $addError('contact_number', 'Contact number is required.');
-    elseif (!validate_phone($contact_number))       $addError('contact_number', 'Contact number must be a valid PH mobile number (09XXXXXXXXX).');
+    if ($contact_number !== '' && !validate_phone($contact_number)) $addError('contact_number', 'Contact number must be a valid PH mobile number (09XXXXXXXXX).');
     if ($email !== '' && !validate_email($email))   $addError('email', 'Please enter a valid email address.');
+    if (mb_strlen($fb_raw) > MAX_FACEBOOK)          $addError('facebook_name', 'Facebook name is too long (max ' . MAX_FACEBOOK . ' characters).');
     if ($address === '')                            $addError('address', 'Address is required.');
     if ($plate_number === '')                       $addError('plate_number', 'Plate number is required.');
     elseif (!validate_plate($plate_number))         $addError('plate_number', 'Plate number contains invalid characters.');
     if ($make === '')                               $addError('make', 'Vehicle make is required.');
     if ($model === '')                              $addError('model', 'Vehicle model is required.');
     if ($year_model === 0)                          $addError('year_model', 'Year model must be a valid year (1960–' . ((int)date('Y') + 1) . ').');
-    if ($motor_number === '')                       $addError('motor_number', 'Engine number is required.');
-    if ($serial_number === '')                      $addError('serial_number', 'Chassis number is required.');
     if (!$consent_signed)                           $addError('consent_signed', 'Please confirm that the client has signed the printed Data Privacy Consent Form.');
 
     // The plate-uniqueness check and the insert used to be two separate, unsynchronized queries — two people
@@ -56,15 +69,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // scoped to this exact plate number now holds the check AND the insert together, so only one submission
     // for a given plate is ever "in the check" at a time — see with_named_lock() for the confirmed repro.
     if (empty($errors) && $plate_number !== '') {
-        $lock = with_named_lock($conn, 'plate_' . $plate_number, function () use ($conn, $plate_number, $full_name, $contact_number, $email, $address, $make, $model, $year_model, $color, $motor_number, $serial_number) {
+        $lock = with_named_lock($conn, 'plate_' . $plate_number, function () use ($conn, $plate_number, $full_name, $contact_number, $email, $facebook_name, $address, $make, $model, $year_model, $color, $motor_number, $serial_number, $agent_id) {
             $check = $conn->prepare("SELECT v.vehicle_id FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id WHERE v.plate_number = ? AND c.deleted_at IS NULL");
             $check->bind_param('s', $plate_number);
             $check->execute();
             if ($check->get_result()->num_rows > 0) return null;   // duplicate — caller adds the field error
 
             $created_by = (int)$_SESSION['user_id'];
-            $ins_client = $conn->prepare("INSERT INTO clients (full_name, contact_number, email, address, created_by, consent_signed_at, consent_recorded_by) VALUES (?, ?, ?, ?, ?, NOW(), ?)");
-            $ins_client->bind_param('ssssii', $full_name, $contact_number, $email, $address, $created_by, $created_by);
+            $ins_client = $conn->prepare("INSERT INTO clients (full_name, contact_number, email, facebook_name, address, created_by, agent_id, consent_signed_at, consent_recorded_by) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?)");
+            $ins_client->bind_param('sssssiii', $full_name, $contact_number, $email, $facebook_name, $address, $created_by, $agent_id, $created_by);
             $ins_client->execute();
             $client_id = $conn->insert_id;
 
@@ -76,7 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $ins_vehicle->bind_param('isssssss', $client_id, $plate_number, $make, $model, $year_model, $color, $motor_number, $serial_number);
             $ins_vehicle->execute();
 
-            return $client_id;
+            return ['client_id' => $client_id, 'vehicle_id' => $conn->insert_id];
         });
 
         if (!$lock['locked']) {
@@ -84,16 +97,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($lock['result'] === null) {
             $addError('plate_number', 'Plate number ' . $plate_number . ' already exists in the system.');
         } else {
-            $client_id = $lock['result'];
+            $client_id  = $lock['result']['client_id'];
+            $vehicle_id = $lock['result']['vehicle_id'];
 
             // Audit log
             $uid = $_SESSION['user_id'];
             $log = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'CLIENT_ADDED', ?)");
-            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' added client "' . $full_name . '" with vehicle ' . ($plate_number ?: 'no plate') . ' (' . $make . ' ' . $model . ').';
+            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' added client "' . $full_name . '" with vehicle ' . ($plate_number ?: 'no plate') . ' (' . $make . ' ' . $model . ')'
+                  . ($agent_id !== (int)$uid ? ' for insurance agent ' . $agents[$agent_id]['full_name'] : '') . '.';
             $log->bind_param('is', $uid, $desc);
             $log->execute();
 
-            header("Location: client_list.php?success=" . urlencode($full_name . ' has been added successfully.'));
+            if ($then_policy) {
+                header("Location: ../insurance/eligibility_check.php?vehicle_id=" . (int)$vehicle_id . "&added=1");
+                exit;
+            }
+            // The list opens on the user's own clients — when this client is another agent's, open that agent's
+            // list instead so the new record is actually in view
+            $list_agent = $agent_id !== (int)$_SESSION['user_id'] ? 'agent=' . $agent_id . '&' : '';
+            header("Location: client_list.php?" . $list_agent . "success=" . urlencode($full_name . ' has been added successfully.'));
             exit;
         }
     }
@@ -238,6 +260,21 @@ require_once '../../includes/topbar.php';
         </div>
         <div style="padding:1.5rem;">
 
+          <div class="field-section">Insurance Agent</div>
+          <div class="form-grid" style="margin-bottom:1rem;">
+            <div class="field">
+              <label class="field-label" for="agent_id">Insurance Agent <span class="req">*</span></label>
+              <?php $sel_agent = isset($_POST['agent_id']) ? (int)$_POST['agent_id'] : $default_agent_id; ?>
+              <select name="agent_id" id="agent_id" class="field-select" data-default="<?= $default_agent_id ?: '' ?>">
+                <option value="" disabled <?= isset($agents[$sel_agent]) ? '' : 'selected' ?>>— Select insurance agent —</option>
+                <?php foreach ($agents as $aid => $ag): ?>
+                <option value="<?= $aid ?>" <?= $sel_agent === $aid ? 'selected' : '' ?>><?= htmlspecialchars(agent_option_label($ag)) ?></option>
+                <?php endforeach; ?>
+              </select>
+              <div class="field-hint">Whose client this is. You can add a client for another agent — you are still recorded as the one who added it.</div>
+            </div>
+          </div>
+
           <div class="field-section">Personal Details</div>
           <div class="form-grid" style="margin-bottom:1rem;">
             <div class="field">
@@ -249,7 +286,7 @@ require_once '../../includes/topbar.php';
                 autofocus/>
             </div>
             <div class="field">
-              <label class="field-label">Contact Number <span class="req">*</span></label>
+              <label class="field-label">Contact Number</label>
               <input type="text" name="contact_number" class="field-input"
                 placeholder="09*********"
                 value="<?= htmlspecialchars($_POST['contact_number'] ?? '') ?>"/>
@@ -261,6 +298,13 @@ require_once '../../includes/topbar.php';
                 value="<?= htmlspecialchars($_POST['email'] ?? '') ?>"/>
             </div>
             <div class="field">
+              <label class="field-label">Facebook Name</label>
+              <input type="text" name="facebook_name" class="field-input" maxlength="<?= MAX_FACEBOOK ?>"
+                placeholder="Juan Dela Cruz"
+                value="<?= htmlspecialchars(is_string($_POST['facebook_name'] ?? null) ? $_POST['facebook_name'] : '') ?>"/>
+              <div class="field-hint">Optional — the name on the client's Facebook account, to message them there.</div>
+            </div>
+            <div class="field span-2">
               <label class="field-label">Address <span class="req">*</span></label>
               <input type="text" name="address" class="field-input"
                 placeholder="San Roque, Pandi, Bulacan"
@@ -309,22 +353,22 @@ require_once '../../includes/topbar.php';
 
             <!-- Row 3: Engine Number (full width) -->
             <div class="field span-3">
-              <label class="field-label">Engine Number <span class="req">*</span></label>
+              <label class="field-label">Engine Number</label>
               <input type="text" name="motor_number" class="field-input"
                 placeholder="Alphanumeric, from OR-CR"
                 value="<?= htmlspecialchars($_POST['motor_number'] ?? '') ?>"
                 style="text-transform:uppercase;"/>
-              <div class="field-hint">Found on the vehicle registration / OR-CR. Required for insurance eligibility.</div>
+              <div class="field-hint">Found on the vehicle registration / OR-CR. Optional — can be added later from the vehicle's Edit page.</div>
             </div>
 
             <!-- Row 4: Chassis Number (full width) -->
             <div class="field span-3">
-              <label class="field-label">Chassis Number <span class="req">*</span></label>
+              <label class="field-label">Chassis Number</label>
               <input type="text" name="serial_number" class="field-input"
                 placeholder="17-character VIN"
                 value="<?= htmlspecialchars($_POST['serial_number'] ?? '') ?>"
                 style="text-transform:uppercase;"/>
-              <div class="field-hint">17-character VIN / chassis number from the OR-CR. Required for policy creation.</div>
+              <div class="field-hint">17-character VIN / chassis number from the OR-CR. Optional — can be added later.</div>
             </div>
 
           </div>
@@ -339,8 +383,10 @@ require_once '../../includes/topbar.php';
 
         </div>
         <div class="form-actions">
+          <input type="hidden" name="after_save" id="after-save" value=""/>
           <button type="button" class="btn-ghost" id="clear-form-btn"><?= icon('x-mark', 14) ?> Clear</button>
-          <button type="submit" class="btn-primary"><?= icon('floppy-disk', 14) ?> Save Client</button>
+          <button type="submit" class="btn-primary" data-after-save=""><?= icon('floppy-disk', 14) ?> Save Client</button>
+          <button type="submit" class="btn-gold" data-after-save="policy" title="Save this client, then check the vehicle's insurance eligibility and create the policy"><?= icon('shield-check', 14) ?> Save &amp; Check Eligibility</button>
         </div>
       </div>
     </form>
@@ -379,16 +425,15 @@ function clearFieldError(el) {
 }
 
 function validateAddClientForm() {
+  // Contact, engine and chassis numbers are optional (a contact number that is given is still checked below)
   var required = [
+    { name: 'agent_id',       msg: 'Please select the insurance agent.' },
     { name: 'full_name',      msg: 'Full name is required.' },
-    { name: 'contact_number', msg: 'Contact number is required.' },
     { name: 'address',        msg: 'Address is required.' },
     { name: 'plate_number',   msg: 'Plate number is required.' },
     { name: 'make',           msg: 'Vehicle make is required.' },
     { name: 'model',          msg: 'Vehicle model is required.' },
-    { name: 'year_model',     msg: 'Year model is required.' },
-    { name: 'motor_number',   msg: 'Engine number is required.' },
-    { name: 'serial_number',  msg: 'Chassis number is required.' }
+    { name: 'year_model',     msg: 'Year model is required.' }
   ];
   var ok = true;
   var firstErrEl = null;
@@ -831,7 +876,7 @@ function validateAddClientForm() {
         reverseButtons: true
       }).then(function(result) {
         if (result.isConfirmed) {
-          var fieldNames = ["full_name","contact_number","email","address","plate_number","make","model","year_model","color","motor_number","serial_number"];
+          var fieldNames = ["full_name","contact_number","email","facebook_name","address","plate_number","make","model","year_model","color","motor_number","serial_number"];
           fieldNames.forEach(function(name) {
             var el = document.querySelector("[name=" + name + "]");
             if (el) { el.value = ""; el.classList.remove("ocr-filled"); clearFieldError(el); }
@@ -839,6 +884,8 @@ function validateAddClientForm() {
           document.querySelectorAll(".ocr-filled").forEach(function(el) { el.classList.remove("ocr-filled"); });
           var consentReset = document.getElementById("consent-signed-checkbox");
           if (consentReset) { consentReset.checked = false; clearFieldError(consentReset); }
+          var agentReset = document.getElementById("agent_id");
+          if (agentReset) { agentReset.value = agentReset.dataset.default || ""; clearFieldError(agentReset); }
         }
       });
     });
@@ -846,27 +893,37 @@ function validateAddClientForm() {
 
   var theForm = document.querySelector("form");
   if (theForm) {
+    // Which save button was pressed — form.submit() below does not send the button itself, so it is copied
+    // into a hidden field (Enter in a text field "clicks" the first one, the plain Save Client)
+    var afterSave = document.getElementById("after-save");
+    document.querySelectorAll("[data-after-save]").forEach(function(btn) {
+      btn.addEventListener("click", function() { afterSave.value = btn.dataset.afterSave; });
+    });
     theForm.addEventListener("submit", function(e) {
       e.preventDefault();
       if (!validateAddClientForm()) return;
       var form = this;
-      var name    = (document.querySelector("[name=full_name]")      || {}).value || "—";
-      var plate   = (document.querySelector("[name=plate_number]")   || {}).value || "—";
-      var vmake   = (document.querySelector("[name=make]")           || {}).value || "—";
-      var vmodel  = (document.querySelector("[name=model]")          || {}).value || "—";
-      var year    = (document.querySelector("[name=year_model]")     || {}).value || "—";
-      var chassis = (document.querySelector("[name=serial_number]")  || {}).value || "—";
+      var toPolicy = afterSave.value === "policy";
+      // Typed (or OCR-filled) values go into the dialog's HTML — escape them so they can only ever be text
+      var esc = function (s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+      var val = function (n) { var el = document.querySelector("[name=" + n + "]"); return esc((el && el.value.trim()) || "—"); };
+      var agentSel = document.getElementById("agent_id");
+      var agent    = esc(agentSel && agentSel.selectedIndex > 0 ? agentSel.options[agentSel.selectedIndex].text : "—");
       Swal.fire({
         icon: "question",
         title: "Confirm Client Details",
         html:
           "<table style=\"width:100%;font-size:0.82rem;text-align:left;border-collapse:collapse;\">" +
-          "<tr><td style=\"padding:0.3rem 0.5rem;color:var(--text-muted);width:45%;\">Full Name</td><td style=\"padding:0.3rem 0.5rem;font-weight:700;\">" + name + "</td></tr>" +
-          "<tr style=\"background:rgba(0,0,0,0.03);\"><td style=\"padding:0.3rem 0.5rem;color:var(--text-muted);\">Plate Number</td><td style=\"padding:0.3rem 0.5rem;font-weight:700;\">" + plate + "</td></tr>" +
-          "<tr><td style=\"padding:0.3rem 0.5rem;color:var(--text-muted);\">Vehicle</td><td style=\"padding:0.3rem 0.5rem;font-weight:700;\">" + year + " " + vmake + " " + vmodel + "</td></tr>" +
-          "<tr style=\"background:rgba(0,0,0,0.03);\"><td style=\"padding:0.3rem 0.5rem;color:var(--text-muted);\">Chassis No.</td><td style=\"padding:0.3rem 0.5rem;font-weight:700;font-family:monospace;\">" + chassis + "</td></tr>" +
-          "</table>",
-        confirmButtonText: "Yes, Save Client",
+          "<tr><td style=\"padding:0.3rem 0.5rem;color:var(--text-muted);width:45%;\">Full Name</td><td style=\"padding:0.3rem 0.5rem;font-weight:700;\">" + val("full_name") + "</td></tr>" +
+          (document.querySelector("[name=facebook_name]").value.trim()
+            ? "<tr><td style=\"padding:0.3rem 0.5rem;color:var(--text-muted);\">Facebook Name</td><td style=\"padding:0.3rem 0.5rem;font-weight:700;\">" + val("facebook_name") + "</td></tr>" : "") +
+          "<tr style=\"background:rgba(0,0,0,0.03);\"><td style=\"padding:0.3rem 0.5rem;color:var(--text-muted);\">Insurance Agent</td><td style=\"padding:0.3rem 0.5rem;font-weight:700;\">" + agent + "</td></tr>" +
+          "<tr><td style=\"padding:0.3rem 0.5rem;color:var(--text-muted);\">Plate Number</td><td style=\"padding:0.3rem 0.5rem;font-weight:700;\">" + val("plate_number") + "</td></tr>" +
+          "<tr style=\"background:rgba(0,0,0,0.03);\"><td style=\"padding:0.3rem 0.5rem;color:var(--text-muted);\">Vehicle</td><td style=\"padding:0.3rem 0.5rem;font-weight:700;\">" + val("year_model") + " " + val("make") + " " + val("model") + "</td></tr>" +
+          "<tr><td style=\"padding:0.3rem 0.5rem;color:var(--text-muted);\">Chassis No.</td><td style=\"padding:0.3rem 0.5rem;font-weight:700;font-family:monospace;\">" + val("serial_number") + "</td></tr>" +
+          "</table>" +
+          (toPolicy ? "<p style=\"font-size:0.78rem;color:var(--text-muted);margin:0.8rem 0 0;\">After saving, you will go straight to the Eligibility Check for this vehicle.</p>" : ""),
+        confirmButtonText: toPolicy ? "Yes, Save &amp; Check Eligibility" : "Yes, Save Client",
         cancelButtonText: "Review Again",
         showCancelButton: true,
         confirmButtonColor: "#B8860B",

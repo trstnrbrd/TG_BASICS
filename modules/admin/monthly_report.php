@@ -433,6 +433,8 @@ require_once '../../includes/topbar.php';
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/motion@13.4.3/dist/motion.min.js"></script>
+<script src="../../assets/js/shared/dash_motion.js?v=<?= filemtime(__DIR__ . '/../../assets/js/shared/dash_motion.js') ?>"></script>
 <script>
 var chartCT, chartPR;
 (function () {
@@ -441,16 +443,22 @@ var chartCT, chartPR;
   const gridColor = 'rgba(255,255,255,0.06)';
   const barAnim   = { duration: 900, easing: 'easeOutQuart', delay: (ctx) => ctx.dataIndex * 60 };
 
+  // ── Motion (assets/js/shared/dash_motion.js): stat numbers count up, cards rise in and chart cards lift on
+  // hover; each chart is drawn once it is on screen (dash_motion draws any still waiting before printing) ──
+  tgCountUp('.mr-stat-grid .dash-stat-value');
+  tgRiseInView('.mr-charts-row > .card, .mr-charts-row ~ .card');
+  tgHoverLift('.mr-charts-row > .card');
+
   const labels   = <?= json_encode(array_column($months_data, 'short')) ?>;
   const insData  = <?= json_encode(array_column($months_data, 'insurance')) ?>;
   const wkData   = <?= json_encode(array_column($months_data, 'walkin')) ?>;
   const polData  = <?= json_encode(array_column($months_data, 'policies')) ?>;
   const repData  = <?= json_encode(array_column($months_data, 'repairs')) ?>;
 
-  const sharedOptions = (extraDatasets) => ({
+  const sharedOptions = (animate) => ({
     responsive: true,
     maintainAspectRatio: true,
-    animation: barAnim,
+    animation: animate ? barAnim : false,
     plugins: {
       legend: {
         display: true,
@@ -464,7 +472,7 @@ var chartCT, chartPR;
     }
   });
 
-  chartCT = new Chart(document.getElementById('chart-ct-monthly'), {
+  tgChartInView('chart-ct-monthly', (animate) => { chartCT = new Chart(document.getElementById('chart-ct-monthly'), {
     type: 'bar',
     data: {
       labels,
@@ -473,10 +481,10 @@ var chartCT, chartPR;
         { label: 'Walk-in',   data: wkData,  backgroundColor: 'rgba(184,134,11,0.8)', borderColor: '#B8860B', borderWidth: 1.5, borderRadius: 5 }
       ]
     },
-    options: sharedOptions()
-  });
+    options: sharedOptions(animate)
+  }); });
 
-  chartPR = new Chart(document.getElementById('chart-pr-monthly'), {
+  tgChartInView('chart-pr-monthly', (animate) => { chartPR = new Chart(document.getElementById('chart-pr-monthly'), {
     type: 'bar',
     data: {
       labels,
@@ -485,20 +493,21 @@ var chartCT, chartPR;
         { label: 'Repairs',  data: repData, backgroundColor: 'rgba(123,63,160,0.8)',  borderColor: '#7B3FA0', borderWidth: 1.5, borderRadius: 5 }
       ]
     },
-    options: sharedOptions()
-  });
+    options: sharedOptions(animate)
+  }); });
 
-  // Resize charts to a clean fixed size before printing so canvas renders correctly
+  // Resize charts to a clean fixed size before printing so canvas renders correctly (dash_motion.js's own
+  // beforeprint handler, registered earlier, has already drawn any chart that was still waiting)
   const PRINT_H = 120;
   window.addEventListener('beforeprint', function () {
-    [chartCT, chartPR].forEach(c => {
+    [chartCT, chartPR].filter(Boolean).forEach(c => {
       c.options.animation = false;
       const w = c.canvas.parentNode.offsetWidth || 320;
       c.resize(w, PRINT_H);
     });
   });
   window.addEventListener('afterprint', function () {
-    [chartCT, chartPR].forEach(c => {
+    [chartCT, chartPR].filter(Boolean).forEach(c => {
       c.options.animation = barAnim;
       c.resize();
     });

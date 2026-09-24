@@ -3,6 +3,7 @@ require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/settings.php';
+require_once '../../config/access.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
     header("Location: ../../auth/login.php");
@@ -24,7 +25,9 @@ $stmt = $conn->prepare("
     SELECT
         p.*,
         DATEDIFF(p.policy_end, CURDATE()) AS days_left,
-        c.full_name, c.contact_number, c.email, c.address, c.created_by AS client_created_by,
+        c.full_name, c.contact_number, c.email, c.address, c.agent_id,
+        (SELECT CASE WHEN ag.is_hidden = 1 THEN 'System Administrator' ELSE ag.full_name END
+           FROM users ag WHERE ag.user_id = c.agent_id) AS agent_name,
         v.plate_number, v.make, v.model, v.year_model, v.color,
         v.motor_number, v.serial_number
     FROM insurance_policies p
@@ -41,10 +44,24 @@ if (!$policy) {
     exit;
 }
 
-// Vault gate — renewal_list.php enforces it for the list, so it must hold here too:
-// an admin outside the vault may only open policies of clients they created themselves.
-if (!renewal_vault_is_unlocked($conn) && (int)$policy['client_created_by'] !== (int)$_SESSION['user_id']) {
+// Any admin who can see the client can open its policy (config/access.php)...
+if (!client_in_scope($conn, (int)$policy['client_id'])) {
     header("Location: renewal_list.php");
+    exit;
+}
+
+// ...but only the client's insurance agent, or the Owner, may change it — payments, receipts, renewal,
+// delete (owner's rule, 2026-09-24). Everyone else gets the page read-only; every POST below is a change.
+$can_edit_policy = policy_editable($policy['agent_id'] !== null ? (int)$policy['agent_id'] : null);
+$view_only_msg   = 'Only the insurance agent of this client (' . ($policy['agent_name'] ?? 'not assigned yet') . ') or the Owner can update this policy.';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$can_edit_policy) {
+    csrf_verify();
+    if (isset($_POST['upload_receipt']) || isset($_POST['delete_receipt'])) {   // AJAX callers read JSON
+        header('Content-Type: application/json');
+        echo json_encode(['ok' => false, 'msg' => $view_only_msg]);
+        exit;
+    }
+    header("Location: view_policy.php?id=" . $policy_id . "&error=" . urlencode($view_only_msg));
     exit;
 }
 
@@ -204,6 +221,80 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_receipt'])) {
         $clr->execute();
     }
     echo json_encode(['ok' => true]); exit;
+}
+
+// ── HANDLE UNDO OF ONE SAVED PAYMENT ──
+// A saved installment is locked in the table, so a wrong entry (amount, mode, OR no.) could not be fixed
+// (owner's request, 2026-09-24). The agent or the Owner can now undo it: the installment goes back to unpaid
+// to be entered again, the policy totals are recomputed, and the activity log keeps what was undone.
+// The attached receipt (if any) is kept — it can be removed separately.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['undo_payment'])) {
+    csrf_verify();
+    $payment_id = (int)($_POST['payment_id'] ?? 0);
+    $undo_row   = null;
+    foreach ($installments as $inst_row) {
+        if ((int)$inst_row['payment_id'] === $payment_id) $undo_row = $inst_row;
+    }
+    $nothing_msg = 'That payment has already been undone — there is nothing left to undo.';
+    if (!$undo_row || (float)$undo_row['amount_paid'] <= 0) {
+        header("Location: view_policy.php?id=" . $policy_id . "&error=" . urlencode($nothing_msg));
+        exit;
+    }
+
+    $conn->begin_transaction();
+    try {
+        // "amount_paid > 0" makes a double-click (or two tabs) undo it only once
+        $clr = $conn->prepare("UPDATE policy_payments SET amount_paid = 0, paid_at = NULL, payment_mode = NULL, control_number = NULL WHERE payment_id = ? AND policy_id = ? AND amount_paid > 0");
+        $clr->bind_param('ii', $payment_id, $policy_id);
+        $clr->execute();
+        if ($clr->affected_rows !== 1) {
+            $conn->rollback();
+            header("Location: view_policy.php?id=" . $policy_id . "&error=" . urlencode($nothing_msg));
+            exit;
+        }
+
+        // Totals and status from what is stored now — same rules as saving the schedule below
+        $tot = $conn->prepare("
+            SELECT COALESCE(SUM(amount_paid), 0),
+                   COALESCE(SUM(CASE WHEN due_date < CURDATE() THEN amount_due  END), 0),
+                   COALESCE(SUM(CASE WHEN due_date < CURDATE() THEN amount_paid END), 0)
+            FROM policy_payments WHERE policy_id = ?
+        ");
+        $tot->bind_param('i', $policy_id);
+        $tot->execute();
+        [$total_paid, $due_past, $paid_past] = array_map('floatval', $tot->get_result()->fetch_row());
+        $new_balance = $payable_amount - $total_paid;
+        if ($new_balance <= 0)                            $new_status = 'Paid';
+        elseif ($due_past > 0 && $paid_past < $due_past)  $new_status = 'Overdue';
+        elseif ($total_paid > 0)                          $new_status = 'Partial';
+        else                                              $new_status = 'Unpaid';
+
+        $upd = $conn->prepare("UPDATE insurance_policies SET amount_paid = ?, balance = ?, payment_status = ? WHERE policy_id = ?");
+        $upd->bind_param('ddsi', $total_paid, $new_balance, $new_status, $policy_id);
+        $upd->execute();
+
+        $ordinals_u = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
+        $undo_label = count($installments) === 1 ? 'Full Payment' : ($ordinals_u[$undo_row['installment_no'] - 1] ?? $undo_row['installment_no'] . 'th') . ' Payment';
+        $undo_what  = 'PHP ' . number_format((float)$undo_row['amount_paid'], 2)
+                    . ' (' . ($undo_row['payment_mode'] ?: 'no mode') . (!empty($undo_row['control_number']) ? ', control no. ' . $undo_row['control_number'] : '') . ')'
+                    . (!empty($undo_row['paid_at']) ? ' recorded ' . date('M d, Y', strtotime($undo_row['paid_at'])) : '');
+        $uid  = $_SESSION['user_id'];
+        $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'PAYMENT_UNDONE', ?)");
+        $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' undid the ' . $undo_label . ' of policy ' . $policy['policy_number'] . ': ' . $undo_what
+              . '. Total paid now PHP ' . number_format($total_paid, 2) . '. Status: ' . $new_status . '.';
+        $log->bind_param('is', $uid, $desc);
+        $log->execute();
+
+        $conn->commit();
+    } catch (Throwable $e) {
+        $conn->rollback();
+        error_log('[TG-BASICS] undo_payment failed: ' . $e->getMessage());
+        header("Location: view_policy.php?id=" . $policy_id . "&error=" . urlencode('The payment could not be undone. Please try again.'));
+        exit;
+    }
+
+    header("Location: view_policy.php?id=" . $policy_id . "&success=" . urlencode($undo_label . ' (₱' . number_format((float)$undo_row['amount_paid'], 2) . ') was undone. You can enter it again.'));
+    exit;
 }
 
 // ── HANDLE PAYMENT UPDATE ──
@@ -403,6 +494,18 @@ require_once '../../includes/header.php';
 require_once '../../includes/navbar.php';
 ?>
 
+<style>
+/* "Undo" under a saved payment — quiet until hovered, since it reverses a payment */
+.vp-undo-btn {
+  margin-top: 0.3rem; display: inline-flex; align-items: center; gap: 0.25rem;
+  padding: 0.15rem 0.5rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-3);
+  font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.66rem; font-weight: 600; color: var(--text-muted);
+  cursor: pointer; transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.vp-undo-btn:hover, .vp-undo-btn:focus-visible { color: var(--danger); border-color: var(--danger-border); background: var(--danger-bg); outline: none; }
+.vp-undo-btn:disabled { opacity: 0.5; cursor: default; }
+</style>
+
 <div class="main">
 
 <?php
@@ -416,6 +519,11 @@ require_once '../../includes/topbar.php';
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
       <a href="renewal_list.php" class="back-link" style="margin-bottom:0;" onclick="goBack('renewal_list.php'); return false;"><?= icon('arrow-left', 14) ?> Back to Renewal Tracking</a>
       <div style="display:flex;gap:0.5rem;align-items:center;">
+        <?php if ($can_edit_policy): ?>
+        <a href="edit_policy.php?id=<?= $policy_id ?>"
+          style="display:inline-flex;align-items:center;gap:0.4rem;background:var(--bg-3);color:var(--text-primary);border:1px solid var(--border);padding:0.45rem 1rem;border-radius:8px;font-size:0.78rem;font-weight:700;cursor:pointer;text-decoration:none;">
+          <?= icon('pencil', 14) ?> Edit Policy
+        </a>
         <?php if ($expired || $days <= $exp_days): ?>
         <a href="../insurance/add_policy.php?renew_from=<?= $policy_id ?>"
           style="display:inline-flex;align-items:center;gap:0.4rem;background:var(--gold-pale);color:var(--gold-bright);border:1px solid var(--gold-bright);padding:0.45rem 1rem;border-radius:8px;font-size:0.78rem;font-weight:700;cursor:pointer;text-decoration:none;">
@@ -426,11 +534,22 @@ require_once '../../includes/topbar.php';
           style="display:inline-flex;align-items:center;gap:0.4rem;background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border);padding:0.45rem 1rem;border-radius:8px;font-size:0.78rem;font-weight:700;cursor:pointer;">
           <?= icon('trash', 14) ?> Delete Policy
         </button>
+        <?php endif; ?>
       </div>
     </div>
 
     <?php if (isset($_GET['success'])): ?>
     <script>document.addEventListener('DOMContentLoaded',function(){ Swal.fire({ toast:true, position:'top-end', icon:'success', titleText:<?= json_encode($_GET['success']) ?>, showConfirmButton:false, timer:3000, timerProgressBar:true }); });</script>
+    <?php endif; ?>
+    <?php if (!empty($_GET['error'])): ?>
+    <script>document.addEventListener('DOMContentLoaded',function(){ Swal.fire({ icon:'error', title:'Not allowed', text:<?= json_encode(san_str($_GET['error'], 300)) ?>, confirmButtonColor:'#B8860B' }); });</script>
+    <?php endif; ?>
+
+    <?php if (!$can_edit_policy): ?>
+    <div class="info-box" style="margin-bottom:1.25rem;">
+      <?= icon('lock-closed', 14) ?>
+      <span><strong>View only.</strong> <?= htmlspecialchars($view_only_msg) ?></span>
+    </div>
     <?php endif; ?>
 
     <!-- POLICY STATUS BANNER -->
@@ -463,10 +582,11 @@ require_once '../../includes/topbar.php';
         <div style="padding:1.25rem 1.5rem;display:flex;flex-direction:column;gap:0.85rem;">
           <?php
           $client_info = [
-            ['Full Name',   $policy['full_name']],
-            ['Contact',     $policy['contact_number']],
-            ['Email',       $policy['email'] ?: 'Not provided'],
-            ['Address',     $policy['address']],
+            ['Full Name',       $policy['full_name']],
+            ['Insurance Agent', $policy['agent_name'] ?? 'Unassigned'],
+            ['Contact',         $policy['contact_number'] ?: 'Not provided'],
+            ['Email',           $policy['email'] ?: 'Not provided'],
+            ['Address',         $policy['address']],
           ];
           foreach ($client_info as [$label, $val]): ?>
           <div>
@@ -671,7 +791,7 @@ require_once '../../includes/topbar.php';
                     // When policy is fully paid, hide rows with zero payment (they're irrelevant)
                     if ($fully_paid && $amt_paid <= 0) continue;
 
-                    $is_locked  = $fully_paid || $amt_paid > 0;  // lock all when fully paid
+                    $is_locked  = !$can_edit_policy || $fully_paid || $amt_paid > 0;  // lock all when fully paid, or when viewing someone else's client
                     $is_overdue = $due_date && $due_date < date('Y-m-d') && $amt_paid < $amt_due;
 
                     if ($amt_paid >= $amt_due && $amt_due > 0) {
@@ -710,7 +830,7 @@ require_once '../../includes/topbar.php';
                       <?php if ($is_locked): ?>
                         <!-- Hidden input to preserve value on POST -->
                         <input type="hidden" name="payment_mode[]" value="<?= htmlspecialchars($v_mode) ?>"/>
-                        <span style="font-size:0.82rem;font-weight:600;color:var(--text-primary);"><?= $v_mode ?: '—' ?></span>
+                        <span style="font-size:0.82rem;font-weight:600;color:var(--text-primary);"><?= htmlspecialchars($v_mode ?: '—') ?></span>
                       <?php else: ?>
                         <select name="payment_mode[]" class="field-select" style="width:130px;">
                           <option value="">— Select —</option>
@@ -723,7 +843,7 @@ require_once '../../includes/topbar.php';
                     <td data-label="Control No." style="text-align:center;">
                       <?php if ($is_locked): ?>
                         <input type="hidden" name="control_number[]" value="<?= htmlspecialchars($v_ctrl) ?>"/>
-                        <span style="font-size:0.82rem;font-weight:600;color:var(--text-primary);"><?= $v_ctrl ?: '—' ?></span>
+                        <span style="font-size:0.82rem;font-weight:600;color:var(--text-primary);"><?= htmlspecialchars($v_ctrl ?: '—') ?></span>
                       <?php else: ?>
                         <input type="text" name="control_number[]" class="field-input"
                           style="width:130px;" placeholder="Ref / OR No."
@@ -735,6 +855,18 @@ require_once '../../includes/topbar.php';
                       <?php if ($is_locked): ?>
                         <input type="hidden" name="installment_amount[]" value="<?= htmlspecialchars($v_amount) ?>"/>
                         <span style="font-size:0.9rem;font-weight:700;color:var(--success);">&#8369;<?= number_format($amt_paid, 2) ?></span>
+                        <?php if ($can_edit_policy && $amt_paid > 0): ?>
+                        <div>
+                          <button type="button" class="vp-undo-btn" title="Entered by mistake? Undo it and enter it again"
+                            data-pid="<?= (int)$inst['payment_id'] ?>"
+                            data-label="<?= htmlspecialchars($inst_label) ?>"
+                            data-amount="<?= htmlspecialchars('₱' . number_format($amt_paid, 2)) ?>"
+                            data-mode="<?= htmlspecialchars($inst['payment_mode'] ?? '') ?>"
+                            data-receipt="<?= !empty($inst['receipt_file']) ? '1' : '0' ?>">
+                            <?= icon('arrow-path', 11) ?> Undo
+                          </button>
+                        </div>
+                        <?php endif; ?>
                       <?php else: ?>
                         <input type="number" step="0.01" min="0"
                           name="installment_amount[]"
@@ -754,18 +886,22 @@ require_once '../../includes/topbar.php';
                             title="View Receipt" style="padding:0.3rem 0.5rem;">
                             <?= icon('eye', 13) ?>
                           </button>
+                          <?php if ($can_edit_policy): ?>
                           <button type="button" class="rc-del-btn"
                             data-pid="<?= $inst['payment_id'] ?>"
                             title="Remove"
                             style="padding:0.3rem 0.5rem;display:inline-flex;align-items:center;gap:0.25rem;background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border);border-radius:6px;font-size:0.72rem;font-weight:600;cursor:pointer;">
                             <?= icon('x-mark', 12) ?>
                           </button>
+                          <?php endif; ?>
                         </div>
-                      <?php else: ?>
+                      <?php elseif ($can_edit_policy): ?>
                         <label class="rc-upload-label" title="Attach receipt" style="display:inline-flex;align-items:center;gap:0.3rem;background:var(--bg-2);border:1px dashed var(--border);border-radius:6px;padding:0.3rem 0.6rem;cursor:pointer;font-size:0.72rem;color:var(--text-muted);white-space:nowrap;">
                           <?= icon('paper-clip', 12) ?> Attach
                           <input type="file" accept="image/*" class="rc-file-input" data-pid="<?= $inst['payment_id'] ?>" style="display:none;"/>
                         </label>
+                      <?php else: ?>
+                        <span style="color:var(--text-muted);">—</span>
                       <?php endif; ?>
                     </td>
                   </tr>
@@ -775,7 +911,7 @@ require_once '../../includes/topbar.php';
               </table>
             </div>
 
-            <?php else: ?>
+            <?php elseif ($can_edit_policy): ?>
             <!-- Legacy single-payment form -->
             <div class="form-grid" style="margin-bottom:1rem;">
               <div class="field">
@@ -795,7 +931,7 @@ require_once '../../includes/topbar.php';
             </div>
             <?php endif; ?>
 
-            <?php if (!$fully_paid): ?>
+            <?php if (!$fully_paid && $can_edit_policy): ?>
             <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
               <button type="submit" id="btn-save-payment" class="btn-primary"><?= icon('check-circle', 14) ?> Save Payment</button>
             </div>
@@ -945,6 +1081,44 @@ require_once '../../includes/footer.php';
 </script>
 
 <script>
+// Undo one saved payment (entered by mistake) -> confirm, transaction PIN, then post it on its own form
+// (the rows sit inside the Save Payment form, and forms can't be nested).
+(function () {
+  var csrf = document.querySelector('input[name="csrf_token"]');
+  document.querySelectorAll(".vp-undo-btn").forEach(function (btn) {
+    btn.addEventListener("click", async function () {
+      var d = btn.dataset;
+      var result = await Swal.fire({
+        icon: "warning",
+        titleText: "Undo the " + d.label + "?",
+        text: "The " + d.amount + (d.mode ? " " + d.mode : "") + " payment will be removed and this installment goes back to unpaid, so you can enter it again correctly." +
+              (d.receipt === "1" ? " The attached receipt is kept — remove it too if it was wrong." : "") +
+              " This is recorded in the activity log.",
+        showCancelButton: true,
+        confirmButtonText: "Yes, undo it",
+        cancelButtonText: "Cancel",
+        confirmButtonColor: "#c0392b",
+        cancelButtonColor: "#6b7280",
+        reverseButtons: true
+      });
+      if (!result.isConfirmed) return;
+      if (!(await requirePin())) return;
+
+      var f = document.createElement("form");
+      f.method = "POST";
+      f.action = "view_policy.php?id=<?= (int)$policy_id ?>";
+      [["csrf_token", csrf ? csrf.value : ""], ["undo_payment", "1"], ["payment_id", d.pid]].forEach(function (kv) {
+        var i = document.createElement("input"); i.type = "hidden"; i.name = kv[0]; i.value = kv[1]; f.appendChild(i);
+      });
+      document.body.appendChild(f);
+      btn.disabled = true;
+      f.submit();
+    });
+  });
+})();
+</script>
+
+<script>
 (function() {
   var form = document.querySelector('form [name="record_payment"]');
   if (!form) return;
@@ -956,7 +1130,7 @@ require_once '../../includes/footer.php';
 
     var rows = table.querySelectorAll('tbody tr');
     for (var i = 0; i < rows.length; i++) {
-      var amtInput  = rows[i].querySelector('input.inst-amount-input');
+      var amtInput  = rows[i].querySelector('input.inst-paid-input');
       var modeSelect = rows[i].querySelector('select[name^="payment_mode"]');
       if (!amtInput || !modeSelect) continue; // locked row — skip
 

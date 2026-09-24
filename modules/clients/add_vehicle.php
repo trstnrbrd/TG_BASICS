@@ -15,9 +15,9 @@ if ($client_id === 0) {
     exit;
 }
 
-// Admins can only work with clients they personally added — same rule as the client list and profile
-if (!client_in_scope($conn, $client_id)) {
-    header("Location: client_list.php");
+// Only the Owner, the admin who encoded this client, or its insurance agent may add vehicles to it (config/access.php)
+if (!client_editable($conn, $client_id)) {
+    header("Location: view_client.php?id=" . $client_id);
     exit;
 }
 
@@ -49,8 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($make === '')          $errors[] = 'Vehicle make is required.';
     if ($model === '')         $errors[] = 'Vehicle model is required.';
     if ($year_model === 0)     $errors[] = 'Year model must be a valid year (1960–' . ((int)date('Y') + 1) . ').';
-    if ($motor_number === '')  $errors[] = 'Engine number is required.';
-    if ($serial_number === '') $errors[] = 'Chassis number is required.';
+    // Engine and chassis numbers are optional (owner's request, 2026-09-24)
 
     // Plate-uniqueness check + insert held under one named lock (closes the same-plate race — see
     // with_named_lock() for the confirmed repro) instead of two separate, unsynchronized queries.
@@ -242,22 +241,22 @@ require_once '../../includes/topbar.php';
 
             <!-- Row 3: Engine Number (full width) -->
             <div class="field span-3">
-              <label class="field-label">Engine Number <span class="req">*</span></label>
+              <label class="field-label">Engine Number</label>
               <input type="text" name="motor_number" class="field-input"
                 placeholder="Alphanumeric, from OR-CR"
                 value="<?= htmlspecialchars($_POST['motor_number'] ?? '') ?>"
                 style="text-transform:uppercase;"/>
-              <div class="field-hint">Found on the vehicle registration / OR-CR. Required for insurance eligibility.</div>
+              <div class="field-hint">Found on the vehicle registration / OR-CR. Optional — can be added later.</div>
             </div>
 
             <!-- Row 4: Chassis Number (full width) -->
             <div class="field span-3">
-              <label class="field-label">Chassis Number <span class="req">*</span></label>
+              <label class="field-label">Chassis Number</label>
               <input type="text" name="serial_number" class="field-input"
                 placeholder="17-character VIN"
                 value="<?= htmlspecialchars($_POST['serial_number'] ?? '') ?>"
                 style="text-transform:uppercase;"/>
-              <div class="field-hint">17-character VIN / chassis number from the OR-CR. Required for policy creation.</div>
+              <div class="field-hint">17-character VIN / chassis number from the OR-CR. Optional — can be added later.</div>
             </div>
 
           </div>

@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../config/session.php';
 require_once '../../config/db.php';
 require_once '../../config/settings.php';
+require_once '../../config/access.php';
 
 $urg_days = (int)getSetting($conn, 'renewal_urgent_days', '7');
 $exp_days = (int)getSetting($conn, 'renewal_expiring_days', '30');
@@ -22,12 +23,15 @@ $recent_vehicles = $conn->query("SELECT COUNT(*) as c FROM vehicles v INNER JOIN
 
 $total_policies   = $conn->query("SELECT COUNT(*) as c FROM insurance_policies WHERE is_renewed = 0")->fetch_assoc()['c'];
 $active_policies  = $conn->query("SELECT COUNT(*) as c FROM insurance_policies WHERE is_renewed = 0 AND policy_end >= CURDATE()")->fetch_assoc()['c'];
-$es_stmt = $conn->prepare("SELECT COUNT(*) as c FROM insurance_policies WHERE is_renewed = 0 AND DATEDIFF(policy_end, CURDATE()) BETWEEN 0 AND ?");
+// Renewal figures follow the same scope as Renewal Tracking: the Owner sees all, an admin only the
+// policies of clients they are the insurance agent of (config/access.php).
+$renewal_scope = renewal_scope_sql('c');
+$es_stmt = $conn->prepare("SELECT COUNT(*) as c FROM insurance_policies p INNER JOIN clients c ON c.client_id = p.client_id WHERE p.is_renewed = 0 AND DATEDIFF(p.policy_end, CURDATE()) BETWEEN 0 AND ? AND $renewal_scope");
 $es_stmt->bind_param('i', $exp_days);
 $es_stmt->execute();
 $expiring_soon = $es_stmt->get_result()->fetch_assoc()['c'];
 
-$up_stmt = $conn->prepare("SELECT COUNT(*) as c FROM insurance_policies WHERE is_renewed = 0 AND DATEDIFF(policy_end, CURDATE()) BETWEEN 0 AND ?");
+$up_stmt = $conn->prepare("SELECT COUNT(*) as c FROM insurance_policies p INNER JOIN clients c ON c.client_id = p.client_id WHERE p.is_renewed = 0 AND DATEDIFF(p.policy_end, CURDATE()) BETWEEN 0 AND ? AND $renewal_scope");
 $up_stmt->bind_param('i', $urg_days);
 $up_stmt->execute();
 $urgent_policies = $up_stmt->get_result()->fetch_assoc()['c'];
@@ -40,7 +44,7 @@ $rn_stmt = $conn->prepare("
     FROM insurance_policies p
     INNER JOIN vehicles v ON p.vehicle_id = v.vehicle_id
     INNER JOIN clients c ON p.client_id = c.client_id
-    WHERE p.is_renewed = 0 AND DATEDIFF(p.policy_end, CURDATE()) BETWEEN 0 AND ?
+    WHERE p.is_renewed = 0 AND DATEDIFF(p.policy_end, CURDATE()) BETWEEN 0 AND ? AND $renewal_scope
     ORDER BY p.policy_end ASC
     LIMIT 6
 ");
@@ -481,7 +485,7 @@ require_once '../../includes/topbar.php';
         <div style="position:relative;width:220px;height:220px;flex-shrink:0;">
           <canvas id="chart-payment-status"></canvas>
           <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;">
-            <div style="font-size:1.8rem;font-weight:800;color:var(--text-primary);line-height:1;"><?= array_sum($pay_status) ?></div>
+            <div class="tg-count" style="font-size:1.8rem;font-weight:800;color:var(--text-primary);line-height:1;"><?= array_sum($pay_status) ?></div>
             <div style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-top:0.2rem;">Policies</div>
           </div>
         </div>
@@ -522,6 +526,8 @@ require_once '../../includes/topbar.php';
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/motion@13.4.3/dist/motion.min.js"></script>
+<script src="../../assets/js/shared/dash_motion.js?v=<?= filemtime(__DIR__ . '/../../assets/js/shared/dash_motion.js') ?>"></script>
 <script src="../../assets/js/shared/dashboard.js"></script>
 <script>
 (function () {
@@ -529,16 +535,20 @@ require_once '../../includes/topbar.php';
   Chart.defaults.color = '#888';
   const gridColor = 'rgba(255,255,255,0.06)';
 
-  // ── Animate payment status bars ──
-  setTimeout(function() {
-    document.querySelectorAll('.ps-bar').forEach(function(b) {
-      b.style.width = b.dataset.pct + '%';
-    });
-  }, 200);
+  // ── Motion (assets/js/shared/dash_motion.js): cards rise in, chart cards lift on hover, the payment total
+  // counts up, and every chart below is only drawn once it is on screen, so its animation is actually seen ──
+  tgRiseInView('.dash-main-grid > .card, .dash-charts-grid > .card, .content > .card');
+  tgHoverLift('.dash-charts-grid > .card');
+  tgCountUp('.tg-count');
 
-  // ── CLIENT TYPES: month navigator ──
+  // ── Payment status bars fill in when their card comes into view ──
+  const psBars = document.querySelectorAll('.ps-bar');
+  tgWhenInView(psBars.length ? psBars[0].closest('.card') : null, function () {
+    setTimeout(function () { psBars.forEach(function (b) { b.style.width = b.dataset.pct + '%'; }); }, 150);
+  });
+
   // ── DOUGHNUT: Client Types (current month) ──
-  new Chart(document.getElementById('chart-client-types'), {
+  tgChartInView('chart-client-types', (animate) => new Chart(document.getElementById('chart-client-types'), {
     type: 'doughnut',
     data: {
       labels: ['Insurance', 'Walk-in'],
@@ -554,7 +564,7 @@ require_once '../../includes/topbar.php';
     },
     options: {
       responsive: true,
-      animation: { duration: 1000, easing: 'easeOutQuart' },
+      animation: animate ? { duration: 1000, easing: 'easeOutQuart' } : false,
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -569,7 +579,7 @@ require_once '../../includes/topbar.php';
       },
       cutout: '68%',
     }
-  });
+  }));
 
   const monthlyPolicyLabels = <?= json_encode(array_column($monthly_policies, 'label')) ?>;
   const monthlyPolicyData   = <?= json_encode(array_column($monthly_policies, 'count')) ?>;
@@ -581,7 +591,7 @@ require_once '../../includes/topbar.php';
   const pieAnim = { duration: 1000, easing: 'easeOutQuart' };
 
   // ── BAR: Policies per Month ──
-  new Chart(document.getElementById('chart-policies'), {
+  tgChartInView('chart-policies', (animate) => new Chart(document.getElementById('chart-policies'), {
     type: 'bar',
     data: {
       labels: monthlyPolicyLabels,
@@ -596,17 +606,17 @@ require_once '../../includes/topbar.php';
     },
     options: {
       responsive: true,
-      animation: barAnim,
+      animation: animate ? barAnim : false,
       plugins: { legend: { display: false } },
       scales: {
         y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 }, grid: { color: gridColor } },
         x: { grid: { display: false }, ticks: { maxRotation: 0, font: { size: 10 } } }
       }
     }
-  });
+  }));
 
   // ── BAR: Repair Jobs per Month ──
-  new Chart(document.getElementById('chart-repairs'), {
+  tgChartInView('chart-repairs', (animate) => new Chart(document.getElementById('chart-repairs'), {
     type: 'bar',
     data: {
       labels: monthlyRepairLabels,
@@ -621,17 +631,17 @@ require_once '../../includes/topbar.php';
     },
     options: {
       responsive: true,
-      animation: barAnim,
+      animation: animate ? barAnim : false,
       plugins: { legend: { display: false } },
       scales: {
         y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 }, grid: { color: gridColor } },
         x: { grid: { display: false }, ticks: { maxRotation: 0, font: { size: 10 } } }
       }
     }
-  });
+  }));
 
   // ── DOUGHNUT: Payment Status ──
-  new Chart(document.getElementById('chart-payment-status'), {
+  tgChartInView('chart-payment-status', (animate) => new Chart(document.getElementById('chart-payment-status'), {
     type: 'doughnut',
     data: {
       labels: ['Paid', 'Partial', 'Unpaid', 'Overdue'],
@@ -647,7 +657,7 @@ require_once '../../includes/topbar.php';
     },
     options: {
       responsive: true,
-      animation: pieAnim,
+      animation: animate ? pieAnim : false,
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -661,7 +671,7 @@ require_once '../../includes/topbar.php';
       },
       cutout: '68%',
     }
-  });
+  }));
 })();
 </script>
 

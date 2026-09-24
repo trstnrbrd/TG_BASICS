@@ -47,11 +47,14 @@ $sql = "
            cl.doc_insurance_policy, cl.doc_or, cl.doc_cr, cl.doc_drivers_license, cl.doc_affidavit, cl.doc_estimate, cl.doc_damage_photos,
            c.full_name, c.client_id,
            v.plate_number, v.make, v.model,
-           ip.policy_number, ip.coverage_type
+           ip.policy_number, ip.coverage_type,
+           CASE WHEN u.is_hidden = 1 THEN 'System Administrator' ELSE u.full_name END AS added_by_name,
+           CASE WHEN u.is_hidden = 1 THEN NULL ELSE u.profile_photo END AS added_by_photo
     FROM claims cl
     INNER JOIN clients c  ON cl.client_id = c.client_id
     INNER JOIN insurance_policies ip ON cl.policy_id = ip.policy_id
     LEFT  JOIN vehicles v ON ip.vehicle_id = v.vehicle_id
+    LEFT  JOIN users u    ON cl.created_by = u.user_id
     WHERE $where_sql
     ORDER BY $order
 ";
@@ -82,6 +85,21 @@ require_once '../../includes/navbar.php';
 ?>
 
 <link rel="stylesheet" href="../../assets/css/shared/claims_list.css"/>
+<style>
+/* Row details open on hover — desktop only (same as Client Records / Renewal Tracking). Touch screens have
+   no real :hover, so phones/tablets (<=768px) keep tap-to-expand from the global handler in footer.php. */
+@media (min-width: 769px) {
+  .claims-list-table .tg-expand-row { display: none; }
+  .claims-list-table .tg-expandable-row:hover + .tg-expand-row,
+  .claims-list-table .tg-expand-row:hover {
+    display: table-row !important;
+  }
+  .claims-list-table .tg-expandable-row:hover .row-chevron {
+    transform: rotate(90deg);
+    opacity: 0.7 !important;
+  }
+}
+</style>
 
 <div class="main">
 
@@ -153,7 +171,7 @@ require_once '../../includes/topbar.php';
 
       <?php if ($result->num_rows > 0): ?>
       <div class="tg-table-wrap mob-card-wrap">
-        <table class="tg-table mob-card mob-claims-table">
+        <table class="tg-table mob-card mob-claims-table claims-list-table">
           <thead>
             <tr>
               <th style="text-align:left;padding-left:2.5rem;">Client / Vehicle</th>
@@ -171,6 +189,7 @@ require_once '../../includes/topbar.php';
               $s = $status_map[$row['status']] ?? ['label' => $row['status'], 'class' => 'badge-muted'];
               $is_finished = in_array($row['status'], ['resolved', 'denied', 'lack_of_requirements']);
               $cid = 'claim-expand-' . $row['claim_id'];
+              $aby_initials = !empty($row['added_by_name']) ? substr(implode('', array_map(fn($w) => strtoupper($w[0] ?? ''), explode(' ', trim($row['added_by_name'])))), 0, 2) : '';
             ?>
             <tr class="tg-expandable-row" data-expand="<?= $cid ?>" tabindex="0" style="cursor:pointer;">
               <td style="text-align:left;">
@@ -237,6 +256,25 @@ require_once '../../includes/topbar.php';
                         </div>
                       </span>
                     </div>
+                    <div class="tg-expand-item">
+                      <span class="tg-expand-label">Added By</span>
+                      <span class="tg-expand-value">
+                        <?php if (!empty($row['added_by_name'])): ?>
+                        <div style="display:inline-flex;align-items:center;gap:0.45rem;">
+                          <div style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,var(--gold-bright),var(--gold));display:flex;align-items:center;justify-content:center;font-size:0.56rem;font-weight:800;color:#fff;flex-shrink:0;overflow:hidden;">
+                            <?php if (!empty($row['added_by_photo'])): ?>
+                              <img src="<?= $base_path ?>uploads/avatars/<?= htmlspecialchars($row['added_by_photo']) ?>" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;"/>
+                            <?php else: ?>
+                              <?= htmlspecialchars($aby_initials) ?>
+                            <?php endif; ?>
+                          </div>
+                          <span><?= htmlspecialchars($row['added_by_name']) ?></span>
+                        </div>
+                        <?php else: ?>
+                          —
+                        <?php endif; ?>
+                      </span>
+                    </div>
                   </div>
                 </div>
               </td>
@@ -263,5 +301,13 @@ require_once '../../includes/topbar.php';
   <input type="hidden" name="delete_claim" value="1"/>
 </form>
 <script src="../../assets/js/shared/claims_list.js?v=<?= filemtime(__DIR__.'/../../assets/js/shared/claims_list.js') ?>"></script>
+<script>
+// Row details open on hover on desktop (CSS above) — keep clicks on this table away from the global
+// click-to-toggle handler in footer.php so it can't fight the hover. Phones/tablets keep tap-to-expand.
+(function () {
+  var t = document.querySelector(".claims-list-table");
+  if (t) t.addEventListener("click", function (e) { if (window.innerWidth > 768) e.stopPropagation(); });
+})();
+</script>
 
 <?php require_once '../../includes/footer.php'; ?>

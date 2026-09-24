@@ -1,14 +1,5 @@
 <?php
-// Who may work with which client, and which deletes would silently wipe other records.
-// One copy of the rules so the client pages, vehicle pages and repair pages cannot drift apart.
 
-/**
- * Is this client within the signed-in user's scope?
- *   super_admin — every client
- *   admin       — only clients they personally added (created_by)
- *   mechanic    — only walk-in clients (nobody with an insurance policy on record)
- * Soft-deleted clients are out of scope for everyone.
- */
 function client_in_scope(mysqli $conn, int $client_id): bool
 {
     if ($client_id <= 0) return false;
@@ -16,21 +7,75 @@ function client_in_scope(mysqli $conn, int $client_id): bool
     $role = $_SESSION['role'] ?? '';
     $sql  = "SELECT 1 FROM clients c WHERE c.client_id = ? AND c.deleted_at IS NULL";
 
-    if ($role === 'admin') {
-        $stmt = $conn->prepare($sql . " AND c.created_by = ? LIMIT 1");
+    if ($role === 'mechanic') {
+        $sql .= " AND NOT EXISTS (SELECT 1 FROM insurance_policies ip WHERE ip.client_id = c.client_id)";
+    } elseif ($role !== 'admin' && $role !== 'super_admin') {
+        return false;
+    }
+    $stmt = $conn->prepare($sql . " LIMIT 1");
+    $stmt->bind_param('i', $client_id);
+    $stmt->execute();
+    return $stmt->get_result()->num_rows > 0;
+}
+
+function client_editable(mysqli $conn, int $client_id): bool
+{
+    if ($client_id <= 0) return false;
+
+    $role = $_SESSION['role'] ?? '';
+    if ($role === 'super_admin') {
+        $stmt = $conn->prepare("SELECT 1 FROM clients WHERE client_id = ? AND deleted_at IS NULL LIMIT 1");
+        $stmt->bind_param('i', $client_id);
+    } elseif ($role === 'admin') {
         $uid  = (int)($_SESSION['user_id'] ?? 0);
-        $stmt->bind_param('ii', $client_id, $uid);
-    } elseif ($role === 'mechanic') {
-        $stmt = $conn->prepare($sql . " AND NOT EXISTS (SELECT 1 FROM insurance_policies ip WHERE ip.client_id = c.client_id) LIMIT 1");
-        $stmt->bind_param('i', $client_id);
-    } elseif ($role === 'super_admin') {
-        $stmt = $conn->prepare($sql . " LIMIT 1");
-        $stmt->bind_param('i', $client_id);
+        $stmt = $conn->prepare("SELECT 1 FROM clients WHERE client_id = ? AND deleted_at IS NULL AND (created_by = ? OR agent_id = ?) LIMIT 1");
+        $stmt->bind_param('iii', $client_id, $uid, $uid);
     } else {
         return false;
     }
     $stmt->execute();
     return $stmt->get_result()->num_rows > 0;
+}
+
+
+function policy_editable(?int $agent_id): bool
+{
+    $role = $_SESSION['role'] ?? '';
+    if ($role === 'super_admin') return true;
+    return $role === 'admin' && $agent_id !== null && $agent_id > 0 && $agent_id === (int)($_SESSION['user_id'] ?? 0);
+}
+
+
+function renewal_scope_sql(string $client_alias = 'c'): string
+{
+    $role = $_SESSION['role'] ?? '';
+    if ($role === 'super_admin') return '1=1';
+    if ($role === 'admin') return $client_alias . '.agent_id = ' . (int)($_SESSION['user_id'] ?? 0);
+    return '1=0';
+}
+
+/**
+ * Who a client can belong to: active admins and super admins — never mechanics, and never the hidden
+ * oversight account (its real name must not surface anywhere in the UI). Returns [user_id => row].
+ */
+function insurance_agents(mysqli $conn): array
+{
+    $res = $conn->query("
+        SELECT user_id, full_name, role, profile_photo FROM users
+        WHERE role IN ('admin', 'super_admin') AND is_active = 1 AND is_hidden = 0
+        ORDER BY FIELD(role, 'super_admin', 'admin'), full_name
+    ");
+    $agents = [];
+    while ($row = $res->fetch_assoc()) $agents[(int)$row['user_id']] = $row;
+    return $agents;
+}
+
+/** Dropdown label for an insurance agent: "Name — Owner" for the super admin, "(you)" for the signed-in user. */
+function agent_option_label(array $agent): string
+{
+    $label = $agent['full_name'] . ($agent['role'] === 'super_admin' ? ' — Owner' : '');
+    if ((int)$agent['user_id'] === (int)($_SESSION['user_id'] ?? 0)) $label .= ' (you)';
+    return $label;
 }
 
 /**
@@ -67,7 +112,7 @@ function users_with_history(mysqli $conn): ?array
 {
     static $refs = [
         ['audit_logs', 'user_id'],
-        ['clients', 'created_by'], ['clients', 'consent_recorded_by'],
+        ['clients', 'created_by'], ['clients', 'consent_recorded_by'], ['clients', 'agent_id'],
         ['insurance_policies', 'created_by'], ['claims', 'created_by'],
         ['repair_jobs', 'created_by'], ['repair_job_images', 'uploaded_by'],
         ['quotations', 'created_by'], ['receipts', 'issued_by'],

@@ -26,15 +26,6 @@ function getSetting(mysqli $conn, string $key, ?string $default = null): string 
     return $default ?? '';
 }
 
-// Renewal Tracking's vault gate: super admins always pass; an admin passes only while
-// their stored unlock stamp matches the current vault version (changing the vault
-// password bumps the version and invalidates every earlier unlock).
-function renewal_vault_is_unlocked(mysqli $conn): bool {
-    if (($_SESSION['role'] ?? '') === 'super_admin') return true;
-    $version = getSetting($conn, 'renewal_vault_updated_at', '0');
-    return !empty($_SESSION['renewal_vault_unlocked_at']) && $_SESSION['renewal_vault_unlocked_at'] === $version;
-}
-
 function setSetting(mysqli $conn, string $key, string $value): bool {
     $stmt = $conn->prepare(
         "INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?)

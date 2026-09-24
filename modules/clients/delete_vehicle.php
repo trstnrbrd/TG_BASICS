@@ -38,9 +38,9 @@ if (!$vehicle) {
     exit;
 }
 
-// Admins can only work with clients they personally added — same rule as the client list and profile
-if (!client_in_scope($conn, (int)$vehicle['client_id'])) {
-    header("Location: client_list.php");
+// Only the Owner, the admin who encoded this client, or its insurance agent may change its vehicles (config/access.php)
+if (!client_editable($conn, (int)$vehicle['client_id'])) {
+    header("Location: view_client.php?id=" . (int)$vehicle['client_id'] . "&error=" . urlencode('Only the Owner, the admin who added this client, or its insurance agent can unregister its vehicles.'));
     exit;
 }
 

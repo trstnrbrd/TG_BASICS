@@ -800,7 +800,8 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
     .span-2, .span-3 { grid-column: span 1; }
     .form-actions { padding: 0.9rem 1rem; flex-direction: column; }
     .form-actions .btn-ghost,
-    .form-actions .btn-primary { width: 100%; justify-content: center; }
+    .form-actions .btn-primary,
+    .form-actions .btn-gold { width: 100%; justify-content: center; }
 
     /* Cards */
     .card-header { padding: 0.85rem 1rem; flex-wrap: wrap; gap: 0.5rem; }
@@ -843,7 +844,7 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
 
   /* ── RESPONSIVE: SMALL MOBILE ── */
   @media (max-width: 480px) {
-    .content { padding: 0.75rem; }
+    .content { padding: 0.75rem; padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }   /* keep clear of the bottom nav */
     .topbar  { padding: 0.65rem 0.75rem; padding-left: 3rem; }
     .user-chip { padding: 0.3rem 0.5rem 0.3rem 0.35rem; font-size: 0; }
     .user-chip .user-avatar  { font-size: 0.62rem; }
@@ -1188,18 +1189,41 @@ function _mob_icon(string $name): string {
 <?php endif; ?>
 
 <script>
-  function goBack(fallback) {
-    var ref = document.referrer;
-    var sameApp = ref && ref.indexOf(location.hostname) !== -1
-                      && ref.toLowerCase().indexOf('/tg-basics/') !== -1
-                      && ref.indexOf('login.php') === -1;
-    if (sameApp) {
-      location.href = ref;
-    } else if (history.length > 1) {
-      history.back();
-    } else {
-      location.href = fallback;
+  // ── Back buttons ──
+  // Each browser tab keeps a short trail of the pages visited (sessionStorage), and "Back" goes to the
+  // previous DIFFERENT page in it. It used to follow document.referrer, which broke in three ways: after a
+  // save / filter / undo the page redirects to itself, so the referrer was the same page ("it just
+  // refreshes"); a reload keeps that referrer; and going A -> B -> back made A's referrer B, so two pages
+  // bounced between each other. A page is its file + record ids (id, client_id, …) — filters and
+  // success messages only update the stored link, so going back also restores a list's last filters.
+  var TG_TRAIL = 'tg_nav_trail';
+  function tgPageKey(href) {
+    var u = new URL(href, location.href), ids = [];
+    u.searchParams.forEach(function (v, k) { if (k === 'id' || /_id$/.test(k) || k === 'renew_from') ids.push(k + '=' + v); });
+    return u.pathname.toLowerCase() + (ids.length ? '?' + ids.sort().join('&') : '');
+  }
+  function tgTrail() {
+    try { var t = JSON.parse(sessionStorage.getItem(TG_TRAIL)); return Array.isArray(t) ? t : []; } catch (e) { return []; }
+  }
+  function tgRecordPage() {
+    var u = new URL(location.href);
+    ['success', 'error', 'msg'].forEach(function (p) { u.searchParams.delete(p); });   // one-time toasts
+    var key = tgPageKey(u.href), t = tgTrail();
+    for (var i = t.length - 1; i >= 0; i--) {
+      if (t[i].k === key) { t = t.slice(0, i); break; }   // back on a page already in the trail: drop what came after it
     }
+    t.push({ k: key, u: u.pathname + u.search });
+    try { sessionStorage.setItem(TG_TRAIL, JSON.stringify(t.slice(-30))); } catch (e) {}
+  }
+  // pageshow also fires when the browser's own Back restores a page from its cache
+  window.addEventListener('pageshow', tgRecordPage);
+
+  function goBack(fallback) {
+    var t = tgTrail(), key = tgPageKey(location.href), prev = null;
+    for (var i = t.length - 1; i >= 0; i--) {
+      if (t[i].k === key) { prev = i > 0 ? t[i - 1] : null; break; }
+    }
+    location.href = prev ? prev.u : fallback;   // opened fresh in a new tab: the page's usual parent
   }
 
   function toggleSidebar() {

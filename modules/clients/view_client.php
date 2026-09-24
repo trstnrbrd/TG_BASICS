@@ -16,34 +16,21 @@ if ($client_id === 0) {
     exit;
 }
 
-// Admins can only open clients they personally added — Super Admin bypasses this
-if ($_SESSION['role'] === 'admin') {
-    $own_check = $conn->prepare("SELECT created_by FROM clients WHERE client_id = ?");
-    $own_check->bind_param('i', $client_id);
-    $own_check->execute();
-    $owner = $own_check->get_result()->fetch_assoc();
-    if (!$owner || (int)$owner['created_by'] !== (int)$_SESSION['user_id']) {
-        header("Location: client_list.php");
-        exit;
-    }
+// Every admin can look up any client; mechanics only walk-in clients (config/access.php)
+if (!client_in_scope($conn, $client_id)) {
+    header("Location: client_list.php");
+    exit;
 }
 
-// Mechanics only see walk-in clients — insurance clients are out of scope for them
-if ($is_mechanic) {
-    $policy_check = $conn->prepare("SELECT COUNT(*) as c FROM insurance_policies WHERE client_id = ?");
-    $policy_check->bind_param('i', $client_id);
-    $policy_check->execute();
-    if ((int)$policy_check->get_result()->fetch_assoc()['c'] > 0) {
-        header("Location: client_list.php");
-        exit;
-    }
-}
+// ...but only the Owner, the admin who encoded this client, or its insurance agent may change the
+// record — details, vehicles, documents, delete. Everyone else gets this page read-only.
+$can_edit = client_editable($conn, $client_id);
 
-// Handle delete — only ever the client this page already passed the role/ownership
-// checks for above, and never for mechanics (the UI hides the button from them).
+// Handle delete — only ever the client this page already passed the checks for above, and only
+// for someone allowed to change it (the UI hides the button from everyone else).
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) {
     csrf_verify();
-    if ($is_mechanic || (int)$_POST['delete_client_id'] !== $client_id) {
+    if (!$can_edit || (int)$_POST['delete_client_id'] !== $client_id) {
         http_response_code(403);
         exit('Not allowed.');
     }
@@ -77,9 +64,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) 
 }
 
 // ── HANDLE DOC UPLOAD ──
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && in_array($_POST['action'], ['upload_doc', 'delete_doc'], true) && !$can_edit) {
+    csrf_verify();
+    header("Location: view_client.php?id=$client_id&error=" . urlencode('Only the Owner, the admin who added this client, or its insurance agent can change its documents.'));
+    exit;
+}
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'upload_doc') {
     csrf_verify();
-    if (!$is_mechanic && !empty($_FILES['policy_doc']['tmp_name'])) {
+    if ($can_edit && !empty($_FILES['policy_doc']['tmp_name'])) {
         $tmp  = $_FILES['policy_doc']['tmp_name'];
         $orig = basename($_FILES['policy_doc']['name']);
         $mime = mime_content_type($tmp);
@@ -101,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 // ── HANDLE DOC DELETE ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_doc') {
     csrf_verify();
-    if (!$is_mechanic) {
+    if ($can_edit) {
         $doc_id = (int)($_POST['doc_id'] ?? 0);
         if ($doc_id) {
             $fd = $conn->prepare("SELECT file_name FROM client_documents WHERE doc_id = ? AND client_id = ?");
@@ -121,8 +113,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     exit;
 }
 
-// Load client (exclude soft-deleted)
-$stmt = $conn->prepare("SELECT * FROM clients WHERE client_id = ? AND deleted_at IS NULL");
+// Load client (exclude soft-deleted), with its insurance agent and who added it — masked if either is the hidden account
+$stmt = $conn->prepare("
+    SELECT c.*,
+           CASE WHEN ag.is_hidden = 1 THEN 'System Administrator' ELSE ag.full_name END AS agent_name,
+           CASE WHEN cb.is_hidden = 1 THEN 'System Administrator' ELSE cb.full_name END AS added_by_name
+    FROM clients c
+    LEFT JOIN users ag ON ag.user_id = c.agent_id
+    LEFT JOIN users cb ON cb.user_id = c.created_by
+    WHERE c.client_id = ? AND c.deleted_at IS NULL
+");
 $stmt->bind_param('i', $client_id);
 $stmt->execute();
 $client = $stmt->get_result()->fetch_assoc();
@@ -263,13 +263,13 @@ require_once '../../includes/topbar.php';
         <div style="font-size:0.7rem;color:rgba(200,192,176,0.45);letter-spacing:1.5px;text-transform:uppercase;font-weight:600;margin-bottom:0.3rem;">Client Profile</div>
         <div style="font-size:1.4rem;font-weight:800;color:#fff;letter-spacing:-0.3px;margin-bottom:0.2rem;"><?= htmlspecialchars($client['full_name']) ?></div>
         <div style="font-size:0.78rem;color:rgba(200,192,176,0.5);">
-           <?= htmlspecialchars($client['contact_number']) ?>
+           <?= htmlspecialchars($client['contact_number'] ?? '') ?>
           <?php if ($client['email']): ?>
           &nbsp;&nbsp; <?= htmlspecialchars($client['email']) ?>
           <?php endif; ?>
         </div>
       </div>
-      <?php if (!$is_mechanic): ?>
+      <?php if ($can_edit): ?>
       <div style="position:relative;z-index:1;display:flex;gap:0.6rem;flex-shrink:0;">
         <a href="edit_client.php?id=<?= $client_id ?>" class="btn-ghost" style="background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.1);color:rgba(200,192,176,0.7);">
           <?= icon('pencil', 14) ?> Edit Client
@@ -326,12 +326,17 @@ require_once '../../includes/topbar.php';
           <?php
           $info_rows = [
             ['Full Name',  $client['full_name']],
-            ['Contact',    $client['contact_number']],
+            ['Contact',    $client['contact_number'] ?: 'Not provided'],
             ['Email',      $client['email'] ?: 'Not provided'],
+            ['Facebook',   ($client['facebook_name'] ?? '') ?: 'Not provided'],
             ['Address',    $client['address']],
             ['Date Added', date('F d, Y', strtotime($client['created_at']))],
-            ['Data Privacy Consent', !empty($client['consent_signed_at']) ? 'Signed — ' . date('F d, Y', strtotime($client['consent_signed_at'])) : 'Not on file'],
           ];
+          // Whose client this is — insurance staff only. ("Data Privacy Consent" and "Added By" were taken off
+          // this card on the owner's request, 2026-09-24; both are still recorded on the client.)
+          if (!$is_mechanic) {
+              $info_rows[] = ['Insurance Agent', $client['agent_name'] ?? 'Unassigned'];
+          }
           foreach ($info_rows as $r): ?>
           <div style="display:flex;flex-direction:column;gap:0.12rem;min-width:0;">
             <div style="font-size:0.6rem;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);font-weight:700;"><?= $r[0] ?></div>
@@ -391,7 +396,7 @@ require_once '../../includes/topbar.php';
           <div class="card-title">Registered Vehicles</div>
           <div class="card-sub"><?= $vc ?> vehicle<?= $vc !== 1 ? 's' : '' ?> on record</div>
         </div>
-        <?php if (!$is_mechanic): ?>
+        <?php if ($can_edit): ?>
         <a href="add_vehicle.php?client_id=<?= $client_id ?>" class="btn-primary" style="margin-left:auto;padding:0.5rem 1rem;font-size:0.78rem;">
           <?= icon('plus', 14) ?> Add Vehicle
         </a>
@@ -502,6 +507,8 @@ require_once '../../includes/topbar.php';
             <a href="../insurance/eligibility_check.php?vehicle_id=<?= $v['vehicle_id'] ?>" class="btn-sm-gold" title="Check Policy" style="padding:0.35rem 0.55rem;">
               <?= icon('shield-check', 13) ?>
             </a>
+            <?php endif; ?>
+            <?php if ($can_edit): ?>
             <a href="edit_vehicle.php?id=<?= $v['vehicle_id'] ?>" class="btn-sm-gold" title="Edit" style="padding:0.35rem 0.55rem;">
               <?= icon('pencil', 13) ?>
             </a>
@@ -525,7 +532,7 @@ require_once '../../includes/topbar.php';
         <div class="empty-icon"><?= icon('vehicle', 28) ?></div>
         <div class="empty-title">No vehicles yet</div>
         <div class="empty-desc">Add a vehicle to start processing insurance.</div>
-        <?php if (!$is_mechanic): ?>
+        <?php if ($can_edit): ?>
         <a href="add_vehicle.php?client_id=<?= $client_id ?>" class="btn-primary"><?= icon('plus', 14) ?> Add Vehicle</a>
         <?php endif; ?>
       </div>
@@ -541,14 +548,14 @@ require_once '../../includes/topbar.php';
           <div class="card-title">Policy Documents</div>
           <div class="card-sub"><?= count($documents) ?> file<?= count($documents) !== 1 ? 's' : '' ?> attached</div>
         </div>
-        <?php if (!$is_mechanic): ?>
+        <?php if ($can_edit): ?>
         <button type="button" onclick="document.getElementById('doc-upload-panel').style.display=document.getElementById('doc-upload-panel').style.display==='none'?'block':'none'" class="btn-sm-gold" style="margin-left:auto;">
           <?= icon('plus', 13) ?> Attach PDF
         </button>
         <?php endif; ?>
       </div>
 
-      <?php if (!$is_mechanic): ?>
+      <?php if ($can_edit): ?>
       <div id="doc-upload-panel" style="display:none;padding:1rem 1.25rem;border-bottom:1px solid var(--border);background:var(--bg-2);">
         <form method="POST" enctype="multipart/form-data" style="display:flex;flex-direction:column;gap:0.75rem;">
           <?= csrf_field() ?>
@@ -585,12 +592,14 @@ require_once '../../includes/topbar.php';
               <a href="<?= $pdf_url ?>" target="_blank" class="btn-sm-gold" style="font-size:0.72rem;padding:0.3rem 0.65rem;" title="Open in new tab">
                 <?= icon('arrow-top-right-on-square', 13) ?>
               </a>
-              <?php if (!$is_mechanic): ?>
+              <?php if ($can_edit): ?>
               <form method="POST" style="display:inline;">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="delete_doc"/>
                 <input type="hidden" name="doc_id" value="<?= $doc['doc_id'] ?>"/>
-                <button type="button" onclick="confirmDeleteDoc(this, '<?= htmlspecialchars($doc['original_name'], ENT_QUOTES) ?>')"
+                <?php /* file name passed via a data attribute: inside onclick="...'NAME'..." the browser decodes
+                         &#039; back to ' before running the JS, so a crafted file name could break out and run code */ ?>
+                <button type="button" data-name="<?= htmlspecialchars($doc['original_name'], ENT_QUOTES) ?>" onclick="confirmDeleteDoc(this, this.dataset.name)"
                   class="btn-sm-danger" style="font-size:0.72rem;padding:0.3rem 0.55rem;" title="Remove">
                   <?= icon('trash', 12) ?>
                 </button>

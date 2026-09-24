@@ -18,6 +18,7 @@ const MAX_COLOR       = 50;
 const MAX_MOTOR_SN    = 50;
 const MAX_POLICY_NUM  = 60;
 const MAX_MORTGAGEE   = 100;
+const MAX_FACEBOOK    = 100;    // client's Facebook name (optional)
 const MAX_TEXT        = 2000;   // descriptions, notes
 const MAX_SEARCH      = 100;
 const MAX_TOKEN       = 128;
@@ -98,6 +99,15 @@ function san_float(mixed $value, float $min = 0.0, float $max = 999_999_999.99):
     $v = (float)$value;
     if ($v < $min || $v > $max) return 0.0;
     return $v;
+}
+
+/**
+ * Peso amount typed into a money input (assets/js/shared/money_input.js), which shows thousands separators
+ * while typing — "500,000.50" / "₱ 500,000" are read as 500000.5. Everything else behaves like san_float().
+ */
+function san_money(mixed $value, float $min = 0.0, float $max = 999_999_999.99): float {
+    if (is_string($value)) $value = str_replace([',', ' ', '₱'], '', $value);
+    return san_float($value, $min, $max);
 }
 
 /**

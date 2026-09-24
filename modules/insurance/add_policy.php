@@ -3,6 +3,7 @@ require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/settings.php';
+require_once '../../config/access.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
     header("Location: ../../auth/login.php");
@@ -18,18 +19,18 @@ $renew_policy = null;
 
 if ($renew_from > 0) {
     $rs = $conn->prepare("
-        SELECT p.*, c.created_by AS client_created_by
+        SELECT p.*, c.agent_id AS client_agent_id
         FROM insurance_policies p
         INNER JOIN clients c ON p.client_id = c.client_id
-        WHERE p.policy_id = ?
+        WHERE p.policy_id = ? AND c.deleted_at IS NULL
     ");
     $rs->bind_param('i', $renew_from);
     $rs->execute();
     $renew_policy = $rs->get_result()->fetch_assoc();
 
-    // Same vault rule as view_policy.php: outside the vault, an admin may only
-    // renew policies of clients they created themselves.
-    if (!$renew_policy || (!renewal_vault_is_unlocked($conn) && (int)$renew_policy['client_created_by'] !== (int)$_SESSION['user_id'])) {
+    // Renewing changes an existing policy, so — like its payments — only the client's insurance agent
+    // or the Owner may do it (same rule as view_policy.php; see config/access.php).
+    if (!$renew_policy || !policy_editable($renew_policy['client_agent_id'] !== null ? (int)$renew_policy['client_agent_id'] : null)) {
         header("Location: ../renewal/renewal_list.php");
         exit;
     }
@@ -56,36 +57,19 @@ if (!in_array($insurance_company, $allowed_companies, true)) {
     $insurance_company = $renew_policy['insurance_company'] ?? '';
 }
 
-// Per-admin scoping only applies to the fresh "new policy from Eligibility Check" path —
-// renewals stay unscoped since Renewal Tracking access is vault-gated, not ownership-gated.
-$is_scoped_admin = $_SESSION['role'] === 'admin' && $renew_from === 0;
-
-// Same as Eligibility Check: a vault-unlocked Admin has already proven elevated
-// trust, so lift the per-admin scoping here too.
-if ($is_scoped_admin) {
-    $vault_version = getSetting($conn, 'renewal_vault_updated_at', '0');
-    if (!empty($_SESSION['renewal_vault_unlocked_at']) && $_SESSION['renewal_vault_unlocked_at'] === $vault_version) {
-        $is_scoped_admin = false;
-    }
-}
-
+// Issuing a NEW policy is open to every admin for any client (all admins see all clients — e.g. an admin
+// encoding a policy for the Owner's client); the policy then belongs to the client's insurance agent.
 $vehicle = null;
 if ($vehicle_id > 0) {
-    $vp_scope_sql = $is_scoped_admin ? "AND c.created_by = ?" : '';
     $stmt = $conn->prepare("
         SELECT c.client_id, c.full_name, c.contact_number, c.address,
                v.vehicle_id, v.plate_number, v.make, v.model,
                v.year_model, v.color, v.motor_number, v.serial_number
         FROM vehicles v
         INNER JOIN clients c ON v.client_id = c.client_id
-        WHERE v.vehicle_id = ?
-        $vp_scope_sql
+        WHERE v.vehicle_id = ? AND c.deleted_at IS NULL
     ");
-    if ($is_scoped_admin) {
-        $stmt->bind_param('ii', $vehicle_id, $_SESSION['user_id']);
-    } else {
-        $stmt->bind_param('i', $vehicle_id);
-    }
+    $stmt->bind_param('i', $vehicle_id);
     $stmt->execute();
     $vehicle = $stmt->get_result()->fetch_assoc();
 }
@@ -120,11 +104,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Required fields — sanitized
     $policy_number     = san_str($_POST['policy_number'] ?? '', MAX_POLICY_NUM);
     $coverage_type     = san_enum($_POST['coverage_type'] ?? '', ALLOWED_COVERAGE_TYPES);
-    $sum_insured       = san_float($_POST['sum_insured'] ?? '');
-    $basic_premium     = san_float($_POST['basic_premium'] ?? ''); // stores commission
-    $total_premium     = san_float($_POST['total_premium'] ?? '');
+    $sum_insured       = san_money($_POST['sum_insured'] ?? '');
+    $basic_premium     = san_money($_POST['basic_premium'] ?? ''); // stores commission
+    $total_premium     = san_money($_POST['total_premium'] ?? '');
     $payable_amount    = $total_premium - $basic_premium; // total client must pay
-    $participation_fee = san_float($_POST['participation_fee'] ?? '0');
+    $participation_fee = san_money($_POST['participation_fee'] ?? '0');
     $policy_start      = san_str($_POST['policy_start'] ?? '', 10);
     $policy_end        = san_str($_POST['policy_end'] ?? '', 10);
     $payment_terms     = san_enum($_POST['payment_terms'] ?? '1 time', ALLOWED_PAYMENT_TERMS);
@@ -139,7 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $raw_amounts = $_POST['installment_amount'] ?? [];
     $raw_modes   = $_POST['installment_mode']   ?? [];
     $raw_ctrls   = $_POST['installment_ctrl']   ?? [];
-    $installment_amounts = array_map(fn($v) => san_float($v), is_array($raw_amounts) ? $raw_amounts : []);
+    $installment_amounts = array_map(fn($v) => san_money($v), is_array($raw_amounts) ? $raw_amounts : []);
     $installment_modes   = array_map(fn($v) => san_enum($v, ALLOWED_PAYMENT_MODES), is_array($raw_modes) ? $raw_modes : []);
     $installment_ctrls   = array_map(fn($v) => san_str($v, 50), is_array($raw_ctrls) ? $raw_ctrls : []);
 
@@ -500,7 +484,7 @@ require_once '../../includes/topbar.php';
             </div>
             <div class="field">
               <label class="field-label">Policy Number <span class="req">*</span></label>
-              <input type="text" name="policy_number" class="field-input" placeholder="P-BLC-YY-X-XX-XXXX-XXXXXX"
+              <input type="text" name="policy_number" class="field-input"
                 value="<?= htmlspecialchars($_POST['policy_number'] ?? '') ?>"/>
               <?php if ($renew_policy): ?><span class="field-hint">Enter the new policy number from the PhilBritish renewal notice.</span><?php endif; ?>
             </div>
@@ -542,25 +526,25 @@ require_once '../../includes/topbar.php';
           <div class="field-section">Premium Breakdown</div>
           <div style="margin-bottom:0.75rem;">
             <div class="alert alert-info" style="margin-bottom:0;">
-              <?= icon('information-circle', 14) ?> Copy the figures from the PhilBritish policy document. The client pays Total Premium − Commission.
+              <?= icon('information-circle', 14) ?> Copy the figures from the policy document. The client pays Total Premium − Commission.
             </div>
           </div>
           <div class="form-grid" style="margin-bottom:1rem;">
             <div class="field">
               <label class="field-label">Sum Insured (PHP) <span class="req">*</span></label>
-              <input type="number" step="0.01" min="0" name="sum_insured" class="field-input" placeholder="0.00"
+              <input type="text" inputmode="decimal" autocomplete="off" name="sum_insured" class="field-input money-input" placeholder="0.00"
                 value="<?= htmlspecialchars($_POST['sum_insured'] ?? ($renew_policy['sum_insured'] ?? '')) ?>"/>
               <span class="field-hint">Coverage amount from the PhilBritish policy.</span>
             </div>
             <div class="field">
               <label class="field-label">Total Premium (PHP) <span class="req">*</span></label>
-              <input type="number" step="0.01" min="0" name="total_premium" id="total_premium" class="field-input" placeholder="0.00"
+              <input type="text" inputmode="decimal" autocomplete="off" name="total_premium" id="total_premium" class="field-input money-input" placeholder="0.00"
                 value="<?= htmlspecialchars($_POST['total_premium'] ?? ($renew_policy['total_premium'] ?? '')) ?>"/>
               <span class="field-hint">Premium amount from PhilBritish.</span>
             </div>
             <div class="field">
               <label class="field-label">Commission (PHP)</label>
-              <input type="number" step="0.01" min="0" name="basic_premium" id="commission_field" class="field-input" placeholder="0.00"
+              <input type="text" inputmode="decimal" autocomplete="off" name="basic_premium" id="commission_field" class="field-input money-input" placeholder="0.00"
                 value="<?= htmlspecialchars($_POST['basic_premium'] ?? ($renew_policy['markup'] ?? '0')) ?>"/>
               <span class="field-hint">Broker commission deducted from the premium.</span>
             </div>
@@ -574,7 +558,7 @@ require_once '../../includes/topbar.php';
           <div class="form-grid" style="margin-bottom:1rem;">
             <div class="field">
               <label class="field-label">Participation Fee (PHP)</label>
-              <input type="number" step="0.01" min="0" name="participation_fee" class="field-input" placeholder="0.00"
+              <input type="text" inputmode="decimal" autocomplete="off" name="participation_fee" class="field-input money-input" placeholder="0.00"
                 value="<?= htmlspecialchars($_POST['participation_fee'] ?? ($renew_policy['participation_fee'] ?? '0')) ?>"/>
               <span class="field-hint">Sedan: ₱2,000 &nbsp;|&nbsp; SUV/Van/Pickup: ₱3,000.</span>
             </div>
@@ -669,7 +653,8 @@ require_once '../../includes/topbar.php';
 
 <?php
 $footer_scripts = '';
-$footer_extra_scripts = <<<'ADDPOLICY_SCRIPT'
+$footer_extra_scripts = '<script src="../../assets/js/shared/money_input.js?v=' . filemtime(__DIR__ . '/../../assets/js/shared/money_input.js') . '"></script>' . "\n"
+    . <<<'ADDPOLICY_SCRIPT'
 <script>
   (function () {
     const termsEl       = document.getElementById("payment_terms");
@@ -695,9 +680,12 @@ $footer_extra_scripts = <<<'ADDPOLICY_SCRIPT'
       return "₱" + n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
+    // Amount fields show thousands separators (money_input.js) — drop them before reading the number
+    function num(el) { return parseFloat(String(el.value).replace(/,/g, "")) || 0; }
+
     function getPayable() {
-      const total      = parseFloat(totalEl.value)      || 0;
-      const commission = parseFloat(commissionEl.value) || 0;
+      const total      = num(totalEl);
+      const commission = num(commissionEl);
       return total - commission;
     }
 
@@ -748,8 +736,8 @@ $footer_extra_scripts = <<<'ADDPOLICY_SCRIPT'
           "<td style=\"text-align:center;\">" + modeSelect + "</td>" +
           "<td style=\"text-align:center;\"><input type=\"text\" name=\"installment_ctrl[]\" class=\"field-input\" style=\"width:120px;\" placeholder=\"Ref / OR No.\"/></td>" +
           "<td style=\"text-align:center;\">" + (amtDue > 0 ? fmt(amtDue) : "—") + "</td>" +
-          "<td style=\"text-align:center;\"><input type=\"number\" step=\"0.01\" min=\"0\" " +
-            "name=\"installment_amount[]\" class=\"field-input inst-amount-input\" " +
+          "<td style=\"text-align:center;\"><input type=\"text\" inputmode=\"decimal\" autocomplete=\"off\" " +
+            "name=\"installment_amount[]\" class=\"field-input inst-amount-input money-input\" " +
             "style=\"width:110px;text-align:right;\" placeholder=\"0.00\" value=\"" + prefillAmt + "\" " +
             "data-due=\"" + amtDue + "\"/></td>" +
           receiptCell +
@@ -771,7 +759,7 @@ $footer_extra_scripts = <<<'ADDPOLICY_SCRIPT'
         const input    = tr.querySelector("input.inst-amount-input");
         const statusEl = tr.querySelector(".status-cell");
         const amtDue   = parseFloat(input.dataset.due) || 0;
-        const amtPaid  = parseFloat(input.value) || 0;
+        const amtPaid  = num(input);
         totalPaid += amtPaid;
 
         if (amtPaid >= amtDue && amtDue > 0) {
@@ -1160,7 +1148,7 @@ $footer_extra_scripts = <<<'ADDPOLICY_SCRIPT'
         const input    = rows[i].querySelector("input.inst-amount-input");
         const modeEl   = rows[i].querySelector("select[name=\"installment_mode[]\"]");
         if (!input || !modeEl) continue;
-        const amt = parseFloat(input.value) || 0;
+        const amt = num(input);
         if (amt > 0 && !modeEl.value) {
           e.preventDefault();
           Swal.fire({ icon: "warning", title: "Mode of Payment Required", text: "Please select a mode of payment for every installment that has an amount entered.", confirmButtonColor: "#B8860B" });

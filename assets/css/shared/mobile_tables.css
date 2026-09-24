@@ -93,8 +93,42 @@
     align-items: center;
     gap: 0.35rem;
   }
+  /* Tap a claim card to open its details under it (same as Renewal Tracking) */
+  .tg-table.mob-claims-table tr.tg-expandable-row.expanded {
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    margin-bottom: 0 !important;
+  }
+  .tg-table.mob-claims-table tr.tg-expandable-row.expanded .row-chevron {
+    transform: rotate(90deg);
+    opacity: 0.7 !important;
+  }
   .tg-table.mob-claims-table tr.tg-expand-row {
     display: none !important;
+  }
+  .tg-table.mob-claims-table tr.tg-expandable-row.expanded + tr.tg-expand-row {
+    display: block !important;
+    margin-top: 0 !important;
+    padding: 0 !important;
+    background: var(--bg-2) !important;
+    border: 1px solid var(--border) !important;
+    border-top: none !important;
+    border-radius: 0 0 12px 12px !important;
+    box-shadow: none !important;
+  }
+  .tg-table.mob-claims-table tr.tg-expand-row td {
+    display: block !important;
+    padding: 0 !important;
+  }
+  .tg-table.mob-claims-table .tg-expand-body {
+    padding: 0.75rem 1rem !important;
+    border: none !important;
+  }
+  .tg-table.mob-claims-table .tg-expand-grid {
+    gap: 0.75rem 1.25rem !important;
+  }
+  .tg-table.mob-claims-table .tg-expand-item {
+    min-width: 40% !important;
   }
   .tg-table.mob-billing-table tbody tr {
     display: grid !important;
@@ -233,55 +267,52 @@
     grid-template-columns: 1fr auto !important;
     gap: 0 !important;
   }
+  /* Columns: 1 Client | 2 Plate | 3 Service | 4 Date | 5 Total | 6 Statement | 7 Status | 8 Action
+     Card:     Client  Plate  /  Service  Status  /  Total  Date  /  actions */
   .tg-table.mob-quotation-table td:first-child {
     grid-column: 1;
     grid-row: 1;
-    font-weight: 700;
   }
   .tg-table.mob-quotation-table td:nth-child(2) {
-    grid-column: 1;
-    grid-row: 2;
-  }
-  .tg-table.mob-quotation-table td:nth-child(3) {
     grid-column: 2;
     grid-row: 1;
     display: flex !important;
     justify-content: flex-end;
     align-items: flex-start;
   }
-  .tg-table.mob-quotation-table td:nth-child(4) {
+  .tg-table.mob-quotation-table td:nth-child(3) {
     grid-column: 1;
-    grid-row: 3;
+    grid-row: 2;
     font-size: 0.72rem !important;
     color: var(--text-muted);
   }
-  .tg-table.mob-quotation-table td:nth-child(5) {
+  .tg-table.mob-quotation-table td:nth-child(4) {
     grid-column: 2;
-    grid-row: 2;
-    display: flex !important;
-    justify-content: flex-end;
-  }
-  .tg-table.mob-quotation-table td:nth-child(6) {
-    grid-column: 1;
-    grid-row: 4;
-    font-weight: 700;
-    color: var(--gold);
-  }
-  .tg-table.mob-quotation-table td:nth-child(7) {
-    display: none !important;
-  }
-  .tg-table.mob-quotation-table td:nth-child(8) {
-    grid-column: 2;
-    grid-row: 3/5;
+    grid-row: 3;
     display: flex !important;
     align-items: center;
     justify-content: flex-end;
     font-size: 0.7rem !important;
     color: var(--text-muted);
   }
-  .tg-table.mob-quotation-table td:nth-child(9) {
+  .tg-table.mob-quotation-table td:nth-child(5) {
+    grid-column: 1;
+    grid-row: 3;
+    font-weight: 700;
+    color: var(--gold);
+  }
+  .tg-table.mob-quotation-table td:nth-child(6) {
+    display: none !important;
+  }
+  .tg-table.mob-quotation-table td:nth-child(7) {
+    grid-column: 2;
+    grid-row: 2;
+    display: flex !important;
+    justify-content: flex-end;
+  }
+  .tg-table.mob-quotation-table td:nth-child(8) {
     grid-column: 1/-1;
-    grid-row: 5;
+    grid-row: 4;
     display: flex !important;
     gap: 0.4rem;
     padding-top: 0.5rem !important;

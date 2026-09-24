@@ -166,14 +166,13 @@ document.addEventListener('DOMContentLoaded',function(){
     <table class="tg-table mob-card mob-quotation-table">
       <thead>
         <tr>
-          <th style="text-align:center;">Quotation #</th>
           <th style="text-align:center;">Client</th>
           <th style="text-align:center;">Plate</th>
           <th style="text-align:center;">Service</th>
-          <th style="text-align:center;">Status</th>
+          <th style="text-align:center;">Date</th>
           <th style="text-align:right;">Total</th>
           <th style="text-align:center;">Statement</th>
-          <th style="text-align:center;">Date</th>
+          <th style="text-align:center;">Status</th>
           <th style="text-align:center;">Action</th>
         </tr>
       </thead>
@@ -182,14 +181,13 @@ document.addEventListener('DOMContentLoaded',function(){
           $sc = $status_cfg[$row['status']] ?? ['Unknown','badge-gray'];
         ?>
         <tr>
-          <td style="text-align:center;"><span class="qt-num"><?= htmlspecialchars($row['quotation_number']) ?></span></td>
           <td style="text-align:center;">
             <div style="font-weight:700;font-size:0.82rem;color:var(--text-primary);"><?= htmlspecialchars($row['full_name']) ?></div>
             <div style="font-size:0.7rem;color:var(--text-muted);"><?= htmlspecialchars($row['contact_number']) ?></div>
           </td>
           <td style="text-align:center;"><span class="badge-dark"><?= htmlspecialchars($row['plate_number']) ?></span></td>
           <td style="text-align:center;font-size:0.75rem;color:var(--text-muted);"><?= htmlspecialchars($service_labels[$row['service_type']] ?? $row['service_type']) ?></td>
-          <td style="text-align:center;"><span class="badge <?= $sc[1] ?>"><?= $sc[0] ?></span></td>
+          <td style="text-align:center;font-size:0.75rem;color:var(--text-muted);white-space:nowrap;"><?= date('M d, Y', strtotime($row['created_at'])) ?></td>
           <td style="text-align:right;font-weight:700;font-size:0.82rem;color:var(--text-primary);">PHP <?= number_format($row['total'], 2) ?></td>
           <td style="text-align:center;">
             <?php if ($row['receipt_number']):
@@ -201,7 +199,7 @@ document.addEventListener('DOMContentLoaded',function(){
               <span style="color:var(--text-muted);font-size:0.75rem;">—</span>
             <?php endif; ?>
           </td>
-          <td style="text-align:center;font-size:0.75rem;color:var(--text-muted);white-space:nowrap;"><?= date('M d, Y', strtotime($row['created_at'])) ?></td>
+          <td style="text-align:center;"><span class="badge <?= $sc[1] ?>"><?= $sc[0] ?></span></td>
           <td style="text-align:center;">
             <div style="display:flex;gap:0.35rem;justify-content:center;">
               <a href="view_quotation.php?id=<?= $row['quotation_id'] ?>" class="btn-sm-gold" title="View" style="padding:0.35rem 0.55rem;"><?= icon('eye', 14) ?></a>
@@ -262,7 +260,7 @@ document.querySelectorAll('.btn-delete-qt').forEach(btn => {
 <?php
 $footer_scripts = '';
 if (!empty($_GET['success'])) {
-    $footer_scripts = 'Swal.fire({toast:true,position:"top-end",icon:"success",title:' . json_encode($_GET['success']) . ',showConfirmButton:false,timer:3000,timerProgressBar:true});';
+    $footer_scripts = 'Swal.fire({toast:true,position:"top-end",icon:"success",titleText:' . json_encode($_GET['success']) . ',showConfirmButton:false,timer:3000,timerProgressBar:true});';
 }
 require_once '../../includes/footer.php';
 ?>

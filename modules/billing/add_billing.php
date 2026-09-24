@@ -79,32 +79,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (empty($errors)) {
-        $prefix   = 'BILL-' . date('Ymd') . '-';
-        $seq_stmt = $conn->prepare("SELECT billing_number FROM billing WHERE billing_number LIKE ? ORDER BY billing_number DESC LIMIT 1");
-        $like     = $prefix . '%';
-        $seq_stmt->bind_param('s', $like);
-        $seq_stmt->execute();
-        $last     = $seq_stmt->get_result()->fetch_row();
-        $seq      = $last ? (int)substr($last[0], -4) + 1 : 1;
-        $bill_num = $prefix . str_pad($seq, 4, '0', STR_PAD_LEFT);
-
-        $ins = $conn->prepare("
-            INSERT INTO billing
-              (claim_id, billing_number, billed_to, incident_date, repair_date, parts_cost, labor_cost, other_cost, deductible, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
+        // Billing number: BILL-YYYYMMDD-XXXX. Wrapped in a retry: two people billing at the same instant can
+        // compute the same next number — this recomputes and retries instead of the request crashing with
+        // an uncaught duplicate-key error (see insert_with_sequential_number() for why).
         $inc_date = $incident_date ?: null;
         $rep_date = $repair_date   ?: null;
-        $ins->bind_param(
-            'issssddddi',
-            $claim_id, $bill_num, $billed_to, $inc_date, $rep_date,
-            $parts_cost, $labor_cost, $other_cost, $deductible,
-            $_SESSION['user_id']
-        );
+        $billing_id = $bill_num = null;
+        try {
+            [$billing_id, $bill_num] = insert_with_sequential_number($conn, 'billing', 'billing_number', 'BILL-' . date('Ymd') . '-',
+                function (string $num) use ($conn, $claim_id, $billed_to, $inc_date, $rep_date, $parts_cost, $labor_cost, $other_cost, $deductible) {
+                    $ins = $conn->prepare("
+                        INSERT INTO billing
+                          (claim_id, billing_number, billed_to, incident_date, repair_date, parts_cost, labor_cost, other_cost, deductible, created_by)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ");
+                    $ins->bind_param(
+                        'issssddddi',
+                        $claim_id, $num, $billed_to, $inc_date, $rep_date,
+                        $parts_cost, $labor_cost, $other_cost, $deductible,
+                        $_SESSION['user_id']
+                    );
+                    $ins->execute();
+                    return [$conn->insert_id, $num];
+                }
+            );
+        } catch (mysqli_sql_exception $e) {
+            error_log('[TG-BASICS] add_billing.php insert failed: ' . $e->getMessage());
+        }
 
-        if ($ins->execute()) {
-            $billing_id = $conn->insert_id;
-
+        if ($billing_id !== null) {
             $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'BILLING_CREATED', ?)");
             $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' created billing ' . $bill_num . '.';
             $log->bind_param('is', $_SESSION['user_id'], $desc);

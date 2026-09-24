@@ -253,6 +253,71 @@ function csrf_verify_json(): void {
  * Output a hidden CSRF input field for use inside <form> tags.
  * Usage: <?= csrf_field() ?>
  */
+// ── SEQUENTIAL NUMBER GENERATION (RJ-/BILL-/Q- style) ──────────────────────
+
+/**
+ * Job/billing/quotation numbers are "highest number for today, plus one" — reading the current max and
+ * inserting it are two separate queries, so two people saving in the same instant can compute the same
+ * next number. The unique key then rejects whichever INSERT lands second, and without this, that surfaces
+ * to the user as an uncaught duplicate-key crash (confirmed under concurrent load, 2026-09-22 pre-launch
+ * test: 9 of 30 truly-simultaneous repair-job submissions failed this way).
+ *
+ * $table/$column are always fixed strings the caller writes in code, never request input.
+ * $attempt receives the freshly computed number and must perform (only) the INSERT for it, returning
+ * whatever the caller wants back — checklist rows, audit logging, etc. happen after this, once it succeeds.
+ * On a collision, this recomputes a fresh number and retries; any other database error is not retried.
+ */
+function insert_with_sequential_number(mysqli $conn, string $table, string $column, string $prefix, callable $attempt, int $max_tries = 5): mixed {
+    $like = $prefix . '%';
+    for ($try = 1; $try <= $max_tries; $try++) {
+        $stmt = $conn->prepare("SELECT `$column` FROM `$table` WHERE `$column` LIKE ? ORDER BY `$column` DESC LIMIT 1");
+        $stmt->bind_param('s', $like);
+        $stmt->execute();
+        $last   = $stmt->get_result()->fetch_row();
+        $seq    = $last ? (int)substr($last[0], -4) + 1 : 1;
+        $number = $prefix . str_pad((string)$seq, 4, '0', STR_PAD_LEFT);
+        try {
+            return $attempt($number);
+        } catch (mysqli_sql_exception $e) {
+            $collided = str_contains($e->getMessage(), 'Duplicate entry') && str_contains($e->getMessage(), "'$column'");
+            if (!$collided || $try === $max_tries) throw $e;
+            // someone else claimed this exact number just now — loop around and compute a fresh one
+        }
+    }
+}
+
+// ── CLOSING CHECK-THEN-WRITE RACES (e.g. "is this plate number free?") ─────
+
+/**
+ * Runs $work() while holding a MySQL named lock scoped to $name, so two requests racing on the same
+ * real-world value (e.g. "is plate ABC 123 already registered?") can't both pass a uniqueness check
+ * before either has written — confirmed under load, 2026-09-22 pre-launch test: 10 truly-simultaneous
+ * "New Client" submissions for the same plate number created 2 duplicate clients, because the check and
+ * the insert were two separate, unsynchronized queries with nothing to serialize them.
+ *
+ * $work must perform BOTH the check and the write together (the lock covers all of it) and return
+ * whatever the caller needs back — including null, if that is a meaningful result for the caller.
+ * Returns ['locked' => false] if the lock itself could not be acquired within $wait_seconds — genuinely
+ * rare (another request for this exact same value is running long) — otherwise ['locked' => true,
+ * 'result' => <whatever $work returned>], so a null from $work is never confused with a failed lock.
+ */
+function with_named_lock(mysqli $conn, string $name, callable $work, int $wait_seconds = 5): array {
+    $lock_name = 'tgb_' . substr(preg_replace('/[^A-Za-z0-9_]/', '_', $name), 0, 55);
+    $stmt = $conn->prepare('SELECT GET_LOCK(?, ?)');
+    $stmt->bind_param('si', $lock_name, $wait_seconds);
+    $stmt->execute();
+    if ((int)$stmt->get_result()->fetch_row()[0] !== 1) {
+        return ['locked' => false];
+    }
+    try {
+        return ['locked' => true, 'result' => $work()];
+    } finally {
+        $rel = $conn->prepare('SELECT RELEASE_LOCK(?)');
+        $rel->bind_param('s', $lock_name);
+        $rel->execute();
+    }
+}
+
 function csrf_field(): string {
     return '<input type="hidden" name="csrf_token" value="' . htmlspecialchars(csrf_token()) . '"/>';
 }

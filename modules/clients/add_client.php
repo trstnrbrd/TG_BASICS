@@ -50,38 +50,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($serial_number === '')                      $addError('serial_number', 'Chassis number is required.');
     if (!$consent_signed)                           $addError('consent_signed', 'Please confirm that the client has signed the printed Data Privacy Consent Form.');
 
-    if ($plate_number !== '') {
-        $check = $conn->prepare("SELECT v.vehicle_id FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id WHERE v.plate_number = ? AND c.deleted_at IS NULL");
-        $check->bind_param('s', $plate_number);
-        $check->execute();
-        if ($check->get_result()->num_rows > 0)
+    // The plate-uniqueness check and the insert used to be two separate, unsynchronized queries — two people
+    // (or one impatient double-click) submitting the same plate at the same instant could both pass the
+    // check before either had inserted, creating two clients with the same vehicle. A MySQL named lock
+    // scoped to this exact plate number now holds the check AND the insert together, so only one submission
+    // for a given plate is ever "in the check" at a time — see with_named_lock() for the confirmed repro.
+    if (empty($errors) && $plate_number !== '') {
+        $lock = with_named_lock($conn, 'plate_' . $plate_number, function () use ($conn, $plate_number, $full_name, $contact_number, $email, $address, $make, $model, $year_model, $color, $motor_number, $serial_number) {
+            $check = $conn->prepare("SELECT v.vehicle_id FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id WHERE v.plate_number = ? AND c.deleted_at IS NULL");
+            $check->bind_param('s', $plate_number);
+            $check->execute();
+            if ($check->get_result()->num_rows > 0) return null;   // duplicate — caller adds the field error
+
+            $created_by = (int)$_SESSION['user_id'];
+            $ins_client = $conn->prepare("INSERT INTO clients (full_name, contact_number, email, address, created_by, consent_signed_at, consent_recorded_by) VALUES (?, ?, ?, ?, ?, NOW(), ?)");
+            $ins_client->bind_param('ssssii', $full_name, $contact_number, $email, $address, $created_by, $created_by);
+            $ins_client->execute();
+            $client_id = $conn->insert_id;
+
+            $tok = $conn->prepare("UPDATE clients SET public_token = SHA2(CONCAT(?, UUID(), 'tgbasics'), 256) WHERE client_id = ?");
+            $tok->bind_param('ii', $client_id, $client_id);
+            $tok->execute();
+
+            $ins_vehicle = $conn->prepare("INSERT INTO vehicles (client_id, plate_number, make, model, year_model, color, motor_number, serial_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $ins_vehicle->bind_param('isssssss', $client_id, $plate_number, $make, $model, $year_model, $color, $motor_number, $serial_number);
+            $ins_vehicle->execute();
+
+            return $client_id;
+        });
+
+        if (!$lock['locked']) {
+            $addError('plate_number', 'The system is busy processing this plate number. Please try again in a moment.');
+        } elseif ($lock['result'] === null) {
             $addError('plate_number', 'Plate number ' . $plate_number . ' already exists in the system.');
-    }
+        } else {
+            $client_id = $lock['result'];
 
-    if (empty($errors)) {
-        $created_by = (int)$_SESSION['user_id'];
-        $ins_client = $conn->prepare("INSERT INTO clients (full_name, contact_number, email, address, created_by, consent_signed_at, consent_recorded_by) VALUES (?, ?, ?, ?, ?, NOW(), ?)");
-        $ins_client->bind_param('ssssii', $full_name, $contact_number, $email, $address, $created_by, $created_by);
-        $ins_client->execute();
-        $client_id = $conn->insert_id;
+            // Audit log
+            $uid = $_SESSION['user_id'];
+            $log = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'CLIENT_ADDED', ?)");
+            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' added client "' . $full_name . '" with vehicle ' . ($plate_number ?: 'no plate') . ' (' . $make . ' ' . $model . ').';
+            $log->bind_param('is', $uid, $desc);
+            $log->execute();
 
-        $tok = $conn->prepare("UPDATE clients SET public_token = SHA2(CONCAT(?, UUID(), 'tgbasics'), 256) WHERE client_id = ?");
-        $tok->bind_param('ii', $client_id, $client_id);
-        $tok->execute();
-
-        $ins_vehicle = $conn->prepare("INSERT INTO vehicles (client_id, plate_number, make, model, year_model, color, motor_number, serial_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-        $ins_vehicle->bind_param('isssssss', $client_id, $plate_number, $make, $model, $year_model, $color, $motor_number, $serial_number);
-        $ins_vehicle->execute();
-
-        // Audit log
-        $uid = $_SESSION['user_id'];
-        $log = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'CLIENT_ADDED', ?)");
-        $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' added client "' . $full_name . '" with vehicle ' . ($plate_number ?: 'no plate') . ' (' . $make . ' ' . $model . ').';
-        $log->bind_param('is', $uid, $desc);
-        $log->execute();
-
-        header("Location: client_list.php?success=" . urlencode($full_name . ' has been added successfully.'));
-        exit;
+            header("Location: client_list.php?success=" . urlencode($full_name . ' has been added successfully.'));
+            exit;
+        }
     }
 }
 

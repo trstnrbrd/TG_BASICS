@@ -113,24 +113,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_admin) {
         $balance       = max(0, $qt['total'] - $amount_paid);
         $pay_status    = $amount_paid <= 0 ? 'unpaid' : ($balance > 0 ? 'partial' : 'paid');
 
-        // Generate billing statement number: BS-YYYYMMDD-XXXX (find next unused)
-        $rc_prefix = 'BS-' . date('Ymd') . '-';
-        $rc_seq_stmt = $conn->prepare("SELECT receipt_number FROM receipts WHERE receipt_number LIKE ? ORDER BY receipt_number DESC LIMIT 1");
-        $rc_like = $rc_prefix . '%';
-        $rc_seq_stmt->bind_param('s', $rc_like);
-        $rc_seq_stmt->execute();
-        $rc_last = $rc_seq_stmt->get_result()->fetch_row();
-        $rc_seq  = $rc_last ? (int)substr($rc_last[0], -4) + 1 : 1;
-        $rc_num  = $rc_prefix . str_pad($rc_seq, 4, '0', STR_PAD_LEFT);
-
         $conn->begin_transaction();
         try {
-            $ins = $conn->prepare("
-                INSERT INTO receipts (quotation_id, receipt_number, amount_paid, balance, payment_method, payment_status, notes, issued_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ");
-            $ins->bind_param('isddsssi', $qt_id, $rc_num, $amount_paid, $balance, $pay_method, $pay_status, $receipt_notes, $_SESSION['user_id']);
-            $ins->execute();
+            // Billing statement number: BS-YYYYMMDD-XXXX. Retries on a same-instant collision — see
+            // insert_with_sequential_number() — instead of failing the whole conversion for it.
+            $rc_num = insert_with_sequential_number($conn, 'receipts', 'receipt_number', 'BS-' . date('Ymd') . '-',
+                function (string $num) use ($conn, $qt_id, $amount_paid, $balance, $pay_method, $pay_status, $receipt_notes) {
+                    $ins = $conn->prepare("
+                        INSERT INTO receipts (quotation_id, receipt_number, amount_paid, balance, payment_method, payment_status, notes, issued_by)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ");
+                    $ins->bind_param('isddsssi', $qt_id, $num, $amount_paid, $balance, $pay_method, $pay_status, $receipt_notes, $_SESSION['user_id']);
+                    $ins->execute();
+                    return $num;
+                }
+            );
 
             $upd = $conn->prepare("UPDATE quotations SET status='converted', converted_at=NOW() WHERE quotation_id=?");
             $upd->bind_param('i', $qt_id);

@@ -52,18 +52,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($motor_number === '')  $errors[] = 'Engine number is required.';
     if ($serial_number === '') $errors[] = 'Chassis number is required.';
 
-    if ($plate_number !== '') {
-        $check = $conn->prepare("SELECT v.vehicle_id FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id WHERE v.plate_number = ? AND c.deleted_at IS NULL");
-        $check->bind_param('s', $plate_number);
-        $check->execute();
-        if ($check->get_result()->num_rows > 0)
-            $errors[] = 'Plate number ' . $plate_number . ' already exists in the system.';
-    }
+    // Plate-uniqueness check + insert held under one named lock (closes the same-plate race — see
+    // with_named_lock() for the confirmed repro) instead of two separate, unsynchronized queries.
+    if (empty($errors) && $plate_number !== '') {
+        $lock = with_named_lock($conn, 'plate_' . $plate_number, function () use ($conn, $client_id, $plate_number, $make, $model, $year_model, $color, $motor_number, $serial_number) {
+            $check = $conn->prepare("SELECT v.vehicle_id FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id WHERE v.plate_number = ? AND c.deleted_at IS NULL");
+            $check->bind_param('s', $plate_number);
+            $check->execute();
+            if ($check->get_result()->num_rows > 0) return false;   // duplicate — caller adds the error
 
-    if (empty($errors)) {
-        $ins = $conn->prepare("INSERT INTO vehicles (client_id, plate_number, make, model, year_model, color, motor_number, serial_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-        $ins->bind_param('isssssss', $client_id, $plate_number, $make, $model, $year_model, $color, $motor_number, $serial_number);
-        if ($ins->execute()) {
+            $ins = $conn->prepare("INSERT INTO vehicles (client_id, plate_number, make, model, year_model, color, motor_number, serial_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $ins->bind_param('isssssss', $client_id, $plate_number, $make, $model, $year_model, $color, $motor_number, $serial_number);
+            return $ins->execute();
+        });
+
+        if (!$lock['locked']) {
+            $errors[] = 'The system is busy processing this plate number. Please try again in a moment.';
+        } elseif ($lock['result'] === false) {
+            $errors[] = 'Plate number ' . $plate_number . ' already exists in the system.';
+        } else {
             // Audit log
             $uid = $_SESSION['user_id'];
             $log = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'VEHICLE_ADDED', ?)");
@@ -73,8 +80,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             header("Location: view_client.php?id=" . $client_id . "&success=Vehicle added successfully.");
             exit;
-        } else {
-            $errors[] = 'Database error. Please try again.';
         }
     }
 }

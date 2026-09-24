@@ -79,28 +79,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (empty($errors)) {
-        // Generate job number: RJ-YYYYMMDD-XXXX — continue from the highest number already used today.
-        // (Counting today's rows breaks after a delete: it hands out a number that still exists, and the
-        // unique key then rejects every new job for the rest of the day.)
-        $prefix   = 'RJ-' . date('Ymd') . '-';
-        $seq_stmt = $conn->prepare("SELECT job_number FROM repair_jobs WHERE job_number LIKE ? ORDER BY job_number DESC LIMIT 1");
-        $like     = $prefix . '%';
-        $seq_stmt->bind_param('s', $like);
-        $seq_stmt->execute();
-        $last     = $seq_stmt->get_result()->fetch_row();
-        $seq      = $last ? (int)substr($last[0], -4) + 1 : 1;
-        $job_num  = $prefix . str_pad($seq, 4, '0', STR_PAD_LEFT);
-
-        $ins = $conn->prepare("
-            INSERT INTO repair_jobs (client_id, vehicle_id, job_number, repair_date, release_date, service_type, additional_damages, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ");
+        // Job number: RJ-YYYYMMDD-XXXX — continues from the highest number already used today. (Counting
+        // today's rows breaks after a delete: it hands out a number that still exists, and the unique key
+        // then rejects every new job for the rest of the day.) Wrapped in a retry: two mechanics saving at
+        // the same instant can compute the same next number — this recomputes and retries instead of the
+        // request crashing with an uncaught duplicate-key error.
         $rel = $release_date ?: null;
-        $ins->bind_param('iisssssi', $client_id, $vehicle_id, $job_num, $repair_date, $rel, $service_type, $additional, $_SESSION['user_id']);
+        $job_id = $job_num = null;
+        try {
+            [$job_id, $job_num] = insert_with_sequential_number($conn, 'repair_jobs', 'job_number', 'RJ-' . date('Ymd') . '-',
+                function (string $num) use ($conn, $client_id, $vehicle_id, $repair_date, $rel, $service_type, $additional) {
+                    $ins = $conn->prepare("
+                        INSERT INTO repair_jobs (client_id, vehicle_id, job_number, repair_date, release_date, service_type, additional_damages, created_by)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ");
+                    $ins->bind_param('iisssssi', $client_id, $vehicle_id, $num, $repair_date, $rel, $service_type, $additional, $_SESSION['user_id']);
+                    $ins->execute();
+                    return [$conn->insert_id, $num];
+                }
+            );
+        } catch (mysqli_sql_exception $e) {
+            error_log('[TG-BASICS] add_repair.php job insert failed: ' . $e->getMessage());
+        }
 
-        if ($ins->execute()) {
-            $job_id = $conn->insert_id;
-
+        if ($job_id !== null) {
             // Save checklist
             $cins = $conn->prepare("INSERT INTO repair_checklist (job_id, area_key, condition_value, notes) VALUES (?, ?, ?, ?)");
             foreach ($checklist_area_keys as $key) {

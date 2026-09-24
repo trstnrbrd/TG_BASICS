@@ -153,23 +153,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_mechanic) {
                 header("Location: view_quotation.php?id=$edit_qt_id&success=" . urlencode('Quotation updated.'));
                 exit;
             } else {
-                // ── INSERT new quotation ──
-                $prefix = 'Q-' . date('Ymd') . '-';
-                $seq_stmt = $conn->prepare("SELECT quotation_number FROM quotations WHERE quotation_number LIKE ? ORDER BY quotation_number DESC LIMIT 1");
-                $like = $prefix . '%';
-                $seq_stmt->bind_param('s', $like);
-                $seq_stmt->execute();
-                $last = $seq_stmt->get_result()->fetch_row();
-                $seq  = $last ? (int)substr($last[0], -4) + 1 : 1;
-                $qt_num = $prefix . str_pad($seq, 4, '0', STR_PAD_LEFT);
-
-                $ins = $conn->prepare("
-                    INSERT INTO quotations (job_id, quotation_number, status, subtotal, discount, total, notes, created_by)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ");
-                $ins->bind_param('issdddsi', $job_id, $qt_num, $status, $subtotal, $discount, $total, $notes, $_SESSION['user_id']);
-                $ins->execute();
-                $qt_id = $conn->insert_id;
+                // ── INSERT new quotation ── (retries on a same-instant quotation_number collision — see
+                // insert_with_sequential_number(); the surrounding try/catch already rolls back on any
+                // other failure, this just avoids that for the common concurrent case)
+                [$qt_id, $qt_num] = insert_with_sequential_number($conn, 'quotations', 'quotation_number', 'Q-' . date('Ymd') . '-',
+                    function (string $num) use ($conn, $job_id, $status, $subtotal, $discount, $total, $notes) {
+                        $ins = $conn->prepare("
+                            INSERT INTO quotations (job_id, quotation_number, status, subtotal, discount, total, notes, created_by)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        ");
+                        $ins->bind_param('issdddsi', $job_id, $num, $status, $subtotal, $discount, $total, $notes, $_SESSION['user_id']);
+                        $ins->execute();
+                        return [$conn->insert_id, $num];
+                    }
+                );
 
                 $item_ins = $conn->prepare("
                     INSERT INTO quotation_items (quotation_id, description, area, qty, unit_price, subtotal, sort_order)

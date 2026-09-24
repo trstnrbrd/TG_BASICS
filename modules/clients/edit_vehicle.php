@@ -58,25 +58,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($motor_number === '')  $errors[] = 'Engine number is required.';
     if ($serial_number === '') $errors[] = 'Chassis number is required.';
 
-    // Duplicate plate check — exclude current vehicle
-    if ($plate_number !== '') {
-        $check = $conn->prepare("SELECT v.vehicle_id FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id WHERE v.plate_number = ? AND v.vehicle_id != ? AND c.deleted_at IS NULL");
-        $check->bind_param('si', $plate_number, $vehicle_id);
-        $check->execute();
-        if ($check->get_result()->num_rows > 0)
+    // Duplicate-plate check + update held under one named lock, excluding the current vehicle (closes the
+    // same-plate race — see with_named_lock() for the confirmed repro) instead of two unsynchronized queries.
+    if (empty($errors) && $plate_number !== '') {
+        $lock = with_named_lock($conn, 'plate_' . $plate_number, function () use ($conn, $vehicle_id, $plate_number, $make, $model, $year_model, $color, $motor_number, $serial_number) {
+            $check = $conn->prepare("SELECT v.vehicle_id FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id WHERE v.plate_number = ? AND v.vehicle_id != ? AND c.deleted_at IS NULL");
+            $check->bind_param('si', $plate_number, $vehicle_id);
+            $check->execute();
+            if ($check->get_result()->num_rows > 0) return false;   // duplicate — caller adds the error
+
+            $upd = $conn->prepare("
+                UPDATE vehicles
+                SET plate_number = ?, make = ?, model = ?, year_model = ?,
+                    color = ?, motor_number = ?, serial_number = ?
+                WHERE vehicle_id = ?
+            ");
+            $upd->bind_param('sssisssi', $plate_number, $make, $model, $year_model, $color, $motor_number, $serial_number, $vehicle_id);
+            return $upd->execute();
+        });
+
+        if (!$lock['locked']) {
+            $errors[] = 'The system is busy processing this plate number. Please try again in a moment.';
+        } elseif ($lock['result'] === false) {
             $errors[] = 'Plate number ' . $plate_number . ' already exists in the system.';
-    }
-
-    if (empty($errors)) {
-        $upd = $conn->prepare("
-            UPDATE vehicles
-            SET plate_number = ?, make = ?, model = ?, year_model = ?,
-                color = ?, motor_number = ?, serial_number = ?
-            WHERE vehicle_id = ?
-        ");
-        $upd->bind_param('sssisssi', $plate_number, $make, $model, $year_model, $color, $motor_number, $serial_number, $vehicle_id);
-
-        if ($upd->execute()) {
+        } else {
             $uid  = $_SESSION['user_id'];
             $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'VEHICLE_UPDATED', ?)");
             $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' updated vehicle ' . $plate_number . ' (' . $make . ' ' . $model . ') for client "' . $vehicle['client_name'] . '".';
@@ -85,8 +90,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             header("Location: view_client.php?id=" . $client_id . "&success=" . urlencode('Vehicle ' . $plate_number . ' updated successfully.'));
             exit;
-        } else {
-            $errors[] = 'Database error. Please try again.';
         }
     }
 

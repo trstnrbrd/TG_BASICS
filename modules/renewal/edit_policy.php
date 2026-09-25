@@ -95,6 +95,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($in['total_premium'] > 0 && $in['markup'] > $in['total_premium']) $errors[] = 'Commission cannot exceed the total premium.';
     if ($in['payment_terms'] === '')                     $errors[] = 'Payment terms are invalid.';
 
+    // A new policy number: hold a named lock on it (same as add_policy.php) so a policy being added with that
+    // number at the same moment can't slip past the duplicate check; MySQL frees it when this request ends.
+    $pn_lock = null;
+    if (empty($errors) && $in['policy_number'] !== $policy['policy_number']) {
+        $pn_lock = named_lock_acquire($conn, 'policyno_' . md5(strtoupper($in['policy_number'])));
+        if ($pn_lock === null) $errors[] = 'Someone is saving a policy with this same number right now. Please try again in a moment.';
+    }
     if (empty($errors) && $in['policy_number'] !== $policy['policy_number']) {
         $dup = $conn->prepare("SELECT 1 FROM insurance_policies WHERE policy_number = ? AND policy_id <> ? LIMIT 1");
         $dup->bind_param('si', $in['policy_number'], $policy_id);
@@ -224,6 +231,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'The policy could not be saved. Please try again.';
         }
     }
+    if ($pn_lock !== null) named_lock_release($conn, $pn_lock);   // not saved (a save redirects above)
 }
 
 // Form values: what was typed (after an error) or what is stored

@@ -18,7 +18,7 @@ $company_email   = getSetting($conn, 'company_email',   'tgcustomworksbulacan@gm
 <link rel="icon" type="image/png" href="../../assets/img/tg_logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../../assets/css/public/client.css"/>
+<link rel="stylesheet" href="../../assets/css/public/client.css?v=<?= filemtime(__DIR__ . '/../../assets/css/public/client.css') ?>"/>
 <style>
 .priv-container { max-width: 700px !important; }
 .priv-section { padding: 0 0 1.5rem; }

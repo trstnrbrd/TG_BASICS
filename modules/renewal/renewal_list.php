@@ -5,6 +5,7 @@ require_once '../../config/validators.php';
 require_once '../../config/settings.php';
 require_once '../../config/access.php';
 require_once '../../includes/agent_filter.php';
+require_once '../../includes/pagination.php';
 
 $urg_days = (int)getSetting($conn, 'renewal_urgent_days', '7');
 $exp_days = (int)getSetting($conn, 'renewal_expiring_days', '30');
@@ -91,10 +92,8 @@ $sql = "
     ORDER BY p.policy_end ASC
 ";
 
-$stmt = $conn->prepare($sql);
-if (!empty($params)) $stmt->bind_param($types, ...$params);
-$stmt->execute();
-$policies = $stmt->get_result();
+// One page at a time (includes/pagination.php) — the total is counted from this same query
+[$policies, $pg] = paginate_query($conn, $sql, $types, $params);
 
 // ── SUMMARY COUNTS ──
 $exp_start_count = $urg_days + 1;
@@ -121,7 +120,7 @@ require_once '../../includes/header.php';
 require_once '../../includes/navbar.php';
 ?>
 
-<link rel="stylesheet" href="../../assets/css/shared/clients.css"/>
+<link rel="stylesheet" href="../../assets/css/shared/clients.css?v=<?= filemtime(__DIR__ . '/../../assets/css/shared/clients.css') ?>"/>
 <link rel="stylesheet" href="../../assets/css/shared/agent_filter.css?v=<?= filemtime(__DIR__ . '/../../assets/css/shared/agent_filter.css') ?>"/>
 <style>
 /* Company quick switch — a two-way toggle, so PhilBritish <-> Alpha no longer needs the sidebar menu */
@@ -261,7 +260,7 @@ require_once '../../includes/topbar.php';
             echo $titles[$filter] ?? 'All Policies';
             ?>
           </div>
-          <div class="card-sub"><?= $policies->num_rows ?> record<?= $policies->num_rows !== 1 ? 's' : '' ?> &middot; <?= htmlspecialchars(agent_filter_label($af)) ?></div>
+          <div class="card-sub"><?= paginate_summary($pg) ?> &middot; <?= htmlspecialchars(agent_filter_label($af)) ?></div>
         </div>
       </div>
 
@@ -395,6 +394,7 @@ require_once '../../includes/topbar.php';
           </tbody>
         </table>
       </div>
+      <?php render_pagination($pg); ?>
 
       <?php else: ?>
       <div class="empty-state">

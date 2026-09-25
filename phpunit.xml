@@ -3,6 +3,9 @@
   <testsuites>
     <testsuite name="TG-BASICS Tests">
       <directory>tests/</directory>
+      <!-- page-level and browser suites have their own runners (see tests/README.md) -->
+      <exclude>tests/server</exclude>
+      <exclude>tests/e2e</exclude>
     </testsuite>
   </testsuites>
 </phpunit>

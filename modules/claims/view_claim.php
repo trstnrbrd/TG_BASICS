@@ -465,7 +465,7 @@ require_once '../../includes/header.php';
 require_once '../../includes/navbar.php';
 ?>
 
-<link rel="stylesheet" href="../../assets/css/shared/view_claim.css"/>
+<link rel="stylesheet" href="../../assets/css/shared/view_claim.css?v=<?= filemtime(__DIR__ . '/../../assets/css/shared/view_claim.css') ?>"/>
 
 <div class="main">
 

@@ -142,6 +142,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($policy_start !== '' && $policy_end !== '' && $policy_end <= $policy_start)
         $errors[] = 'Inception date must be after the starting date.';
 
+    // Two people saving the same policy number at the same moment could both pass the duplicate check below
+    // before either had inserted. A MySQL named lock on the number turns check + insert into one step (same
+    // technique as the plate check in add_client.php); MySQL frees it when this request ends.
+    // (No UNIQUE index on policy_number: a renewal may keep the old policy's number.)
+    $pn_lock = null;
+    if ($policy_number !== '') {
+        $pn_lock = named_lock_acquire($conn, 'policyno_' . md5(strtoupper($policy_number)));
+        if ($pn_lock === null) $errors[] = 'Someone is saving a policy with this same number right now. Please try again in a moment.';
+    }
+
     // Check for duplicate policy number (exclude the old policy being renewed)
     if ($policy_number !== '') {
         if ($renew_from > 0) {
@@ -301,6 +311,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'Database error. Please try again.';
         }
     }
+    // Not saved (the success path exits above): let the next person with this policy number through
+    if ($pn_lock !== null) named_lock_release($conn, $pn_lock);
 }
 
 $page_title  = 'Add Policy';

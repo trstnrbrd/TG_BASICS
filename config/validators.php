@@ -312,20 +312,41 @@ function insert_with_sequential_number(mysqli $conn, string $table, string $colu
  * 'result' => <whatever $work returned>], so a null from $work is never confused with a failed lock.
  */
 function with_named_lock(mysqli $conn, string $name, callable $work, int $wait_seconds = 5): array {
-    $lock_name = 'tgb_' . substr(preg_replace('/[^A-Za-z0-9_]/', '_', $name), 0, 55);
-    $stmt = $conn->prepare('SELECT GET_LOCK(?, ?)');
-    $stmt->bind_param('si', $lock_name, $wait_seconds);
-    $stmt->execute();
-    if ((int)$stmt->get_result()->fetch_row()[0] !== 1) {
+    $lock_name = named_lock_acquire($conn, $name, $wait_seconds);
+    if ($lock_name === null) {
         return ['locked' => false];
     }
     try {
         return ['locked' => true, 'result' => $work()];
     } finally {
-        $rel = $conn->prepare('SELECT RELEASE_LOCK(?)');
-        $rel->bind_param('s', $lock_name);
-        $rel->execute();
+        named_lock_release($conn, $lock_name);
     }
+}
+
+/**
+ * The two halves of with_named_lock(), for a check-then-write that is spread over a long page flow
+ * (Add / Edit Policy: duplicate policy-number check ... insert). Returns the lock's name to pass to
+ * named_lock_release(), or null if it could not be taken within $wait_seconds. MySQL also frees the
+ * lock by itself when the request's connection closes, so a page that exit()s after saving is fine.
+ */
+function named_lock_acquire(mysqli $conn, string $name, int $wait_seconds = 5): ?string {
+    $lock_name = named_lock_name($name);
+    $stmt = $conn->prepare('SELECT GET_LOCK(?, ?)');
+    $stmt->bind_param('si', $lock_name, $wait_seconds);
+    $stmt->execute();
+    return (int)$stmt->get_result()->fetch_row()[0] === 1 ? $lock_name : null;
+}
+
+/** The MySQL lock name for $name (the client import takes many plate locks in one query, so it needs the same names). */
+function named_lock_name(string $name): string {
+    return 'tgb_' . substr(preg_replace('/[^A-Za-z0-9_]/', '_', $name), 0, 55);
+}
+
+function named_lock_release(mysqli $conn, string $lock_name): void {
+    $rel = $conn->prepare('SELECT RELEASE_LOCK(?)');
+    $rel->bind_param('s', $lock_name);
+    $rel->execute();
+    $rel->get_result();
 }
 
 function csrf_field(): string {

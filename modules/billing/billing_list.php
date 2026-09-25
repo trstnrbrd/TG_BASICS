@@ -2,6 +2,7 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
+require_once '../../includes/pagination.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
     header("Location: ../../auth/login.php");
@@ -58,10 +59,8 @@ $sql = "
     WHERE $where_sql
     ORDER BY $order
 ";
-$stmt = $conn->prepare($sql);
-if (!empty($params)) $stmt->bind_param($types, ...$params);
-$stmt->execute();
-$result = $stmt->get_result();
+// One page at a time (includes/pagination.php) — the total is counted from this same query
+[$result, $pg] = paginate_query($conn, $sql, $types, $params);
 
 $status_map = [
     'draft'  => ['Draft',   'badge-gray'],
@@ -129,7 +128,7 @@ require_once '../../includes/topbar.php';
         <div class="card-icon"><?= icon('document-text', 16) ?></div>
         <div>
           <div class="card-title">Billing Records</div>
-          <div class="card-sub"><?= $result->num_rows ?> record<?= $result->num_rows !== 1 ? 's' : '' ?> found</div>
+          <div class="card-sub"><?= paginate_summary($pg) ?></div>
         </div>
         <div style="margin-left:auto;">
           <a href="add_billing.php" class="btn-primary"><?= icon('plus', 14) ?> New Billing</a>
@@ -193,6 +192,7 @@ require_once '../../includes/topbar.php';
           <?php endwhile; ?>
         </tbody>
       </table>
+      <?php render_pagination($pg); ?>
       <?php else: ?>
       <div class="empty-state">
         <div class="empty-icon-wrap"><?= icon('document-text', 26) ?></div>

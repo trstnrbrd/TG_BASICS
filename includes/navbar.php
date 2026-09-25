@@ -16,7 +16,7 @@ $dash_url = $role === 'mechanic'
     ? $base_path . 'modules/repair/dashboard_mechanic.php'
     : $base_path . 'modules/admin/dashboard_admin.php';
 ?>
-<link rel="stylesheet" href="<?= $base_path ?>assets/css/sidebar.css"/>
+<link rel="stylesheet" href="<?= $base_path ?>assets/css/sidebar.css?v=<?= filemtime(__DIR__ . '/../assets/css/sidebar.css') ?>"/>
 
 <aside class="sidebar" id="tg-sidebar">
 

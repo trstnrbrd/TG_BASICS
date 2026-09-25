@@ -70,6 +70,29 @@ function insurance_agents(mysqli $conn): array
     return $agents;
 }
 
+/**
+ * Active clients whose full name is exactly $name (case and extra spaces ignored), with their plates — for the
+ * "this name already exists" warning on Add Client and the bulk import (owner's staff are encoding ~1,000
+ * clients, so the same person being added twice is likely). A warning only: two people can share a name.
+ * Returns [['client_id'=>…, 'full_name'=>…, 'plates'=>'ABC 123, XYZ 789'], …].
+ */
+function same_name_clients(mysqli $conn, string $name, int $limit = 5): array
+{
+    $name = strtoupper(trim(preg_replace('/\s+/', ' ', $name)));
+    if ($name === '') return [];
+    $st = $conn->prepare("
+        SELECT c.client_id, c.full_name, GROUP_CONCAT(v.plate_number ORDER BY v.vehicle_id SEPARATOR ', ') AS plates
+        FROM clients c
+        LEFT JOIN vehicles v ON v.client_id = c.client_id
+        WHERE c.deleted_at IS NULL AND c.full_name = ?
+        GROUP BY c.client_id
+        ORDER BY c.client_id
+        LIMIT " . max(1, (int)$limit));
+    $st->bind_param('s', $name);
+    $st->execute();
+    return $st->get_result()->fetch_all(MYSQLI_ASSOC);
+}
+
 /** Dropdown label for an insurance agent: "Name — Owner" for the super admin, "(you)" for the signed-in user. */
 function agent_option_label(array $agent): string
 {

@@ -398,4 +398,4 @@ const savedPolicy       = '<?= (int)($_POST['policy_id'] ?? 0) ?>';
 const prefillClientId   = <?= $prefill_client_id ?>;
 const prefillClientName = <?= json_encode($prefill_client_name) ?>;
 </script>
-<script src="../../assets/js/shared/add_claim.js"></script>
+<script src="../../assets/js/shared/add_claim.js?v=<?= filemtime(__DIR__ . '/../../assets/js/shared/add_claim.js') ?>"></script>

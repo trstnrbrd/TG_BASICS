@@ -2,6 +2,7 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
+require_once '../../includes/pagination.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin', 'mechanic'])) {
     header("Location: ../../auth/login.php");
@@ -71,10 +72,8 @@ $sql = "
     ORDER BY q.created_at DESC
 ";
 
-$stmt = $conn->prepare($sql);
-if (!empty($params)) $stmt->bind_param($types, ...$params);
-$stmt->execute();
-$rows = $stmt->get_result();
+// One page at a time (includes/pagination.php) — the total is counted from this same query
+[$rows, $pg] = paginate_query($conn, $sql, $types, $params);
 
 $service_labels = [
     'repair_panel'   => 'Per Panel Repair',  'repair_full'    => 'Full Body Repair',
@@ -99,7 +98,7 @@ $pay_cfg = [
 $page_title  = 'Quotations & Receipts';
 $active_page = 'quotations';
 $base_path   = '../../';
-$extra_css   = '<link rel="stylesheet" href="../../assets/css/shared/quotations.css"/>';
+$extra_css   = '<link rel="stylesheet" href="../../assets/css/shared/quotations.css?v=' . filemtime(__DIR__ . '/../../assets/css/shared/quotations.css') . '"/>';
 require_once '../../includes/header.php';
 require_once '../../includes/navbar.php';
 ?>
@@ -155,7 +154,7 @@ document.addEventListener('DOMContentLoaded',function(){
       <div class="card-icon"><?= icon('receipt', 16) ?></div>
       <div>
         <div class="card-title">Quotations</div>
-        <div class="card-sub"><?= $rows->num_rows ?> record<?= $rows->num_rows !== 1 ? 's' : '' ?></div>
+        <div class="card-sub"><?= paginate_summary($pg) ?></div>
       </div>
     </div>
     <a href="../repair/repair_list.php" class="btn-sm-gold"><?= icon('wrench', 12) ?> Repair Jobs</a>
@@ -215,6 +214,7 @@ document.addEventListener('DOMContentLoaded',function(){
       </tbody>
     </table>
   </div>
+  <?php render_pagination($pg); ?>
   <?php else: ?>
   <div class="empty-state">
     <div class="empty-icon-wrap"><?= icon('receipt', 26) ?></div>

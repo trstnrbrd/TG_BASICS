@@ -4,6 +4,7 @@ require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../includes/agent_filter.php';
+require_once '../../includes/pagination.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin', 'mechanic'])) {
     header("Location: ../../auth/login.php");
@@ -169,10 +170,8 @@ $sql = "
     ORDER BY $order
 ";
 
-$stmt = $conn->prepare($sql);
-if (!empty($params)) $stmt->bind_param($types, ...$params);
-$stmt->execute();
-$result = $stmt->get_result();
+// One page at a time (includes/pagination.php) — the total is counted from this same query
+[$result, $pg] = paginate_query($conn, $sql, $types, $params);
 $rows = $result->fetch_all(MYSQLI_ASSOC);
 
 // Mechanics only ever see walk-in clients — exclude anyone with an insurance policy on record
@@ -358,6 +357,7 @@ require_once '../../includes/topbar.php';
         <a href="client_list.php" class="btn-ghost"><?= icon('x-mark', 14) ?> Clear</a>
         <?php endif; ?>
         <?php if ($_SESSION['role'] !== 'mechanic'): ?>
+        <a href="import_clients.php" class="btn-ghost" title="Add many clients at once from a CSV file"><?= icon('arrow-up-tray', 14) ?> Import</a>
         <a href="add_client.php" class="btn-primary"><?= icon('plus', 14) ?> Add Client</a>
         <?php endif; ?>
       </div>
@@ -369,7 +369,7 @@ require_once '../../includes/topbar.php';
         <div class="card-icon"><?= icon('users', 16) ?></div>
         <div>
           <div class="card-title"><?= htmlspecialchars($list_title) ?></div>
-          <div class="card-sub"><?= count($rows) ?> record<?= count($rows) !== 1 ? 's' : '' ?></div>
+          <div class="card-sub"><?= paginate_summary($pg) ?></div>
         </div>
       </div>
 
@@ -436,7 +436,7 @@ require_once '../../includes/topbar.php';
                   : ($sort_by === 'name_desc'
                     ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>'
                     : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="opacity:0.35"><path d="M8 9l4-4 4 4M8 15l4 4 4-4"/></svg>');
-                $sort_qs = http_build_query(array_merge($_GET, ['sort' => $next_sort]));
+                $sort_qs = http_build_query(array_merge(array_diff_key($_GET, ['page' => 1, 'success' => 1, 'error' => 1]), ['sort' => $next_sort]));   // re-sorting starts at page 1
                 ?>
                 <a href="?<?= $sort_qs ?>" style="display:inline-flex;align-items:center;gap:0.35rem;color:inherit;text-decoration:none;">
                   Client <?= $sort_icon ?>
@@ -536,6 +536,7 @@ require_once '../../includes/topbar.php';
           </tbody>
         </table>
       </div>
+      <?php render_pagination($pg); ?>
       <?php else: ?>
       <div class="empty-state">
         <div class="empty-icon-wrap"><?= icon('users', 26) ?></div>

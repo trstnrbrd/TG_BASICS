@@ -66,7 +66,7 @@ $total_pages = max(1, ceil($total / $per_page));
 
 // Fetch logs
 $sql  = "SELECT a.log_id, a.user_id, a.action, a.description, a.created_at,
-                CASE WHEN u.is_hidden = 1 THEN 'System Administrator' ELSE u.full_name END AS full_name,
+                CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.full_name END AS full_name,
                 CASE WHEN u.is_hidden = 1 THEN NULL ELSE u.profile_photo END AS profile_photo
          FROM audit_logs a
          LEFT JOIN users u ON a.user_id = u.user_id
@@ -111,7 +111,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     $exp_where_sql = 'WHERE ' . implode(' AND ', $exp_where);
 
     $exp_sql  = "SELECT a.log_id,
-                        CASE WHEN u.is_hidden = 1 THEN 'System Administrator' ELSE u.full_name END AS full_name,
+                        CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.full_name END AS full_name,
                         a.action, a.description, a.created_at
                  FROM audit_logs a
                  LEFT JOIN users u ON a.user_id = u.user_id

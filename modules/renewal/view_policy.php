@@ -26,7 +26,7 @@ $stmt = $conn->prepare("
         p.*,
         DATEDIFF(p.policy_end, CURDATE()) AS days_left,
         c.full_name, c.contact_number, c.email, c.address, c.agent_id,
-        (SELECT CASE WHEN ag.is_hidden = 1 THEN 'System Administrator' ELSE ag.full_name END
+        (SELECT CASE WHEN ag.is_hidden = 1 THEN 'Developer' ELSE ag.full_name END
            FROM users ag WHERE ag.user_id = c.agent_id) AS agent_name,
         v.plate_number, v.make, v.model, v.year_model, v.color,
         v.motor_number, v.serial_number

@@ -62,7 +62,8 @@ if (isset($_SESSION['user_id'], $conn)) {
     </div>
   </div>
   <div class="topbar-right">
-    <!-- GLOBAL SEARCH -->
+    <!-- GLOBAL SEARCH (not for the developer account: it searches client records) -->
+    <?php if (empty($_SESSION['is_hidden'])): ?>
     <div class="gs-wrap" id="gs-wrap">
       <div class="gs-input-row">
         <svg class="gs-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -71,6 +72,7 @@ if (isset($_SESSION['user_id'], $conn)) {
       </div>
       <div class="gs-dropdown" id="gs-dropdown" style="display:none;"></div>
     </div>
+    <?php endif; ?>
     <div id="user-dropdown-root"
       data-name="<?= htmlspecialchars($full_name_display) ?>"
       data-firstname="<?= htmlspecialchars($_first_name_display) ?>"

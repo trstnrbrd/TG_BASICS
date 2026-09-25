@@ -21,6 +21,7 @@
       (form.requestSubmit ? form.requestSubmit() : form.submit());
   });
 }),
+  document.getElementById("js-create-btn") &&
   document
     .getElementById("js-create-btn")
     .addEventListener("click", function () {
@@ -106,3 +107,4 @@ document.querySelectorAll(".js-reactivate-user").forEach(function (btn) {
     form.requestSubmit ? form.requestSubmit() : form.submit();
   });
 });
+

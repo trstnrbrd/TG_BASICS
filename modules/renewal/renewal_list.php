@@ -80,8 +80,8 @@ $sql = "
         DATEDIFF(p.policy_end, CURDATE()) AS days_left,
         c.client_id, c.full_name, c.contact_number,
         v.plate_number, v.make, v.model, v.year_model,
-        CASE WHEN u.is_hidden = 1 THEN 'System Administrator' ELSE u.full_name END AS added_by_name,
-        CASE WHEN ag.is_hidden = 1 THEN 'System Administrator' ELSE ag.full_name END AS agent_name,
+        CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.full_name END AS added_by_name,
+        CASE WHEN ag.is_hidden = 1 THEN 'Developer' ELSE ag.full_name END AS agent_name,
         CASE WHEN ag.is_hidden = 1 THEN NULL ELSE ag.profile_photo END AS agent_photo
     FROM insurance_policies p
     INNER JOIN clients c ON p.client_id = c.client_id

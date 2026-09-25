@@ -118,7 +118,7 @@ function db_backup_status(mysqli $conn): array
     $by  = null;
     if ($uid > 0) {
         // Same masking as everywhere else: the hidden account never shows its real name
-        $st = $conn->prepare("SELECT CASE WHEN is_hidden = 1 THEN 'System Administrator' ELSE full_name END FROM users WHERE user_id = ?");
+        $st = $conn->prepare("SELECT CASE WHEN is_hidden = 1 THEN 'Developer' ELSE full_name END FROM users WHERE user_id = ?");
         $st->bind_param('i', $uid);
         $st->execute();
         $by = $st->get_result()->fetch_row()[0] ?? null;

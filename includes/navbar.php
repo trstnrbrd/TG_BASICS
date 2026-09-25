@@ -2,6 +2,7 @@
 $active_page = $active_page ?? '';
 $base_path   = $base_path   ?? '../';
 $role        = $_SESSION['role'] ?? '';
+$is_dev_nav  = !empty($_SESSION['is_hidden']);   // developer account: Settings only (config/dev_access.php)
 
 $active_group = match($active_page) {
     'clients'                      => 'clients',
@@ -12,9 +13,10 @@ $active_group = match($active_page) {
     default                        => ''
 };
 
-$dash_url = $role === 'mechanic'
+$dash_url = $is_dev_nav ? $base_path . 'modules/admin/settings.php'
+    : ($role === 'mechanic'
     ? $base_path . 'modules/repair/dashboard_mechanic.php'
-    : $base_path . 'modules/admin/dashboard_admin.php';
+    : $base_path . 'modules/admin/dashboard_admin.php');
 ?>
 <link rel="stylesheet" href="<?= $base_path ?>assets/css/sidebar.css?v=<?= filemtime(__DIR__ . '/../assets/css/sidebar.css') ?>"/>
 
@@ -34,6 +36,15 @@ $dash_url = $role === 'mechanic'
     <?php
     $chevron = '<svg class="nav-item-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>';
     ?>
+
+    <?php if ($is_dev_nav): ?>
+    <!-- Developer account: no business records, Settings only -->
+    <div class="nav-item-wrap">
+      <a href="<?= $base_path ?>modules/admin/settings.php" class="nav-item active">
+        <?= icon('cog', 16) ?> Settings
+      </a>
+    </div>
+    <?php else: ?>
 
     <!-- Client Records (no flyout — single page) -->
     <div class="nav-item-wrap">
@@ -138,6 +149,8 @@ $dash_url = $role === 'mechanic'
       </div>
     </div>
     <?php endif; ?>
+
+    <?php endif; /* developer account */ ?>
 
   </nav>
 

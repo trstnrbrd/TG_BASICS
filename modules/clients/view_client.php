@@ -116,8 +116,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 // Load client (exclude soft-deleted), with its insurance agent and who added it — masked if either is the hidden account
 $stmt = $conn->prepare("
     SELECT c.*,
-           CASE WHEN ag.is_hidden = 1 THEN 'System Administrator' ELSE ag.full_name END AS agent_name,
-           CASE WHEN cb.is_hidden = 1 THEN 'System Administrator' ELSE cb.full_name END AS added_by_name
+           CASE WHEN ag.is_hidden = 1 THEN 'Developer' ELSE ag.full_name END AS agent_name,
+           CASE WHEN cb.is_hidden = 1 THEN 'Developer' ELSE cb.full_name END AS added_by_name
     FROM clients c
     LEFT JOIN users ag ON ag.user_id = c.agent_id
     LEFT JOIN users cb ON cb.user_id = c.created_by

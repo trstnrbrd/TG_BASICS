@@ -6,6 +6,7 @@ require_once '../../config/settings.php';
 require_once '../../config/mailer.php';
 require_once '../../config/rate_limit.php';
 require_once '../../includes/db_backup.php';
+require_once '../../config/dev_access.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin', 'mechanic'])) {
     header("Location: ../../auth/login.php");
@@ -15,6 +16,8 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'supe
 $user_id  = $_SESSION['user_id'];
 $role     = $_SESSION['role'];
 $is_super = $role === 'super_admin';
+// The developer account (config/dev_access.php) reaches System Settings only once its authenticator app is on
+if (is_developer() && !dev_has_authenticator($conn, (int)$user_id)) $is_super = false;
 
 // ═══════════════════════════════════════════════════
 // AJAX SAVE HANDLERS
@@ -109,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             $last   = san_str($_POST['last_name']  ?? '', MAX_NAME);
             $name   = trim($first . ' ' . $last);
             // Hidden accounts keep the masked label even after a profile name edit.
-            $display_name = !empty($_SESSION['is_hidden']) ? 'System Administrator' : $name;
+            $display_name = !empty($_SESSION['is_hidden']) ? 'Developer' : $name;
             $email  = san_str($_POST['email'] ?? '', MAX_EMAIL);
             $cur_pw = san_str($_POST['current_password'] ?? '', MAX_PASSWORD);
             $new_pw = san_str($_POST['new_password'] ?? '', MAX_PASSWORD);
@@ -375,6 +378,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             $s->bind_param('i', $user_id); $s->execute();
             $row = $s->get_result()->fetch_assoc();
             if (!$row || !password_verify($password, $row['password'])) { echo json_encode(['ok' => false, 'error' => 'Incorrect password.']); exit; }
+            if (is_developer()) { echo json_encode(['ok' => false, 'error' => 'The developer account must keep the authenticator app on.']); exit; }
             $u = $conn->prepare("UPDATE users SET totp_secret = NULL, totp_enabled = 0, totp_recovery_codes = NULL WHERE user_id = ?");
             $u->bind_param('i', $user_id); $u->execute();
             $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'TOTP_DISABLED', ?)");
@@ -420,6 +424,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             }
             // Email (simplified — no host/port/encryption)
             foreach (['smtp_username', 'smtp_password', 'smtp_sender_name', 'smtp_sender_email'] as $k) {
+                if ($k === 'smtp_password' && is_developer()) continue;   // hidden from the developer, so never overwritten by it
                 setSetting($conn, $k, trim($_POST[$k] ?? ''));
             }
 
@@ -595,8 +600,8 @@ $settings = getAllSettings($conn);
 $claim_notify_rows = [];
 $cnr_res = $conn->query("
     SELECT r.user_id, r.email AS raw_email,
-           CASE WHEN u.is_hidden = 1 THEN 'System Administrator' ELSE u.username  END AS username,
-           CASE WHEN u.is_hidden = 1 THEN 'System Administrator' ELSE u.full_name END AS full_name,
+           CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.username  END AS username,
+           CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.full_name END AS full_name,
            u.email AS user_email
     FROM claim_notify_recipients r
     LEFT JOIN users u ON r.user_id = u.user_id
@@ -638,6 +643,21 @@ require_once '../../includes/topbar.php';
     $photo_url   = $has_photo ? $base_path . 'uploads/avatars/' . htmlspecialchars($current_user['profile_photo']) : '';
     $user_theme  = $current_user['theme'] ?? 'light';
     ?>
+
+    <?php if (is_developer() && empty($current_user['totp_enabled'])): ?>
+    <!-- The developer account must use an authenticator app; System Settings opens once it is on -->
+    <div class="alert alert-warning" role="alert" id="dev-totp-required">
+      <?= icon('shield-check', 15) ?>
+      <span><strong>Set up an authenticator app to continue.</strong> The developer account must use one. Press <strong>Set Up Authenticator</strong> below; System Settings opens once it is active.</span>
+    </div>
+    <script>document.addEventListener('DOMContentLoaded', function () { var c = document.getElementById('totp-card'); if (c) c.scrollIntoView({ block: 'center' }); });</script>
+    <?php elseif (is_developer() && isset($_GET['no_access'])): ?>
+    <!-- config/session.php sends the developer here from any page with business records -->
+    <div class="alert alert-info" role="status" id="dev-no-access">
+      <?= icon('information-circle', 15) ?>
+      <span>The developer account cannot open business records. Only Settings is available to it.</span>
+    </div>
+    <?php endif; ?>
 
     <!-- ═══ HORIZONTAL TABS ═══ -->
     <div class="settings-tabs-bar">
@@ -865,7 +885,7 @@ require_once '../../includes/topbar.php';
         </div>
 
         <!-- Authenticator App 2FA Card -->
-        <div class="card" style="margin-top:1.5rem;">
+        <div class="card" id="totp-card" style="margin-top:1.5rem;">
           <div class="card-header">
             <div class="card-icon"><?= icon('device-phone-mobile', 16) ?></div>
             <div>
@@ -943,7 +963,11 @@ require_once '../../includes/topbar.php';
             <button type="button" onclick="totpStartSetup()" class="btn-primary" id="totp-setup-btn"><?= icon('shield-check', 14) ?> Set Up Authenticator</button>
             <?php else: ?>
             <button type="button" onclick="totpRegenRecovery()" class="btn-ghost"><?= icon('arrow-path', 14) ?> Regenerate Recovery Codes</button>
+            <?php if (is_developer()): ?>
+            <span style="font-size:0.75rem;color:var(--text-muted);align-self:center;">Required for the developer account.</span>
+            <?php else: ?>
             <button type="button" onclick="totpDisable()" class="btn-danger"><?= icon('x-mark', 14) ?> Disable Authenticator</button>
+            <?php endif; ?>
             <?php endif; ?>
           </div>
         </div>
@@ -1077,9 +1101,13 @@ require_once '../../includes/topbar.php';
               <div id="db-backup-last" style="font-size:0.92rem;font-weight:700;color:var(--text-primary);">No backup yet</div>
               <?php endif; ?>
             </div>
+            <?php if (is_developer()): ?>
+            <span style="font-size:0.78rem;color:var(--text-muted);">Only the owner can download a backup.</span>
+            <?php else: ?>
             <button type="button" class="btn-primary" id="db-backup-btn"><?= icon('arrow-down-tray', 14) ?> Download Backup</button>
+            <?php endif; ?>
           </div>
-          <?php if ($bk['overdue']): ?>
+          <?php if ($bk['overdue'] && !is_developer()): ?>
           <div class="alert alert-warning" role="status" style="margin:1rem 0 0;">
             <?= icon('exclamation-triangle', 15) ?>
             <span><?= $bk['at'] ? 'The last backup is more than ' . DB_BACKUP_WARN_DAYS . ' days old.' : 'No backup has been downloaded yet.' ?> Download one now and keep it somewhere safe.</span>
@@ -1155,9 +1183,14 @@ require_once '../../includes/topbar.php';
               </div>
               <div class="field">
                 <label class="field-label">Email App Password</label>
+                <?php if (is_developer()): ?>
+                <input type="password" class="field-input" value="" placeholder="Hidden from the developer account" disabled/>
+                <span class="field-hint">Only the owner can see or change the email app password.</span>
+                <?php else: ?>
                 <input type="password" name="smtp_password" class="field-input"
                   value="<?= htmlspecialchars($settings['smtp_password']) ?>"/>
                 <span class="field-hint">App-specific password from your email provider.</span>
+                <?php endif; ?>
               </div>
             </div>
             <div class="field-section">Sender Identity</div>

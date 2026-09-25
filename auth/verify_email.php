@@ -44,7 +44,7 @@ if ($token !== '') {
             // Audit log
             $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'EMAIL_VERIFIED', ?)");
             // No session on this token-link page, so mask the hidden account's name here.
-            $actor = !empty($row['is_hidden']) ? 'System Administrator' : $row['full_name'];
+            $actor = !empty($row['is_hidden']) ? 'Developer' : $row['full_name'];
             $desc  = $actor . ' verified new email address: ' . $row['new_email'];
             $log->bind_param('is', $row['user_id'], $desc);
             $log->execute();

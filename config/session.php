@@ -102,6 +102,23 @@ if (isset($_SESSION['user_id'])) {
     }
 }
 
+// Developer account (users.is_hidden): sees no business data — inside the app it may open only Settings — and
+// must use an authenticator app. Checked on every request; see config/dev_access.php.
+if (!empty($_SESSION['user_id']) && !empty($_SESSION['is_hidden'])) {
+    require_once __DIR__ . '/dev_access.php';
+    $_script = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
+    if (!dev_may_open($_script)) {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && stripos($_SERVER['HTTP_ACCEPT'] ?? '', 'text/html') !== false) {
+            header('Location: ' . preg_replace('#/(modules|ajax)/.*$#', '/', $_script) . DEV_HOME . '?no_access=1');
+        } else {
+            http_response_code(403);
+            header('Content-Type: application/json');
+            echo json_encode(['ok' => false, 'error' => 'The developer account cannot open business records.', 'msg' => 'The developer account cannot open business records.']);
+        }
+        exit;
+    }
+}
+
 // Security headers for every page that starts a session.
 if (!headers_sent()) {
     header('X-Frame-Options: SAMEORIGIN');                       // no embedding in other sites (clickjacking)

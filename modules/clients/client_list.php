@@ -156,8 +156,8 @@ $sql = "
     SELECT c.client_id, c.full_name, c.contact_number, c.email, c.created_by, c.agent_id,
            COUNT(DISTINCT v.vehicle_id) AS vehicle_count, c.created_at,
            COUNT(DISTINCT ip.policy_id) > 0 AS has_policy,
-           CASE WHEN u.is_hidden = 1 THEN 'System Administrator' ELSE u.full_name END AS added_by_name,
-           CASE WHEN ag.is_hidden = 1 THEN 'System Administrator' ELSE ag.full_name END AS agent_name,
+           CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.full_name END AS added_by_name,
+           CASE WHEN ag.is_hidden = 1 THEN 'Developer' ELSE ag.full_name END AS agent_name,
            CASE WHEN ag.is_hidden = 1 THEN NULL ELSE ag.profile_photo END AS agent_photo
     FROM clients c
     LEFT JOIN vehicles v            ON c.client_id = v.client_id

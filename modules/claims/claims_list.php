@@ -49,7 +49,7 @@ $sql = "
            c.full_name, c.client_id,
            v.plate_number, v.make, v.model,
            ip.policy_number, ip.coverage_type,
-           CASE WHEN u.is_hidden = 1 THEN 'System Administrator' ELSE u.full_name END AS added_by_name,
+           CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.full_name END AS added_by_name,
            CASE WHEN u.is_hidden = 1 THEN NULL ELSE u.profile_photo END AS added_by_photo
     FROM claims cl
     INNER JOIN clients c  ON cl.client_id = c.client_id

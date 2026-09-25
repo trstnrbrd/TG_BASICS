@@ -25,7 +25,7 @@ if (!client_editable($conn, $client_id)) {
 // Load client (exclude soft-deleted) with its current insurance agent
 $stmt = $conn->prepare("
     SELECT c.*,
-           CASE WHEN ag.is_hidden = 1 THEN 'System Administrator' ELSE ag.full_name END AS agent_name
+           CASE WHEN ag.is_hidden = 1 THEN 'Developer' ELSE ag.full_name END AS agent_name
     FROM clients c
     LEFT JOIN users ag ON ag.user_id = c.agent_id
     WHERE c.client_id = ? AND c.deleted_at IS NULL

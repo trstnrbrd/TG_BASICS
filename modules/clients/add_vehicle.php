@@ -208,20 +208,20 @@ require_once '../../includes/topbar.php';
               <label class="field-label">Plate Number <span class="req">*</span></label>
               <input type="text" name="plate_number" class="field-input"
                 placeholder="ABC 1234"
-                value="<?= htmlspecialchars($_POST['plate_number'] ?? '') ?>"
+                value="<?= old('plate_number') ?>"
                 style="text-transform:uppercase;" autofocus/>
             </div>
             <div class="field">
               <label class="field-label">Make <span class="req">*</span></label>
               <input type="text" name="make" class="field-input"
                 placeholder="Toyota / Honda / Mitsubishi"
-                value="<?= htmlspecialchars($_POST['make'] ?? '') ?>"/>
+                value="<?= old('make') ?>"/>
             </div>
             <div class="field">
               <label class="field-label">Model <span class="req">*</span></label>
               <input type="text" name="model" class="field-input"
                 placeholder="Innova / Civic / L300"
-                value="<?= htmlspecialchars($_POST['model'] ?? '') ?>"/>
+                value="<?= old('model') ?>"/>
             </div>
 
             <!-- Row 2: Year | Color (2-col) -->
@@ -230,13 +230,13 @@ require_once '../../includes/topbar.php';
               <input type="number" name="year_model" class="field-input"
                 min="1990" max="<?= date('Y') + 1 ?>"
                 placeholder="YYYY"
-                value="<?= htmlspecialchars($_POST['year_model'] ?? '') ?>"/>
+                value="<?= old('year_model') ?>"/>
             </div>
             <div class="field span-2">
               <label class="field-label">Color</label>
               <input type="text" name="color" class="field-input"
                 placeholder="Pearl White / Black / Silver"
-                value="<?= htmlspecialchars($_POST['color'] ?? '') ?>"/>
+                value="<?= old('color') ?>"/>
             </div>
 
             <!-- Row 3: Engine Number (full width) -->
@@ -244,7 +244,7 @@ require_once '../../includes/topbar.php';
               <label class="field-label">Engine Number</label>
               <input type="text" name="motor_number" class="field-input"
                 placeholder="Alphanumeric, from OR-CR"
-                value="<?= htmlspecialchars($_POST['motor_number'] ?? '') ?>"
+                value="<?= old('motor_number') ?>"
                 style="text-transform:uppercase;"/>
               <div class="field-hint">Found on the vehicle registration / OR-CR. Optional — can be added later.</div>
             </div>
@@ -254,7 +254,7 @@ require_once '../../includes/topbar.php';
               <label class="field-label">Chassis Number</label>
               <input type="text" name="serial_number" class="field-input"
                 placeholder="17-character VIN"
-                value="<?= htmlspecialchars($_POST['serial_number'] ?? '') ?>"
+                value="<?= old('serial_number') ?>"
                 style="text-transform:uppercase;"/>
               <div class="field-hint">17-character VIN / chassis number from the OR-CR. Optional — can be added later.</div>
             </div>

@@ -5,8 +5,20 @@ require_once '../../config/validators.php';
 require_once '../../config/settings.php';
 require_once '../../config/rate_limit.php';
 require_once '../../includes/db_backup.php';
+require_once '../../config/dev_access.php';
 
 // Owner only: the file holds every client's data and every account's password hash
+if (isset($_SESSION['user_id']) && is_developer()) {
+    // The developer account is a super admin too, but never takes the whole database home
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        http_response_code(403);
+        header('Content-Type: application/json');
+        echo json_encode(['ok' => false, 'error' => 'Only the owner can download a database backup.']);
+    } else {
+        header('Location: settings.php');
+    }
+    exit;
+}
 if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'super_admin') {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         http_response_code(403);

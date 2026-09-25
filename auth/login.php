@@ -6,9 +6,12 @@ require_once '../config/mailer.php';
 require_once '../config/rate_limit.php';
 require_once '../config/validators.php';
 require_once '../includes/icons.php';
+require_once '../config/dev_access.php';
 
 if (isset($_SESSION['user_id'])) {
-    if ($_SESSION['role'] === 'mechanic') {
+    if (!empty($_SESSION['is_hidden'])) {
+        header("Location: ../" . DEV_HOME);
+    } elseif ($_SESSION['role'] === 'mechanic') {
         header("Location: ../modules/repair/dashboard_mechanic.php");
     } else {
         header("Location: ../modules/admin/dashboard_admin.php");
@@ -72,8 +75,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $reset->bind_param('s', $username);
                     $reset->execute();
 
-                    // Hidden accounts never show their real name, even in audit logs.
-                    $display_name = !empty($user['is_hidden']) ? 'System Administrator' : $user['full_name'];
+                    // The developer account never shows its real name, even in audit logs.
+                    $display_name = !empty($user['is_hidden']) ? 'Developer' : $user['full_name'];
 
                     // Check if authenticator TOTP is enabled (takes priority over email 2FA)
                     if (!empty($user['totp_enabled'])) {
@@ -140,7 +143,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $_SESSION['full_name'] = $display_name;
                     $_SESSION['is_hidden'] = !empty($user['is_hidden']);
 
-                    if ($user['role'] === 'mechanic') {
+                    if (!empty($user['is_hidden'])) {
+                        header("Location: ../" . DEV_HOME);   // the developer account opens Settings only
+                    } elseif ($user['role'] === 'mechanic') {
                         header("Location: ../modules/repair/dashboard_mechanic.php");
                     } else {
                         header("Location: ../modules/admin/dashboard_admin.php");
@@ -283,8 +288,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
-<script type="text/babel" src="../assets/js/auth/login.react.js?v=<?= filemtime(__DIR__.'/../assets/js/auth/login.react.js') ?>"></script>
+<!-- login.react.js is precompiled (2026-09-25) — no more babel-standalone here, it was the heaviest thing on this page -->
+<script src="../assets/js/auth/login.react.js?v=<?= filemtime(__DIR__.'/../assets/js/auth/login.react.js') ?>"></script>
 
 <script src="../assets/js/auth/login.js?v=<?= filemtime(__DIR__.'/../assets/js/auth/login.js') ?>"></script>
 

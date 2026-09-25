@@ -107,7 +107,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Clean up 2FA session vars
             unset($_SESSION['2fa_user_id'], $_SESSION['2fa_full_name'], $_SESSION['2fa_role'], $_SESSION['2fa_username'], $_SESSION['2fa_email'], $_SESSION['2fa_is_hidden']);
 
-            if ($pending_role === 'mechanic') {
+            if ($pending_hidden) {
+                header("Location: ../modules/admin/settings.php");   // the developer account opens Settings only (config/dev_access.php)
+            } elseif ($pending_role === 'mechanic') {
                 header("Location: ../modules/repair/dashboard_mechanic.php");
             } else {
                 header("Location: ../modules/admin/dashboard_admin.php");

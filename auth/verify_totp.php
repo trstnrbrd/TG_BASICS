@@ -84,7 +84,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $_SESSION['is_hidden'] = $pending_hidden;
     unset($_SESSION['totp_user_id'], $_SESSION['totp_full_name'], $_SESSION['totp_role'], $_SESSION['totp_username'], $_SESSION['totp_is_hidden']);
 
-    if ($pending_role === 'mechanic') {
+    if ($pending_hidden) {
+        header("Location: ../modules/admin/settings.php");   // the developer account opens Settings only (config/dev_access.php)
+    } elseif ($pending_role === 'mechanic') {
         header("Location: ../modules/repair/dashboard_mechanic.php");
     } else {
         header("Location: ../modules/admin/dashboard_admin.php");

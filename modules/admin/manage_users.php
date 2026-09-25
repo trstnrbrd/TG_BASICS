@@ -4,6 +4,7 @@ require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/mailer.php';
 require_once '../../config/access.php';
+require_once '../../config/dev_access.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'super_admin') {
     header("Location: ../../auth/login.php");
@@ -16,6 +17,14 @@ $admin_id  = (int)$_SESSION['user_id'];
 
 $success = '';
 $errors  = [];
+
+// The developer account cannot open this page at all (config/session.php); refusing its changes here as well
+// keeps that true even if the page rule ever changes. Emptying $_POST means none of the handlers below runs.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_developer()) {
+    csrf_verify();
+    $errors[] = 'The developer account cannot change user accounts.';
+    $_POST = [];
+}
 
 // The account this POST is about — never the hidden oversight account
 function mu_load_target(mysqli $conn, int $user_id): ?array {
@@ -164,10 +173,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 $users = $conn->query("
     SELECT user_id, full_name, username, role, email, is_active, created_at, last_active, profile_photo,
            (last_active IS NOT NULL AND last_active >= NOW() - INTERVAL 5 MINUTE) AS is_online,
-           CASE WHEN is_active = 1 THEN 'active' WHEN activation_token IS NULL THEN 'deactivated' ELSE 'pending' END AS acct_status
+           CASE WHEN is_active = 1 THEN 'active' WHEN activation_token IS NULL THEN 'deactivated' ELSE 'pending' END AS acct_status,
+           is_hidden
     FROM users
-    WHERE is_hidden = 0
-    ORDER BY FIELD(role, 'super_admin', 'admin', 'mechanic'), full_name ASC
+    ORDER BY is_hidden, FIELD(role, 'super_admin', 'admin', 'mechanic'), full_name ASC
 ");
 $users_with_history = users_with_history($conn);   // null = unknown → treated as "has history" below
 
@@ -188,6 +197,13 @@ function mu_action_forms(array $u, ?array $history): void {
 <?php }
 }
 
+// The developer account (config/dev_access.php) is listed like everyone else so the owner can see it exists, but as
+// "Developer": no real name, no username, no profile popup, and protected like the owner's own account.
+function mu_dev_row(array $u): array {
+    if (empty($u['is_hidden'])) return $u;
+    return array_merge($u, ['full_name' => 'Developer', 'username' => '', 'profile_photo' => '', 'role' => 'developer']);
+}
+
 // Status badge: Active / Pending (invited, not yet activated) / Deactivated (switched off by an admin)
 function mu_status_badge(string $status): string {
     return match ($status) {
@@ -200,7 +216,7 @@ function mu_status_badge(string $status): string {
 // ── LOAD RECENT AUDIT LOGS ──
 $logs = $conn->query("
     SELECT a.log_id, a.action, a.description, a.created_at,
-           CASE WHEN u.is_hidden = 1 THEN 'System Administrator' ELSE u.full_name END AS full_name
+           CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.full_name END AS full_name
     FROM audit_logs a
     LEFT JOIN users u ON a.user_id = u.user_id
     ORDER BY a.created_at DESC
@@ -223,7 +239,6 @@ require_once '../../includes/topbar.php';
 ?>
 
   <div class="content">
-
 
     <?php if ($success): ?>
     <script>
@@ -260,11 +275,12 @@ require_once '../../includes/topbar.php';
         <?php
         // Store users for both desktop table and mobile cards
         $users_list = [];
-        while ($u = $users->fetch_assoc()) $users_list[] = $u;
+        while ($u = $users->fetch_assoc()) $users_list[] = mu_dev_row($u);
         $role_labels = [
           'super_admin' => ['Super Admin', 'badge-gold'],
           'admin'       => ['Admin',       'badge-green'],
           'mechanic'    => ['Mechanic',    'badge-blue'],
+          'developer'   => ['Developer',   'badge-gray'],
         ];
         ?>
 
@@ -288,22 +304,22 @@ require_once '../../includes/topbar.php';
             <tr>
               <td style="text-align:left;padding-left:1.25rem;">
                 <div style="display:flex;align-items:center;gap:0.65rem;">
-                  <div data-user-id="<?= $u['user_id'] ?>" title="View profile" style="position:relative;flex-shrink:0;cursor:pointer;">
+                  <div <?= $u['role'] === 'developer' ? '' : 'data-user-id="' . (int)$u['user_id'] . '" title="View profile"' ?> style="position:relative;flex-shrink:0;cursor:pointer;">
                     <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--gold-bright),var(--gold));display:flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:800;color:#fff;overflow:hidden;border:2px solid var(--border);">
                       <?php if ($u_photo): ?><img src="<?= $u_photo ?>" style="width:100%;height:100%;object-fit:cover;" alt="" loading="lazy"/><?php else: ?><?= $u_initials ?><?php endif; ?>
                     </div>
                     <span style="position:absolute;bottom:0;right:0;width:9px;height:9px;border-radius:50%;background:<?= $is_online ? '#22c55e' : 'var(--border)' ?>;border:2px solid var(--bg-3);<?= $is_online ? 'box-shadow:0 0 0 2px rgba(34,197,94,0.25);' : '' ?>"></span>
                   </div>
-                  <div data-user-id="<?= $u['user_id'] ?>" title="View profile" style="cursor:pointer;">
+                  <div <?= $u['role'] === 'developer' ? '' : 'data-user-id="' . (int)$u['user_id'] . '" title="View profile"' ?> style="cursor:pointer;">
                     <div style="font-weight:700;color:var(--text-primary);font-size:0.82rem;line-height:1.2;"><?= htmlspecialchars($u['full_name']) ?></div>
-                    <div style="font-size:0.7rem;color:var(--text-muted);">@<?= htmlspecialchars($u['username']) ?></div>
+                    <div style="font-size:0.7rem;color:var(--text-muted);"><?= $u['username'] !== '' ? '@' . htmlspecialchars($u['username']) : 'System maintenance' ?></div>
                   </div>
                 </div>
               </td>
               <td><span class="badge <?= $rl[1] ?>"><?= $rl[0] ?></span></td>
               <td><?= mu_status_badge($u['acct_status']) ?></td>
               <td>
-                <?php if ($u['role'] !== 'super_admin'): ?>
+                <?php if (!in_array($u['role'], ['super_admin', 'developer'], true)): ?>
                 <div class="mu-act-group"><?php mu_action_forms($u, $users_with_history); ?></div>
                 <?php else: ?>
                 <span style="font-size:0.7rem;color:var(--text-muted);">Protected</span>
@@ -324,16 +340,16 @@ require_once '../../includes/topbar.php';
           ?>
           <div class="mu-card">
             <!-- Avatar -->
-            <div class="mu-card-avatar" data-user-id="<?= $u['user_id'] ?>">
+            <div class="mu-card-avatar" <?= $u['role'] === 'developer' ? '' : 'data-user-id="' . (int)$u['user_id'] . '"' ?>>
               <div class="mu-card-avatar-inner">
                 <?php if ($u_photo): ?><img src="<?= $u_photo ?>" alt="" loading="lazy"/><?php else: ?><?= $u_initials ?><?php endif; ?>
               </div>
               <span class="mu-card-dot" style="background:<?= $is_online ? '#22c55e' : 'var(--border)' ?>;<?= $is_online ? 'box-shadow:0 0 0 2px rgba(34,197,94,0.25);' : '' ?>"></span>
             </div>
             <!-- Name -->
-            <div class="mu-card-body" data-user-id="<?= $u['user_id'] ?>">
+            <div class="mu-card-body" <?= $u['role'] === 'developer' ? '' : 'data-user-id="' . (int)$u['user_id'] . '"' ?>>
               <div class="mu-card-name"><?= htmlspecialchars($u['full_name']) ?></div>
-              <div class="mu-card-username">@<?= htmlspecialchars($u['username']) ?></div>
+              <div class="mu-card-username"><?= $u['username'] !== '' ? '@' . htmlspecialchars($u['username']) : 'System maintenance' ?></div>
             </div>
             <!-- Badges -->
             <div class="mu-card-badges">
@@ -342,7 +358,7 @@ require_once '../../includes/topbar.php';
             </div>
             <!-- Action -->
             <div class="mu-card-action">
-              <?php if ($u['role'] !== 'super_admin'): ?>
+              <?php if (!in_array($u['role'], ['super_admin', 'developer'], true)): ?>
               <?php mu_action_forms($u, $users_with_history); ?>
               <?php else: ?>
               <span class="mu-protected">Protected</span>
@@ -372,13 +388,13 @@ require_once '../../includes/topbar.php';
                 <label class="field-label">First Name <span class="req">*</span></label>
                 <input type="text" name="new_first_name" class="field-input"
                   placeholder="e.g. Juan"
-                  value="<?= htmlspecialchars($_POST['new_first_name'] ?? '') ?>"/>
+                  value="<?= old('new_first_name') ?>"/>
               </div>
               <div class="field">
                 <label class="field-label">Last Name <span class="req">*</span></label>
                 <input type="text" name="new_last_name" class="field-input"
                   placeholder="e.g. dela Cruz"
-                  value="<?= htmlspecialchars($_POST['new_last_name'] ?? '') ?>"/>
+                  value="<?= old('new_last_name') ?>"/>
               </div>
             </div>
 
@@ -386,7 +402,7 @@ require_once '../../includes/topbar.php';
               <label class="field-label">Email Address <span class="req">*</span></label>
               <input type="email" name="new_email" class="field-input"
                 placeholder="name@email.com"
-                value="<?= htmlspecialchars($_POST['new_email'] ?? '') ?>"/>
+                value="<?= old('new_email') ?>"/>
               <span class="field-hint">Activation link will be sent here.</span>
             </div>
 
@@ -394,7 +410,7 @@ require_once '../../includes/topbar.php';
               <label class="field-label">Username <span class="req">*</span></label>
               <input type="text" name="new_username" class="field-input"
                 placeholder="Letters, numbers, underscores"
-                value="<?= htmlspecialchars($_POST['new_username'] ?? '') ?>"/>
+                value="<?= old('new_username') ?>"/>
             </div>
 
             <div class="field">

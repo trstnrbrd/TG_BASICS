@@ -26,7 +26,7 @@ $stmt = $conn->prepare("
         p.*,
         DATEDIFF(p.policy_end, CURDATE()) AS days_left,
         c.full_name, c.contact_number, c.email, c.address, c.agent_id,
-        (SELECT CASE WHEN ag.is_hidden = 1 THEN 'System Administrator' ELSE ag.full_name END
+        (SELECT CASE WHEN ag.is_hidden = 1 THEN 'Developer' ELSE ag.full_name END
            FROM users ag WHERE ag.user_id = c.agent_id) AS agent_name,
         v.plate_number, v.make, v.model, v.year_model, v.color,
         v.motor_number, v.serial_number
@@ -917,7 +917,7 @@ require_once '../../includes/topbar.php';
               <div class="field">
                 <label class="field-label">Payment Amount (PHP) <span class="req">*</span></label>
                 <input type="number" step="0.01" min="0.01" max="<?= $policy['balance'] ?>" name="payment_amount" id="payment_amount" class="field-input"
-                  placeholder="0.00" value="<?= htmlspecialchars($_POST['payment_amount'] ?? '') ?>"/>
+                  placeholder="0.00" value="<?= old('payment_amount') ?>"/>
                 <span class="field-hint">Remaining balance: PHP <?= number_format($policy['balance'], 2) ?></span>
                 <span class="field-hint" id="balance-after" style="font-weight:600;"></span>
               </div>
@@ -925,7 +925,7 @@ require_once '../../includes/topbar.php';
                 <label class="field-label">Payment Notes</label>
                 <input type="text" name="payment_notes" class="field-input"
                   placeholder="Cash / GCash / Bank transfer"
-                  value="<?= htmlspecialchars($_POST['payment_notes'] ?? '') ?>"/>
+                  value="<?= old('payment_notes') ?>"/>
                 <span class="field-hint">Optional remarks for this payment.</span>
               </div>
             </div>

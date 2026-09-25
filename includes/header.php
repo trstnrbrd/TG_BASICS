@@ -7,6 +7,8 @@ $role_label = match($_SESSION['role'] ?? '') {
     'mechanic'    => 'Mechanic',
     default       => 'User'
 };
+// The developer account is a super admin, but it is not the Owner (config/dev_access.php)
+if (!empty($_SESSION['is_hidden'])) $role_label = 'Maintenance';
 
 require_once __DIR__ . '/icons.php';
 
@@ -90,11 +92,17 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
 /* ── MOBILE BOTTOM NAV ── */
 $_mob_role        = $_SESSION['role'] ?? '';
 $_mob_active      = $active_page ?? '';
-$_mob_is_admin    = in_array($_mob_role, ['admin', 'super_admin']);
+$_mob_is_dev      = !empty($_SESSION['is_hidden']);   // developer account: Settings only (config/dev_access.php)
+$_mob_is_admin    = in_array($_mob_role, ['admin', 'super_admin']) && !$_mob_is_dev;
 $_mob_is_mechanic = $_mob_role === 'mechanic';
 
 // Determine nav items per role
-if ($_mob_is_admin) {
+if ($_mob_is_dev) {
+    $_mob_nav = [
+        ['id' => 'settings', 'label' => 'Settings', 'href' => $base_path . 'modules/admin/settings.php', 'icon' => 'user-circle'],
+        ['id' => 'more',     'label' => 'More',     'href' => '#', 'icon' => 'more'],
+    ];
+} elseif ($_mob_is_admin) {
     $_mob_nav = [
         ['id' => 'dashboard', 'label' => 'Home',    'href' => $base_path . 'modules/admin/dashboard_admin.php',    'icon' => 'home'],
         ['id' => 'clients',   'label' => 'Clients', 'href' => $base_path . 'modules/clients/client_list.php',      'icon' => 'users'],

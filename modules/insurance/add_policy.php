@@ -497,7 +497,7 @@ require_once '../../includes/topbar.php';
             <div class="field">
               <label class="field-label">Policy Number <span class="req">*</span></label>
               <input type="text" name="policy_number" class="field-input"
-                value="<?= htmlspecialchars($_POST['policy_number'] ?? '') ?>"/>
+                value="<?= old('policy_number') ?>"/>
               <?php if ($renew_policy): ?><span class="field-hint">Enter the new policy number from the PhilBritish renewal notice.</span><?php endif; ?>
             </div>
             <div class="field">
@@ -525,12 +525,12 @@ require_once '../../includes/topbar.php';
             <div class="field">
               <label class="field-label">Starting Date <span class="req">*</span></label>
               <input type="date" name="policy_start" id="policy_start" class="field-input"
-                value="<?= htmlspecialchars($_POST['policy_start'] ?? date('Y-m-d')) ?>"/>
+                value="<?= old('policy_start', date('Y-m-d')) ?>"/>
             </div>
             <div class="field">
               <label class="field-label">Inception Date <span class="req">*</span></label>
               <input type="date" name="policy_end" id="policy_end" class="field-input"
-                value="<?= htmlspecialchars($_POST['policy_end'] ?? date('Y-m-d', strtotime('+1 year'))) ?>"/>
+                value="<?= old('policy_end', date('Y-m-d', strtotime('+1 year'))) ?>"/>
             </div>
           </div>
 
@@ -545,19 +545,19 @@ require_once '../../includes/topbar.php';
             <div class="field">
               <label class="field-label">Sum Insured (PHP) <span class="req">*</span></label>
               <input type="text" inputmode="decimal" autocomplete="off" name="sum_insured" class="field-input money-input" placeholder="0.00"
-                value="<?= htmlspecialchars($_POST['sum_insured'] ?? ($renew_policy['sum_insured'] ?? '')) ?>"/>
+                value="<?= old('sum_insured', $renew_policy['sum_insured'] ?? '') ?>"/>
               <span class="field-hint">Coverage amount from the PhilBritish policy.</span>
             </div>
             <div class="field">
               <label class="field-label">Total Premium (PHP) <span class="req">*</span></label>
               <input type="text" inputmode="decimal" autocomplete="off" name="total_premium" id="total_premium" class="field-input money-input" placeholder="0.00"
-                value="<?= htmlspecialchars($_POST['total_premium'] ?? ($renew_policy['total_premium'] ?? '')) ?>"/>
+                value="<?= old('total_premium', $renew_policy['total_premium'] ?? '') ?>"/>
               <span class="field-hint">Premium amount from PhilBritish.</span>
             </div>
             <div class="field">
               <label class="field-label">Commission (PHP)</label>
               <input type="text" inputmode="decimal" autocomplete="off" name="basic_premium" id="commission_field" class="field-input money-input" placeholder="0.00"
-                value="<?= htmlspecialchars($_POST['basic_premium'] ?? ($renew_policy['markup'] ?? '0')) ?>"/>
+                value="<?= old('basic_premium', $renew_policy['markup'] ?? '0') ?>"/>
               <span class="field-hint">Broker commission deducted from the premium.</span>
             </div>
             <div class="field">
@@ -571,7 +571,7 @@ require_once '../../includes/topbar.php';
             <div class="field">
               <label class="field-label">Participation Fee (PHP)</label>
               <input type="text" inputmode="decimal" autocomplete="off" name="participation_fee" class="field-input money-input" placeholder="0.00"
-                value="<?= htmlspecialchars($_POST['participation_fee'] ?? ($renew_policy['participation_fee'] ?? '0')) ?>"/>
+                value="<?= old('participation_fee', $renew_policy['participation_fee'] ?? '0') ?>"/>
               <span class="field-hint">Sedan: ₱2,000 &nbsp;|&nbsp; SUV/Van/Pickup: ₱3,000.</span>
             </div>
           </div>
@@ -641,7 +641,7 @@ require_once '../../includes/topbar.php';
           <div class="field-section">Additional Notes</div>
           <div class="field" style="margin-bottom:0.5rem;">
             <label class="field-label">Notes (Optional)</label>
-            <textarea name="notes" class="field-textarea" placeholder="Any remarks about this policy..."><?= htmlspecialchars($_POST['notes'] ?? '') ?></textarea>
+            <textarea name="notes" class="field-textarea" placeholder="Any remarks about this policy..."><?= old('notes') ?></textarea>
           </div>
           <?php if ($renew_from > 0): ?>
           <input type="hidden" name="renew_from" value="<?= $renew_from ?>"/>

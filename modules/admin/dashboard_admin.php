@@ -4,6 +4,7 @@ require_once '../../config/db.php';
 require_once '../../config/settings.php';
 require_once '../../config/access.php';
 require_once '../../includes/db_backup.php';
+require_once '../../config/dev_access.php';
 
 $urg_days = (int)getSetting($conn, 'renewal_urgent_days', '7');
 $exp_days = (int)getSetting($conn, 'renewal_expiring_days', '30');
@@ -78,7 +79,7 @@ $team = $conn->query("
 // ── RECENT ACTIVITY (from audit_logs) ──
 $activity = $conn->query("
     SELECT a.action, a.description, a.created_at,
-           CASE WHEN u.is_hidden = 1 THEN 'System Administrator' ELSE u.full_name END AS actor
+           CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.full_name END AS actor
     FROM audit_logs a
     LEFT JOIN users u ON a.user_id = u.user_id
     ORDER BY a.created_at DESC
@@ -180,7 +181,7 @@ require_once '../../includes/topbar.php';
 
   <div class="content">
 
-    <?php if ($_SESSION['role'] === 'super_admin' && ($bk = db_backup_status($conn))['overdue']): ?>
+    <?php if ($_SESSION['role'] === 'super_admin' && !is_developer() && ($bk = db_backup_status($conn))['overdue']): ?>
     <!-- Weekly backup reminder for the Owner (Settings > System Settings > Database Backup) -->
     <div class="alert alert-warning" role="status" style="align-items:center;flex-wrap:wrap;">
       <?= icon('exclamation-triangle', 15) ?>

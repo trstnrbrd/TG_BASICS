@@ -3,6 +3,7 @@ require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/settings.php';
+require_once '../../includes/pagination.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
     header("Location: ../../auth/login.php");
@@ -54,14 +55,15 @@ $initials  = substr(implode('', array_map(fn($w) => strtoupper($w[0]), explode('
 $search         = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
 $selected_vid   = isset($_GET['vehicle_id']) ? (int)$_GET['vehicle_id'] : 0;
 $search_results = [];
+$search_pg      = null;
 $vehicle        = null;
 $client         = null;
 $eligibility    = null;
 
-// Search clients and vehicles
+// Search clients and vehicles — one page of results at a time (includes/pagination.php)
 if ($search !== '') {
     $like = "%$search%";
-    $stmt = $conn->prepare("
+    [$found, $search_pg] = paginate_query($conn, "
         SELECT c.client_id, c.full_name, c.contact_number,
                v.vehicle_id, v.plate_number, v.make, v.model, v.year_model, v.color
         FROM clients c
@@ -71,10 +73,8 @@ if ($search !== '') {
            OR v.model LIKE ? OR c.contact_number LIKE ? OR v.motor_number LIKE ?
            OR v.serial_number LIKE ? OR CONCAT(v.make,' ',v.model) LIKE ?)
         ORDER BY c.full_name ASC
-    ");
-    $stmt->bind_param('ssssssss', $like, $like, $like, $like, $like, $like, $like, $like);
-    $stmt->execute();
-    $search_results = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    ", 'ssssssss', array_fill(0, 8, $like));
+    $search_results = $found->fetch_all(MYSQLI_ASSOC);
 }
 
 // Load selected vehicle and compute eligibility
@@ -238,6 +238,7 @@ require_once '../../includes/topbar.php';
                 <?php endforeach; ?>
               </tbody>
             </table>
+            <?php if ($search_pg) render_pagination($search_pg); ?>
           </div>
         <?php endif; ?>
       </div>

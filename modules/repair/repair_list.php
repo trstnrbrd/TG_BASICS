@@ -2,6 +2,7 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
+require_once '../../includes/pagination.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin', 'mechanic'])) {
     header("Location: ../../auth/login.php");
@@ -70,10 +71,8 @@ $sql = "
     WHERE $where_sql
     ORDER BY $order
 ";
-$stmt = $conn->prepare($sql);
-if (!empty($params)) $stmt->bind_param($types, ...$params);
-$stmt->execute();
-$jobs = $stmt->get_result();
+// One page at a time (includes/pagination.php) — the total is counted from this same query
+[$jobs, $pg] = paginate_query($conn, $sql, $types, $params);
 
 $service_labels = [
     'repair_panel'   => 'Per Panel Repair',
@@ -154,7 +153,7 @@ require_once '../../includes/topbar.php';
         <div class="card-icon"><?= icon('wrench', 16) ?></div>
         <div>
           <div class="card-title">Repair Jobs</div>
-          <div class="card-sub"><?= $jobs->num_rows ?> job<?= $jobs->num_rows !== 1 ? 's' : '' ?> found</div>
+          <div class="card-sub"><?= paginate_summary($pg, 'job') ?></div>
         </div>
         <div style="margin-left:auto;">
           <a href="add_repair.php" class="btn-primary"><?= icon('plus', 14) ?> New Repair Job</a>
@@ -210,6 +209,7 @@ require_once '../../includes/topbar.php';
           <?php endwhile; ?>
         </tbody>
       </table>
+      <?php render_pagination($pg); ?>
 
       <?php else: ?>
       <div class="empty-state">

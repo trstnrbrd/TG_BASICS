@@ -3,6 +3,7 @@ require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../includes/icons.php';
+require_once '../../includes/pagination.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
     header("Location: ../../auth/login.php");
@@ -59,10 +60,8 @@ $sql = "
     ORDER BY $order
 ";
 
-$stmt = $conn->prepare($sql);
-if (!empty($params)) $stmt->bind_param($types, ...$params);
-$stmt->execute();
-$result = $stmt->get_result();
+// One page at a time (includes/pagination.php) — the total is counted from this same query
+[$result, $pg] = paginate_query($conn, $sql, $types, $params);
 
 $status_map = [
     'compiling'            => ['label' => 'Compiling Requirements', 'class' => 'badge-info'],
@@ -162,7 +161,7 @@ require_once '../../includes/topbar.php';
         <div class="card-icon"><?= icon('clipboard-list',16) ?></div>
         <div>
           <div class="card-title">All Claims</div>
-          <div class="card-sub"><?= $result->num_rows ?> record<?= $result->num_rows !== 1 ? 's' : '' ?></div>
+          <div class="card-sub"><?= paginate_summary($pg) ?></div>
         </div>
         <div style="margin-left:auto;">
           <a href="add_claim.php" class="btn-primary"><?= icon('plus',14) ?> File New Claim</a>
@@ -283,6 +282,7 @@ require_once '../../includes/topbar.php';
           </tbody>
         </table>
       </div>
+      <?php render_pagination($pg); ?>
       <?php else: ?>
       <div class="empty-state">
         <div class="empty-icon-wrap"><?= icon('clipboard-list', 26) ?></div>

@@ -201,9 +201,9 @@ require_once '../../includes/topbar.php';
                 <label class="field-label">Client <span style="color:var(--danger);">*</span></label>
                 <input type="text" id="client_search" class="field-input" autocomplete="off"
                   placeholder="Type to search client..."
-                  value="<?= htmlspecialchars($_POST['client_name_display'] ?? '') ?>"/>
+                  value="<?= old('client_name_display') ?>"/>
                 <input type="hidden" name="client_id" id="client_id" value="<?= (int)($_POST['client_id'] ?? 0) ?>"/>
-                <input type="hidden" name="client_name_display" id="client_name_display" value="<?= htmlspecialchars($_POST['client_name_display'] ?? '') ?>"/>
+                <input type="hidden" name="client_name_display" id="client_name_display" value="<?= old('client_name_display') ?>"/>
                 <div id="client_dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:var(--bg-3);border:1px solid var(--gold-bright);border-radius:9px;box-shadow:var(--shadow-md);max-height:220px;overflow-y:auto;margin-top:2px;"></div>
               </div>
 
@@ -245,7 +245,7 @@ require_once '../../includes/topbar.php';
               <div class="field">
                 <label class="field-label">Incident Date <span style="color:var(--danger);">*</span></label>
                 <input type="date" name="incident_date" class="field-input"
-                  value="<?= htmlspecialchars($_POST['incident_date'] ?? '') ?>"
+                  value="<?= old('incident_date') ?>"
                   max="<?= date('Y-m-d') ?>" required/>
               </div>
 
@@ -253,7 +253,7 @@ require_once '../../includes/topbar.php';
                 <label class="field-label">Incident Description <span style="color:var(--danger);">*</span></label>
                 <textarea name="description" class="field-input" rows="4"
                   placeholder="Briefly describe what happened..."
-                  required><?= htmlspecialchars($_POST['description'] ?? '') ?></textarea>
+                  required><?= old('description') ?></textarea>
               </div>
 
             </div>

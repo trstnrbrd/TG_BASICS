@@ -83,6 +83,22 @@ function san_str(mixed $value, int $max = MAX_TEXT): string {
 }
 
 /**
+ * Re-displays a submitted value in a "sticky" form field (re-filled after a validation error), HTML-escaped.
+ * $default takes the place of a plain '' or of a longer `$_POST[...] ?? $other['thing'] ?? '...'` fallback
+ * chain — resolve that chain yourself and pass the result in, e.g. old('sum_insured', $renew_policy['sum_insured'] ?? '').
+ * Usage: value="<?= old('full_name') ?>" in place of value="<?= htmlspecialchars($_POST['full_name'] ?? '') ?>".
+ *
+ * Same reasoning as san_str(): raw request data can arrive as an array (?field[]=x, from a tampered request),
+ * and htmlspecialchars() throws an uncaught TypeError on an array — is_scalar() guards that here too, so a
+ * crafted request can't crash the page (confirmed 2026-09-25 pre-deployment audit: 45 sticky-value call sites
+ * across 8 "Add ___" forms and Settings all shared this same htmlspecialchars($_POST[...]) pattern).
+ */
+function old(string $key, mixed $default = ''): string {
+    $v = $_POST[$key] ?? $default;
+    return htmlspecialchars(is_scalar($v) ? (string)$v : '');
+}
+
+/**
  * Cast to positive integer. Returns 0 if invalid or negative.
  */
 function san_int(mixed $value, int $min = 0, int $max = PHP_INT_MAX): int {

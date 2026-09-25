@@ -219,20 +219,20 @@ require_once '../../includes/topbar.php';
               <div>
                 <label class="field-label">Billed To (Insurance Company) <span style="color:var(--danger)">*</span></label>
                 <input type="text" name="billed_to" class="field-input"
-                  value="<?= htmlspecialchars($_POST['billed_to'] ?? $prefill_claim['insurer_name'] ?? 'PhilBritish Insurance Corp.') ?>"
+                  value="<?= old('billed_to', $prefill_claim['insurer_name'] ?? 'PhilBritish Insurance Corp.') ?>"
                   placeholder="Insurance company name" required style="width:100%;"/>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
                 <div>
                   <label class="field-label">Incident Date</label>
                   <input type="date" name="incident_date" class="field-input"
-                    value="<?= htmlspecialchars($_POST['incident_date'] ?? $prefill_claim['incident_date'] ?? '') ?>"
+                    value="<?= old('incident_date', $prefill_claim['incident_date'] ?? '') ?>"
                     style="width:100%;"/>
                 </div>
                 <div>
                   <label class="field-label">Repair Date</label>
                   <input type="date" name="repair_date" class="field-input"
-                    value="<?= htmlspecialchars($_POST['repair_date'] ?? '') ?>"
+                    value="<?= old('repair_date') ?>"
                     style="width:100%;"/>
                 </div>
               </div>
@@ -255,7 +255,7 @@ require_once '../../includes/topbar.php';
                   <div class="field-prefix-wrap">
                     <span class="field-prefix">₱</span>
                     <input type="number" name="parts_cost" class="field-input field-with-prefix"
-                      value="<?= htmlspecialchars($_POST['parts_cost'] ?? '0') ?>"
+                      value="<?= old('parts_cost', '0') ?>"
                       min="0" step="0.01" id="parts_cost" oninput="calcTotal()"/>
                   </div>
                 </div>
@@ -264,7 +264,7 @@ require_once '../../includes/topbar.php';
                   <div class="field-prefix-wrap">
                     <span class="field-prefix">₱</span>
                     <input type="number" name="labor_cost" class="field-input field-with-prefix"
-                      value="<?= htmlspecialchars($_POST['labor_cost'] ?? '0') ?>"
+                      value="<?= old('labor_cost', '0') ?>"
                       min="0" step="0.01" id="labor_cost" oninput="calcTotal()"/>
                   </div>
                 </div>
@@ -273,7 +273,7 @@ require_once '../../includes/topbar.php';
                   <div class="field-prefix-wrap">
                     <span class="field-prefix">₱</span>
                     <input type="number" name="other_cost" class="field-input field-with-prefix"
-                      value="<?= htmlspecialchars($_POST['other_cost'] ?? '0') ?>"
+                      value="<?= old('other_cost', '0') ?>"
                       min="0" step="0.01" id="other_cost" oninput="calcTotal()"/>
                   </div>
                 </div>
@@ -282,7 +282,7 @@ require_once '../../includes/topbar.php';
                   <div class="field-prefix-wrap">
                     <span class="field-prefix">₱</span>
                     <input type="number" name="deductible" class="field-input field-with-prefix"
-                      value="<?= htmlspecialchars($_POST['deductible'] ?? ($prefill_claim['participation_fee'] ?? '0')) ?>"
+                      value="<?= old('deductible', $prefill_claim['participation_fee'] ?? '0') ?>"
                       min="0" step="0.01" id="deductible" oninput="calcTotal()"/>
                   </div>
                 </div>
@@ -313,7 +313,7 @@ require_once '../../includes/topbar.php';
             <div style="padding:1.25rem;">
               <textarea name="notes" class="field-input" rows="5"
                 style="width:100%;resize:vertical;"
-                placeholder="Any additional notes about this billing..."><?= htmlspecialchars($_POST['notes'] ?? '') ?></textarea>
+                placeholder="Any additional notes about this billing..."><?= old('notes') ?></textarea>
             </div>
           </div>
 

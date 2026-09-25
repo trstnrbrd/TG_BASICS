@@ -388,13 +388,13 @@ require_once '../../includes/topbar.php';
                 <label class="field-label">First Name <span class="req">*</span></label>
                 <input type="text" name="new_first_name" class="field-input"
                   placeholder="e.g. Juan"
-                  value="<?= htmlspecialchars($_POST['new_first_name'] ?? '') ?>"/>
+                  value="<?= old('new_first_name') ?>"/>
               </div>
               <div class="field">
                 <label class="field-label">Last Name <span class="req">*</span></label>
                 <input type="text" name="new_last_name" class="field-input"
                   placeholder="e.g. dela Cruz"
-                  value="<?= htmlspecialchars($_POST['new_last_name'] ?? '') ?>"/>
+                  value="<?= old('new_last_name') ?>"/>
               </div>
             </div>
 
@@ -402,7 +402,7 @@ require_once '../../includes/topbar.php';
               <label class="field-label">Email Address <span class="req">*</span></label>
               <input type="email" name="new_email" class="field-input"
                 placeholder="name@email.com"
-                value="<?= htmlspecialchars($_POST['new_email'] ?? '') ?>"/>
+                value="<?= old('new_email') ?>"/>
               <span class="field-hint">Activation link will be sent here.</span>
             </div>
 
@@ -410,7 +410,7 @@ require_once '../../includes/topbar.php';
               <label class="field-label">Username <span class="req">*</span></label>
               <input type="text" name="new_username" class="field-input"
                 placeholder="Letters, numbers, underscores"
-                value="<?= htmlspecialchars($_POST['new_username'] ?? '') ?>"/>
+                value="<?= old('new_username') ?>"/>
             </div>
 
             <div class="field">

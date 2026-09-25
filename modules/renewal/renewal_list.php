@@ -120,7 +120,7 @@ require_once '../../includes/header.php';
 require_once '../../includes/navbar.php';
 ?>
 
-<link rel="stylesheet" href="../../assets/css/shared/clients.css"/>
+<link rel="stylesheet" href="../../assets/css/shared/clients.css?v=<?= filemtime(__DIR__ . '/../../assets/css/shared/clients.css') ?>"/>
 <link rel="stylesheet" href="../../assets/css/shared/agent_filter.css?v=<?= filemtime(__DIR__ . '/../../assets/css/shared/agent_filter.css') ?>"/>
 <style>
 /* Company quick switch — a two-way toggle, so PhilBritish <-> Alpha no longer needs the sidebar menu */

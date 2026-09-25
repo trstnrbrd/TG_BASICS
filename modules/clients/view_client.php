@@ -205,7 +205,7 @@ require_once '../../includes/header.php';
 require_once '../../includes/navbar.php';
 ?>
 
-<link rel="stylesheet" href="../../assets/css/shared/clients.css"/>
+<link rel="stylesheet" href="../../assets/css/shared/clients.css?v=<?= filemtime(__DIR__ . '/../../assets/css/shared/clients.css') ?>"/>
 
 <div class="main">
 

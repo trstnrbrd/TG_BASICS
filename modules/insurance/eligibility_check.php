@@ -349,7 +349,7 @@ require_once '../../includes/topbar.php';
   </div>
 </div>
 
-<script src="../../assets/js/shared/eligibility_check.js"></script>
+<script src="../../assets/js/shared/eligibility_check.js?v=<?= filemtime(__DIR__ . '/../../assets/js/shared/eligibility_check.js') ?>"></script>
 </script>
 
 <?php require_once '../../includes/footer.php'; ?>

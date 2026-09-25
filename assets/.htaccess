@@ -1,0 +1,12 @@
+# Browser caching for static files (applies to assets/ only, never to uploads/).
+# Every CSS/JS include carries ?v=<file modified time>, so an edited file gets a new URL and is fetched fresh;
+# an unchanged one is reused from the browser cache instead of being checked or downloaded on every page.
+# Any NEW include must have that ?v= cache-buster too, or browsers keep the old copy for up to 30 days.
+<IfModule mod_headers.c>
+  <FilesMatch "\.(css|js)$">
+    Header set Cache-Control "public, max-age=2592000"
+  </FilesMatch>
+  <FilesMatch "\.(png|jpe?g|gif|webp|svg|ico|woff2?)$">
+    Header set Cache-Control "public, max-age=604800"
+  </FilesMatch>
+</IfModule>

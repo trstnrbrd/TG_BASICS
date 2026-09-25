@@ -98,7 +98,7 @@ $pay_cfg = [
 $page_title  = 'Quotations & Receipts';
 $active_page = 'quotations';
 $base_path   = '../../';
-$extra_css   = '<link rel="stylesheet" href="../../assets/css/shared/quotations.css"/>';
+$extra_css   = '<link rel="stylesheet" href="../../assets/css/shared/quotations.css?v=' . filemtime(__DIR__ . '/../../assets/css/shared/quotations.css') . '"/>';
 require_once '../../includes/header.php';
 require_once '../../includes/navbar.php';
 ?>

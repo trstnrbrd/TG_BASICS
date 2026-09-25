@@ -450,6 +450,7 @@ require_once '../../includes/topbar.php';
               'ACCOUNT_REACTIVATED' => 'badge-green',
               'PASSWORD_RESET'   => 'badge-yellow',
               'CLIENT_ADDED'     => 'badge-green',
+              'CLIENT_IMPORTED'  => 'badge-green',
               'CLIENT_UPDATED'   => 'badge-yellow',
               'VEHICLE_ADDED'    => 'badge-green',
               'POLICY_CREATED'   => 'badge-gold',

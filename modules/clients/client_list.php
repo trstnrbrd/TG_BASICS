@@ -357,6 +357,7 @@ require_once '../../includes/topbar.php';
         <a href="client_list.php" class="btn-ghost"><?= icon('x-mark', 14) ?> Clear</a>
         <?php endif; ?>
         <?php if ($_SESSION['role'] !== 'mechanic'): ?>
+        <a href="import_clients.php" class="btn-ghost" title="Add many clients at once from a CSV file"><?= icon('arrow-up-tray', 14) ?> Import</a>
         <a href="add_client.php" class="btn-primary"><?= icon('plus', 14) ?> Add Client</a>
         <?php endif; ?>
       </div>

@@ -83,7 +83,7 @@ require_once '../../includes/header.php';
 require_once '../../includes/navbar.php';
 ?>
 
-<link rel="stylesheet" href="../../assets/css/shared/claims_list.css"/>
+<link rel="stylesheet" href="../../assets/css/shared/claims_list.css?v=<?= filemtime(__DIR__ . '/../../assets/css/shared/claims_list.css') ?>"/>
 <style>
 /* Row details open on hover — desktop only (same as Client Records / Renewal Tracking). Touch screens have
    no real :hover, so phones/tablets (<=768px) keep tap-to-expand from the global handler in footer.php. */

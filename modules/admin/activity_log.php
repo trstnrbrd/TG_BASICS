@@ -188,7 +188,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
         'SECURITY_UPDATED'       => '#fff8e1', 'TOTP_ENABLED'           => '#e8f5e9',
         'TOTP_DISABLED'          => '#f0f0f0', 'SETTINGS_UPDATED'       => '#fff8e1',
         'CLIENT_ADDED'           => '#e8f5e9', 'CLIENT_UPDATED'         => '#fff8e1',
-        'CLIENT_DELETED'         => '#ffebee',
+        'CLIENT_DELETED'         => '#ffebee', 'CLIENT_IMPORTED'        => '#e8f5e9',
         'VEHICLE_ADDED'          => '#e8f5e9', 'VEHICLE_UPDATED'        => '#fff8e1',
         'VEHICLE_UNREGISTERED'   => '#ffebee',
         'POLICY_CREATED'         => '#fff8e1', 'POLICY_RENEWED'         => '#e8f5e9',
@@ -390,6 +390,7 @@ require_once '../../includes/topbar.php';
                 'CLIENT_ADDED'           => ['badge-green',  'user-plus'],
                 'CLIENT_UPDATED'         => ['badge-yellow', 'pencil'],
                 'CLIENT_DELETED'         => ['badge-red',    'trash'],
+                'CLIENT_IMPORTED'        => ['badge-green',  'arrow-up-tray'],
                 // Vehicles
                 'VEHICLE_ADDED'          => ['badge-green',  'plus'],
                 'VEHICLE_UPDATED'        => ['badge-yellow', 'pencil'],

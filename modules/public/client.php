@@ -189,7 +189,7 @@ $initials = strtoupper(substr(implode('', array_map(fn($w) => $w[0], $words)), 0
 <link rel="icon" type="image/png" href="../../assets/img/tg_logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Big+Shoulders+Text:wght@800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../../assets/css/public/client.css"/>
+<link rel="stylesheet" href="../../assets/css/public/client.css?v=<?= filemtime(__DIR__ . '/../../assets/css/public/client.css') ?>"/>
 <style>
 @keyframes loaderSpin { to { transform: rotate(360deg); } }
 @keyframes loaderPulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.7; transform:scale(0.95); } }

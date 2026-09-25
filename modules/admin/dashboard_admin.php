@@ -314,7 +314,7 @@ require_once '../../includes/topbar.php';
           $dot_colors = [
             'LOGIN'=>'var(--success)','LOGOUT'=>'var(--text-muted)',
             'ACCOUNT_CREATED'=>'var(--gold-bright)','ACCOUNT_DELETED'=>'var(--danger)',
-            'PASSWORD_RESET'=>'var(--warning)','CLIENT_ADDED'=>'var(--success)',
+            'PASSWORD_RESET'=>'var(--warning)','CLIENT_ADDED'=>'var(--success)','CLIENT_IMPORTED'=>'var(--success)',
             'CLIENT_UPDATED'=>'var(--warning)','VEHICLE_ADDED'=>'var(--success)',
             'POLICY_CREATED'=>'var(--gold-bright)','POLICY_SAVED'=>'var(--success)',
           ];
@@ -528,7 +528,7 @@ require_once '../../includes/topbar.php';
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/motion@13.4.3/dist/motion.min.js"></script>
 <script src="../../assets/js/shared/dash_motion.js?v=<?= filemtime(__DIR__ . '/../../assets/js/shared/dash_motion.js') ?>"></script>
-<script src="../../assets/js/shared/dashboard.js"></script>
+<script src="../../assets/js/shared/dashboard.js?v=<?= filemtime(__DIR__ . '/../../assets/js/shared/dashboard.js') ?>"></script>
 <script>
 (function () {
   Chart.defaults.font.family = "'Plus Jakarta Sans', sans-serif";

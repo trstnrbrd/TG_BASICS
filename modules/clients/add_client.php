@@ -9,6 +9,14 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'supe
     exit;
 }
 
+// Same-name check (AJAX, when the Full Name field is left): a warning, never a block — see same_name_clients()
+if (isset($_GET['check_name'])) {
+    header('Content-Type: application/json');
+    $name = is_string($_GET['check_name']) ? san_str($_GET['check_name'], MAX_NAME) : '';
+    echo json_encode(['matches' => same_name_clients($conn, $name)]);
+    exit;
+}
+
 $full_name_user = $_SESSION['full_name'];
 $initials       = substr(implode('', array_map(fn($w) => strtoupper($w[0]), explode(' ', $full_name_user))), 0, 2);
 
@@ -284,6 +292,8 @@ require_once '../../includes/topbar.php';
                 value="<?= htmlspecialchars($_POST['full_name'] ?? '') ?>"
                 style="text-transform:uppercase;"
                 autofocus/>
+              <div id="dup-name-warning" role="status" hidden
+                style="margin-top:0.4rem;padding:0.5rem 0.7rem;border-radius:8px;background:var(--warning-bg);border:1px solid var(--warning-border, var(--border));color:var(--warning);font-size:0.74rem;line-height:1.5;"></div>
             </div>
             <div class="field">
               <label class="field-label">Contact Number</label>
@@ -892,6 +902,48 @@ function validateAddClientForm() {
   }
 
   var theForm = document.querySelector("form");
+  // Same-name warning: when the Full Name field is left, list existing clients with exactly that name (a
+  // warning only — two people can share a name). Built with textContent, so names can only ever be text.
+  var dupMatches = [];
+  var nameEl = document.querySelector("[name=full_name]");
+  var dupBox = document.getElementById("dup-name-warning");
+  var lastChecked = null, pendingCheck = Promise.resolve();
+  // Returns a promise, so Save can wait for the answer before showing its confirmation
+  function checkSameName() {
+    var name = nameEl.value.trim().replace(/\s+/g, " ").toUpperCase();
+    if (name === lastChecked) return pendingCheck;
+    lastChecked = name;
+    if (!name) { dupMatches = []; dupBox.hidden = true; return (pendingCheck = Promise.resolve()); }
+    return (pendingCheck = fetch("add_client.php?check_name=" + encodeURIComponent(name), { credentials: "same-origin" })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (nameEl.value.trim().replace(/\s+/g, " ").toUpperCase() !== name) return;   // typed on meanwhile
+        dupMatches = (d && d.matches) || [];
+        dupBox.textContent = "";
+        if (!dupMatches.length) { dupBox.hidden = true; return; }
+        var head = document.createElement("strong");
+        head.textContent = dupMatches.length === 1 ? "A client with this name already exists: " : dupMatches.length + " clients with this name already exist: ";
+        dupBox.appendChild(head);
+        dupMatches.forEach(function (m, i) {
+          if (i) dupBox.appendChild(document.createTextNode(", "));
+          var a = document.createElement("a");
+          a.href = "view_client.php?id=" + encodeURIComponent(m.client_id);
+          a.target = "_blank"; a.rel = "noopener";
+          a.style.color = "inherit"; a.style.fontWeight = "700";
+          a.textContent = m.full_name + (m.plates ? " (" + m.plates + ")" : "");
+          dupBox.appendChild(a);
+        });
+        dupBox.appendChild(document.createTextNode(". Make sure this is a different person before saving."));
+        dupBox.hidden = false;
+      })
+      .catch(function () { /* the check is only a helper — saving still works without it */ }));
+  }
+  if (nameEl && dupBox) {
+    nameEl.addEventListener("blur", checkSameName);
+    nameEl.addEventListener("change", checkSameName);
+    if (nameEl.value.trim()) checkSameName();   // form shown again after an error
+  }
+
   if (theForm) {
     // Which save button was pressed — form.submit() below does not send the button itself, so it is copied
     // into a hidden field (Enter in a text field "clicks" the first one, the plain Save Client)
@@ -909,7 +961,7 @@ function validateAddClientForm() {
       var val = function (n) { var el = document.querySelector("[name=" + n + "]"); return esc((el && el.value.trim()) || "—"); };
       var agentSel = document.getElementById("agent_id");
       var agent    = esc(agentSel && agentSel.selectedIndex > 0 ? agentSel.options[agentSel.selectedIndex].text : "—");
-      Swal.fire({
+      (nameEl && dupBox ? checkSameName() : Promise.resolve()).then(function () { Swal.fire({
         icon: "question",
         title: "Confirm Client Details",
         html:
@@ -922,6 +974,10 @@ function validateAddClientForm() {
           "<tr style=\"background:rgba(0,0,0,0.03);\"><td style=\"padding:0.3rem 0.5rem;color:var(--text-muted);\">Vehicle</td><td style=\"padding:0.3rem 0.5rem;font-weight:700;\">" + val("year_model") + " " + val("make") + " " + val("model") + "</td></tr>" +
           "<tr><td style=\"padding:0.3rem 0.5rem;color:var(--text-muted);\">Chassis No.</td><td style=\"padding:0.3rem 0.5rem;font-weight:700;font-family:monospace;\">" + val("serial_number") + "</td></tr>" +
           "</table>" +
+          (dupMatches.length
+            ? "<p style=\"font-size:0.78rem;color:var(--warning);background:var(--warning-bg);border-radius:8px;padding:0.5rem 0.7rem;margin:0.8rem 0 0;text-align:left;\"><strong>Same name already on file:</strong> " +
+              dupMatches.map(function (m) { return esc(m.full_name + (m.plates ? " (" + m.plates + ")" : "")); }).join(", ") + ". Save only if this is a different person.</p>"
+            : "") +
           (toPolicy ? "<p style=\"font-size:0.78rem;color:var(--text-muted);margin:0.8rem 0 0;\">After saving, you will go straight to the Eligibility Check for this vehicle.</p>" : ""),
         confirmButtonText: toPolicy ? "Yes, Save &amp; Check Eligibility" : "Yes, Save Client",
         cancelButtonText: "Review Again",
@@ -931,7 +987,7 @@ function validateAddClientForm() {
         reverseButtons: true
       }).then(function(result) {
         if (result.isConfirmed) { form.submit(); }
-      });
+      }); });
     });
   }
 

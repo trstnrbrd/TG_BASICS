@@ -190,7 +190,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user && !$user['is_active']) {
   </div>
 </div>
 
-<script src="../assets/js/auth/activate.js"></script>
+<script src="../assets/js/auth/activate.js?v=<?= filemtime(__DIR__ . '/../assets/js/auth/activate.js') ?>"></script>
 
 </body>
 </html>

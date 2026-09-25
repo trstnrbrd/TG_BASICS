@@ -1,3 +1,11 @@
+/* Login page: the submit button (with loading state and Enter-key handling) and the lockout toast.
+ *
+ * 2026-09-25: precompiled from JSX (was `type="text/babel"`, compiled by babel-standalone in the browser on
+ * every visit to the login page — the single heaviest thing on this page). Precompiled once with
+ * @babel/standalone (classic runtime) into the React.createElement() calls below; behavior is unchanged, this
+ * is a mechanical transform. React and ReactDOM (UMD) still load — this file calls their hooks and createRoot()
+ * same as before. Edit as plain React.createElement() calls; don't reintroduce a browser Babel dependency.
+ */
 const { useState, useEffect } = React;
 
 function Toast({ message, type, onDone }) {
@@ -10,17 +18,17 @@ function Toast({ message, type, onDone }) {
       clearTimeout(t2);
     };
   }, []);
-  return (
-    <div
-      style={{
+  return (/*#__PURE__*/
+    React.createElement("div", {
+      style: {
         display: "flex",
         alignItems: "center",
         gap: "0.6rem",
         background: type === "lockout" ? "#FDF2F2" : "#1C1A17",
         border:
-          type === "lockout"
-            ? "1px solid rgba(192,57,43,0.25)"
-            : "1px solid rgba(212,160,23,0.25)",
+        type === "lockout" ?
+        "1px solid rgba(192,57,43,0.25)" :
+        "1px solid rgba(212,160,23,0.25)",
         color: type === "lockout" ? "#C0392B" : "#D4A017",
         padding: "0.75rem 1.25rem",
         borderRadius: "10px",
@@ -29,41 +37,41 @@ function Toast({ message, type, onDone }) {
         fontFamily: "'Plus Jakarta Sans',sans-serif",
         boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
         pointerEvents: "auto",
-        animation: leaving
-          ? "toastOut 0.4s ease forwards"
-          : "toastIn 0.35s ease forwards",
+        animation: leaving ?
+        "toastOut 0.4s ease forwards" :
+        "toastIn 0.35s ease forwards",
         maxWidth: "360px",
-        lineHeight: "1.4",
-      }}
-    >
-      <span
-        style={{ flexShrink: 0, display: "flex", alignItems: "center" }}
-        dangerouslySetInnerHTML={{
-          __html: type === "lockout" ? iconLockout : iconWarning,
-        }}
-      />
-      <span>{message}</span>
-    </div>
-  );
+        lineHeight: "1.4"
+      } }, /*#__PURE__*/
+
+    React.createElement("span", {
+      style: { flexShrink: 0, display: "flex", alignItems: "center" },
+      dangerouslySetInnerHTML: {
+        __html: type === "lockout" ? iconLockout : iconWarning
+      } }
+    ), /*#__PURE__*/
+    React.createElement("span", null, message)
+    ));
+
 }
 
 function ToastManager({ initialToast }) {
   const [toasts, setToasts] = useState(
-    initialToast ? [{ id: Date.now(), ...initialToast }] : [],
+    initialToast ? [{ id: Date.now(), ...initialToast }] : []
   );
   const remove = (id) => setToasts((prev) => prev.filter((t) => t.id !== id));
-  return (
-    <>
-      {toasts.map((t) => (
-        <Toast
-          key={t.id}
-          message={t.message}
-          type={t.type}
-          onDone={() => remove(t.id)}
-        />
-      ))}
-    </>
-  );
+  return (/*#__PURE__*/
+    React.createElement(React.Fragment, null,
+    toasts.map((t) => /*#__PURE__*/
+    React.createElement(Toast, {
+      key: t.id,
+      message: t.message,
+      type: t.type,
+      onDone: () => remove(t.id) }
+    )
+    )
+    ));
+
 }
 
 function SubmitButton() {
@@ -88,18 +96,18 @@ function SubmitButton() {
 
     if (!username) {
       if (typeof showFieldError === "function")
-        showFieldError(usernameEl, "Please enter your username.");
+      showFieldError(usernameEl, "Please enter your username.");
       valid = false;
     }
     if (!password) {
       if (typeof showFieldError === "function")
-        showFieldError(passwordEl, "Please enter your password.");
+      showFieldError(passwordEl, "Please enter your password.");
       valid = false;
     }
 
     if (!valid) {
-      if (!username && usernameEl) usernameEl.focus();
-      else if (passwordEl) passwordEl.focus();
+      if (!username && usernameEl) usernameEl.focus();else
+      if (passwordEl) passwordEl.focus();
       return;
     }
 
@@ -122,27 +130,27 @@ function SubmitButton() {
 
   const handleClick = handleSubmit;
 
-  return (
-    <button
-      type="button"
-      className="btn-submit"
-      id="react-submit-btn"
-      onClick={handleClick}
-      disabled={loading}
-    >
-      {loading ? (
-        <>
-          <div className="spinner"></div>Signing in...
-        </>
-      ) : (
-        <>Sign In to TG-BASICS</>
-      )}
-    </button>
-  );
+  return (/*#__PURE__*/
+    React.createElement("button", {
+      type: "button",
+      className: "btn-submit",
+      id: "react-submit-btn",
+      onClick: handleClick,
+      disabled: loading },
+
+    loading ? /*#__PURE__*/
+    React.createElement(React.Fragment, null, /*#__PURE__*/
+    React.createElement("div", { className: "spinner" }), "Signing in..."
+    ) : /*#__PURE__*/
+
+    React.createElement(React.Fragment, null, "Sign In to TG-BASICS")
+
+    ));
+
 }
 
-ReactDOM.createRoot(document.getElementById("submit-root")).render(
-  <SubmitButton />,
+ReactDOM.createRoot(document.getElementById("submit-root")).render(/*#__PURE__*/
+  React.createElement(SubmitButton, null)
 );
 
 // Toast for lockout - injected via PHP data attributes
@@ -153,7 +161,7 @@ const iconLockout = toastRoot ? toastRoot.dataset.iconLockout : "";
 const iconWarning = toastRoot ? toastRoot.dataset.iconWarning : "";
 
 if (lockoutData === "1" && lockoutMsg) {
-  ReactDOM.createRoot(toastRoot).render(
-    <ToastManager initialToast={{ message: lockoutMsg, type: "lockout" }} />,
+  ReactDOM.createRoot(toastRoot).render(/*#__PURE__*/
+    React.createElement(ToastManager, { initialToast: { message: lockoutMsg, type: "lockout" } })
   );
 }

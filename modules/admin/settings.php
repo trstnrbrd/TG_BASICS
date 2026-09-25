@@ -5,6 +5,7 @@ require_once '../../config/validators.php';
 require_once '../../config/settings.php';
 require_once '../../config/mailer.php';
 require_once '../../config/rate_limit.php';
+require_once '../../includes/db_backup.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin', 'mechanic'])) {
     header("Location: ../../auth/login.php");
@@ -1051,6 +1052,47 @@ require_once '../../includes/topbar.php';
 
     <!-- ── SYSTEM SETTINGS (Owner) ── -->
     <div class="settings-panel" id="panel-system_settings">
+
+      <!-- Database Backup (owner's request 2026-09-25): outside the settings form, it saves nothing -->
+      <?php
+      $bk      = db_backup_status($conn);
+      $bk_when = $bk['days'] === null ? '' : ($bk['days'] === 0 ? 'today' : ($bk['days'] === 1 ? 'yesterday' : $bk['days'] . ' days ago'));
+      ?>
+      <div class="card" id="db-backup" style="margin-bottom:1.5rem;">
+        <div class="card-header">
+          <div class="card-icon"><?= icon('arrow-down-tray', 16) ?></div>
+          <div>
+            <div class="card-title">Database Backup</div>
+            <div class="card-sub">Download a copy of every record, in case the server ever loses data</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+            <div style="flex:1 1 260px;min-width:0;">
+              <div class="field-label" style="margin-bottom:0.2rem;">Last backup</div>
+              <?php if ($bk['at']): ?>
+              <div id="db-backup-last" style="font-size:0.92rem;font-weight:700;color:var(--text-primary);"><?= date('M j, Y, g:i A', strtotime($bk['at'])) ?></div>
+              <div style="font-size:0.75rem;color:var(--text-muted);"><?= htmlspecialchars(ucfirst($bk_when) . ($bk['by'] ? ' by ' . $bk['by'] : '')) ?></div>
+              <?php else: ?>
+              <div id="db-backup-last" style="font-size:0.92rem;font-weight:700;color:var(--text-primary);">No backup yet</div>
+              <?php endif; ?>
+            </div>
+            <button type="button" class="btn-primary" id="db-backup-btn"><?= icon('arrow-down-tray', 14) ?> Download Backup</button>
+          </div>
+          <?php if ($bk['overdue']): ?>
+          <div class="alert alert-warning" role="status" style="margin:1rem 0 0;">
+            <?= icon('exclamation-triangle', 15) ?>
+            <span><?= $bk['at'] ? 'The last backup is more than ' . DB_BACKUP_WARN_DAYS . ' days old.' : 'No backup has been downloaded yet.' ?> Download one now and keep it somewhere safe.</span>
+          </div>
+          <?php endif; ?>
+          <ul style="margin:1rem 0 0;padding-left:1.1rem;font-size:0.76rem;color:var(--text-secondary);line-height:1.7;">
+            <li>Do this at least once a week. Keep the file in a safe place, like your Google Drive or a USB drive.</li>
+            <li>The file holds all client records and account details. Do not send it through group chats or share it.</li>
+            <li>It contains the records only; uploaded photos and documents are not included.</li>
+            <li>To restore it, give the file to the system developer (phpMyAdmin &gt; Import).</li>
+          </ul>
+        </div>
+      </div>
       <form class="settings-form" data-section="system_settings">
         <input type="hidden" name="section" value="system_settings"/>
         <?= csrf_field() ?>
@@ -1300,7 +1342,8 @@ require_once '../../includes/topbar.php';
 <?php
 $footer_scripts = ''; // JS moved to assets/js/shared/settings.js
 $footer_extra_scripts = '<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>'
-    . '<script src="../../assets/js/shared/settings.js?v=' . filemtime(__DIR__ . '/../../assets/js/shared/settings.js') . '"></script>';
+    . '<script src="../../assets/js/shared/settings.js?v=' . filemtime(__DIR__ . '/../../assets/js/shared/settings.js') . '"></script>'
+    . ($is_super ? '<script src="../../assets/js/shared/db_backup.js?v=' . filemtime(__DIR__ . '/../../assets/js/shared/db_backup.js') . '"></script>' : '');
 /* REMOVED HEREDOC START
 // ── Tab switching ──
 document.querySelectorAll('.settings-tab-btn').forEach(tab => {

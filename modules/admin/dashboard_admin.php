@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../config/session.php';
 require_once '../../config/db.php';
 require_once '../../config/settings.php';
 require_once '../../config/access.php';
+require_once '../../includes/db_backup.php';
 
 $urg_days = (int)getSetting($conn, 'renewal_urgent_days', '7');
 $exp_days = (int)getSetting($conn, 'renewal_expiring_days', '30');
@@ -179,6 +180,15 @@ require_once '../../includes/topbar.php';
 
   <div class="content">
 
+    <?php if ($_SESSION['role'] === 'super_admin' && ($bk = db_backup_status($conn))['overdue']): ?>
+    <!-- Weekly backup reminder for the Owner (Settings > System Settings > Database Backup) -->
+    <div class="alert alert-warning" role="status" style="align-items:center;flex-wrap:wrap;">
+      <?= icon('exclamation-triangle', 15) ?>
+      <span style="flex:1 1 240px;"><?= $bk['at'] ? 'The last database backup was ' . $bk['days'] . ' days ago.' : 'No database backup has been downloaded yet.' ?> Download one so the records stay safe even if the server has problems.</span>
+      <a href="settings.php#db-backup" class="btn-primary" style="font-size:0.78rem;padding:0.45rem 1rem;"><?= icon('arrow-down-tray', 13) ?> Back Up Now</a>
+    </div>
+    <?php endif; ?>
+
     <!-- STAT CARDS -->
     <div class="dash-stats">
       <?php
@@ -314,7 +324,7 @@ require_once '../../includes/topbar.php';
           $dot_colors = [
             'LOGIN'=>'var(--success)','LOGOUT'=>'var(--text-muted)',
             'ACCOUNT_CREATED'=>'var(--gold-bright)','ACCOUNT_DELETED'=>'var(--danger)',
-            'PASSWORD_RESET'=>'var(--warning)','CLIENT_ADDED'=>'var(--success)','CLIENT_IMPORTED'=>'var(--success)',
+            'PASSWORD_RESET'=>'var(--warning)','CLIENT_ADDED'=>'var(--success)','CLIENT_IMPORTED'=>'var(--success)','DATABASE_BACKUP'=>'var(--info)',
             'CLIENT_UPDATED'=>'var(--warning)','VEHICLE_ADDED'=>'var(--success)',
             'POLICY_CREATED'=>'var(--gold-bright)','POLICY_SAVED'=>'var(--success)',
           ];

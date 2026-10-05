@@ -49,8 +49,9 @@ function db_backup_write(mysqli $conn, callable $out): array
         $res = $conn->query("SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'");
         while ($row = $res->fetch_row()) $tables[] = $row[0];
 
-        $cols_st = $conn->prepare("SELECT COLUMN_NAME, DATA_TYPE, EXTRA FROM information_schema.COLUMNS
-                                   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION");
+        // Column lists come from SHOW COLUMNS, not information_schema: on the InfinityFree host information_schema
+        // returned no rows for some tables (billing: 0 rows while SHOW COLUMNS lists 20), which would have written
+        // INSERTs with no column names.
         foreach ($tables as $table) {
             $q = '`' . str_replace('`', '``', $table) . '`';
             $create = $conn->query("SHOW CREATE TABLE $q")->fetch_row()[1];
@@ -59,14 +60,16 @@ function db_backup_write(mysqli $conn, callable $out): array
             // Generated columns (users.full_name, billing.total_amount_due) are rebuilt by the database itself;
             // inserting a value into them is an error, so they are left out of the INSERTs
             $cols = [];
-            $cols_st->bind_param('s', $table);
-            $cols_st->execute();
-            foreach ($cols_st->get_result() as $c) {
+            $desc = $conn->query("SHOW COLUMNS FROM $q");
+            foreach ($desc->fetch_all(MYSQLI_ASSOC) as $c) {
                 // Only real generated columns ("STORED GENERATED", "VIRTUAL GENERATED"). MySQL 8 writes timestamps with a
                 // default as "DEFAULT_GENERATED", which must NOT be skipped — dropping them lost created_at/updated_at.
-                if (preg_match('/\b(VIRTUAL|STORED|PERSISTENT) GENERATED\b/i', $c['EXTRA'])) continue;
-                $cols[] = ['name' => $c['COLUMN_NAME'], 'bin' => in_array(strtolower($c['DATA_TYPE']), $binary, true)];
+                if (preg_match('/\b(VIRTUAL|STORED|PERSISTENT) GENERATED\b/i', $c['Extra'])) continue;
+                preg_match('/^[a-z]+/i', $c['Type'], $t);
+                $cols[] = ['name' => $c['Field'], 'bin' => in_array(strtolower($t[0] ?? ''), $binary, true)];
             }
+            // Never write an INSERT without column names: stop the whole backup instead of producing a broken file
+            if (!$cols) throw new RuntimeException("Could not read the columns of table {$table}.");
             $names = implode(', ', array_map(fn($c) => '`' . str_replace('`', '``', $c['name']) . '`', $cols));
             $select = implode(', ', array_map(fn($c) => $c['bin'] ? 'HEX(`' . str_replace('`', '``', $c['name']) . '`)' : '`' . str_replace('`', '``', $c['name']) . '`', $cols));
 

@@ -50,7 +50,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === '1') {
 }
 
 $full_name = $_SESSION['full_name'];
-$initials  = substr(implode('', array_map(fn($w) => strtoupper($w[0]), explode(' ', $full_name))), 0, 2);
+$initials  = substr(implode('', array_map(fn($w) => strtoupper($w[0] ?? ''), array_filter(explode(' ', $full_name), 'strlen'))), 0, 2);
 
 $search         = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
 $selected_vid   = isset($_GET['vehicle_id']) ? (int)$_GET['vehicle_id'] : 0;

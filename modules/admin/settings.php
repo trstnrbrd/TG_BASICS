@@ -578,7 +578,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
 // PAGE DATA
 // ═══════════════════════════════════════════════════
 $full_name = $_SESSION['full_name'];
-$initials  = substr(implode('', array_map(fn($w) => strtoupper($w[0]), explode(' ', $full_name))), 0, 2);
+$initials  = substr(implode('', array_map(fn($w) => strtoupper($w[0] ?? ''), array_filter(explode(' ', $full_name), 'strlen'))), 0, 2);
 
 // Current user record (include 2FA status, photo, theme)
 $u_stmt = $conn->prepare("SELECT first_name, last_name, full_name, username, username_changed_at, email, two_factor_enabled, totp_enabled, profile_photo, theme, transaction_pin FROM users WHERE user_id = ?");

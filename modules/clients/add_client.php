@@ -18,7 +18,7 @@ if (isset($_GET['check_name'])) {
 }
 
 $full_name_user = $_SESSION['full_name'];
-$initials       = substr(implode('', array_map(fn($w) => strtoupper($w[0]), explode(' ', $full_name_user))), 0, 2);
+$initials       = substr(implode('', array_map(fn($w) => strtoupper($w[0] ?? ''), array_filter(explode(' ', $full_name_user), 'strlen'))), 0, 2);
 
 // Insurance agent = whose client this is; it can differ from whoever encodes it ("added by").
 // Defaults to the person encoding, when they are an agent themselves.

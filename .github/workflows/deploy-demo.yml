@@ -1,0 +1,47 @@
+name: Deploy to InfinityFree (demo)
+
+# Only the demo branch deploys here. The production workflow (deploy.yml) only
+# listens to master, so pushing to demo never touches the live site.
+on:
+  push:
+    branches: [demo]
+
+jobs:
+  ftp-deploy:
+    name: FTP Deploy (demo)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: FTP Deploy
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          # Only the password is secret (GitHub → Settings → Secrets). The server IP and
+          # username are not secret, same as deploy.yml. The IP is used instead of the
+          # hostname because GitHub's runners sometimes fail to resolve InfinityFree
+          # hostnames (EAI_AGAIN).
+          server: 185.27.134.115
+          username: if0_43029597
+          password: ${{ secrets.DEMO_FTP_PASSWORD }}
+          server-dir: /htdocs/TG-BASICS/
+          # Never delete files that only exist on the demo server
+          dangerous-clean-slate: false
+          # Same exclusions as production. config/db.php, mailer.php and ocr.php are
+          # hand-edited on the demo host (they hold the demo database login), so they
+          # must never be overwritten from git.
+          exclude: |
+            **/.git*
+            **/.git*/**
+            .github/**
+            vendor/**
+            node_modules/**
+            config/db.php
+            config/mailer.php
+            config/ocr.php
+            uploads/**
+            data_gathering (documentation)/**
+            selenium_tests/**
+            tools/**
+            tests/**
+            **/*.sql

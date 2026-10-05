@@ -509,7 +509,7 @@ $footer_extra_scripts  = $footer_extra_scripts  ?? '';
       .then(function(r) { return r.json(); })
       .then(function(data) {
         if (input.value.trim() !== q) return; // stale
-        buildDropdown(data);
+        buildDropdown(data.results || []);
       })
       .catch(function() {
         dropdown.innerHTML = '<div class="gs-empty">Search unavailable.</div>';

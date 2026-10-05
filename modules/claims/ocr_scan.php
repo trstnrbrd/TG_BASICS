@@ -1,33 +1,28 @@
 <?php
 require_once '../../config/session.php';
 require_once '../../config/ocr.php';
+require_once __DIR__ . '/../../includes/api.php';
 
-header('Content-Type: application/json');
 
 // Every call spends the shop's OCR.space quota, so it needs a logged-in staff session.
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
-    http_response_code(401);
-    echo json_encode(['error' => 'Unauthorized.']);
-    exit;
+    api_error('Unauthorized.', 401);
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || empty($_FILES['image'])) {
-    echo json_encode(['error' => 'No image uploaded.']);
-    exit;
+    api_error('No image uploaded.', 400);
 }
 
 $file = $_FILES['image'];
 if ($file['error'] !== UPLOAD_ERR_OK) {
-    echo json_encode(['error' => 'Upload error.']);
-    exit;
+    api_error('Upload error.', 400);
 }
 
 // Sniff the real content type — $file['type'] is whatever the client claims.
 $allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
 $mime    = finfo_file(finfo_open(FILEINFO_MIME_TYPE), $file['tmp_name']);
 if (!in_array($mime, $allowed, true)) {
-    echo json_encode(['error' => 'Invalid file type.']);
-    exit;
+    api_error('Invalid file type.', 400);
 }
 
 $ch = curl_init('https://api.ocr.space/parse/image');
@@ -50,16 +45,14 @@ $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 curl_close($ch);
 
 if (!$response || $httpCode !== 200) {
-    echo json_encode(['error' => 'OCR request failed (HTTP ' . $httpCode . ').']);
-    exit;
+    api_error('OCR request failed (HTTP ' . $httpCode . ').', 500);
 }
 
 $data = json_decode($response, true);
 
 if (empty($data['ParsedResults'])) {
     $msg = $data['ErrorMessage'][0] ?? 'No text detected in the image.';
-    echo json_encode(['error' => $msg]);
-    exit;
+    api_error($msg, 400);
 }
 
 $text = '';
@@ -69,8 +62,7 @@ foreach ($data['ParsedResults'] as $page) {
 $text = trim($text);
 
 if (!$text) {
-    echo json_encode(['error' => 'No text detected in the image.']);
-    exit;
+    api_error('No text detected in the image.', 400);
 }
 
-echo json_encode(['text' => $text]);
+api_success(['text' => $text]);

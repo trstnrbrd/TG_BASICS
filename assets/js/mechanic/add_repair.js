@@ -65,7 +65,7 @@ function updateVehicleDetails() {
       (contactInput.value = contact),
       (clientDropdown.style.display = "none"));
     const res = await fetch("ajax_get_vehicles.php?client_id=" + id),
-      data = await res.json();
+      data = (await res.json()).vehicles || [];
     ((vehicleSelect.innerHTML = data.length
       ? '<option value="">— Select vehicle —</option>' +
         data

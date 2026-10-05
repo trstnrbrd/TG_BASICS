@@ -2,17 +2,13 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/access.php';
+require_once __DIR__ . '/../../includes/api.php';
 
-header('Content-Type: application/json');
-if (!isset($_SESSION['user_id'])) {
-    http_response_code(403);
-    echo json_encode([]);
-    exit;
-}
+if (!isset($_SESSION['user_id'])) api_error('Not signed in.', 401);
 
 $client_id = (int)($_GET['client_id'] ?? 0);
 // Only clients this user may work with (mechanics: walk-in only, admins: their own) — anything else looks empty
-if (!client_in_scope($conn, $client_id)) { echo json_encode([]); exit; }
+if (!client_in_scope($conn, $client_id)) api_success(['vehicles' => []]);
 
 $stmt = $conn->prepare("
     SELECT vehicle_id, plate_number, make, model, year_model, color
@@ -22,4 +18,4 @@ $stmt = $conn->prepare("
 ");
 $stmt->bind_param('i', $client_id);
 $stmt->execute();
-echo json_encode($stmt->get_result()->fetch_all(MYSQLI_ASSOC));
+api_success(['vehicles' => $stmt->get_result()->fetch_all(MYSQLI_ASSOC)]);

@@ -11,7 +11,7 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'supe
 }
 
 $full_name = $_SESSION['full_name'];
-$initials  = substr(implode('', array_map(fn($w) => strtoupper($w[0]), explode(' ', $full_name))), 0, 2);
+$initials  = substr(implode('', array_map(fn($w) => strtoupper($w[0] ?? ''), array_filter(explode(' ', $full_name), 'strlen'))), 0, 2);
 
 // Renewal pre-fill: load existing policy data
 $renew_from   = isset($_GET['renew_from']) ? (int)$_GET['renew_from'] : (isset($_POST['renew_from']) ? (int)$_POST['renew_from'] : 0);

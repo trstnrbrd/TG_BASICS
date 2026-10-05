@@ -582,7 +582,8 @@ window.prefillData  = <?= $prefill_data ? json_encode($prefill_data) : 'null' ?>
 
   fetch('ajax_get_vehicles.php?client_id=' + d.client_id)
     .then(function(r){ return r.json(); })
-    .then(function(vehicles) {
+    .then(function(resp) {
+      var vehicles = resp.vehicles || [];
       var sel = document.getElementById('vehicle_id_select');
       if (!vehicles.length) {
         sel.innerHTML = '<option value="">No vehicles for this client</option>';

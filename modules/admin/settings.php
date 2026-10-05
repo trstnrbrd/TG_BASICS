@@ -578,7 +578,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
 // PAGE DATA
 // ═══════════════════════════════════════════════════
 $full_name = $_SESSION['full_name'];
-$initials  = substr(implode('', array_map(fn($w) => strtoupper($w[0]), explode(' ', $full_name))), 0, 2);
+$initials  = substr(implode('', array_map(fn($w) => strtoupper($w[0] ?? ''), array_filter(explode(' ', $full_name), 'strlen'))), 0, 2);
 
 // Current user record (include 2FA status, photo, theme)
 $u_stmt = $conn->prepare("SELECT first_name, last_name, full_name, username, username_changed_at, email, two_factor_enabled, totp_enabled, profile_photo, theme, transaction_pin FROM users WHERE user_id = ?");
@@ -592,8 +592,27 @@ $pend_stmt->bind_param('i', $user_id);
 $pend_stmt->execute();
 $pending_email = $pend_stmt->get_result()->fetch_assoc();
 
-// All system settings
-$settings = getAllSettings($conn);
+// All system settings. The defaults fill in any key that has no row yet (a fresh or local database),
+// so the form never prints an undefined-key warning; saved values always win over these.
+$settings = array_merge([
+    'company_name'         => 'TG Customworks & Basic Car Insurance',
+    'company_address'      => '49 Villa Tierra St., San Roque, Pandi, Bulacan',
+    'company_contact'      => '',
+    'company_email'        => 'tgcustomworksbulacan@gmail.com',
+    'smtp_username'        => '',
+    'smtp_password'        => '',
+    'smtp_sender_name'     => '',
+    'smtp_sender_email'    => '',
+    'eligibility_max_age'  => '10',
+    'renewal_urgent_days'  => '7',
+    'renewal_expiring_days'=> '30',
+    'max_login_attempts'   => '5',
+    'lockout_duration'     => '15',
+    'activation_link_expiry' => '24',
+    'reset_link_expiry'    => '1',
+    'timezone'             => 'Asia/Manila',
+    'date_format'          => 'M d, Y',
+], getAllSettings($conn));
 
 // Claim notify recipients (up to 5) — each is either a linked user (email follows their account)
 // or a raw typed email address.

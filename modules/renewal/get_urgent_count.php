@@ -3,12 +3,10 @@ require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/settings.php';
 require_once '../../config/access.php';
+require_once __DIR__ . '/../../includes/api.php';
 
-header('Content-Type: application/json');
-if (!isset($_SESSION['user_id'])) {
-    echo json_encode(['count' => 0]);
-    exit;
-}
+// Not signed in: the sidebar badge simply shows nothing
+if (!isset($_SESSION['user_id'])) api_success(['count' => 0]);
 
 // Sidebar badge = the urgent policies this user is responsible for, with the same window setting as Renewal
 // Tracking: the Owner counts all of them; an admin only their own clients' (the page's "My Clients" view —
@@ -27,4 +25,4 @@ $result = $conn->query("
 ");
 
 $count = $result->fetch_assoc()['c'];
-echo json_encode(['count' => (int)$count]);
+api_success(['count' => (int)$count]);

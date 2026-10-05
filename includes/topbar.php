@@ -9,7 +9,7 @@
  */
 $topbar_show_clock = true; // show on all pages
 $full_name_display = $_SESSION['full_name'] ?? 'User';
-$initials_display  = substr(implode('', array_map(fn($w) => strtoupper($w[0]), explode(' ', $full_name_display))), 0, 2);
+$initials_display  = substr(implode('', array_map(fn($w) => strtoupper($w[0]), array_filter(explode(' ', $full_name_display), 'strlen'))), 0, 2);
 
 // Get profile photo for dropdown
 $_profile_photo_url = '';

@@ -1,20 +1,14 @@
 <?php
 require_once __DIR__ . '/../config/session.php';
 require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/api.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
-    http_response_code(403);
-    echo json_encode(['error' => 'Unauthorized']);
-    exit;
+    api_error('Unauthorized.', 403);
 }
-
-header('Content-Type: application/json');
 
 $plate = trim($_GET['plate'] ?? '');
-if ($plate === '') {
-    echo json_encode(['error' => 'No plate number provided.']);
-    exit;
-}
+if ($plate === '') api_error('No plate number provided.', 400);
 
 // Fetch vehicle + client
 $stmt = $conn->prepare("
@@ -31,8 +25,7 @@ $stmt->execute();
 $vehicle = $stmt->get_result()->fetch_assoc();
 
 if (!$vehicle) {
-    echo json_encode(['error' => 'No vehicle found with plate number "' . htmlspecialchars($plate) . '".']);
-    exit;
+    api_error('No vehicle found with plate number "' . htmlspecialchars($plate) . '".', 404);
 }
 
 // Fetch last policy for this vehicle
@@ -48,7 +41,7 @@ $ps->bind_param('i', $vehicle['vehicle_id']);
 $ps->execute();
 $last_policy = $ps->get_result()->fetch_assoc();
 
-echo json_encode([
+api_success([
     'vehicle'     => $vehicle,
     'last_policy' => $last_policy ?: null,
 ]);

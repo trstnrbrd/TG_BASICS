@@ -2,13 +2,12 @@
 require_once __DIR__ . '/../config/session.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/validators.php';
+require_once __DIR__ . '/../includes/api.php';
 
-if (!isset($_SESSION['user_id'])) { http_response_code(401); exit; }
-
-header('Content-Type: application/json');
+if (!isset($_SESSION['user_id'])) api_error('Not signed in.', 401);
 
 $q = trim($_GET['q'] ?? '');
-if (strlen($q) < 1) { echo json_encode([]); exit; }
+if (strlen($q) < 1) api_success(['results' => []]);
 
 // The term is bound as a prepared-statement parameter below, so it must NOT also go through
 // real_escape_string() (that adds backslashes which then become part of the searched text — a name
@@ -140,4 +139,4 @@ while ($row = $rows->fetch_assoc()) {
     ];
 }
 
-echo json_encode($results);
+api_success(['results' => $results]);

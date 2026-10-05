@@ -1,13 +1,12 @@
 <?php
 require_once __DIR__ . '/../config/session.php';
 require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/api.php';
 
-if (!isset($_SESSION['user_id'])) { http_response_code(401); exit; }
-
-header('Content-Type: application/json');
+if (!isset($_SESSION['user_id'])) api_error('Not signed in.', 401);
 
 $uid = (int)($_GET['id'] ?? 0);
-if (!$uid) { echo json_encode(['ok' => false]); exit; }
+if (!$uid) api_error('No user id given.', 400);
 
 $own_id = (int)$_SESSION['user_id'];
 $stmt = $conn->prepare("
@@ -20,7 +19,7 @@ $stmt->bind_param('ii', $uid, $own_id);
 $stmt->execute();
 $u = $stmt->get_result()->fetch_assoc();
 
-if (!$u) { echo json_encode(['ok' => false]); exit; }
+if (!$u) api_error('User not found.', 404);
 
 $role_labels = [
     'super_admin' => 'Owner',
@@ -28,8 +27,7 @@ $role_labels = [
     'mechanic'    => 'Mechanic',
 ];
 
-echo json_encode([
-    'ok'           => true,
+api_success([
     'user_id'      => (int)$u['user_id'],
     'full_name'    => $u['full_name'],
     'username'     => $u['username'],

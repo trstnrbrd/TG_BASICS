@@ -62,7 +62,9 @@ function db_backup_write(mysqli $conn, callable $out): array
             $cols_st->bind_param('s', $table);
             $cols_st->execute();
             foreach ($cols_st->get_result() as $c) {
-                if (preg_match('/GENERATED|VIRTUAL|PERSISTENT|STORED/i', $c['EXTRA'])) continue;
+                // Only real generated columns ("STORED GENERATED", "VIRTUAL GENERATED"). MySQL 8 writes timestamps with a
+                // default as "DEFAULT_GENERATED", which must NOT be skipped — dropping them lost created_at/updated_at.
+                if (preg_match('/\b(VIRTUAL|STORED|PERSISTENT) GENERATED\b/i', $c['EXTRA'])) continue;
                 $cols[] = ['name' => $c['COLUMN_NAME'], 'bin' => in_array(strtolower($c['DATA_TYPE']), $binary, true)];
             }
             $names = implode(', ', array_map(fn($c) => '`' . str_replace('`', '``', $c['name']) . '`', $cols));

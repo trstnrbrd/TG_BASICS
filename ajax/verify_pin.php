@@ -2,18 +2,11 @@
 require_once __DIR__ . '/../config/session.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/rate_limit.php';
+require_once __DIR__ . '/../includes/api.php';
 
-header('Content-Type: application/json');
+if (!isset($_SESSION['user_id'])) api_error('Unauthorized.', 401);
 
-if (!isset($_SESSION['user_id'])) {
-    echo json_encode(['ok' => false, 'error' => 'Unauthorized.']);
-    exit;
-}
-
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    echo json_encode(['ok' => false, 'error' => 'Invalid request.']);
-    exit;
-}
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') api_error('Invalid request.', 400);
 
 $user_id = $_SESSION['user_id'];
 
@@ -24,9 +17,7 @@ $rl_key = 'uid:' . (int)$user_id;
 $pin = $_POST['pin'] ?? '';
 
 if ($pin !== '' && rate_limit_blocked($conn, 'verify_pin', $rl_key)) {
-    http_response_code(429);
-    echo json_encode(['ok' => false, 'error' => 'Too many attempts. Please wait a few minutes before trying again.']);
-    exit;
+    api_error('Too many attempts. Please wait a few minutes before trying again.', 429);
 }
 
 $stmt = $conn->prepare("SELECT transaction_pin FROM users WHERE user_id = ?");
@@ -34,20 +25,14 @@ $stmt->bind_param('i', $user_id);
 $stmt->execute();
 $row = $stmt->get_result()->fetch_assoc();
 
-if (empty($row['transaction_pin'])) {
-    echo json_encode(['ok' => true, 'no_pin' => true]);
-    exit;
-}
+if (empty($row['transaction_pin'])) api_success(['no_pin' => true]);
 
-if ($pin === '') {
-    echo json_encode(['ok' => true, 'has_pin' => true]);
-    exit;
-}
+if ($pin === '') api_success(['has_pin' => true]);
 
 if (password_verify($pin, $row['transaction_pin'])) {
     rate_limit_clear($conn, 'verify_pin', $rl_key);
-    echo json_encode(['ok' => true]);
-} else {
-    rate_limit_record($conn, 'verify_pin', $rl_key);
-    echo json_encode(['ok' => false, 'error' => 'Incorrect PIN.']);
+    api_success();
 }
+
+rate_limit_record($conn, 'verify_pin', $rl_key);
+api_error('Incorrect PIN.', 403);

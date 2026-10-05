@@ -21,7 +21,7 @@ jobs:
           # username are not secret, same as deploy.yml. The IP is used instead of the
           # hostname because GitHub's runners sometimes fail to resolve InfinityFree
           # hostnames (EAI_AGAIN).
-          server: 185.27.134.115
+          server: 185.27.134.11
           username: if0_43029597
           password: ${{ secrets.DEMO_FTP_PASSWORD }}
           server-dir: /htdocs/TG-BASICS/

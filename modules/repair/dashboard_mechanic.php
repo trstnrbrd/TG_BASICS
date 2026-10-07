@@ -2,10 +2,7 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'mechanic') {
-    header("Location: ../../auth/login.php");
-    exit;
-}
+require_role(['mechanic']);
 
 $full_name = $_SESSION['full_name'] ?? 'Mechanic';
 

@@ -115,3 +115,36 @@ if (!headers_sent()) {
         header('Pragma: no-cache');
     }
 }
+
+/**
+ * Page guard: the signed-in user must have one of $roles, otherwise the browser is sent to the sign-in page.
+ * Every admin/mechanic page starts with require_role(['admin', 'super_admin']) (or with the mechanic role added).
+ * JSON endpoints keep their own api_error(401/403) reply.
+ */
+function require_role(array $roles): void
+{
+    if (isset($_SESSION['user_id']) && in_array($_SESSION['role'] ?? '', $roles, true)) return;
+    header('Location: ' . login_url());
+    exit;
+}
+
+/** Relative link from the current page to auth/login.php, whatever folder the page is in. */
+function login_url(): string
+{
+    $script = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
+    if (!preg_match('#/tg-basics/(.*)$#i', $script, $m)) return '/auth/login.php';
+    return str_repeat('../', substr_count($m[1], '/')) . 'auth/login.php';
+}
+
+
+function require_role_json(array $roles, string $message = 'Unauthorized.', int $status = 401): void
+{
+    if (isset($_SESSION['user_id']) && in_array($_SESSION['role'] ?? '', $roles, true)) return;
+    api_error($message, $status);
+}
+
+
+function is_super_admin(): bool { return ($_SESSION['role'] ?? '') === 'super_admin'; }
+function is_mechanic(): bool    { return ($_SESSION['role'] ?? '') === 'mechanic'; }
+/** Front-office staff: admin or super admin — the pairing used wherever mechanics are excluded. */
+function is_staff(): bool       { return in_array($_SESSION['role'] ?? '', ['admin', 'super_admin'], true); }

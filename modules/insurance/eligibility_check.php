@@ -5,10 +5,7 @@ require_once '../../config/validators.php';
 require_once '../../config/settings.php';
 require_once '../../includes/pagination.php';
 
-if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
-    header("Location: ../../auth/login.php");
-    exit;
-}
+require_role(['admin', 'super_admin']);
 
 // Every admin can look up any client here (owner's rule, 2026-09-24 — the old vault password is gone).
 

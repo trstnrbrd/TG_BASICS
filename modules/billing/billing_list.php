@@ -4,10 +4,7 @@ require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../includes/pagination.php';
 
-if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
-    header("Location: ../../auth/login.php");
-    exit;
-}
+require_role(['admin', 'super_admin']);
 
 // ── CHECK ELIGIBLE CLAIMS (claims without billing) ──
 $eligible_claims = $conn->query("
@@ -121,6 +118,14 @@ require_once '../../includes/topbar.php';
         <?php endif; ?>
       </div>
     </form>
+
+    <script>
+    document.querySelectorAll('form[method="GET"] select[name="status"], form[method="GET"] select[name="sort"]').forEach(function (select) {
+      select.addEventListener('change', function () {
+        this.form.submit();
+      });
+    });
+    </script>
 
     <!-- TABLE -->
     <div class="card">

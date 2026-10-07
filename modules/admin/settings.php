@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config/session.php';
 require_once '../../config/db.php';
+require_once '../../includes/api.php';
 require_once '../../config/validators.php';
 require_once '../../config/settings.php';
 require_once '../../config/mailer.php';
@@ -8,14 +9,10 @@ require_once '../../config/rate_limit.php';
 require_once '../../includes/db_backup.php';
 require_once '../../config/dev_access.php';
 
-if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin', 'mechanic'])) {
-    header("Location: ../../auth/login.php");
-    exit;
-}
+require_role(['admin', 'super_admin', 'mechanic']);
 
 $user_id  = $_SESSION['user_id'];
-$role     = $_SESSION['role'];
-$is_super = $role === 'super_admin';
+$is_super = is_super_admin();
 // The developer account (config/dev_access.php) reaches System Settings only once its authenticator app is on
 if (is_developer() && !dev_has_authenticator($conn, (int)$user_id)) $is_super = false;
 
@@ -23,13 +20,11 @@ if (is_developer() && !dev_has_authenticator($conn, (int)$user_id)) $is_super = 
 // AJAX SAVE HANDLERS
 // ═══════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
-    header('Content-Type: application/json');
 
     // CSRF check for all POST handlers
     $submitted_token = $_POST['csrf_token'] ?? '';
     if (!isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $submitted_token)) {
-        http_response_code(403);
-        echo json_encode(['ok' => false, 'error' => 'Invalid or missing CSRF token.']);
+        api_error('Invalid or missing CSRF token.', 403);
         exit;
     }
 
@@ -37,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
     $admin_only = ['system_settings'];
 
     if (in_array($section, $admin_only) && !$is_super) {
-        echo json_encode(['ok' => false, 'error' => 'Unauthorized.']);
+        api_error('Unauthorized.', 401);
         exit;
     }
 
@@ -49,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
 
             if (empty($_FILES['avatar']) || $_FILES['avatar']['error'] !== UPLOAD_ERR_OK) {
-                echo json_encode(['ok' => false, 'error' => 'No file uploaded or upload error.']);
+                api_error('No file uploaded or upload error.');
                 exit;
             }
 
@@ -60,11 +55,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             finfo_close($finfo);
 
             if (!in_array($mime, $allowed)) {
-                echo json_encode(['ok' => false, 'error' => 'Only JPG, PNG, and WebP images are allowed.']);
+                api_error('Only JPG, PNG, and WebP images are allowed.');
                 exit;
             }
             if ($file['size'] > 2 * 1024 * 1024) {
-                echo json_encode(['ok' => false, 'error' => 'Image must be under 2 MB.']);
+                api_error('Image must be under 2 MB.');
                 exit;
             }
 
@@ -85,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             $upd->bind_param('si', $filename, $user_id);
             $upd->execute();
 
-            echo json_encode(['ok' => true, 'message' => 'Profile photo updated.', 'photo' => $filename]);
+            api_success(['photo' => $filename], 'Profile photo updated.');
             break;
 
         // ── REMOVE AVATAR ──
@@ -103,7 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             $upd->bind_param('i', $user_id);
             $upd->execute();
 
-            echo json_encode(['ok' => true, 'message' => 'Profile photo removed.']);
+            api_success([], 'Profile photo removed.');
             break;
 
         // ── MY ACCOUNT ──
@@ -119,15 +114,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             $cfm_pw = san_str($_POST['confirm_password'] ?? '', MAX_PASSWORD);
 
             if ($first === '') {
-                echo json_encode(['ok' => false, 'error' => 'First name is required.']);
+                api_error('First name is required.');
                 exit;
             }
             if ($last === '') {
-                echo json_encode(['ok' => false, 'error' => 'Last name is required.']);
+                api_error('Last name is required.');
                 exit;
             }
             if (!validate_name($first) || !validate_name($last)) {
-                echo json_encode(['ok' => false, 'error' => 'Name contains invalid characters.']);
+                api_error('Name contains invalid characters.');
                 exit;
             }
 
@@ -144,7 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                 $dup->bind_param('si', $email, $user_id);
                 $dup->execute();
                 if ($dup->get_result()->num_rows > 0) {
-                    echo json_encode(['ok' => false, 'error' => 'Email is already used by another account.']);
+                    api_error('Email is already used by another account.');
                     exit;
                 }
 
@@ -197,15 +192,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             // Password change (only if any password field is filled)
             if ($new_pw !== '' || $cur_pw !== '' || $cfm_pw !== '') {
                 if ($cur_pw === '') {
-                    echo json_encode(['ok' => false, 'error' => 'Current password is required to change password.']);
+                    api_error('Current password is required to change password.');
                     exit;
                 }
                 if (!validate_password($new_pw)) {
-                    echo json_encode(['ok' => false, 'error' => 'Password must be 8–128 characters and include an uppercase letter, a number, and a special character.']);
+                    api_error('Password must be 8–128 characters and include an uppercase letter, a number, and a special character.');
                     exit;
                 }
                 if ($new_pw !== $cfm_pw) {
-                    echo json_encode(['ok' => false, 'error' => 'Passwords do not match.']);
+                    api_error('Passwords do not match.');
                     exit;
                 }
 
@@ -215,7 +210,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                 $pw_row = $pw_stmt->get_result()->fetch_assoc();
 
                 if (!password_verify($cur_pw, $pw_row['password'])) {
-                    echo json_encode(['ok' => false, 'error' => 'Current password is incorrect.']);
+                    api_error('Current password is incorrect.', 403);
                     exit;
                 }
 
@@ -238,7 +233,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                 $msg = 'Profile and password updated.';
             }
 
-            echo json_encode(['ok' => true, 'message' => $msg]);
+            api_success([], $msg);
             break;
 
         // ── CHANGE USERNAME ──
@@ -247,17 +242,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             $cur_pw       = san_str($_POST['current_password'] ?? '', MAX_PASSWORD);
 
             if ($new_username === '') {
-                echo json_encode(['ok' => false, 'error' => 'Username cannot be empty.']);
+                api_error('Username cannot be empty.');
                 exit;
             }
             // Same rule the login page enforces — if these disagree, a username saved here can
             // never be typed in at login and the account is locked out of itself.
             if (!validate_username($new_username)) {
-                echo json_encode(['ok' => false, 'error' => 'Username may only contain letters, numbers, and underscores (3–50 characters).']);
+                api_error('Username may only contain letters, numbers, and underscores (3–50 characters).');
                 exit;
             }
             if ($cur_pw === '') {
-                echo json_encode(['ok' => false, 'error' => 'Current password is required to change your username.']);
+                api_error('Current password is required to change your username.');
                 exit;
             }
 
@@ -271,17 +266,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                 $days_since = (int)floor((time() - strtotime($pw_row['username_changed_at'])) / 86400);
                 $days_left  = 60 - $days_since;
                 if ($days_left > 0) {
-                    echo json_encode(['ok' => false, 'error' => 'You can only change your username once every 60 days. ' . $days_left . ' day' . ($days_left !== 1 ? 's' : '') . ' remaining.']);
+                    api_error('You can only change your username once every 60 days. ' . $days_left . ' day' . ($days_left !== 1 ? 's' : '') . ' remaining.');
                     exit;
                 }
             }
 
             if (!password_verify($cur_pw, $pw_row['password'])) {
-                echo json_encode(['ok' => false, 'error' => 'Current password is incorrect.']);
+                api_error('Current password is incorrect.', 403);
                 exit;
             }
             if ($new_username === $pw_row['username']) {
-                echo json_encode(['ok' => false, 'error' => 'New username is the same as your current one.']);
+                api_error('New username is the same as your current one.');
                 exit;
             }
 
@@ -290,7 +285,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             $dup->bind_param('si', $new_username, $user_id);
             $dup->execute();
             if ($dup->get_result()->num_rows > 0) {
-                echo json_encode(['ok' => false, 'error' => 'That username is already taken.']);
+                api_error('That username is already taken.');
                 exit;
             }
 
@@ -306,7 +301,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             $log->bind_param('is', $user_id, $desc);
             $log->execute();
 
-            echo json_encode(['ok' => true, 'message' => 'Username updated to @' . $new_username . '.', 'new_username' => $new_username]);
+            api_success(['new_username' => $new_username], 'Username updated to @' . $new_username . '.');
             exit;
 
         // ── TOGGLE 2FA ──
@@ -320,7 +315,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                 $em_chk->execute();
                 $em_row = $em_chk->get_result()->fetch_assoc();
                 if (empty($em_row['email'])) {
-                    echo json_encode(['ok' => false, 'error' => 'You must have an email address set before enabling Two-Factor Authentication.']);
+                    api_error('You must have an email address set before enabling Two-Factor Authentication.');
                     exit;
                 }
             }
@@ -334,7 +329,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             $log->bind_param('is', $user_id, $desc);
             $log->execute();
 
-            echo json_encode(['ok' => true, 'message' => '2FA ' . ($enabled ? 'enabled' : 'disabled') . ' successfully.']);
+            api_success([], '2FA ' . ($enabled ? 'enabled' : 'disabled') . ' successfully.');
             break;
 
         // ── TOTP GENERATE ──
@@ -343,7 +338,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             $secret = totp_generate_secret();
             $_SESSION['totp_pending_secret'] = $secret;
             $label  = $_SESSION['username'] ?? 'user';
-            echo json_encode(['ok' => true, 'secret' => $secret, 'uri' => totp_qr_uri($secret, $label)]);
+            api_success(['secret' => $secret, 'uri' => totp_qr_uri($secret, $label)]);
             exit;
 
         // ── TOTP CONFIRM ──
@@ -352,13 +347,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             $code     = preg_replace('/\D/', '', $_POST['code'] ?? '');
             $password = $_POST['password'] ?? '';
             $secret   = $_SESSION['totp_pending_secret'] ?? '';
-            if (!$secret) { echo json_encode(['ok' => false, 'error' => 'No pending setup. Please start again.']); exit; }
-            if (!totp_verify($secret, $code)) { echo json_encode(['ok' => false, 'error' => 'Incorrect code. Make sure your authenticator app time is in sync.']); exit; }
+            if (!$secret) { api_error('No pending setup. Please start again.'); exit; }
+            if (!totp_verify($secret, $code)) { api_error('Incorrect code. Make sure your authenticator app time is in sync.', 403); exit; }
             // Verify password
             $pw_row = $conn->prepare("SELECT password FROM users WHERE user_id = ?");
             $pw_row->bind_param('i', $user_id); $pw_row->execute();
             $pw_hash = $pw_row->get_result()->fetch_assoc()['password'] ?? '';
-            if (!password_verify($password, $pw_hash)) { echo json_encode(['ok' => false, 'error' => 'Incorrect password.']); exit; }
+            if (!password_verify($password, $pw_hash)) { api_error('Incorrect password.', 403); exit; }
             $plain_codes  = totp_generate_recovery_codes(8);
             $hashed_codes = array_map(fn($c) => password_hash($c, PASSWORD_DEFAULT), $plain_codes);
             $encoded = json_encode($hashed_codes);
@@ -368,7 +363,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'TOTP_ENABLED', ?)");
             $desc = ($_SESSION['full_name'] ?? '') . ' enabled authenticator app 2FA.';
             $log->bind_param('is', $user_id, $desc); $log->execute();
-            echo json_encode(['ok' => true, 'recovery_codes' => $plain_codes]);
+            api_success(['recovery_codes' => $plain_codes]);
             exit;
 
         // ── TOTP DISABLE ──
@@ -377,14 +372,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             $s = $conn->prepare("SELECT password FROM users WHERE user_id = ?");
             $s->bind_param('i', $user_id); $s->execute();
             $row = $s->get_result()->fetch_assoc();
-            if (!$row || !password_verify($password, $row['password'])) { echo json_encode(['ok' => false, 'error' => 'Incorrect password.']); exit; }
-            if (is_developer()) { echo json_encode(['ok' => false, 'error' => 'The developer account must keep the authenticator app on.']); exit; }
+            if (!$row || !password_verify($password, $row['password'])) { api_error('Incorrect password.', 403); exit; }
+            if (is_developer()) { api_error('The developer account must keep the authenticator app on.', 403); exit; }
             $u = $conn->prepare("UPDATE users SET totp_secret = NULL, totp_enabled = 0, totp_recovery_codes = NULL WHERE user_id = ?");
             $u->bind_param('i', $user_id); $u->execute();
             $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'TOTP_DISABLED', ?)");
             $desc = ($_SESSION['full_name'] ?? '') . ' disabled authenticator app 2FA.';
             $log->bind_param('is', $user_id, $desc); $log->execute();
-            echo json_encode(['ok' => true]);
+            api_success();
             exit;
 
         // ── TOTP REGEN RECOVERY ──
@@ -394,13 +389,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             $s = $conn->prepare("SELECT password FROM users WHERE user_id = ?");
             $s->bind_param('i', $user_id); $s->execute();
             $row = $s->get_result()->fetch_assoc();
-            if (!$row || !password_verify($password, $row['password'])) { echo json_encode(['ok' => false, 'error' => 'Incorrect password.']); exit; }
+            if (!$row || !password_verify($password, $row['password'])) { api_error('Incorrect password.', 403); exit; }
             $plain_codes  = totp_generate_recovery_codes(8);
             $hashed_codes = array_map(fn($c) => password_hash($c, PASSWORD_DEFAULT), $plain_codes);
             $encoded = json_encode($hashed_codes);
             $u = $conn->prepare("UPDATE users SET totp_recovery_codes = ? WHERE user_id = ?");
             $u->bind_param('si', $encoded, $user_id); $u->execute();
-            echo json_encode(['ok' => true, 'recovery_codes' => $plain_codes]);
+            api_success(['recovery_codes' => $plain_codes]);
             exit;
 
         // ── DESIGN PREFERENCES ──
@@ -413,7 +408,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
 
             $_SESSION['theme'] = $theme;
 
-            echo json_encode(['ok' => true, 'message' => 'Design preferences saved.']);
+            api_success([], 'Design preferences saved.');
             break;
 
         // ── SYSTEM SETTINGS (Owner only — all in one save) ──
@@ -478,7 +473,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             $log->bind_param('is', $user_id, $desc);
             $log->execute();
 
-            echo json_encode(['ok' => true, 'message' => 'All settings saved successfully.']);
+            api_success([], 'All settings saved successfully.');
             break;
 
         // (The Renewal Tracking vault password was removed on 2026-09-24 — Renewal Tracking now shows each
@@ -491,15 +486,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             $cur_pw   = san_str($_POST['current_password'] ?? '', MAX_PASSWORD);
 
             if (!preg_match('/^\d{4,6}$/', $new_pin)) {
-                echo json_encode(['ok' => false, 'error' => 'PIN must be 4 to 6 digits.']);
+                api_error('PIN must be 4 to 6 digits.');
                 exit;
             }
             if ($new_pin !== $cfm_pin) {
-                echo json_encode(['ok' => false, 'error' => 'PINs do not match.']);
+                api_error('PINs do not match.');
                 exit;
             }
             if ($cur_pw === '') {
-                echo json_encode(['ok' => false, 'error' => 'Current password is required.']);
+                api_error('Current password is required.');
                 exit;
             }
             $pw_stmt = $conn->prepare("SELECT password FROM users WHERE user_id = ?");
@@ -507,7 +502,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             $pw_stmt->execute();
             $pw_row = $pw_stmt->get_result()->fetch_assoc();
             if (!password_verify($cur_pw, $pw_row['password'])) {
-                echo json_encode(['ok' => false, 'error' => 'Current password is incorrect.']);
+                api_error('Current password is incorrect.', 403);
                 exit;
             }
             $hashed_pin = password_hash($new_pin, PASSWORD_DEFAULT);
@@ -518,13 +513,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             $desc = ($_SESSION['full_name'] ?? '') . ' set a transaction PIN.';
             $log->bind_param('is', $user_id, $desc);
             $log->execute();
-            echo json_encode(['ok' => true, 'message' => 'Transaction PIN set successfully.']);
+            api_success([], 'Transaction PIN set successfully.');
             exit;
 
         case 'pin_remove':
             $cur_pw = san_str($_POST['current_password'] ?? '', MAX_PASSWORD);
             if ($cur_pw === '') {
-                echo json_encode(['ok' => false, 'error' => 'Current password is required.']);
+                api_error('Current password is required.');
                 exit;
             }
             $pw_stmt = $conn->prepare("SELECT password FROM users WHERE user_id = ?");
@@ -532,13 +527,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             $pw_stmt->execute();
             $pw_row = $pw_stmt->get_result()->fetch_assoc();
             if (!password_verify($cur_pw, $pw_row['password'])) {
-                echo json_encode(['ok' => false, 'error' => 'Current password is incorrect.']);
+                api_error('Current password is incorrect.', 403);
                 exit;
             }
             $upd = $conn->prepare("UPDATE users SET transaction_pin = NULL WHERE user_id = ?");
             $upd->bind_param('i', $user_id);
             $upd->execute();
-            echo json_encode(['ok' => true, 'message' => 'Transaction PIN removed.']);
+            api_success([], 'Transaction PIN removed.');
             exit;
 
         case 'pin_verify':
@@ -548,28 +543,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             $pin_stmt->execute();
             $pin_row = $pin_stmt->get_result()->fetch_assoc();
             if (!$pin_row['transaction_pin']) {
-                echo json_encode(['ok' => true, 'no_pin' => true]);
+                api_success(['no_pin' => true]);
                 exit;
             }
             // Same per-account bucket as ajax/verify_pin.php, so switching endpoints
             // doesn't reset the attempt count.
             $rl_key = 'uid:' . (int)$user_id;
             if (rate_limit_blocked($conn, 'verify_pin', $rl_key)) {
-                http_response_code(429);
-                echo json_encode(['ok' => false, 'error' => 'Too many attempts. Please wait a few minutes before trying again.']);
+                api_error('Too many attempts. Please wait a few minutes before trying again.', 429);
                 exit;
             }
             if (password_verify($pin, $pin_row['transaction_pin'])) {
                 rate_limit_clear($conn, 'verify_pin', $rl_key);
-                echo json_encode(['ok' => true]);
+                api_success();
             } else {
                 rate_limit_record($conn, 'verify_pin', $rl_key);
-                echo json_encode(['ok' => false, 'error' => 'Incorrect PIN.']);
+                api_error('Incorrect PIN.', 403);
             }
             exit;
 
         default:
-            echo json_encode(['ok' => false, 'error' => 'Unknown section.']);
+            api_error('Unknown section.');
     }
     exit;
 }

@@ -6,10 +6,7 @@ require_once '../../config/access.php';
 require_once '../../includes/agent_filter.php';
 require_once '../../includes/pagination.php';
 
-if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin', 'mechanic'])) {
-    header("Location: ../../auth/login.php");
-    exit;
-}
+require_role(['admin', 'super_admin', 'mechanic']);
 
 // AJAX autocomplete
 if (isset($_GET['ajax_ac']) && isset($_GET['q'])) {
@@ -240,11 +237,26 @@ require_once '../../includes/navbar.php';
   .client-toolbar > div > button[type="submit"],
   .client-toolbar > div > a[href*="add_client"] { grid-column: span 1; justify-content: center; }
   .client-toolbar > div > a[href*="client_list"] { grid-column: span 1; justify-content: center; }
+  .client-toolbar-actions { display: contents; }
+}
+
+@media (min-width: 769px) {
+  .client-toolbar > div { gap: 0.6rem; }
+  .client-toolbar-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-left: auto;
+  }
 }
 
 /* Row details open on hover, not click — no dead zone between the two <tr>s
    since .tg-table uses border-collapse, so the adjacent-sibling hover chain
    holds as the cursor moves from one row straight into the other. */
+.client-list-table thead th { padding: 0.45rem 0.75rem; }
+.client-list-table tbody td { padding: 0.45rem 0.75rem; }
+.client-list-table thead th:first-child,
+.client-list-table tbody td:first-child { text-align: left !important; }
 .client-list-table .tg-expand-row { display: none; }
 .client-list-table .tg-expandable-row:hover + .tg-expand-row,
 .client-list-table .tg-expand-row:hover {
@@ -310,6 +322,9 @@ require_once '../../includes/topbar.php';
     <form method="GET" action="" class="client-toolbar" style="margin-bottom:1rem;">
       <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
 
+        <!-- INSURANCE AGENT (opens on the signed-in agent's own clients; changing it applies right away) -->
+        <?php render_agent_filter($af, $base_path); ?>
+
         <!-- SEARCH INPUT with autocomplete -->
         <div style="position:relative;flex:1;min-width:150px;max-width:400px;">
           <span style="position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;z-index:1;"><?= icon('magnifying-glass', 14) ?></span>
@@ -321,8 +336,7 @@ require_once '../../includes/topbar.php';
           <div id="client-ac-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:200;background:var(--bg-3);border:1px solid var(--gold-bright);border-radius:9px;box-shadow:var(--shadow-md);max-height:220px;overflow-y:auto;margin-top:2px;"></div>
         </div>
 
-        <!-- INSURANCE AGENT (opens on the signed-in agent's own clients; changing it applies right away) -->
-        <?php render_agent_filter($af, $base_path); ?>
+        <button type="submit" class="btn-primary"><?= icon('magnifying-glass', 14) ?> Search</button>
 
         <!-- FILTER BY -->
         <select name="filter_by" class="filter-input" style="min-width:120px;">
@@ -351,14 +365,15 @@ require_once '../../includes/topbar.php';
           <option value="vehicles" <?= $sort_by === 'vehicles' ? 'selected' : '' ?>>Most Vehicles</option>
         </select>
 
-        <!-- BUTTONS -->
-        <button type="submit" class="btn-primary"><?= icon('magnifying-glass', 14) ?> Search</button>
         <?php if ($search || $filter_by !== 'all' || $sort_by !== 'newest' || $filter_type !== 'all' || $agent_filter !== $agent_default): ?>
         <a href="client_list.php" class="btn-ghost"><?= icon('x-mark', 14) ?> Clear</a>
         <?php endif; ?>
+
         <?php if ($_SESSION['role'] !== 'mechanic'): ?>
-        <a href="import_clients.php" class="btn-ghost" title="Add many clients at once from a CSV file"><?= icon('arrow-up-tray', 14) ?> Import</a>
+        <span class="client-toolbar-actions">
         <a href="add_client.php" class="btn-primary"><?= icon('plus', 14) ?> Add Client</a>
+        <a href="import_clients.php" class="btn-ghost" title="Add many clients at once from a CSV file"><?= icon('arrow-up-tray', 14) ?> Import</a>
+        </span>
         <?php endif; ?>
       </div>
     </form>
@@ -559,6 +574,17 @@ require_once '../../includes/topbar.php';
 <script src="../../assets/js/shared/client_list.js?v=<?= filemtime(__DIR__.'/../../assets/js/shared/client_list.js') ?>"></script>
 <script src="../../assets/js/shared/agent_filter.js?v=<?= filemtime(__DIR__.'/../../assets/js/shared/agent_filter.js') ?>"></script>
 <script>
+(function() {
+  var toolbar = document.querySelector('.client-toolbar');
+  if (toolbar) {
+    toolbar.querySelectorAll('select[name="filter_by"], select[name="client_type"], select[name="sort"]').forEach(function(select) {
+      select.addEventListener('change', function() {
+        toolbar.submit();
+      });
+    });
+  }
+})();
+
 (function() {
   var input    = document.getElementById('client-search-input');
   var dropdown = document.getElementById('client-ac-dropdown');

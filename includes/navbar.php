@@ -1,7 +1,6 @@
 <?php
 $active_page = $active_page ?? '';
 $base_path   = $base_path   ?? '../';
-$role        = $_SESSION['role'] ?? '';
 
 $active_group = match($active_page) {
     'clients'                      => 'clients',
@@ -12,7 +11,7 @@ $active_group = match($active_page) {
     default                        => ''
 };
 
-$dash_url = $role === 'mechanic'
+$dash_url = is_mechanic()
     ? $base_path . 'modules/repair/dashboard_mechanic.php'
     : $base_path . 'modules/admin/dashboard_admin.php';
 ?>
@@ -43,7 +42,7 @@ $dash_url = $role === 'mechanic'
       </a>
     </div>
 
-    <?php if ($role !== 'mechanic'): ?>
+    <?php if (!is_mechanic()): ?>
 
     <!-- Policy -->
     <div class="nav-item-wrap">
@@ -118,7 +117,7 @@ $dash_url = $role === 'mechanic'
       </div>
     </div>
 
-    <?php if ($role === 'super_admin'): ?>
+    <?php if (is_super_admin()): ?>
     <!-- User Management -->
     <div class="nav-item-wrap">
       <a href="<?= $base_path ?>modules/admin/manage_users.php"

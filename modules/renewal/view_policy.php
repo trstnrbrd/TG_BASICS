@@ -5,12 +5,11 @@ require_once '../../config/validators.php';
 require_once '../../config/settings.php';
 require_once '../../config/access.php';
 
-if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
-    header("Location: ../../auth/login.php");
-    exit;
-}
+require_role(['admin', 'super_admin']);
 
 require_once '../../includes/icons.php';
+require_once '../../includes/api.php';
+require_once '../../includes/transaction.php';
 
 $urg_days = (int)getSetting($conn, 'renewal_urgent_days', '7');
 $exp_days = (int)getSetting($conn, 'renewal_expiring_days', '30');
@@ -57,9 +56,7 @@ $view_only_msg   = 'Only the insurance agent of this client (' . ($policy['agent
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$can_edit_policy) {
     csrf_verify();
     if (isset($_POST['upload_receipt']) || isset($_POST['delete_receipt'])) {   // AJAX callers read JSON
-        header('Content-Type: application/json');
-        echo json_encode(['ok' => false, 'msg' => $view_only_msg]);
-        exit;
+        api_error($view_only_msg, 403);
     }
     header("Location: view_policy.php?id=" . $policy_id . "&error=" . urlencode($view_only_msg));
     exit;
@@ -156,29 +153,22 @@ if ($has_installments && $_SERVER['REQUEST_METHOD'] !== 'POST') {
 // ── HANDLE RECEIPT UPLOAD (AJAX) ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_receipt'])) {
     csrf_verify();
-    header('Content-Type: application/json');
     $payment_id = isset($_POST['payment_id']) ? (int)$_POST['payment_id'] : 0;
-    if ($payment_id <= 0) { echo json_encode(['ok' => false, 'msg' => 'Invalid payment.']); exit; }
+    if ($payment_id <= 0) api_error('Invalid payment.');
 
     // Verify it belongs to this policy
     $chk = $conn->prepare("SELECT payment_id, receipt_file FROM policy_payments WHERE payment_id = ? AND policy_id = ?");
     $chk->bind_param('ii', $payment_id, $policy_id);
     $chk->execute();
     $chk_row = $chk->get_result()->fetch_assoc();
-    if (!$chk_row) { echo json_encode(['ok' => false, 'msg' => 'Not found.']); exit; }
+    if (!$chk_row) api_error('Not found.', 404);
 
-    if (empty($_FILES['receipt_file']['tmp_name'])) {
-        echo json_encode(['ok' => false, 'msg' => 'No file received.']); exit;
-    }
+    if (empty($_FILES['receipt_file']['tmp_name'])) api_error('No file received.');
     $f    = $_FILES['receipt_file'];
     $mime = mime_content_type($f['tmp_name']);
     $allowed_mime = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    if (!in_array($mime, $allowed_mime)) {
-        echo json_encode(['ok' => false, 'msg' => 'Only JPEG, PNG, WEBP, or GIF images are allowed.']); exit;
-    }
-    if ($f['size'] > 5 * 1024 * 1024) {
-        echo json_encode(['ok' => false, 'msg' => 'File too large (max 5 MB).']); exit;
-    }
+    if (!in_array($mime, $allowed_mime)) api_error('Only JPEG, PNG, WEBP, or GIF images are allowed.');
+    if ($f['size'] > 5 * 1024 * 1024) api_error('File too large (max 5 MB).', 413);
     $ext      = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'][$mime];
     $filename = 'rcpt_' . $payment_id . '_' . time() . '.' . $ext;
     $dest     = __DIR__ . '/../../uploads/receipts/' . $filename;
@@ -188,9 +178,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_receipt'])) {
         unlink(__DIR__ . '/../../uploads/receipts/' . $chk_row['receipt_file']);
     }
 
-    if (!move_uploaded_file($f['tmp_name'], $dest)) {
-        echo json_encode(['ok' => false, 'msg' => 'Upload failed. Check server permissions.']); exit;
-    }
+    if (!move_uploaded_file($f['tmp_name'], $dest)) api_error('Upload failed. Check server permissions.', 500);
     $upd_rc = $conn->prepare("UPDATE policy_payments SET receipt_file = ? WHERE payment_id = ?");
     $upd_rc->bind_param('si', $filename, $payment_id);
     $upd_rc->execute();
@@ -201,15 +189,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_receipt'])) {
     $log->bind_param('is', $uid, $desc);
     $log->execute();
 
-    echo json_encode(['ok' => true, 'filename' => $filename]); exit;
+    api_success(['filename' => $filename]);
 }
 
 // ── HANDLE RECEIPT DELETE (AJAX) ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_receipt'])) {
     csrf_verify();
-    header('Content-Type: application/json');
     $payment_id = isset($_POST['payment_id']) ? (int)$_POST['payment_id'] : 0;
-    $chk2 = $conn->prepare("SELECT receipt_file FROM policy_payments WHERE payment_id = ? AND policy_id = ?");
+    $chk2 =$conn->prepare("SELECT receipt_file FROM policy_payments WHERE payment_id = ? AND policy_id = ?");
     $chk2->bind_param('ii', $payment_id, $policy_id);
     $chk2->execute();
     $chk2_row = $chk2->get_result()->fetch_assoc();
@@ -220,7 +207,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_receipt'])) {
         $clr->bind_param('i', $payment_id);
         $clr->execute();
     }
-    echo json_encode(['ok' => true]); exit;
+    api_success();
 }
 
 // ── HANDLE UNDO OF ONE SAVED PAYMENT ──
@@ -348,58 +335,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
         }
 
         if ($valid) {
-            $total_paid = 0;
-            foreach ($installments as $row) {
-                $inst_no  = $row['installment_no'];
-                $idx      = $inst_no - 1;
-                $amt_paid = $amounts[$idx] ?? 0.0;
-                // Keep the original payment date when this installment's amount didn't change — only a new or
-                // edited payment is stamped "now" (otherwise saving installment 3 re-dates installments 1 and 2).
-                $unchanged = abs((float)$row['amount_paid'] - $amt_paid) < 0.005 && !empty($row['paid_at']);
-                $paid_at   = $amt_paid > 0 ? ($unchanged ? $row['paid_at'] : date('Y-m-d H:i:s')) : null;
-                $pay_mode = !empty($pay_modes[$idx])    ? $pay_modes[$idx]    : null;
-                $ctrl_num = !empty($ctrl_numbers[$idx]) ? $ctrl_numbers[$idx] : null;
-                $total_paid += $amt_paid;
+            // Every installment row, the policy's own totals and the audit entry are saved together or not at
+            // all (includes/transaction.php) — a failure halfway used to leave paid installments behind a
+            // policy balance that still said they were unpaid.
+            try {
+                db_transaction($conn, function () use ($conn, $installments, $amounts, $pay_modes, $ctrl_numbers, $payable_amount, $policy_id, $policy) {
+                    $total_paid = 0;
+                    foreach ($installments as $row) {
+                        $inst_no  = $row['installment_no'];
+                        $idx      = $inst_no - 1;
+                        $amt_paid = $amounts[$idx] ?? 0.0;
+                        // Keep the original payment date when this installment's amount didn't change — only a new or
+                        // edited payment is stamped "now" (otherwise saving installment 3 re-dates installments 1 and 2).
+                        $unchanged = abs((float)$row['amount_paid'] - $amt_paid) < 0.005 && !empty($row['paid_at']);
+                        $paid_at   = $amt_paid > 0 ? ($unchanged ? $row['paid_at'] : date('Y-m-d H:i:s')) : null;
+                        $pay_mode = !empty($pay_modes[$idx])    ? $pay_modes[$idx]    : null;
+                        $ctrl_num = !empty($ctrl_numbers[$idx]) ? $ctrl_numbers[$idx] : null;
+                        $total_paid += $amt_paid;
 
-                $upd_pp = $conn->prepare("UPDATE policy_payments SET amount_paid = ?, paid_at = ?, payment_mode = ?, control_number = ? WHERE payment_id = ?");
-                $upd_pp->bind_param('dsssi', $amt_paid, $paid_at, $pay_mode, $ctrl_num, $row['payment_id']);
-                $upd_pp->execute();
-            }
+                        $upd_pp = $conn->prepare("UPDATE policy_payments SET amount_paid = ?, paid_at = ?, payment_mode = ?, control_number = ? WHERE payment_id = ?");
+                        $upd_pp->bind_param('dsssi', $amt_paid, $paid_at, $pay_mode, $ctrl_num, $row['payment_id']);
+                        $upd_pp->execute();
+                    }
 
-            $new_balance  = $payable_amount - $total_paid;
-            $today        = date('Y-m-d');
-            $due_past = 0; $paid_past = 0;
-            foreach ($installments as $row) {
-                if ($row['due_date'] && $row['due_date'] < $today) {
-                    $idx = $row['installment_no'] - 1;
-                    $due_past  += (float)$row['amount_due'];
-                    $paid_past += (float)($amounts[$idx] ?? 0);
-                }
-            }
-            $has_overdue = $due_past > 0 && $paid_past < $due_past;
-            if ($new_balance <= 0) {
-                $new_status = 'Paid';
-            } elseif ($has_overdue) {
-                $new_status = 'Overdue';
-            } elseif ($total_paid > 0) {
-                $new_status = 'Partial';
-            } else {
-                $new_status = 'Unpaid';
-            }
+                    $new_balance  = $payable_amount - $total_paid;
+                    $today        = date('Y-m-d');
+                    $due_past = 0; $paid_past = 0;
+                    foreach ($installments as $row) {
+                        if ($row['due_date'] && $row['due_date'] < $today) {
+                            $idx = $row['installment_no'] - 1;
+                            $due_past  += (float)$row['amount_due'];
+                            $paid_past += (float)($amounts[$idx] ?? 0);
+                        }
+                    }
+                    $has_overdue = $due_past > 0 && $paid_past < $due_past;
+                    if ($new_balance <= 0) {
+                        $new_status = 'Paid';
+                    } elseif ($has_overdue) {
+                        $new_status = 'Overdue';
+                    } elseif ($total_paid > 0) {
+                        $new_status = 'Partial';
+                    } else {
+                        $new_status = 'Unpaid';
+                    }
 
-            $upd = $conn->prepare("UPDATE insurance_policies SET amount_paid = ?, balance = ?, payment_status = ? WHERE policy_id = ?");
-            $upd->bind_param('ddsi', $total_paid, $new_balance, $new_status, $policy_id);
+                    $upd = $conn->prepare("UPDATE insurance_policies SET amount_paid = ?, balance = ?, payment_status = ? WHERE policy_id = ?");
+                    $upd->bind_param('ddsi', $total_paid, $new_balance, $new_status, $policy_id);
+                    $upd->execute();
 
-            if ($upd->execute()) {
-                $uid  = $_SESSION['user_id'];
-                $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'PAYMENT_RECORDED', ?)");
-                $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' updated installment payments for policy ' . $policy['policy_number'] . '. Total paid: PHP ' . number_format($total_paid, 2) . '. Status: ' . $new_status . '.';
-                $log->bind_param('is', $uid, $desc);
-                $log->execute();
+                    $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'PAYMENT_RECORDED', ?)");
+                    $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' updated installment payments for policy ' . $policy['policy_number'] . '. Total paid: PHP ' . number_format($total_paid, 2) . '. Status: ' . $new_status . '.';
+                    $log->bind_param('is', $_SESSION['user_id'], $desc);
+                    $log->execute();
+                });
 
                 header("Location: view_policy.php?id=" . $policy_id . "&success=" . urlencode("Payment schedule updated successfully."));
                 exit;
-            } else {
+            } catch (Throwable $e) {
+                error_log('[TG-BASICS] record_payment (installments) failed: ' . $e->getMessage());
                 $pay_errors[] = 'Database error. Please try again.';
             }
         }
@@ -425,19 +418,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
                 $new_notes  = $new_notes ? $new_notes . "\n" . $note_entry : $note_entry;
             }
 
-            $upd = $conn->prepare("UPDATE insurance_policies SET amount_paid = ?, balance = ?, payment_status = ?, notes = ? WHERE policy_id = ?");
-            $upd->bind_param('ddssi', $new_amount_paid, $new_balance, $new_status, $new_notes, $policy_id);
+            // The policy totals and the audit entry are saved together or not at all (includes/transaction.php)
+            try {
+                db_transaction($conn, function () use ($conn, $new_amount_paid, $new_balance, $new_status, $new_notes, $policy_id, $policy, $payment_amount) {
+                    $upd = $conn->prepare("UPDATE insurance_policies SET amount_paid = ?, balance = ?, payment_status = ?, notes = ? WHERE policy_id = ?");
+                    $upd->bind_param('ddssi', $new_amount_paid, $new_balance, $new_status, $new_notes, $policy_id);
+                    $upd->execute();
 
-            if ($upd->execute()) {
-                $uid  = $_SESSION['user_id'];
-                $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'PAYMENT_RECORDED', ?)");
-                $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' recorded payment of PHP ' . number_format($payment_amount, 2) . ' for policy ' . $policy['policy_number'] . '. New balance: PHP ' . number_format($new_balance, 2) . '. Status: ' . $new_status . '.';
-                $log->bind_param('is', $uid, $desc);
-                $log->execute();
+                    $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'PAYMENT_RECORDED', ?)");
+                    $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' recorded payment of PHP ' . number_format($payment_amount, 2) . ' for policy ' . $policy['policy_number'] . '. New balance: PHP ' . number_format($new_balance, 2) . '. Status: ' . $new_status . '.';
+                    $log->bind_param('is', $_SESSION['user_id'], $desc);
+                    $log->execute();
+                });
 
                 header("Location: view_policy.php?id=" . $policy_id . "&success=" . urlencode("Payment of PHP " . number_format((float)$payment_amount, 2) . " recorded successfully."));
                 exit;
-            } else {
+            } catch (Throwable $e) {
+                error_log('[TG-BASICS] record_payment (single amount) failed: ' . $e->getMessage());
                 $pay_errors[] = 'Database error. Please try again.';
             }
         }
@@ -1213,7 +1210,7 @@ require_once '../../includes/footer.php';
             // re-bind delete btn
             bindDelBtn(cell.querySelector('.rc-del-btn'));
           } else {
-            cell.innerHTML = '<span style="font-size:0.7rem;color:var(--danger);">' + (data.msg || 'Upload failed') + '</span>';
+            cell.innerHTML = '<span style="font-size:0.7rem;color:var(--danger);">' + (data.message || 'Upload failed') + '</span>';
           }
         })
         .catch(function(){ cell.innerHTML = '<span style="font-size:0.7rem;color:var(--danger);">Upload error.</span>'; });

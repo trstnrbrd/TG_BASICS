@@ -13,11 +13,10 @@ if (strlen($q) < 1) api_success(['results' => []]);
 // real_escape_string() (that adds backslashes which then become part of the searched text — a name
 // like D'Souza would never match). Only LIKE's own wildcards need escaping.
 $like   = '%' . addcslashes($q, '\\%_') . '%';
-$role   = $_SESSION['role'] ?? '';
 $results = [];
 
 // ── CLIENTS ── (mechanics only ever see walk-in clients, no insurance policy on record)
-$clients_walkin_sql = $role === 'mechanic'
+$clients_walkin_sql = is_mechanic()
     ? "AND NOT EXISTS (SELECT 1 FROM insurance_policies ip WHERE ip.client_id = clients.client_id)"
     : '';
 $r = $conn->prepare("
@@ -42,7 +41,7 @@ while ($row = $rows->fetch_assoc()) {
 }
 
 // ── VEHICLES ── (mechanics only ever see walk-in clients' vehicles)
-$vehicles_walkin_sql = $role === 'mechanic'
+$vehicles_walkin_sql = is_mechanic()
     ? "AND NOT EXISTS (SELECT 1 FROM insurance_policies ip WHERE ip.client_id = c.client_id)"
     : '';
 $r = $conn->prepare("
@@ -67,7 +66,7 @@ while ($row = $rows->fetch_assoc()) {
 }
 
 // ── POLICIES (non-mechanic only) ──
-if ($role !== 'mechanic') {
+if (!is_mechanic()) {
     $r = $conn->prepare("
         SELECT ip.policy_id, ip.policy_number, ip.coverage_type, ip.policy_end,
                c.full_name, c.client_id

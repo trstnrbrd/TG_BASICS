@@ -4,10 +4,7 @@ require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
 
-if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin', 'mechanic'])) {
-    header("Location: ../../auth/login.php");
-    exit;
-}
+require_role(['admin', 'super_admin', 'mechanic']);
 $is_mechanic = $_SESSION['role'] === 'mechanic';
 
 $client_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;

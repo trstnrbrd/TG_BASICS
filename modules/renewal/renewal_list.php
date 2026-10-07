@@ -10,10 +10,7 @@ require_once '../../includes/pagination.php';
 $urg_days = (int)getSetting($conn, 'renewal_urgent_days', '7');
 $exp_days = (int)getSetting($conn, 'renewal_expiring_days', '30');
 
-if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
-    header("Location: ../../auth/login.php");
-    exit;
-}
+require_role(['admin', 'super_admin']);
 
 $is_super = $_SESSION['role'] === 'super_admin';
 
@@ -148,6 +145,11 @@ require_once '../../includes/navbar.php';
    :hover, so mobile/tablet (<=768px) keeps the original tap-to-expand
    behavior from the global click handler in footer.php instead. */
 @media (min-width: 769px) {
+  .renewal-list-table thead th { padding: 0.45rem 0.75rem; }
+  .renewal-list-table tbody td { padding: 0.45rem 0.75rem; }
+  .renewal-list-table thead th:first-child,
+  .renewal-list-table tbody td:first-child { text-align: left !important; }
+  .renewal-list-table tbody td:first-child > div { justify-content: flex-start !important; }
   .renewal-list-table .tg-expand-row { display: none; }
   .renewal-list-table .tg-expandable-row:hover + .tg-expand-row,
   .renewal-list-table .tg-expand-row:hover {
@@ -269,7 +271,7 @@ require_once '../../includes/topbar.php';
         <table class="tg-table mob-card mob-renewal-table renewal-list-table">
           <thead>
             <tr>
-              <th style="text-align:center;">Client</th>
+              <th style="text-align:left;">Client</th>
               <th style="text-align:center;">Plate</th>
               <th style="text-align:center;">Expiry Date</th>
               <th style="text-align:center;">Status</th>
@@ -314,8 +316,8 @@ require_once '../../includes/topbar.php';
               }
             ?>
             <tr class="tg-expandable-row" data-expand="<?= $rid ?>" tabindex="0" style="cursor:pointer;<?= $row_style ?>">
-              <td style="text-align:center;">
-                <div style="display:flex;align-items:center;justify-content:center;gap:0.5rem;">
+              <td style="text-align:left;">
+                <div style="display:flex;align-items:center;justify-content:flex-start;gap:0.5rem;">
                   <svg class="row-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;opacity:0.35;transition:transform 0.2s;"><polyline points="9 18 15 12 9 6"/></svg>
                   <div>
                     <div style="font-weight:700;color:var(--text-primary);font-size:0.82rem;"><?= htmlspecialchars($row['full_name']) ?></div>

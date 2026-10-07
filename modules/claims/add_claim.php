@@ -3,11 +3,9 @@ require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../includes/icons.php';
+require_once '../../includes/transaction.php';
 
-if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
-    header("Location: ../../auth/login.php");
-    exit;
-}
+require_role(['admin', 'super_admin']);
 
 $errors  = [];
 $success = false;
@@ -60,18 +58,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($description === '')    $errors[] = 'Incident description is required.';
 
     if (empty($errors)) {
-        $stmt = $conn->prepare("
-            INSERT INTO claims (policy_id, client_id, claim_type, incident_date, description, status, created_by)
-            VALUES (?, ?, ?, ?, ?, 'compiling', ?)
-        ");
-        $stmt->bind_param('iisssi', $policy_id, $client_id, $claim_type, $incident_date, $description, $_SESSION['user_id']);
-        $stmt->execute();
-        $new_id = $conn->insert_id;
+        // The claim and its audit entry are saved together or not at all (includes/transaction.php)
+        $new_id = db_transaction($conn, function () use ($conn, $policy_id, $client_id, $claim_type, $incident_date, $description) {
+            $stmt = $conn->prepare("
+                INSERT INTO claims (policy_id, client_id, claim_type, incident_date, description, status, created_by)
+                VALUES (?, ?, ?, ?, ?, 'compiling', ?)
+            ");
+            $stmt->bind_param('iisssi', $policy_id, $client_id, $claim_type, $incident_date, $description, $_SESSION['user_id']);
+            $stmt->execute();
+            $id = $conn->insert_id;
 
-        $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'CLAIM_FILED', ?)");
-        $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' filed a new ' . $claim_type . ' claim.';
-        $log->bind_param('is', $_SESSION['user_id'], $desc);
-        $log->execute();
+            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'CLAIM_FILED', ?)");
+            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' filed a new ' . $claim_type . ' claim.';
+            $log->bind_param('is', $_SESSION['user_id'], $desc);
+            $log->execute();
+
+            return $id;
+        });
 
         header("Location: view_claim.php?id=$new_id&success=" . urlencode('Claim filed successfully.'));
         exit;

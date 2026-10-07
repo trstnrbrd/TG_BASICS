@@ -1,9 +1,7 @@
 <?php
-// Page-by-page lists (owner's staff expect ~1,000 clients) — Client Records, Renewal Tracking, Claims, Billing,
-// Repair Jobs and Quotations. Same pager look as the Activity Log. The page number travels in ?page=; a list's
-// filter form doesn't carry it, so changing a filter or searching starts again from page 1.
 
-const TG_PER_PAGE = 25;
+
+const TG_PER_PAGE = 20;
 
 /**
  * Runs a list query one page at a time. $sql is the page's full query (ORDER BY included, no LIMIT) and

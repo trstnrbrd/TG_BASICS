@@ -4,11 +4,10 @@ require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../includes/icons.php';
 require_once '../../config/mailer.php';
+require_once '../../includes/transaction.php';
+require_once '../../includes/api.php';
 
-if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
-    header("Location: ../../auth/login.php");
-    exit;
-}
+require_role(['admin', 'super_admin']);
 
 $claim_id = (int)($_GET['id'] ?? 0);
 if (!$claim_id) { header("Location: claims_list.php"); exit; }
@@ -79,17 +78,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Handle AJAX file upload
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_upload'])) {
-    header('Content-Type: application/json');
     $doc_field = san_str($_POST['doc_field'] ?? '', 40);
     $allowed   = ['doc_insurance_policy', 'doc_or', 'doc_cr', 'doc_drivers_license', 'doc_affidavit', 'doc_estimate', 'doc_damage_photos'];
     $policy_expired_ajax = strtotime($claim['policy_end']) < strtotime(date('Y-m-d'));
     $docs_open_statuses = ['compiling', 'sent_admin', 'lack_of_requirements'];
     if (!in_array($doc_field, $allowed, true) || !in_array($claim['status'], $docs_open_statuses) || $policy_expired_ajax) {
-        echo json_encode(['ok' => false, 'msg' => 'Not allowed.']); exit;
+        api_error('Not allowed.', 403);
     }
 
     if (!isset($_FILES['doc_file']) || $_FILES['doc_file']['error'] !== UPLOAD_ERR_OK) {
-        echo json_encode(['ok' => false, 'msg' => 'Upload failed.']); exit;
+        api_error('Upload failed.');
     }
 
     $file     = $_FILES['doc_file'];
@@ -98,12 +96,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_upload'])) {
     $mime     = finfo_file($finfo, $file['tmp_name']);
     finfo_close($finfo);
 
-    if (!in_array($mime, $allowed_types)) {
-        echo json_encode(['ok' => false, 'msg' => 'Only images and PDFs allowed.']); exit;
-    }
-    if ($file['size'] > 10 * 1024 * 1024) {
-        echo json_encode(['ok' => false, 'msg' => 'File too large (max 10MB).']); exit;
-    }
+    if (!in_array($mime, $allowed_types)) api_error('Only images and PDFs allowed.');
+    if ($file['size'] > 10 * 1024 * 1024) api_error('File too large (max 10MB).', 413);
 
     $ext      = $mime === 'application/pdf' ? 'pdf' : explode('/', $mime)[1];
     $filename = 'claim_' . $claim_id . '_' . $doc_field . '_' . time() . '.' . $ext;
@@ -119,9 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_upload'])) {
         unlink(__DIR__ . '/../../uploads/claims/' . $old);
     }
 
-    if (!move_uploaded_file($file['tmp_name'], $dest)) {
-        echo json_encode(['ok' => false, 'msg' => 'Could not save file.']); exit;
-    }
+    if (!move_uploaded_file($file['tmp_name'], $dest)) api_error('Could not save file.', 500);
 
     $file_col = $doc_field . '_file';
     $upd = $conn->prepare("UPDATE claims SET $doc_field = 1, $file_col = ? WHERE claim_id = ?");
@@ -131,17 +123,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_upload'])) {
     $counts = fetchDocCounts($conn, $claim_id);
     $url    = '../../uploads/claims/' . $filename;
     $is_pdf = $mime === 'application/pdf';
-    echo json_encode(['ok' => true, 'url' => $url, 'filename' => $filename, 'is_pdf' => $is_pdf] + $counts);
-    exit;
+    api_success(['url' => $url, 'filename' => $filename, 'is_pdf' => $is_pdf] + $counts);
 }
 
 // Handle AJAX file remove
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_remove_doc'])) {
-    header('Content-Type: application/json');
     $doc_field = san_str($_POST['doc_field'] ?? '', 40);
     $allowed   = ['doc_insurance_policy', 'doc_or', 'doc_cr', 'doc_drivers_license', 'doc_affidavit', 'doc_estimate', 'doc_damage_photos'];
     if (!in_array($doc_field, $allowed, true) || !in_array($claim['status'], ['compiling', 'sent_admin', 'lack_of_requirements'])) {
-        echo json_encode(['ok' => false]); exit;
+        api_error('Not allowed.', 403);
     }
 
     $file_col = $doc_field . '_file';
@@ -158,16 +148,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_remove_doc'])) {
     $upd->execute();
 
     $counts = fetchDocCounts($conn, $claim_id);
-    echo json_encode(['ok' => true] + $counts);
-    exit;
+    api_success($counts);
 }
 
 // Handle AJAX damage photo upload (multi)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_damage_upload'])) {
-    header('Content-Type: application/json');
     $policy_expired_ajax = strtotime($claim['policy_end']) < strtotime(date('Y-m-d'));
-    if (!in_array($claim['status'], ['compiling', 'sent_admin', 'lack_of_requirements']) || $policy_expired_ajax) { echo json_encode(['ok' => false, 'msg' => 'Not allowed.']); exit; }
-    if (!isset($_FILES['damage_file']) || $_FILES['damage_file']['error'] !== UPLOAD_ERR_OK) { echo json_encode(['ok' => false, 'msg' => 'Upload failed.']); exit; }
+    if (!in_array($claim['status'], ['compiling', 'sent_admin', 'lack_of_requirements']) || $policy_expired_ajax) api_error('Not allowed.', 403);
+    if (!isset($_FILES['damage_file']) || $_FILES['damage_file']['error'] !== UPLOAD_ERR_OK) api_error('Upload failed.');
 
     $file  = $_FILES['damage_file'];
     $allowed_types = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -175,70 +163,84 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_damage_upload'])
     $mime  = finfo_file($finfo, $file['tmp_name']);
     finfo_close($finfo);
 
-    if (!in_array($mime, $allowed_types)) { echo json_encode(['ok' => false, 'msg' => 'Only images allowed for damage photos.']); exit; }
-    if ($file['size'] > 10 * 1024 * 1024) { echo json_encode(['ok' => false, 'msg' => 'File too large (max 10MB).']); exit; }
+    if (!in_array($mime, $allowed_types)) api_error('Only images allowed for damage photos.');
+    if ($file['size'] > 10 * 1024 * 1024) api_error('File too large (max 10MB).', 413);
 
     $ext      = explode('/', $mime)[1];
     $filename = 'dmg_' . $claim_id . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
     $dest     = __DIR__ . '/../../uploads/claims/' . $filename;
 
-    if (!move_uploaded_file($file['tmp_name'], $dest)) { echo json_encode(['ok' => false, 'msg' => 'Could not save file.']); exit; }
+    if (!move_uploaded_file($file['tmp_name'], $dest)) api_error('Could not save file.', 500);
 
-    $ins = $conn->prepare("INSERT INTO claim_damage_photos (claim_id, filename) VALUES (?, ?)");
-    $ins->bind_param('is', $claim_id, $filename);
-    $ins->execute();
-    $photo_id = $conn->insert_id;
+    // The photo row and the "photos present" flag change together; if either fails, the saved file is removed
+    try {
+        $photo_id = db_transaction($conn, function () use ($conn, $claim_id, $filename) {
+            $ins = $conn->prepare("INSERT INTO claim_damage_photos (claim_id, filename) VALUES (?, ?)");
+            $ins->bind_param('is', $claim_id, $filename);
+            $ins->execute();
+            $id = $conn->insert_id;
 
-    // Mark doc_damage_photos = 1 if not already
-    $dmg_upd = $conn->prepare("UPDATE claims SET doc_damage_photos = 1 WHERE claim_id = ? AND doc_damage_photos = 0");
-    $dmg_upd->bind_param('i', $claim_id);
-    $dmg_upd->execute();
+            // Mark doc_damage_photos = 1 if not already
+            $dmg_upd = $conn->prepare("UPDATE claims SET doc_damage_photos = 1 WHERE claim_id = ? AND doc_damage_photos = 0");
+            $dmg_upd->bind_param('i', $claim_id);
+            $dmg_upd->execute();
+
+            return $id;
+        });
+    } catch (Throwable $e) {
+        unlink($dest);
+        throw $e;
+    }
 
     $counts = fetchDocCounts($conn, $claim_id);
     $url    = '../../uploads/claims/' . $filename;
-    echo json_encode(['ok' => true, 'photo_id' => $photo_id, 'url' => $url, 'filename' => $filename] + $counts);
-    exit;
+    api_success(['photo_id' => $photo_id, 'url' => $url, 'filename' => $filename] + $counts);
 }
 
 // Handle AJAX damage photo remove
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_damage_remove'])) {
-    header('Content-Type: application/json');
     $policy_expired_ajax = strtotime($claim['policy_end']) < strtotime(date('Y-m-d'));
-    if (!in_array($claim['status'], ['compiling', 'sent_admin', 'lack_of_requirements']) || $policy_expired_ajax) { echo json_encode(['ok' => false]); exit; }
+    if (!in_array($claim['status'], ['compiling', 'sent_admin', 'lack_of_requirements']) || $policy_expired_ajax) api_error('Not allowed.', 403);
 
     $photo_id = (int)($_POST['photo_id'] ?? 0);
-    $ph_sel = $conn->prepare("SELECT filename FROM claim_damage_photos WHERE photo_id = ? AND claim_id = ?");
-    $ph_sel->bind_param('ii', $photo_id, $claim_id);
-    $ph_sel->execute();
-    $row = $ph_sel->get_result()->fetch_assoc();
-    if ($row) {
-        $path = __DIR__ . '/../../uploads/claims/' . $row['filename'];
-        if (file_exists($path)) unlink($path);
-        $ph_del = $conn->prepare("DELETE FROM claim_damage_photos WHERE photo_id = ?");
-        $ph_del->bind_param('i', $photo_id);
-        $ph_del->execute();
-    }
+    // The photo row, the remaining count and the "photos present" flag change together
+    [$removed_file, $remaining] = db_transaction($conn, function () use ($conn, $photo_id, $claim_id) {
+        $removed_file = null;
+        $ph_sel = $conn->prepare("SELECT filename FROM claim_damage_photos WHERE photo_id = ? AND claim_id = ?");
+        $ph_sel->bind_param('ii', $photo_id, $claim_id);
+        $ph_sel->execute();
+        $row = $ph_sel->get_result()->fetch_assoc();
+        if ($row) {
+            $removed_file = $row['filename'];
+            $ph_del = $conn->prepare("DELETE FROM claim_damage_photos WHERE photo_id = ?");
+            $ph_del->bind_param('i', $photo_id);
+            $ph_del->execute();
+        }
 
-    // If no photos remain, uncheck doc_damage_photos
-    $rem_stmt = $conn->prepare("SELECT COUNT(*) as c FROM claim_damage_photos WHERE claim_id = ?");
-    $rem_stmt->bind_param('i', $claim_id);
-    $rem_stmt->execute();
-    $remaining = $rem_stmt->get_result()->fetch_assoc()['c'];
-    if ($remaining === 0) {
-        $uncheck = $conn->prepare("UPDATE claims SET doc_damage_photos = 0 WHERE claim_id = ?");
-        $uncheck->bind_param('i', $claim_id);
-        $uncheck->execute();
+        // If no photos remain, uncheck doc_damage_photos
+        $rem_stmt = $conn->prepare("SELECT COUNT(*) as c FROM claim_damage_photos WHERE claim_id = ?");
+        $rem_stmt->bind_param('i', $claim_id);
+        $rem_stmt->execute();
+        $remaining = $rem_stmt->get_result()->fetch_assoc()['c'];
+        if ($remaining === 0) {
+            $uncheck = $conn->prepare("UPDATE claims SET doc_damage_photos = 0 WHERE claim_id = ?");
+            $uncheck->bind_param('i', $claim_id);
+            $uncheck->execute();
+        }
+        return [$removed_file, $remaining];
+    });
+    // The file goes only after the database change is committed
+    if ($removed_file !== null) {
+        $path = __DIR__ . '/../../uploads/claims/' . $removed_file;
+        if (file_exists($path)) unlink($path);
     }
 
     $counts = fetchDocCounts($conn, $claim_id);
-    echo json_encode(['ok' => true, 'remaining' => $remaining] + $counts);
-    exit;
+    api_success(['remaining' => $remaining] + $counts);
 }
 
 // Handle AJAX: Send requirements email to admin
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_send_admin_email'])) {
-    header('Content-Type: application/json');
-
     // Linked recipients use the user's CURRENT email (follows their account); raw entries use the stored email.
     $notify_emails = [];
     $cnr_res = $conn->query("
@@ -252,10 +254,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_send_admin_email
             $notify_emails[] = $cnr_row['resolved_email'];
         }
     }
-    if (empty($notify_emails)) {
-        echo json_encode(['ok' => false, 'msg' => 'No admin email configured. Please set it in Settings.']);
-        exit;
-    }
+    if (empty($notify_emails)) api_error('No admin email configured. Please set it in Settings.');
 
     // Reload fresh claim data
     $fr_stmt = $conn->prepare("SELECT * FROM claims WHERE claim_id = ?");
@@ -318,8 +317,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_send_admin_email
         $attachments
     );
 
-    echo json_encode(['ok' => $ok, 'msg' => $ok ? 'Email sent successfully.' : 'Failed to send email. Check SMTP settings.']);
-    exit;
+    if (!$ok) api_error('Failed to send email. Check SMTP settings.', 500);
+    api_success([], 'Email sent successfully.');
 }
 
 // Shared delete routine — cleans up all files then removes DB row
@@ -335,33 +334,37 @@ function deleteClaim($conn, $claim_id, $display_num, $user_id, $actor_name) {
     $dc_stmt = $conn->prepare("SELECT " . implode(',', $doc_cols) . " FROM claims WHERE claim_id = ?");
     $dc_stmt->bind_param('i', $claim_id);
     $dc_stmt->execute();
+    // Files are removed only after the database delete is committed (below), so a failed delete keeps them
+    $files = [];
     $row = $dc_stmt->get_result()->fetch_assoc();
     if ($row) {
         foreach ($doc_cols as $col) {
-            if (!empty($row[$col]) && file_exists($upload_dir . $row[$col])) {
-                unlink($upload_dir . $row[$col]);
-            }
+            if (!empty($row[$col]) && file_exists($upload_dir . $row[$col])) $files[] = $upload_dir . $row[$col];
         }
     }
 
-    // Delete damage photos from claim_damage_photos table + files
+    // Damage photos listed in claim_damage_photos (the rows go with the claim)
     $dp2 = $conn->prepare("SELECT filename FROM claim_damage_photos WHERE claim_id = ?");
     $dp2->bind_param('i', $claim_id);
     $dp2->execute();
     $photos = $dp2->get_result();
     while ($p = $photos->fetch_assoc()) {
-        if (file_exists($upload_dir . $p['filename'])) unlink($upload_dir . $p['filename']);
+        if (file_exists($upload_dir . $p['filename'])) $files[] = $upload_dir . $p['filename'];
     }
 
-    // Delete DB row (claim_damage_photos deleted via CASCADE)
-    $del = $conn->prepare("DELETE FROM claims WHERE claim_id = ?");
-    $del->bind_param('i', $claim_id);
-    $del->execute();
+    // Delete DB row (claim_damage_photos deleted via CASCADE) and its audit entry, together
+    db_transaction($conn, function () use ($conn, $claim_id, $user_id, $actor_name) {
+        $del = $conn->prepare("DELETE FROM claims WHERE claim_id = ?");
+        $del->bind_param('i', $claim_id);
+        $del->execute();
 
-    $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'CLAIM_DELETED', ?)");
-    $desc = $actor_name . ' deleted claim #' . $claim_id . '.';
-    $log->bind_param('is', $user_id, $desc);
-    $log->execute();
+        $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'CLAIM_DELETED', ?)");
+        $desc = $actor_name . ' deleted claim #' . $claim_id . '.';
+        $log->bind_param('is', $user_id, $desc);
+        $log->execute();
+    });
+
+    foreach ($files as $path) unlink($path);
 }
 
 // Handle delete (POST, from this page or the claims list) — only in the statuses the Delete
@@ -415,15 +418,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
     }
 
     if (in_array($new_status, $allowed_statuses)) {
-        $upd = $conn->prepare("UPDATE claims SET status = ?, denial_reason = ?, notes = ? WHERE claim_id = ?");
         $dr  = $new_status === 'denied' ? $denial_reason : null;
-        $upd->bind_param('sssi', $new_status, $dr, $notes, $claim_id);
-        $upd->execute();
+        // The status change and its audit entry are saved together or not at all (includes/transaction.php)
+        db_transaction($conn, function () use ($conn, $claim_id, $new_status, $dr, $notes) {
+            $upd = $conn->prepare("UPDATE claims SET status = ?, denial_reason = ?, notes = ? WHERE claim_id = ?");
+            $upd->bind_param('sssi', $new_status, $dr, $notes, $claim_id);
+            $upd->execute();
 
-        $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'CLAIM_UPDATED', ?)");
-        $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' updated claim #' . $claim_id . ' status to ' . $new_status . '.';
-        $log->bind_param('is', $_SESSION['user_id'], $desc);
-        $log->execute();
+            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'CLAIM_UPDATED', ?)");
+            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' updated claim #' . $claim_id . ' status to ' . $new_status . '.';
+            $log->bind_param('is', $_SESSION['user_id'], $desc);
+            $log->execute();
+        });
 
         // Send email notification to client if they have an email on file
         if (!empty($claim['email'])) {
@@ -497,7 +503,7 @@ require_once '../../includes/topbar.php';
       <div>
         <div style="display:flex;align-items:center;gap:0.75rem;">
           <a href="claims_list.php" class="back-link" onclick="goBack('claims_list.php'); return false;" style="margin-bottom:0;"><?= icon('arrow-left',14) ?> Back to Claims</a>
-          <h2 style="font-size:1.1rem;font-weight:800;color:var(--text-primary);">Claim #<?= $display_num ?></h2>
+          <h2 style="font-size:1.1rem;font-weight:800;color:var(--text-primary);"><?= htmlspecialchars($claim['full_name']) ?></h2>
           <span class="badge <?= $s['class'] ?>"><?= $s['label'] ?></span>
           <?php if ($claim['claim_type'] === 'repair'): ?>
           <span class="badge badge-danger">Repair</span>
@@ -978,7 +984,7 @@ const xIcon      = `<?= icon('x-mark', 10) ?>`;
           if (data.ok) {
             Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Email sent to admin.', showConfirmButton: false, timer: 3000, timerProgressBar: true });
           } else {
-            Swal.fire({ icon: 'error', title: 'Failed to Send', text: data.msg || 'Could not send email. Check SMTP settings.' });
+            Swal.fire({ icon: 'error', title: 'Failed to Send', text: data.message || 'Could not send email. Check SMTP settings.' });
           }
         })
         .catch(function() {

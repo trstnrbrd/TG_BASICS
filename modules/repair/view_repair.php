@@ -3,11 +3,9 @@ require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/mailer.php';
+require_once '../../includes/transaction.php';
 
-if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin', 'mechanic'])) {
-    header("Location: ../../auth/login.php");
-    exit;
-}
+require_role(['admin', 'super_admin', 'mechanic']);
 
 $role   = $_SESSION['role'];
 $job_id = san_int($_GET['id'] ?? 0, 1);
@@ -45,7 +43,7 @@ $images = $img_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 // ── HANDLE IMAGE DELETE ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_image') {
     csrf_verify();
-    if (in_array($role, ['admin','super_admin'])) {
+    if (is_staff()) {
         $img_id = san_int($_POST['image_id'] ?? 0, 1);
         if ($img_id) {
             $fi = $conn->prepare("SELECT file_name FROM repair_job_images WHERE image_id = ? AND job_id = ?");
@@ -100,13 +98,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] === 'update_status') {
         $new_status = san_enum($_POST['status'] ?? '', ['pending','in_progress','for_pickup','completed','cancelled']);
         if ($new_status) {
-            $upd = $conn->prepare("UPDATE repair_jobs SET status = ? WHERE job_id = ?");
-            $upd->bind_param('si', $new_status, $job_id);
-            $upd->execute();
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'REPAIR_STATUS_UPDATED', ?)");
-            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' updated repair job ' . $job['job_number'] . ' status to ' . $new_status . '.';
-            $log->bind_param('is', $_SESSION['user_id'], $desc);
-            $log->execute();
+            // The status change and its audit entry are saved together or not at all (includes/transaction.php)
+            db_transaction($conn, function () use ($conn, $job_id, $job, $new_status) {
+                $upd = $conn->prepare("UPDATE repair_jobs SET status = ? WHERE job_id = ?");
+                $upd->bind_param('si', $new_status, $job_id);
+                $upd->execute();
+                $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'REPAIR_STATUS_UPDATED', ?)");
+                $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' updated repair job ' . $job['job_number'] . ' status to ' . $new_status . '.';
+                $log->bind_param('is', $_SESSION['user_id'], $desc);
+                $log->execute();
+            });
 
             if ($new_status === 'completed' && !empty($job['email'])) {
                 $tok_row = $conn->prepare("SELECT public_token FROM clients WHERE client_id = ?");
@@ -420,7 +421,7 @@ document.addEventListener('DOMContentLoaded', function() {
             style="width:100%;height:100%;object-fit:cover;cursor:pointer;transition:opacity 0.15s;"
             onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'"
             onclick="openLightbox('<?= $img_url ?>')"/>
-          <?php if (in_array($role, ['admin','super_admin'])): ?>
+          <?php if (is_staff()): ?>
           <form method="POST" style="position:absolute;top:0.35rem;right:0.35rem;">
             <?= csrf_field() ?>
             <input type="hidden" name="action" value="delete_image"/>

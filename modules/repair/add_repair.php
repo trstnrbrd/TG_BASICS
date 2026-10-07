@@ -3,11 +3,9 @@ require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
+require_once '../../includes/transaction.php';
 
-if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin', 'mechanic'])) {
-    header("Location: ../../auth/login.php");
-    exit;
-}
+require_role(['admin', 'super_admin', 'mechanic']);
 
 $checklist_area_keys = [
     'front_bumper','rear_bumper','hood','trunk','windshield',
@@ -85,40 +83,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // the same instant can compute the same next number — this recomputes and retries instead of the
         // request crashing with an uncaught duplicate-key error.
         $rel = $release_date ?: null;
-        $job_id = $job_num = null;
+        // The job, its checklist and the audit entry are saved together or not at all (includes/transaction.php)
+        $created = null;
         try {
-            [$job_id, $job_num] = insert_with_sequential_number($conn, 'repair_jobs', 'job_number', 'RJ-' . date('Ymd') . '-',
-                function (string $num) use ($conn, $client_id, $vehicle_id, $repair_date, $rel, $service_type, $additional) {
-                    $ins = $conn->prepare("
-                        INSERT INTO repair_jobs (client_id, vehicle_id, job_number, repair_date, release_date, service_type, additional_damages, created_by)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    ");
-                    $ins->bind_param('iisssssi', $client_id, $vehicle_id, $num, $repair_date, $rel, $service_type, $additional, $_SESSION['user_id']);
-                    $ins->execute();
-                    return [$conn->insert_id, $num];
+            $created = db_transaction($conn, function () use ($conn, $client_id, $vehicle_id, $repair_date, $rel, $service_type, $additional, $checklist_area_keys) {
+                [$job_id, $job_num] = insert_with_sequential_number($conn, 'repair_jobs', 'job_number', 'RJ-' . date('Ymd') . '-',
+                    function (string $num) use ($conn, $client_id, $vehicle_id, $repair_date, $rel, $service_type, $additional) {
+                        $ins = $conn->prepare("
+                            INSERT INTO repair_jobs (client_id, vehicle_id, job_number, repair_date, release_date, service_type, additional_damages, created_by)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        ");
+                        $ins->bind_param('iisssssi', $client_id, $vehicle_id, $num, $repair_date, $rel, $service_type, $additional, $_SESSION['user_id']);
+                        $ins->execute();
+                        return [$conn->insert_id, $num];
+                    }
+                );
+
+                // Save checklist
+                $cins = $conn->prepare("INSERT INTO repair_checklist (job_id, area_key, condition_value, notes) VALUES (?, ?, ?, ?)");
+                foreach ($checklist_area_keys as $key) {
+                    $cond  = san_enum($_POST['area_' . $key] ?? 'none', ['none', 'minor', 'major']);
+                    $note  = san_str($_POST['note_' . $key] ?? '', 255);
+                    $cins->bind_param('isss', $job_id, $key, $cond, $note);
+                    $cins->execute();
                 }
-            );
+
+                // Audit log
+                $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'REPAIR_JOB_CREATED', ?)");
+                $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' created repair job ' . $job_num . '.';
+                $log->bind_param('is', $_SESSION['user_id'], $desc);
+                $log->execute();
+
+                return $job_num;
+            });
         } catch (mysqli_sql_exception $e) {
             error_log('[TG-BASICS] add_repair.php job insert failed: ' . $e->getMessage());
         }
 
-        if ($job_id !== null) {
-            // Save checklist
-            $cins = $conn->prepare("INSERT INTO repair_checklist (job_id, area_key, condition_value, notes) VALUES (?, ?, ?, ?)");
-            foreach ($checklist_area_keys as $key) {
-                $cond  = san_enum($_POST['area_' . $key] ?? 'none', ['none', 'minor', 'major']);
-                $note  = san_str($_POST['note_' . $key] ?? '', 255);
-                $cins->bind_param('isss', $job_id, $key, $cond, $note);
-                $cins->execute();
-            }
-
-            // Audit log
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'REPAIR_JOB_CREATED', ?)");
-            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' created repair job ' . $job_num . '.';
-            $log->bind_param('is', $_SESSION['user_id'], $desc);
-            $log->execute();
-
-            header("Location: repair_list.php?success=" . urlencode('Repair job ' . $job_num . ' created successfully.'));
+        if ($created !== null) {
+            header("Location: repair_list.php?success=" . urlencode('Repair job ' . $created . ' created successfully.'));
             exit;
         } else {
             $errors[] = 'Database error. Please try again.';

@@ -9,10 +9,7 @@ require_once '../../config/dev_access.php';
 $urg_days = (int)getSetting($conn, 'renewal_urgent_days', '7');
 $exp_days = (int)getSetting($conn, 'renewal_expiring_days', '30');
 
-if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
-    header("Location: ../../auth/login.php");
-    exit;
-}
+require_role(['admin', 'super_admin']);
 
 $full_name = $_SESSION['full_name'];
 $first_name = explode(' ', $full_name)[0];

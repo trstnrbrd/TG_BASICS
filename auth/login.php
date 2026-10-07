@@ -9,7 +9,7 @@ require_once '../includes/icons.php';
 require_once '../config/dev_access.php';
 
 if (isset($_SESSION['user_id'])) {
-    if ($_SESSION['role'] === 'mechanic') {
+    if (is_mechanic()) {
         header("Location: ../modules/repair/dashboard_mechanic.php");
     } else {
         header("Location: ../modules/admin/dashboard_admin.php");

@@ -2,11 +2,9 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
+require_once '../../includes/transaction.php';
 
-if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
-    header("Location: ../../auth/login.php");
-    exit;
-}
+require_role(['admin', 'super_admin']);
 
 $errors  = [];
 $success = '';
@@ -84,37 +82,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // an uncaught duplicate-key error (see insert_with_sequential_number() for why).
         $inc_date = $incident_date ?: null;
         $rep_date = $repair_date   ?: null;
-        $billing_id = $bill_num = null;
+        // The billing record and its audit entry are saved together or not at all (includes/transaction.php).
+        // The claim row is locked first, so two people billing the same claim at once cannot both pass the
+        // duplicate check.
+        $created = null;
         try {
-            [$billing_id, $bill_num] = insert_with_sequential_number($conn, 'billing', 'billing_number', 'BILL-' . date('Ymd') . '-',
-                function (string $num) use ($conn, $claim_id, $billed_to, $inc_date, $rep_date, $parts_cost, $labor_cost, $other_cost, $deductible) {
-                    $ins = $conn->prepare("
-                        INSERT INTO billing
-                          (claim_id, billing_number, billed_to, incident_date, repair_date, parts_cost, labor_cost, other_cost, deductible, created_by)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ");
-                    $ins->bind_param(
-                        'issssddddi',
-                        $claim_id, $num, $billed_to, $inc_date, $rep_date,
-                        $parts_cost, $labor_cost, $other_cost, $deductible,
-                        $_SESSION['user_id']
-                    );
-                    $ins->execute();
-                    return [$conn->insert_id, $num];
-                }
-            );
+            $created = db_transaction($conn, function () use ($conn, $claim_id, $billed_to, $inc_date, $rep_date, $parts_cost, $labor_cost, $other_cost, $deductible) {
+                $lock = $conn->prepare("SELECT claim_id FROM claims WHERE claim_id = ? FOR UPDATE");
+                $lock->bind_param('i', $claim_id);
+                $lock->execute();
+
+                $dup = $conn->prepare("SELECT billing_id FROM billing WHERE claim_id = ?");
+                $dup->bind_param('i', $claim_id);
+                $dup->execute();
+                if ($dup->get_result()->num_rows > 0) return ['duplicate' => true];
+
+                [$billing_id, $bill_num] = insert_with_sequential_number($conn, 'billing', 'billing_number', 'BILL-' . date('Ymd') . '-',
+                    function (string $num) use ($conn, $claim_id, $billed_to, $inc_date, $rep_date, $parts_cost, $labor_cost, $other_cost, $deductible) {
+                        $ins = $conn->prepare("
+                            INSERT INTO billing
+                              (claim_id, billing_number, billed_to, incident_date, repair_date, parts_cost, labor_cost, other_cost, deductible, created_by)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ");
+                        $ins->bind_param(
+                            'issssddddi',
+                            $claim_id, $num, $billed_to, $inc_date, $rep_date,
+                            $parts_cost, $labor_cost, $other_cost, $deductible,
+                            $_SESSION['user_id']
+                        );
+                        $ins->execute();
+                        return [$conn->insert_id, $num];
+                    }
+                );
+
+                $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'BILLING_CREATED', ?)");
+                $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' created billing ' . $bill_num . '.';
+                $log->bind_param('is', $_SESSION['user_id'], $desc);
+                $log->execute();
+
+                return ['num' => $bill_num];
+            });
         } catch (mysqli_sql_exception $e) {
             error_log('[TG-BASICS] add_billing.php insert failed: ' . $e->getMessage());
         }
 
-        if ($billing_id !== null) {
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'BILLING_CREATED', ?)");
-            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' created billing ' . $bill_num . '.';
-            $log->bind_param('is', $_SESSION['user_id'], $desc);
-            $log->execute();
-
-            header("Location: billing_list.php?success=" . urlencode($bill_num . ' created successfully.'));
+        if (isset($created['num'])) {
+            header("Location: billing_list.php?success=" . urlencode($created['num'] . ' created successfully.'));
             exit;
+        } elseif (isset($created['duplicate'])) {
+            $errors[] = 'A billing record already exists for this claim.';
         } else {
             $errors[] = 'Database error. Please try again.';
         }

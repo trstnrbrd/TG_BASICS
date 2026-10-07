@@ -22,6 +22,22 @@ $footer_extra_scripts  = $footer_extra_scripts  ?? '';
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="<?= $base_path ?>assets/js/shared/layout_react.js?v=<?= filemtime(__DIR__ . '/../assets/js/shared/layout_react.js') ?>"></script>
 
+<!-- Every fetch() in the app asks for a JSON reply. A failed security check (csrf_verify in config/validators.php)
+     then answers in JSON the caller can read, instead of plain text that breaks r.json(). A caller that sets its
+     own Accept header keeps it. -->
+<script>
+  (function () {
+    var nativeFetch = window.fetch;
+    window.fetch = function (input, init) {
+      init = init || {};
+      var headers = new Headers(init.headers || {});
+      if (!headers.has('Accept')) headers.set('Accept', 'application/json');
+      init.headers = headers;
+      return nativeFetch.call(window, input, init);
+    };
+  })();
+</script>
+
 <?php if ($footer_extra_scripts): ?>
   <?= $footer_extra_scripts ?>
 <?php endif; ?>

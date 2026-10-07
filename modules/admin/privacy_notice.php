@@ -2,10 +2,7 @@
 require_once __DIR__ . '/../../config/session.php';
 require_once '../../config/db.php';
 
-if (!isset($_SESSION['user_id'])) {
-    header("Location: ../../auth/login.php");
-    exit;
-}
+require_role(['super_admin', 'admin', 'mechanic']);
 
 $page_title  = 'Privacy Notice';
 $active_page = '';

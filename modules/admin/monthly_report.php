@@ -3,10 +3,7 @@ require_once __DIR__ . '/../../config/session.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 
-if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
-    header("Location: ../../auth/login.php");
-    exit;
-}
+require_role(['admin', 'super_admin']);
 
 // ── FILTER: year (default current year) ──
 // Build year range: from earliest data year (or current-2) up to current year

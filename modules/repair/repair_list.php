@@ -3,17 +3,13 @@ require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../includes/pagination.php';
+require_once '../../includes/transaction.php';
 
-if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin', 'mechanic'])) {
-    header("Location: ../../auth/login.php");
-    exit;
-}
-
-$role = $_SESSION['role'];
+require_role(['admin', 'super_admin', 'mechanic']);
 
 // ── DELETE ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
-    if (!in_array($role, ['admin', 'super_admin'])) { header("Location: repair_list.php"); exit; }
+    if (!is_staff()) { header("Location: repair_list.php"); exit; }
     csrf_verify();
     $del_id = san_int($_POST['job_id'] ?? 0, 1);
     if ($del_id) {
@@ -22,13 +18,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $job_row->execute();
         $job_row = $job_row->get_result()->fetch_assoc();
         if ($job_row) {
-            $del = $conn->prepare("DELETE FROM repair_jobs WHERE job_id = ?");
-            $del->bind_param('i', $del_id);
-            $del->execute();
-            $log = $conn->prepare("INSERT INTO audit_logs (user_id,action,description) VALUES (?,'REPAIR_JOB_DELETED',?)");
-            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' deleted repair job ' . $job_row['job_number'] . '.';
-            $log->bind_param('is', $_SESSION['user_id'], $desc);
-            $log->execute();
+            db_transaction($conn, function () use ($conn, $del_id, $job_row) {
+                $del = $conn->prepare("DELETE FROM repair_jobs WHERE job_id = ?");
+                $del->bind_param('i', $del_id);
+                $del->execute();
+                $log = $conn->prepare("INSERT INTO audit_logs (user_id,action,description) VALUES (?,'REPAIR_JOB_DELETED',?)");
+                $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' deleted repair job ' . $job_row['job_number'] . '.';
+                $log->bind_param('is', $_SESSION['user_id'], $desc);
+                $log->execute();
+            });
         }
     }
     header("Location: repair_list.php?success=" . urlencode('Repair job deleted.'));
@@ -198,7 +196,7 @@ require_once '../../includes/topbar.php';
                 <a href="view_repair.php?id=<?= $j['job_id'] ?>" class="btn-sm-gold" title="View">
                   <?= icon('eye', 14) ?>
                 </a>
-                <?php if (in_array($role, ['admin','super_admin'])): ?>
+                <?php if (is_staff()): ?>
                 <button type="button" class="btn-sm-danger btn-delete-job" data-id="<?= $j['job_id'] ?>" data-num="<?= htmlspecialchars($j['job_number']) ?>" title="Delete">
                   <?= icon('trash', 13) ?>
                 </button>
@@ -226,7 +224,7 @@ require_once '../../includes/topbar.php';
   </div>
 </div>
 
-<?php if (in_array($role, ['admin','super_admin'])): ?>
+<?php if (is_staff()): ?>
 <form id="delete-job-form" method="POST" style="display:none;">
   <?= csrf_field() ?>
   <input type="hidden" name="action" value="delete"/>
@@ -258,4 +256,11 @@ document.querySelectorAll('.btn-delete-job').forEach(btn => {
 });
 </script>
 <?php endif; ?>
+<script>
+document.querySelectorAll('.rl-filter-form select[name="status"], .rl-filter-form select[name="sort"]').forEach(function (select) {
+  select.addEventListener('change', function () {
+    this.form.submit();
+  });
+});
+</script>
 <?php require_once '../../includes/footer.php'; ?>

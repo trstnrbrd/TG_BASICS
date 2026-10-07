@@ -211,23 +211,61 @@ function mu_status_badge(string $status): string {
     };
 }
 
-// ── LOAD RECENT AUDIT LOGS ──
-$logs = $conn->query("
-    SELECT a.log_id, a.action, a.description, a.created_at,
-           CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.full_name END AS full_name
-    FROM audit_logs a
-    LEFT JOIN users u ON a.user_id = u.user_id
-    WHERE (a.user_id IS NULL OR a.user_id NOT IN (SELECT user_id FROM users WHERE is_hidden = 1))
-    ORDER BY a.created_at DESC
-    LIMIT 10
-");
-
 $page_title  = 'Manage Users';
 $active_page = 'manage_users';
 $base_path   = '../../';
 require_once '../../includes/header.php';
 require_once '../../includes/navbar.php';
 ?>
+
+<style>
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  width: min(100%, 620px);
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+.modal-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.modal-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.modal-close:hover { background: var(--gold-pale); color: var(--gold); }
+</style>
 
 <div class="main">
 
@@ -260,7 +298,7 @@ require_once '../../includes/topbar.php';
     </script>
     <?php endif; ?>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;">
+    <div style="display:grid;grid-template-columns:minmax(0,1fr);gap:1.25rem;margin-bottom:1.25rem;">
 
       <!-- USER LIST -->
       <div class="card" style="margin-bottom:0;">
@@ -270,6 +308,9 @@ require_once '../../includes/topbar.php';
             <div class="card-title">System Users</div>
             <div class="card-sub">All staff accounts</div>
           </div>
+          <button type="button" class="btn-primary" id="js-open-create-modal" style="margin-left:auto;">
+            <?= icon('plus', 14) ?> Create New Account
+          </button>
         </div>
         <?php
         // Store users for both desktop table and mobile cards
@@ -368,15 +409,13 @@ require_once '../../includes/topbar.php';
         </div>
       </div>
 
-      <!-- CREATE ACCOUNT FORM -->
-      <div class="card" style="margin-bottom:0;">
-        <div class="card-header">
-          <div class="card-icon"><?= icon('plus', 16) ?></div>
-          <div>
-            <div class="card-title">Create New Account</div>
-            <div class="card-sub">Activation link will be sent via email</div>
+      <!-- CREATE ACCOUNT MODAL -->
+      <div class="modal-overlay" id="create-account-modal" onclick="if(event.target===this)closeCreateAccountModal()">
+        <div class="modal-box" style="max-width:620px;max-height:90vh;overflow-y:auto;">
+          <div class="modal-header">
+            <div class="modal-title"><?= icon('plus', 16) ?> <span>Create New Account</span></div>
+            <button type="button" class="modal-close" onclick="closeCreateAccountModal()" aria-label="Close"><?= icon('x-mark', 14) ?></button>
           </div>
-        </div>
         <form method="POST" action="">
           <?= csrf_field() ?>
           <input type="hidden" name="action" value="create"/>
@@ -426,77 +465,33 @@ require_once '../../includes/topbar.php';
             <button type="button" class="btn-primary" id="js-create-btn"><?= icon('envelope', 14) ?> Create &amp; Send Activation</button>
           </div>
         </form>
-      </div>
-
-    </div>
-
-    <!-- AUDIT LOGS -->
-    <div class="card">
-      <div class="card-header" style="justify-content:space-between;">
-        <div style="display:flex;align-items:center;gap:0.75rem;">
-          <div class="card-icon"><?= icon('clipboard-list', 16) ?></div>
-          <div>
-            <div class="card-title">Recent Activity</div>
-            <div class="card-sub">Last 10 system events</div>
-          </div>
         </div>
-        <a href="activity_log.php" class="btn-sm-gold">
-          View All <?= icon('chevron-right', 12) ?>
-        </a>
       </div>
-      <?php if ($logs->num_rows > 0): ?>
-      <table class="tg-table mob-card mob-audit-table">
-        <thead>
-          <tr>
-            <th>User</th>
-            <th>Action</th>
-            <th>Description</th>
-            <th>Date &amp; Time</th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php while ($log = $logs->fetch_assoc()):
-            $action_badges = [
-              'LOGIN'            => 'badge-green',
-              'LOGOUT'           => 'badge-gray',
-              'ACCOUNT_CREATED'  => 'badge-gold',
-              'ACCOUNT_DELETED'  => 'badge-red',
-              'ACCOUNT_DEACTIVATED' => 'badge-red',
-              'ACCOUNT_REACTIVATED' => 'badge-green',
-              'PASSWORD_RESET'   => 'badge-yellow',
-              'CLIENT_ADDED'     => 'badge-green',
-              'CLIENT_IMPORTED'  => 'badge-green',
-              'DATABASE_BACKUP'  => 'badge-blue',
-              'CLIENT_UPDATED'   => 'badge-yellow',
-              'VEHICLE_ADDED'    => 'badge-green',
-              'POLICY_CREATED'   => 'badge-gold',
-              'POLICY_SAVED'     => 'badge-green',
-            ];
-            $ab = $action_badges[$log['action']] ?? 'badge-gray';
-          ?>
-          <tr>
-            <td style="font-weight:700;color:<?= $log['full_name'] ? 'var(--text-primary)' : 'var(--text-muted)' ?>;font-size:0.8rem;font-style:<?= $log['full_name'] ? 'normal' : 'italic' ?>;">
-              <?= $log['full_name'] ? htmlspecialchars($log['full_name']) : 'Deleted User' ?>
-            </td>
-            <td><span class="badge <?= $ab ?>"><?= htmlspecialchars($log['action']) ?></span></td>
-            <td style="font-size:0.78rem;color:var(--text-secondary);"><?= htmlspecialchars($log['description']) ?></td>
-            <td style="font-size:0.72rem;color:var(--text-muted);white-space:nowrap;"><?= date('M d, Y h:i A', strtotime($log['created_at'])) ?></td>
-          </tr>
-          <?php endwhile; ?>
-        </tbody>
-      </table>
-      <?php else: ?>
-      <div class="empty-state">
-        <div class="empty-icon"><?= icon('clipboard-list', 28) ?></div>
-        <div class="empty-title">No logs yet</div>
-        <div class="empty-desc">System events will appear here.</div>
-      </div>
-      <?php endif; ?>
+
     </div>
 
   </div>
 </div>
 
 <script src="../../assets/js/super_admin/manage_users.js?v=<?= filemtime(__DIR__.'/../../assets/js/super_admin/manage_users.js') ?>"></script>
+<script>
+function openCreateAccountModal() {
+  document.getElementById('create-account-modal').classList.add('open');
+  setTimeout(function () {
+    var first = document.querySelector('[name="new_first_name"]');
+    if (first) first.focus();
+  }, 80);
+}
+function closeCreateAccountModal() {
+  document.getElementById('create-account-modal').classList.remove('open');
+}
+document.getElementById('js-open-create-modal').addEventListener('click', openCreateAccountModal);
+document.addEventListener('keydown', function (event) {
+  if (event.key === 'Escape') closeCreateAccountModal();
+});
+<?php if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors): ?>
+openCreateAccountModal();
+<?php endif; ?>
+</script>
 
 <?php require_once '../../includes/footer.php'; ?>

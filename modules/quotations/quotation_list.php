@@ -158,11 +158,19 @@ document.addEventListener('DOMContentLoaded',function(){
   </div>
 
   <?php if ($rows->num_rows > 0): ?>
-  <div class="tg-table-wrap mob-card-wrap">
+    <style>
+    @media (min-width: 769px) {
+      .mob-quotation-table thead th { padding: 0.45rem 0.75rem; }
+      .mob-quotation-table tbody td { padding: 0.45rem 0.75rem; }
+      .mob-quotation-table thead th:first-child,
+      .mob-quotation-table tbody td:first-child { text-align: left !important; }
+    }
+    </style>
+    <div class="tg-table-wrap mob-card-wrap">
     <table class="tg-table mob-card mob-quotation-table">
       <thead>
         <tr>
-          <th style="text-align:center;">Client</th>
+          <th style="text-align:left;">Client</th>
           <th style="text-align:center;">Plate</th>
           <th style="text-align:center;">Service</th>
           <th style="text-align:center;">Date</th>
@@ -177,7 +185,7 @@ document.addEventListener('DOMContentLoaded',function(){
           $sc = $status_cfg[$row['status']] ?? ['Unknown','badge-gray'];
         ?>
         <tr>
-          <td style="text-align:center;">
+          <td style="text-align:left;">
             <div style="font-weight:700;font-size:0.82rem;color:var(--text-primary);"><?= htmlspecialchars($row['full_name']) ?></div>
             <div style="font-size:0.7rem;color:var(--text-muted);"><?= htmlspecialchars($row['contact_number']) ?></div>
           </td>

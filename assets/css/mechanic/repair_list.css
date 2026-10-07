@@ -126,6 +126,12 @@
   color: var(--text-muted);
   white-space: nowrap;
 }
+@media (min-width: 769px) {
+  .tg-table.repair-jobs-table thead th { padding: 0.45rem 0.75rem; }
+  .tg-table.repair-jobs-table tbody td { padding: 0.45rem 0.75rem; }
+  .tg-table.repair-jobs-table thead th:nth-child(2),
+  .tg-table.repair-jobs-table tbody td:nth-child(2) { text-align: left !important; }
+}
 @media (max-width: 768px) {
   .tg-table.repair-jobs-table {
     min-width: 0 !important;

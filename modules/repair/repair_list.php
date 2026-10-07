@@ -256,4 +256,11 @@ document.querySelectorAll('.btn-delete-job').forEach(btn => {
 });
 </script>
 <?php endif; ?>
+<script>
+document.querySelectorAll('.rl-filter-form select[name="status"], .rl-filter-form select[name="sort"]').forEach(function (select) {
+  select.addEventListener('change', function () {
+    this.form.submit();
+  });
+});
+</script>
 <?php require_once '../../includes/footer.php'; ?>

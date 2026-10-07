@@ -85,6 +85,10 @@ require_once '../../includes/navbar.php';
 /* Row details open on hover — desktop only (same as Client Records / Renewal Tracking). Touch screens have
    no real :hover, so phones/tablets (<=768px) keep tap-to-expand from the global handler in footer.php. */
 @media (min-width: 769px) {
+  .claims-list-table thead th { padding: 0.45rem 0.75rem; }
+  .claims-list-table tbody td { padding: 0.45rem 0.75rem; }
+  .claims-list-table thead th:first-child,
+  .claims-list-table tbody td:first-child { text-align: left !important; }
   .claims-list-table .tg-expand-row { display: none; }
   .claims-list-table .tg-expandable-row:hover + .tg-expand-row,
   .claims-list-table .tg-expand-row:hover {
@@ -299,6 +303,12 @@ require_once '../../includes/topbar.php';
 </form>
 <script src="../../assets/js/shared/claims_list.js?v=<?= filemtime(__DIR__.'/../../assets/js/shared/claims_list.js') ?>"></script>
 <script>
+document.querySelectorAll('form[method="GET"] select[name="status"], form[method="GET"] select[name="type"], form[method="GET"] select[name="sort"]').forEach(function (select) {
+  select.addEventListener('change', function () {
+    this.form.submit();
+  });
+});
+
 // Row details open on hover on desktop (CSS above) — keep clicks on this table away from the global
 // click-to-toggle handler in footer.php so it can't fight the hover. Phones/tablets keep tap-to-expand.
 (function () {

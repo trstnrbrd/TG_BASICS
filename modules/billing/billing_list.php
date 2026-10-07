@@ -119,6 +119,14 @@ require_once '../../includes/topbar.php';
       </div>
     </form>
 
+    <script>
+    document.querySelectorAll('form[method="GET"] select[name="status"], form[method="GET"] select[name="sort"]').forEach(function (select) {
+      select.addEventListener('change', function () {
+        this.form.submit();
+      });
+    });
+    </script>
+
     <!-- TABLE -->
     <div class="card">
       <div class="card-header">

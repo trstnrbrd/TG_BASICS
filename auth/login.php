@@ -9,9 +9,7 @@ require_once '../includes/icons.php';
 require_once '../config/dev_access.php';
 
 if (isset($_SESSION['user_id'])) {
-    if (!empty($_SESSION['is_hidden'])) {
-        header("Location: ../" . DEV_HOME);
-    } elseif ($_SESSION['role'] === 'mechanic') {
+    if ($_SESSION['role'] === 'mechanic') {
         header("Location: ../modules/repair/dashboard_mechanic.php");
     } else {
         header("Location: ../modules/admin/dashboard_admin.php");
@@ -143,9 +141,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $_SESSION['full_name'] = $display_name;
                     $_SESSION['is_hidden'] = !empty($user['is_hidden']);
 
-                    if (!empty($user['is_hidden'])) {
-                        header("Location: ../" . DEV_HOME);   // the developer account opens Settings only
-                    } elseif ($user['role'] === 'mechanic') {
+                    if ($user['role'] === 'mechanic') {
                         header("Location: ../modules/repair/dashboard_mechanic.php");
                     } else {
                         header("Location: ../modules/admin/dashboard_admin.php");

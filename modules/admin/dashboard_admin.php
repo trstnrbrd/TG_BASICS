@@ -82,6 +82,7 @@ $activity = $conn->query("
            CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.full_name END AS actor
     FROM audit_logs a
     LEFT JOIN users u ON a.user_id = u.user_id
+    WHERE (a.user_id IS NULL OR a.user_id NOT IN (SELECT user_id FROM users WHERE is_hidden = 1))
     ORDER BY a.created_at DESC
     LIMIT 8
 ");

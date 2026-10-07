@@ -670,12 +670,6 @@ require_once '../../includes/topbar.php';
       <span><strong>Set up an authenticator app to continue.</strong> The developer account must use one. Press <strong>Set Up Authenticator</strong> below; System Settings opens once it is active.</span>
     </div>
     <script>document.addEventListener('DOMContentLoaded', function () { var c = document.getElementById('totp-card'); if (c) c.scrollIntoView({ block: 'center' }); });</script>
-    <?php elseif (is_developer() && isset($_GET['no_access'])): ?>
-    <!-- config/session.php sends the developer here from any page with business records -->
-    <div class="alert alert-info" role="status" id="dev-no-access">
-      <?= icon('information-circle', 15) ?>
-      <span>The developer account cannot open business records. Only Settings is available to it.</span>
-    </div>
     <?php endif; ?>
 
     <!-- ═══ HORIZONTAL TABS ═══ -->

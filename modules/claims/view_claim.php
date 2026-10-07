@@ -503,7 +503,7 @@ require_once '../../includes/topbar.php';
       <div>
         <div style="display:flex;align-items:center;gap:0.75rem;">
           <a href="claims_list.php" class="back-link" onclick="goBack('claims_list.php'); return false;" style="margin-bottom:0;"><?= icon('arrow-left',14) ?> Back to Claims</a>
-          <h2 style="font-size:1.1rem;font-weight:800;color:var(--text-primary);">Claim #<?= $display_num ?></h2>
+          <h2 style="font-size:1.1rem;font-weight:800;color:var(--text-primary);"><?= htmlspecialchars($claim['full_name']) ?></h2>
           <span class="badge <?= $s['class'] ?>"><?= $s['label'] ?></span>
           <?php if ($claim['claim_type'] === 'repair'): ?>
           <span class="badge badge-danger">Repair</span>

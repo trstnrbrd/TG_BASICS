@@ -43,7 +43,7 @@ $images = $img_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 // ── HANDLE IMAGE DELETE ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_image') {
     csrf_verify();
-    if (in_array($role, ['admin','super_admin'])) {
+    if (is_staff()) {
         $img_id = san_int($_POST['image_id'] ?? 0, 1);
         if ($img_id) {
             $fi = $conn->prepare("SELECT file_name FROM repair_job_images WHERE image_id = ? AND job_id = ?");
@@ -421,7 +421,7 @@ document.addEventListener('DOMContentLoaded', function() {
             style="width:100%;height:100%;object-fit:cover;cursor:pointer;transition:opacity 0.15s;"
             onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'"
             onclick="openLightbox('<?= $img_url ?>')"/>
-          <?php if (in_array($role, ['admin','super_admin'])): ?>
+          <?php if (is_staff()): ?>
           <form method="POST" style="position:absolute;top:0.35rem;right:0.35rem;">
             <?= csrf_field() ?>
             <input type="hidden" name="action" value="delete_image"/>

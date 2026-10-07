@@ -12,8 +12,7 @@ require_once '../../config/dev_access.php';
 require_role(['admin', 'super_admin', 'mechanic']);
 
 $user_id  = $_SESSION['user_id'];
-$role     = $_SESSION['role'];
-$is_super = $role === 'super_admin';
+$is_super = is_super_admin();
 // The developer account (config/dev_access.php) reaches System Settings only once its authenticator app is on
 if (is_developer() && !dev_has_authenticator($conn, (int)$user_id)) $is_super = false;
 

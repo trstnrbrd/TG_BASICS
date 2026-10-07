@@ -6,9 +6,8 @@ require_once __DIR__ . '/includes/icons.php';
 $base = '/TG-BASICS/';
 require_once __DIR__ . '/config/session.php';
 $logged_in = isset($_SESSION['user_id']);
-$role = $_SESSION['role'] ?? '';
 if ($logged_in) {
-    if ($role === 'mechanic') {
+    if (is_mechanic()) {
         $back_href = $base . 'modules/repair/dashboard_mechanic.php';
     } else {
         $back_href = $base . 'modules/admin/dashboard_admin.php';

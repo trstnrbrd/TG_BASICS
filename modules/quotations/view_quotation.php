@@ -5,7 +5,7 @@ require_once '../../config/validators.php';
 require_once '../../config/mailer.php';
 
 require_role(['admin', 'super_admin', 'mechanic']);
-$is_admin = in_array($_SESSION['role'], ['admin', 'super_admin']);
+$is_admin = is_staff();
 
 $qt_id = san_int($_GET['id'] ?? 0, 1);
 if (!$qt_id) { header("Location: quotation_list.php"); exit; }

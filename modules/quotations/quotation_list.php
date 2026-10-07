@@ -5,7 +5,7 @@ require_once '../../config/validators.php';
 require_once '../../includes/pagination.php';
 
 require_role(['admin', 'super_admin', 'mechanic']);
-$is_admin = in_array($_SESSION['role'], ['admin', 'super_admin']);
+$is_admin = is_staff();
 
 // ── DELETE ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {

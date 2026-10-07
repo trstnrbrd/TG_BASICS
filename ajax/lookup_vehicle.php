@@ -3,9 +3,7 @@ require_once __DIR__ . '/../config/session.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../includes/api.php';
 
-if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
-    api_error('Unauthorized.', 403);
-}
+require_role_json(['admin', 'super_admin'], 'Unauthorized.', 403);
 
 $plate = trim($_GET['plate'] ?? '');
 if ($plate === '') api_error('No plate number provided.', 400);

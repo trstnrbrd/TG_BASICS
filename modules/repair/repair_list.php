@@ -7,11 +7,9 @@ require_once '../../includes/transaction.php';
 
 require_role(['admin', 'super_admin', 'mechanic']);
 
-$role = $_SESSION['role'];
-
 // ── DELETE ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
-    if (!in_array($role, ['admin', 'super_admin'])) { header("Location: repair_list.php"); exit; }
+    if (!is_staff()) { header("Location: repair_list.php"); exit; }
     csrf_verify();
     $del_id = san_int($_POST['job_id'] ?? 0, 1);
     if ($del_id) {
@@ -198,7 +196,7 @@ require_once '../../includes/topbar.php';
                 <a href="view_repair.php?id=<?= $j['job_id'] ?>" class="btn-sm-gold" title="View">
                   <?= icon('eye', 14) ?>
                 </a>
-                <?php if (in_array($role, ['admin','super_admin'])): ?>
+                <?php if (is_staff()): ?>
                 <button type="button" class="btn-sm-danger btn-delete-job" data-id="<?= $j['job_id'] ?>" data-num="<?= htmlspecialchars($j['job_number']) ?>" title="Delete">
                   <?= icon('trash', 13) ?>
                 </button>
@@ -226,7 +224,7 @@ require_once '../../includes/topbar.php';
   </div>
 </div>
 
-<?php if (in_array($role, ['admin','super_admin'])): ?>
+<?php if (is_staff()): ?>
 <form id="delete-job-form" method="POST" style="display:none;">
   <?= csrf_field() ?>
   <input type="hidden" name="action" value="delete"/>

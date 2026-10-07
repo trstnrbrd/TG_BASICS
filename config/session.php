@@ -135,3 +135,16 @@ function login_url(): string
     if (!preg_match('#/tg-basics/(.*)$#i', $script, $m)) return '/auth/login.php';
     return str_repeat('../', substr_count($m[1], '/')) . 'auth/login.php';
 }
+
+
+function require_role_json(array $roles, string $message = 'Unauthorized.', int $status = 401): void
+{
+    if (isset($_SESSION['user_id']) && in_array($_SESSION['role'] ?? '', $roles, true)) return;
+    api_error($message, $status);
+}
+
+
+function is_super_admin(): bool { return ($_SESSION['role'] ?? '') === 'super_admin'; }
+function is_mechanic(): bool    { return ($_SESSION['role'] ?? '') === 'mechanic'; }
+/** Front-office staff: admin or super admin — the pairing used wherever mechanics are excluded. */
+function is_staff(): bool       { return in_array($_SESSION['role'] ?? '', ['admin', 'super_admin'], true); }

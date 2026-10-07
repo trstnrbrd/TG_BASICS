@@ -5,9 +5,7 @@ require_once __DIR__ . '/../../includes/api.php';
 
 
 // Every call spends the shop's OCR.space quota, so it needs a logged-in staff session.
-if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
-    api_error('Unauthorized.', 401);
-}
+require_role_json(['admin', 'super_admin']);
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || empty($_FILES['image'])) {
     api_error('No image uploaded.', 400);

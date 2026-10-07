@@ -7,7 +7,10 @@
  *
  * SMTP credentials are stored in the database (system_settings table) and
  * managed through the Settings page. This file only contains PHPMailer setup
- * and shared email template functions — no hardcoded credentials.
+ * (the newMailer() factory and _smtpSetting()) — no hardcoded credentials, and
+ * no email content. The template, the logo, and the send*Email() functions are
+ * in includes/email_template.php instead (tracked by git, unlike this file) —
+ * put new email content there, not here.
  *
  * Required system_settings keys:
  *   smtp_host          — e.g. smtp.gmail.com

@@ -4,6 +4,7 @@ require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/settings.php';
 require_once '../../config/access.php';
+require_once '../../includes/transaction.php';
 
 require_role(['admin', 'super_admin']);
 
@@ -211,101 +212,120 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (empty($errors)) {
-        $ins = $conn->prepare("
-            INSERT INTO insurance_policies (
-                client_id, vehicle_id, policy_number, insurance_company, coverage_type,
-                sum_insured, markup, total_premium, participation_fee,
-                policy_start, policy_end, payment_terms, mortgagee, payment_status,
-                amount_paid, balance, notes, created_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
         $created_by = (int)$_SESSION['user_id'];
-        $ins->bind_param(
-            'iisssddddsssssddsi',
-            $vehicle['client_id'],
-            $vehicle_id,
-            $policy_number,
-            $insurance_company,
-            $coverage_type,
-            $sum_insured,
-            $basic_premium,
-            $total_premium,
-            $participation_fee,
-            $policy_start,
-            $policy_end,
-            $payment_terms,
-            $mortgagee,
-            $payment_status,
-            $amount_paid,
-            $balance,
-            $notes,
-            $created_by
-        );
+        // The policy, its whole installment schedule, the renewal stamps and the audit entry are saved together
+        // or not at all (includes/transaction.php) — a failure halfway used to leave a policy behind with only
+        // part of its payment schedule. A receipt file saved on the way is removed again if the save fails.
+        $moved_receipts = [];
+        $saved = false;
+        try {
+            db_transaction($conn, function () use (
+                $conn, $vehicle, $vehicle_id, $policy_number, $insurance_company, $coverage_type,
+                $sum_insured, $basic_premium, $total_premium, $participation_fee,
+                $policy_start, $policy_end, $payment_terms, $mortgagee, $payment_status,
+                $amount_paid, $balance, $notes, $created_by,
+                $payable_amount, $num_months, $installment_amounts, $installment_modes, $installment_ctrls,
+                $receipt_file_name, $renew_from, &$moved_receipts
+            ) {
+                $ins = $conn->prepare("
+                    INSERT INTO insurance_policies (
+                        client_id, vehicle_id, policy_number, insurance_company, coverage_type,
+                        sum_insured, markup, total_premium, participation_fee,
+                        policy_start, policy_end, payment_terms, mortgagee, payment_status,
+                        amount_paid, balance, notes, created_by
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $ins->bind_param(
+                    'iisssddddsssssddsi',
+                    $vehicle['client_id'],
+                    $vehicle_id,
+                    $policy_number,
+                    $insurance_company,
+                    $coverage_type,
+                    $sum_insured,
+                    $basic_premium,
+                    $total_premium,
+                    $participation_fee,
+                    $policy_start,
+                    $policy_end,
+                    $payment_terms,
+                    $mortgagee,
+                    $payment_status,
+                    $amount_paid,
+                    $balance,
+                    $notes,
+                    $created_by
+                );
+                $ins->execute();
+                $new_policy_id = $conn->insert_id;
 
-        if ($ins->execute()) {
-            $new_policy_id = $conn->insert_id;
+                // Insert installment schedule into policy_payments
+                // Each installment = (total_premium - commission) / num_months
+                $per_installment = round($payable_amount / $num_months, 2);
+                for ($i = 0; $i < $num_months; $i++) {
+                    $due_date   = date('Y-m-d', strtotime($policy_start . ' +' . $i . ' months'));
+                    // Last installment absorbs the rounding remainder so the schedule
+                    // sums to the payable exactly — otherwise paying in full trips the
+                    // overpayment check by a few centavos and never reaches 'Paid'.
+                    $amt_due    = ($payable_amount > 0 && $i === $num_months - 1)
+                        ? round($payable_amount - ($per_installment * ($num_months - 1)), 2)
+                        : $per_installment;
+                    $amt_paid_i = (float)($installment_amounts[$i] ?? 0);
+                    $paid_at    = $amt_paid_i > 0 ? date('Y-m-d H:i:s') : null;
+                    $inst_mode  = !empty($installment_modes[$i])  ? trim($installment_modes[$i])  : null;
+                    $inst_ctrl  = !empty($installment_ctrls[$i])  ? trim($installment_ctrls[$i])  : null;
 
-            // Insert installment schedule into policy_payments
-            // Each installment = (total_premium - commission) / num_months
-            $per_installment = round($payable_amount / $num_months, 2);
-            for ($i = 0; $i < $num_months; $i++) {
-                $due_date   = date('Y-m-d', strtotime($policy_start . ' +' . $i . ' months'));
-                // Last installment absorbs the rounding remainder so the schedule
-                // sums to the payable exactly — otherwise paying in full trips the
-                // overpayment check by a few centavos and never reaches 'Paid'.
-                $amt_due    = ($payable_amount > 0 && $i === $num_months - 1)
-                    ? round($payable_amount - ($per_installment * ($num_months - 1)), 2)
-                    : $per_installment;
-                $amt_paid_i = (float)($installment_amounts[$i] ?? 0);
-                $paid_at    = $amt_paid_i > 0 ? date('Y-m-d H:i:s') : null;
-                $inst_mode  = !empty($installment_modes[$i])  ? trim($installment_modes[$i])  : null;
-                $inst_ctrl  = !empty($installment_ctrls[$i])  ? trim($installment_ctrls[$i])  : null;
+                    $pp = $conn->prepare("INSERT INTO policy_payments (policy_id, installment_no, due_date, amount_due, amount_paid, paid_at, payment_mode, control_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                    $inst_no = $i + 1;
+                    $pp->bind_param('iisddsss', $new_policy_id, $inst_no, $due_date, $amt_due, $amt_paid_i, $paid_at, $inst_mode, $inst_ctrl);
+                    $pp->execute();
 
-                $pp = $conn->prepare("INSERT INTO policy_payments (policy_id, installment_no, due_date, amount_due, amount_paid, paid_at, payment_mode, control_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-                $inst_no = $i + 1;
-                $pp->bind_param('iisddsss', $new_policy_id, $inst_no, $due_date, $amt_due, $amt_paid_i, $paid_at, $inst_mode, $inst_ctrl);
-                $pp->execute();
-
-                // Save receipt for 1st installment if uploaded
-                if ($i === 0 && $receipt_file_name === '__pending__') {
-                    $new_pp_id = $conn->insert_id;
-                    $rf        = $_FILES['first_receipt'];
-                    $mime      = mime_content_type($rf['tmp_name']);
-                    $ext_map   = ['image/jpeg'=>'jpg','image/png'=>'png','image/webp'=>'webp','image/gif'=>'gif'];
-                    $ext       = $ext_map[$mime] ?? null;
-                    $fname     = 'rcpt_' . $new_pp_id . '_' . time() . '.' . $ext;
-                    $dest      = __DIR__ . '/../../uploads/receipts/' . $fname;
-                    if ($ext !== null && move_uploaded_file($rf['tmp_name'], $dest)) {
-                        $upd_rc = $conn->prepare("UPDATE policy_payments SET receipt_file = ? WHERE payment_id = ?");
-                        $upd_rc->bind_param('si', $fname, $new_pp_id);
-                        $upd_rc->execute();
+                    // Save receipt for 1st installment if uploaded
+                    if ($i === 0 && $receipt_file_name === '__pending__') {
+                        $new_pp_id = $conn->insert_id;
+                        $rf        = $_FILES['first_receipt'];
+                        $mime      = mime_content_type($rf['tmp_name']);
+                        $ext_map   = ['image/jpeg'=>'jpg','image/png'=>'png','image/webp'=>'webp','image/gif'=>'gif'];
+                        $ext       = $ext_map[$mime] ?? null;
+                        $fname     = 'rcpt_' . $new_pp_id . '_' . time() . '.' . $ext;
+                        $dest      = __DIR__ . '/../../uploads/receipts/' . $fname;
+                        if ($ext !== null && move_uploaded_file($rf['tmp_name'], $dest)) {
+                            $moved_receipts[] = $dest;
+                            $upd_rc = $conn->prepare("UPDATE policy_payments SET receipt_file = ? WHERE payment_id = ?");
+                            $upd_rc->bind_param('si', $fname, $new_pp_id);
+                            $upd_rc->execute();
+                        }
                     }
                 }
-            }
 
-            // Mark old policy as renewed and stamp the new policy with renewed_at
-            if ($renew_from > 0) {
-                $mark_renewed = $conn->prepare("UPDATE insurance_policies SET is_renewed = 1 WHERE policy_id = ?");
-                $mark_renewed->bind_param('i', $renew_from);
-                $mark_renewed->execute();
+                // Mark old policy as renewed and stamp the new policy with renewed_at
+                if ($renew_from > 0) {
+                    $mark_renewed = $conn->prepare("UPDATE insurance_policies SET is_renewed = 1 WHERE policy_id = ?");
+                    $mark_renewed->bind_param('i', $renew_from);
+                    $mark_renewed->execute();
 
-                $stamp = $conn->prepare("UPDATE insurance_policies SET renewed_at = NOW() WHERE policy_id = ?");
-                $stamp->bind_param('i', $new_policy_id);
-                $stamp->execute();
-            }
+                    $stamp = $conn->prepare("UPDATE insurance_policies SET renewed_at = NOW() WHERE policy_id = ?");
+                    $stamp->bind_param('i', $new_policy_id);
+                    $stamp->execute();
+                }
 
-            // Audit log
-            $uid  = $_SESSION['user_id'];
-            $action = $renew_from > 0 ? 'POLICY_RENEWED' : 'POLICY_CREATED';
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, ?, ?)");
-            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ($renew_from > 0 ? ' renewed policy as ' : ' created policy ') . $policy_number . ' (' . $coverage_type . ') for vehicle ' . ($vehicle['plate_number'] ?? '') . ' — Payable: ₱' . number_format($payable_amount, 2) . ' (Premium: ₱' . number_format((float)$total_premium, 2) . ' − Commission: ₱' . number_format((float)$basic_premium, 2) . ').';
-            $log->bind_param('iss', $uid, $action, $desc);
-            $log->execute();
+                // Audit log
+                $action = $renew_from > 0 ? 'POLICY_RENEWED' : 'POLICY_CREATED';
+                $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, ?, ?)");
+                $desc = ($_SESSION['full_name'] ?? 'Unknown') . ($renew_from > 0 ? ' renewed policy as ' : ' created policy ') . $policy_number . ' (' . $coverage_type . ') for vehicle ' . ($vehicle['plate_number'] ?? '') . ' — Payable: ₱' . number_format($payable_amount, 2) . ' (Premium: ₱' . number_format((float)$total_premium, 2) . ' − Commission: ₱' . number_format((float)$basic_premium, 2) . ').';
+                $log->bind_param('iss', $created_by, $action, $desc);
+                $log->execute();
+            });
+            $saved = true;
+        } catch (Throwable $e) {
+            error_log('[TG-BASICS] add_policy.php save failed: ' . $e->getMessage());
+            foreach ($moved_receipts as $p) { if (file_exists($p)) unlink($p); }
+            $errors[] = 'Database error. Please try again.';
+        }
 
+        if ($saved) {
             header("Location: ../renewal/renewal_list.php?success=" . urlencode("Policy " . $policy_number . " saved successfully for " . ($vehicle['full_name'] ?? '') . "."));
             exit;
-        } else {
-            $errors[] = 'Database error. Please try again.';
         }
     }
     // Not saved (the success path exits above): let the next person with this policy number through

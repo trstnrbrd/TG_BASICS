@@ -4,10 +4,7 @@ require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/mailer.php';
 
-if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin', 'mechanic'])) {
-    header("Location: ../../auth/login.php");
-    exit;
-}
+require_role(['admin', 'super_admin', 'mechanic']);
 $is_admin = in_array($_SESSION['role'], ['admin', 'super_admin']);
 
 $qt_id = san_int($_GET['id'] ?? 0, 1);

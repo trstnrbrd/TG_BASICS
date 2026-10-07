@@ -6,10 +6,7 @@ require_once '../../config/access.php';
 require_once '../../includes/agent_filter.php';
 require_once '../../includes/pagination.php';
 
-if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin', 'mechanic'])) {
-    header("Location: ../../auth/login.php");
-    exit;
-}
+require_role(['admin', 'super_admin', 'mechanic']);
 
 // AJAX autocomplete
 if (isset($_GET['ajax_ac']) && isset($_GET['q'])) {

@@ -6,28 +6,18 @@ require_once '../../config/settings.php';
 require_once '../../config/rate_limit.php';
 require_once '../../includes/db_backup.php';
 require_once '../../config/dev_access.php';
+require_once '../../includes/api.php';
 
 // Owner only: the file holds every client's data and every account's password hash
 if (isset($_SESSION['user_id']) && is_developer()) {
     // The developer account is a super admin too, but never takes the whole database home
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        http_response_code(403);
-        header('Content-Type: application/json');
-        echo json_encode(['ok' => false, 'error' => 'Only the owner can download a database backup.']);
-    } else {
-        header('Location: settings.php');
-    }
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') api_error('Only the owner can download a database backup.', 403);
+    header('Location: settings.php');
     exit;
 }
 if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'super_admin') {
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        http_response_code(403);
-        header('Content-Type: application/json');
-        echo json_encode(['ok' => false, 'error' => 'Only the Owner can download a database backup.']);
-        exit;
-    }
-    header("Location: ../../auth/login.php");
-    exit;
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') api_error('Only the Owner can download a database backup.', 403);
+    require_role(['super_admin']);
 }
 $uid = (int)$_SESSION['user_id'];
 
@@ -35,13 +25,10 @@ $uid = (int)$_SESSION['user_id'];
 // Asked again even though the Owner is signed in, so a computer left logged in cannot be used to walk off
 // with the whole database.
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    header('Content-Type: application/json');
     csrf_verify_json();
     $rl_key = 'uid:' . $uid;
     if (rate_limit_blocked($conn, 'db_backup', $rl_key)) {
-        http_response_code(429);
-        echo json_encode(['ok' => false, 'error' => 'Too many attempts. Please wait a few minutes before trying again.']);
-        exit;
+        api_error('Too many attempts. Please wait a few minutes before trying again.', 429);
     }
     $password = is_string($_POST['password'] ?? null) ? $_POST['password'] : '';
     $st = $conn->prepare('SELECT password FROM users WHERE user_id = ? AND is_active = 1');
@@ -50,14 +37,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $hash = $st->get_result()->fetch_row()[0] ?? '';
     if ($password === '' || $hash === '' || !password_verify($password, $hash)) {
         rate_limit_record($conn, 'db_backup', $rl_key);
-        echo json_encode(['ok' => false, 'error' => 'Incorrect password.']);
-        exit;
+        api_error('Incorrect password.', 403);
     }
     rate_limit_clear($conn, 'db_backup', $rl_key);
     $token = bin2hex(random_bytes(16));
     $_SESSION['db_backup_token'] = ['token' => $token, 'expires' => time() + 60];
-    echo json_encode(['ok' => true, 'url' => 'backup_database.php?token=' . $token]);
-    exit;
+    api_success(['url' => 'backup_database.php?token=' . $token]);
 }
 
 // ── Step 2: the download ──

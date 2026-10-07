@@ -3,11 +3,9 @@ require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../includes/pagination.php';
+require_once '../../includes/transaction.php';
 
-if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin', 'mechanic'])) {
-    header("Location: ../../auth/login.php");
-    exit;
-}
+require_role(['admin', 'super_admin', 'mechanic']);
 
 $role = $_SESSION['role'];
 
@@ -22,13 +20,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $job_row->execute();
         $job_row = $job_row->get_result()->fetch_assoc();
         if ($job_row) {
-            $del = $conn->prepare("DELETE FROM repair_jobs WHERE job_id = ?");
-            $del->bind_param('i', $del_id);
-            $del->execute();
-            $log = $conn->prepare("INSERT INTO audit_logs (user_id,action,description) VALUES (?,'REPAIR_JOB_DELETED',?)");
-            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' deleted repair job ' . $job_row['job_number'] . '.';
-            $log->bind_param('is', $_SESSION['user_id'], $desc);
-            $log->execute();
+            db_transaction($conn, function () use ($conn, $del_id, $job_row) {
+                $del = $conn->prepare("DELETE FROM repair_jobs WHERE job_id = ?");
+                $del->bind_param('i', $del_id);
+                $del->execute();
+                $log = $conn->prepare("INSERT INTO audit_logs (user_id,action,description) VALUES (?,'REPAIR_JOB_DELETED',?)");
+                $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' deleted repair job ' . $job_row['job_number'] . '.';
+                $log->bind_param('is', $_SESSION['user_id'], $desc);
+                $log->execute();
+            });
         }
     }
     header("Location: repair_list.php?success=" . urlencode('Repair job deleted.'));

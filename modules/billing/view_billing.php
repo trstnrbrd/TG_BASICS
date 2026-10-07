@@ -2,11 +2,9 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
+require_once '../../includes/transaction.php';
 
-if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin'])) {
-    header("Location: ../../auth/login.php");
-    exit;
-}
+require_role(['admin', 'super_admin']);
 
 $billing_id = (int)($_GET['id'] ?? 0);
 if (!$billing_id) { header("Location: billing_list.php"); exit; }
@@ -42,13 +40,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Delete is a POST with a CSRF token — it used to be a GET link, which any page could trigger.
     if ($action === 'delete_billing') {
-        $del = $conn->prepare("DELETE FROM billing WHERE billing_id = ?");
-        $del->bind_param('i', $billing_id);
-        $del->execute();
-        $log = $conn->prepare("INSERT INTO audit_logs (user_id,action,description) VALUES (?,'BILLING_DELETED',?)");
-        $desc = ($_SESSION['full_name'] ?? '') . ' deleted billing ' . $billing['billing_number'] . '.';
-        $log->bind_param('is', $_SESSION['user_id'], $desc);
-        $log->execute();
+        db_transaction($conn, function () use ($conn, $billing_id, $billing) {
+            $del = $conn->prepare("DELETE FROM billing WHERE billing_id = ?");
+            $del->bind_param('i', $billing_id);
+            $del->execute();
+            $log = $conn->prepare("INSERT INTO audit_logs (user_id,action,description) VALUES (?,'BILLING_DELETED',?)");
+            $desc = ($_SESSION['full_name'] ?? '') . ' deleted billing ' . $billing['billing_number'] . '.';
+            $log->bind_param('is', $_SESSION['user_id'], $desc);
+            $log->execute();
+        });
         header("Location: billing_list.php?success=" . urlencode('Billing record deleted.')); exit;
     }
 
@@ -56,13 +56,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $new_status = san_enum($_POST['status'] ?? '', ['draft', 'sent', 'paid', 'unpaid']);
         if ($new_status) {
             $sent_at = ($new_status === 'sent' && !$billing['sent_at']) ? date('Y-m-d H:i:s') : null;
-            $upd = $conn->prepare("UPDATE billing SET status=?, sent_at=COALESCE(?,sent_at) WHERE billing_id=?");
-            $upd->bind_param('ssi', $new_status, $sent_at, $billing_id);
-            $upd->execute();
-            $log = $conn->prepare("INSERT INTO audit_logs (user_id,action,description) VALUES (?,'BILLING_STATUS_UPDATED',?)");
-            $desc = ($_SESSION['full_name'] ?? '') . ' changed billing ' . $billing['billing_number'] . ' to ' . $new_status . '.';
-            $log->bind_param('is', $_SESSION['user_id'], $desc);
-            $log->execute();
+            db_transaction($conn, function () use ($conn, $billing_id, $billing, $new_status, $sent_at) {
+                $upd = $conn->prepare("UPDATE billing SET status=?, sent_at=COALESCE(?,sent_at) WHERE billing_id=?");
+                $upd->bind_param('ssi', $new_status, $sent_at, $billing_id);
+                $upd->execute();
+                $log = $conn->prepare("INSERT INTO audit_logs (user_id,action,description) VALUES (?,'BILLING_STATUS_UPDATED',?)");
+                $desc = ($_SESSION['full_name'] ?? '') . ' changed billing ' . $billing['billing_number'] . ' to ' . $new_status . '.';
+                $log->bind_param('is', $_SESSION['user_id'], $desc);
+                $log->execute();
+            });
         }
         header("Location: view_billing.php?id=$billing_id&success=Status+updated"); exit;
     }
@@ -71,13 +73,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $dr = isset($_POST['doc_release_of_claim'])  ? 1 : 0;
         $dl = isset($_POST['doc_drivers_license'])   ? 1 : 0;
         $ds = isset($_POST['doc_billing_statement']) ? 1 : 0;
-        $upd = $conn->prepare("UPDATE billing SET doc_release_of_claim=?,doc_drivers_license=?,doc_billing_statement=? WHERE billing_id=?");
-        $upd->bind_param('iiii', $dr, $dl, $ds, $billing_id);
-        $upd->execute();
-        $log = $conn->prepare("INSERT INTO audit_logs (user_id,action,description) VALUES (?,'BILLING_DOCS_UPDATED',?)");
-        $desc = ($_SESSION['full_name'] ?? '') . ' updated docs for billing ' . $billing['billing_number'] . '.';
-        $log->bind_param('is', $_SESSION['user_id'], $desc);
-        $log->execute();
+        db_transaction($conn, function () use ($conn, $billing_id, $billing, $dr, $dl, $ds) {
+            $upd = $conn->prepare("UPDATE billing SET doc_release_of_claim=?,doc_drivers_license=?,doc_billing_statement=? WHERE billing_id=?");
+            $upd->bind_param('iiii', $dr, $dl, $ds, $billing_id);
+            $upd->execute();
+            $log = $conn->prepare("INSERT INTO audit_logs (user_id,action,description) VALUES (?,'BILLING_DOCS_UPDATED',?)");
+            $desc = ($_SESSION['full_name'] ?? '') . ' updated docs for billing ' . $billing['billing_number'] . '.';
+            $log->bind_param('is', $_SESSION['user_id'], $desc);
+            $log->execute();
+        });
         header("Location: view_billing.php?id=$billing_id&success=Documents+updated"); exit;
     }
 
@@ -102,13 +106,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$bad && $rep_d !== null && !validate_date($rep_d)) $bad = 'Repair date is not a valid date.';
         if ($bad) { header("Location: view_billing.php?id=$billing_id&error=" . urlencode($bad)); exit; }
 
-        $upd = $conn->prepare("UPDATE billing SET billed_to=?,incident_date=?,repair_date=?,parts_cost=?,labor_cost=?,other_cost=?,deductible=?,notes=? WHERE billing_id=?");
-        $upd->bind_param('sssddddsi', $billed, $inc_d, $rep_d, $parts, $labor, $other, $deduct, $notes, $billing_id);
-        $upd->execute();
-        $log = $conn->prepare("INSERT INTO audit_logs (user_id,action,description) VALUES (?,'BILLING_UPDATED',?)");
-        $desc = ($_SESSION['full_name'] ?? '') . ' updated billing ' . $billing['billing_number'] . '.';
-        $log->bind_param('is', $_SESSION['user_id'], $desc);
-        $log->execute();
+        db_transaction($conn, function () use ($conn, $billing_id, $billing, $billed, $inc_d, $rep_d, $parts, $labor, $other, $deduct, $notes) {
+            $upd = $conn->prepare("UPDATE billing SET billed_to=?,incident_date=?,repair_date=?,parts_cost=?,labor_cost=?,other_cost=?,deductible=?,notes=? WHERE billing_id=?");
+            $upd->bind_param('sssddddsi', $billed, $inc_d, $rep_d, $parts, $labor, $other, $deduct, $notes, $billing_id);
+            $upd->execute();
+            $log = $conn->prepare("INSERT INTO audit_logs (user_id,action,description) VALUES (?,'BILLING_UPDATED',?)");
+            $desc = ($_SESSION['full_name'] ?? '') . ' updated billing ' . $billing['billing_number'] . '.';
+            $log->bind_param('is', $_SESSION['user_id'], $desc);
+            $log->execute();
+        });
         header("Location: view_billing.php?id=$billing_id&success=Billing+updated"); exit;
     }
 }

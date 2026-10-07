@@ -257,6 +257,12 @@ function csrf_verify(): void {
     // is_string(): hash_equals() throws a TypeError on an array-valued csrf_token field.
     if (!is_string($submitted) || !isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $submitted)) {
         http_response_code(403);
+        // The app's fetch() calls ask for JSON (footer.php sets Accept); a plain form post gets the text message
+        if (str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json')) {
+            header('Content-Type: application/json');
+            echo json_encode(['ok' => false, 'msg' => 'Your session expired. Please refresh the page and try again.', 'error' => 'Invalid or missing CSRF token.']);
+            exit;
+        }
         die('Invalid or missing CSRF token. Please go back and try again.');
     }
 }

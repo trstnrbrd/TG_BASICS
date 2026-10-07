@@ -3,11 +3,9 @@ require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/mailer.php';
+require_once '../../includes/transaction.php';
 
-if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'super_admin', 'mechanic'])) {
-    header("Location: ../../auth/login.php");
-    exit;
-}
+require_role(['admin', 'super_admin', 'mechanic']);
 
 $role   = $_SESSION['role'];
 $job_id = san_int($_GET['id'] ?? 0, 1);
@@ -100,13 +98,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] === 'update_status') {
         $new_status = san_enum($_POST['status'] ?? '', ['pending','in_progress','for_pickup','completed','cancelled']);
         if ($new_status) {
-            $upd = $conn->prepare("UPDATE repair_jobs SET status = ? WHERE job_id = ?");
-            $upd->bind_param('si', $new_status, $job_id);
-            $upd->execute();
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'REPAIR_STATUS_UPDATED', ?)");
-            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' updated repair job ' . $job['job_number'] . ' status to ' . $new_status . '.';
-            $log->bind_param('is', $_SESSION['user_id'], $desc);
-            $log->execute();
+            // The status change and its audit entry are saved together or not at all (includes/transaction.php)
+            db_transaction($conn, function () use ($conn, $job_id, $job, $new_status) {
+                $upd = $conn->prepare("UPDATE repair_jobs SET status = ? WHERE job_id = ?");
+                $upd->bind_param('si', $new_status, $job_id);
+                $upd->execute();
+                $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'REPAIR_STATUS_UPDATED', ?)");
+                $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' updated repair job ' . $job['job_number'] . ' status to ' . $new_status . '.';
+                $log->bind_param('is', $_SESSION['user_id'], $desc);
+                $log->execute();
+            });
 
             if ($new_status === 'completed' && !empty($job['email'])) {
                 $tok_row = $conn->prepare("SELECT public_token FROM clients WHERE client_id = ?");

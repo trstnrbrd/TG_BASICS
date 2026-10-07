@@ -115,7 +115,7 @@ function attachDmgRemoveBtn(btn) {
             return void Swal.fire({
               icon: "error",
               title: "Upload Failed",
-              text: data.msg || "Could not upload file.",
+              text: data.message || "Could not upload file.",
               confirmButtonColor: "#B8860B",
             });
           item.classList.add("received");
@@ -159,7 +159,7 @@ function attachDmgRemoveBtn(btn) {
                   return void Swal.fire({
                     icon: "error",
                     title: "Upload Failed",
-                    text: data.msg || "Could not upload.",
+                    text: data.message || "Could not upload.",
                     confirmButtonColor: "#B8860B",
                   });
                 const grid = document.getElementById("damage-photo-grid");

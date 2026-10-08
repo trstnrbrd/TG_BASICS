@@ -1,5 +1,39 @@
 <?php
 
+/*
+ * Claim/policy business rules shared by billing, claims and renewal pages — "is this related record in the
+ * right state for this action", not just "is the input well-formed". Each rule used to be a copy-pasted status
+ * list or date compare in every page that needed it (senior dev review, 2026-10-08); one drifting out of sync
+ * with the others silently let through — or silently blocked — an action that should have gone the other way.
+ */
+const CLAIM_DOCS_OPEN_STATUSES = ['compiling', 'sent_admin', 'lack_of_requirements'];
+const CLAIM_DELETABLE_STATUSES = ['resolved', 'denied', 'lack_of_requirements'];
+const CLAIM_BILLABLE_STATUSES  = ['loa_received', 'pending', 'approved', 'resolved'];
+
+/** Can the claim's requirement documents still be uploaded or removed, and its status moved forward? */
+function claim_docs_open(string $status): bool
+{
+    return in_array($status, CLAIM_DOCS_OPEN_STATUSES, true);
+}
+
+/** Can this claim be deleted? Only once it is fully settled one way or another. */
+function claim_is_deletable(string $status): bool
+{
+    return in_array($status, CLAIM_DELETABLE_STATUSES, true);
+}
+
+/** Can a billing record be created against this claim? */
+function claim_is_billable(string $status): bool
+{
+    return in_array($status, CLAIM_BILLABLE_STATUSES, true);
+}
+
+/** Has a policy's coverage period already ended? (policy_end is a DATE column, so a plain string compare works.) */
+function policy_is_expired(string $policy_end): bool
+{
+    return $policy_end < date('Y-m-d');
+}
+
 function client_in_scope(mysqli $conn, int $client_id): bool
 {
     if ($client_id <= 0) return false;

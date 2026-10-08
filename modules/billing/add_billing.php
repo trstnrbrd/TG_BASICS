@@ -2,6 +2,7 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
+require_once '../../config/access.php';
 require_once '../../includes/transaction.php';
 
 require_role(['admin', 'super_admin']);
@@ -61,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $crow = $cs->get_result()->fetch_assoc();
         if (!$crow) {
             $errors[] = 'The selected claim was not found.';
-        } elseif (!in_array($crow['status'], ['loa_received', 'pending', 'approved', 'resolved'], true)) {
+        } elseif (!claim_is_billable($crow['status'])) {
             $errors[] = 'Billing can only be created for approved claims.';
         }
     }
@@ -148,7 +149,7 @@ $claims_res = $conn->query("
     INNER JOIN insurance_policies ip ON cl.policy_id  = ip.policy_id
     LEFT  JOIN vehicles v         ON ip.vehicle_id = v.vehicle_id
     LEFT  JOIN billing b          ON b.claim_id = cl.claim_id
-    WHERE cl.status IN ('loa_received','pending','approved','resolved')
+    WHERE cl.status IN ('" . implode("','", CLAIM_BILLABLE_STATUSES) . "')
       AND b.billing_id IS NULL
     ORDER BY cl.created_at DESC
 ");

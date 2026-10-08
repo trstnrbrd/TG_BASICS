@@ -2,6 +2,7 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
+require_once '../../config/access.php';
 require_once '../../includes/icons.php';
 require_once '../../includes/pagination.php';
 
@@ -187,7 +188,7 @@ require_once '../../includes/topbar.php';
                          + (int)$row['doc_drivers_license'] + (int)$row['doc_affidavit']
                          + (int)$row['doc_estimate'] + (int)$row['doc_damage_photos'];
               $s = $status_map[$row['status']] ?? ['label' => $row['status'], 'class' => 'badge-muted'];
-              $is_finished = in_array($row['status'], ['resolved', 'denied', 'lack_of_requirements']);
+              $is_finished = claim_is_deletable($row['status']);
               $cid = 'claim-expand-' . $row['claim_id'];
               $aby_initials = !empty($row['added_by_name']) ? substr(implode('', array_map(fn($w) => strtoupper($w[0] ?? ''), explode(' ', trim($row['added_by_name'])))), 0, 2) : '';
             ?>

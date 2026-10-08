@@ -2,6 +2,7 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
+require_once '../../config/access.php';
 require_once '../../includes/icons.php';
 require_once '../../config/mailer.php';
 require_once '../../includes/transaction.php';
@@ -36,7 +37,7 @@ if (!$claim) { header("Location: claims_list.php"); exit; }
 // Policy expiry + document progress. Computed here, before any POST handler runs, because the
 // status-update guards below read them (they used to be defined further down, after the handlers
 // had already returned, so those guards always saw an undefined value and never blocked anything).
-$policy_expired = strtotime($claim['policy_end']) < strtotime(date('Y-m-d'));
+$policy_expired = policy_is_expired($claim['policy_end']);
 $required_docs  = 7; // policy, OR, CR, license, affidavit, estimate, photos
 $docs_done      = (int)$claim['doc_insurance_policy'] + (int)$claim['doc_or'] + (int)$claim['doc_cr']
                 + (int)$claim['doc_drivers_license'] + (int)$claim['doc_affidavit']
@@ -80,9 +81,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_upload'])) {
     $doc_field = san_str($_POST['doc_field'] ?? '', 40);
     $allowed   = ['doc_insurance_policy', 'doc_or', 'doc_cr', 'doc_drivers_license', 'doc_affidavit', 'doc_estimate', 'doc_damage_photos'];
-    $policy_expired_ajax = strtotime($claim['policy_end']) < strtotime(date('Y-m-d'));
-    $docs_open_statuses = ['compiling', 'sent_admin', 'lack_of_requirements'];
-    if (!in_array($doc_field, $allowed, true) || !in_array($claim['status'], $docs_open_statuses) || $policy_expired_ajax) {
+    $policy_expired_ajax = policy_is_expired($claim['policy_end']);
+    if (!in_array($doc_field, $allowed, true) || !claim_docs_open($claim['status']) || $policy_expired_ajax) {
         api_error('Not allowed.', 403);
     }
 
@@ -130,7 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_upload'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_remove_doc'])) {
     $doc_field = san_str($_POST['doc_field'] ?? '', 40);
     $allowed   = ['doc_insurance_policy', 'doc_or', 'doc_cr', 'doc_drivers_license', 'doc_affidavit', 'doc_estimate', 'doc_damage_photos'];
-    if (!in_array($doc_field, $allowed, true) || !in_array($claim['status'], ['compiling', 'sent_admin', 'lack_of_requirements'])) {
+    if (!in_array($doc_field, $allowed, true) || !claim_docs_open($claim['status'])) {
         api_error('Not allowed.', 403);
     }
 
@@ -153,8 +153,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_remove_doc'])) {
 
 // Handle AJAX damage photo upload (multi)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_damage_upload'])) {
-    $policy_expired_ajax = strtotime($claim['policy_end']) < strtotime(date('Y-m-d'));
-    if (!in_array($claim['status'], ['compiling', 'sent_admin', 'lack_of_requirements']) || $policy_expired_ajax) api_error('Not allowed.', 403);
+    $policy_expired_ajax = policy_is_expired($claim['policy_end']);
+    if (!claim_docs_open($claim['status']) || $policy_expired_ajax) api_error('Not allowed.', 403);
     if (!isset($_FILES['damage_file']) || $_FILES['damage_file']['error'] !== UPLOAD_ERR_OK) api_error('Upload failed.');
 
     $file  = $_FILES['damage_file'];
@@ -199,8 +199,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_damage_upload'])
 
 // Handle AJAX damage photo remove
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_damage_remove'])) {
-    $policy_expired_ajax = strtotime($claim['policy_end']) < strtotime(date('Y-m-d'));
-    if (!in_array($claim['status'], ['compiling', 'sent_admin', 'lack_of_requirements']) || $policy_expired_ajax) api_error('Not allowed.', 403);
+    $policy_expired_ajax = policy_is_expired($claim['policy_end']);
+    if (!claim_docs_open($claim['status']) || $policy_expired_ajax) api_error('Not allowed.', 403);
 
     $photo_id = (int)($_POST['photo_id'] ?? 0);
     // The photo row, the remaining count and the "photos present" flag change together
@@ -371,7 +371,7 @@ function deleteClaim($conn, $claim_id, $display_num, $user_id, $actor_name) {
 // button is offered for, so an in-progress claim can't be removed by a hand-made request.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_claim'])) {
     csrf_verify();
-    if (!in_array($claim['status'], ['resolved', 'denied', 'lack_of_requirements'])) {
+    if (!claim_is_deletable($claim['status'])) {
         header("Location: view_claim.php?id=$claim_id&error=" . urlencode('Only resolved, denied, or lack-of-requirements claims can be deleted.'));
         exit;
     }
@@ -523,7 +523,7 @@ require_once '../../includes/topbar.php';
       $has_billing = $has_billing_stmt->get_result()->fetch_assoc();
       ?>
       <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-        <?php if (in_array($claim['status'], ['loa_received','pending','approved','resolved'])): ?>
+        <?php if (claim_is_billable($claim['status'])): ?>
           <?php if ($has_billing): ?>
           <a href="../billing/view_billing.php?id=<?= $has_billing['billing_id'] ?>" class="btn-sm-gold">
             <?= icon('document-text',13) ?> View Billing
@@ -534,7 +534,7 @@ require_once '../../includes/topbar.php';
           </a>
           <?php endif; ?>
         <?php endif; ?>
-        <?php if (in_array($claim['status'], ['resolved', 'denied', 'lack_of_requirements'])): ?>
+        <?php if (claim_is_deletable($claim['status'])): ?>
         <form method="POST" style="display:inline;">
           <?= csrf_field() ?>
           <input type="hidden" name="delete_claim" value="1"/>
@@ -682,7 +682,7 @@ require_once '../../includes/topbar.php';
             ['doc_estimate',         'Estimate',                 'Written cost estimate from the repair shop for the damage'],
             // proof/pictures handled separately below as damage photos
           ];
-          $docs_locked = !in_array($claim['status'], ['compiling', 'sent_admin', 'lack_of_requirements']);
+          $docs_locked = !claim_docs_open($claim['status']);
           foreach ($docs as $d):
             $checked   = (bool)$claim[$d[0]];
             $file_col  = $d[0] . '_file';
@@ -793,14 +793,14 @@ require_once '../../includes/topbar.php';
         </div>
 
         <!-- ACTION BUTTONS — open while compiling/sent_admin/lack_of_requirements, locked after forwarded to head office -->
-        <?php if (in_array($claim['status'], ['compiling', 'sent_admin', 'lack_of_requirements']) && !$policy_expired): ?>
+        <?php if (claim_docs_open($claim['status']) && !$policy_expired): ?>
         <div style="padding:0 1rem 1rem;display:flex;flex-direction:column;gap:0.5rem;" id="doc-action-btns">
           <button type="button" id="btn-send-admin-email" class="btn-primary" style="width:100%;<?= $docs_done === 0 ? 'opacity:0.45;cursor:not-allowed;' : '' ?>" <?= $docs_done === 0 ? 'disabled' : '' ?>>
             <?= icon('envelope',14) ?> Send Requirements to Admin
           </button>
           <div id="send-btn-hint" style="font-size:0.65rem;color:var(--text-muted);text-align:center;padding:0 0.5rem;"><?= $docs_done === 0 ? 'Upload at least one requirement before sending.' : 'Sends the current requirements checklist to the admin email for review and follow-up.' ?></div>
         </div>
-        <?php elseif ($policy_expired && in_array($claim['status'], ['compiling', 'sent_admin', 'lack_of_requirements'])): ?>
+        <?php elseif ($policy_expired && claim_docs_open($claim['status'])): ?>
         <div style="padding:0 1rem 1rem;">
           <button class="btn-primary" style="width:100%;opacity:0.45;cursor:not-allowed;background:var(--danger);border-color:var(--danger);" disabled>
             <?= icon('lock-closed',14) ?> Policy Expired — Cannot Process

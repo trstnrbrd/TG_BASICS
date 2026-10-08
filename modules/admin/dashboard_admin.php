@@ -179,7 +179,7 @@ require_once '../../includes/topbar.php';
 
   <div class="content">
 
-    <?php if ($_SESSION['role'] === 'super_admin' && !is_developer() && ($bk = db_backup_status($conn))['overdue']): ?>
+    <?php if (is_super_admin() && !is_developer() && ($bk = db_backup_status($conn))['overdue']): ?>
     <!-- Weekly backup reminder for the Owner (Settings > System Settings > Database Backup) -->
     <div class="alert alert-warning" role="status" style="align-items:center;flex-wrap:wrap;">
       <?= icon('exclamation-triangle', 15) ?>
@@ -224,7 +224,7 @@ require_once '../../includes/topbar.php';
     </div>
 
     <!-- MAIN GRID: 3 equal columns (Recent Activity is Super Admin only, so Admins get 2) -->
-    <div class="dash-main-grid" style="display:grid;grid-template-columns:<?= $_SESSION['role'] === 'super_admin' ? '1fr 1fr 1fr' : '1fr 1fr' ?>;gap:1.25rem;margin-bottom:1.25rem;">
+    <div class="dash-main-grid" style="display:grid;grid-template-columns:<?= is_super_admin() ? '1fr 1fr 1fr' : '1fr 1fr' ?>;gap:1.25rem;margin-bottom:1.25rem;">
 
       <!-- COL 1: RENEWAL ALERTS -->
       <div class="card" style="margin-bottom:0;max-height:320px;overflow:hidden;display:flex;flex-direction:column;">
@@ -302,7 +302,7 @@ require_once '../../includes/topbar.php';
         </div>
       </div>
 
-      <?php if ($_SESSION['role'] === 'super_admin'): ?>
+      <?php if (is_super_admin()): ?>
       <!-- COL 3: RECENT ACTIVITY (Super Admin only — shows system-wide events across all staff) -->
       <div class="card" style="margin-bottom:0;max-height:320px;overflow:hidden;display:flex;flex-direction:column;">
         <div class="card-header" style="justify-content:space-between;">

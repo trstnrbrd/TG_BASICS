@@ -145,6 +145,7 @@ function require_role_json(array $roles, string $message = 'Unauthorized.', int 
 
 
 function is_super_admin(): bool { return ($_SESSION['role'] ?? '') === 'super_admin'; }
+function is_admin(): bool       { return ($_SESSION['role'] ?? '') === 'admin'; }
 function is_mechanic(): bool    { return ($_SESSION['role'] ?? '') === 'mechanic'; }
 /** Front-office staff: admin or super admin — the pairing used wherever mechanics are excluded. */
 function is_staff(): bool       { return in_array($_SESSION['role'] ?? '', ['admin', 'super_admin'], true); }

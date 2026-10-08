@@ -15,7 +15,7 @@ if (isset($_GET['ajax_ac']) && isset($_GET['q'])) {
 
     // Every admin sees every client; mechanics only ever see walk-in clients (config/access.php)
     $ac_scope_sql = '';
-    if ($_SESSION['role'] === 'mechanic') $ac_scope_sql = "AND NOT EXISTS (SELECT 1 FROM insurance_policies ip WHERE ip.client_id = c.client_id)";
+    if (is_mechanic()) $ac_scope_sql = "AND NOT EXISTS (SELECT 1 FROM insurance_policies ip WHERE ip.client_id = c.client_id)";
 
     $stmt = $conn->prepare("
         SELECT c.client_id, c.full_name, c.contact_number,
@@ -81,7 +81,7 @@ $initials  = substr(implode('', array_map(fn($w) => strtoupper($w[0] ?? ''), arr
 $search      = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
 $filter_by   = san_enum($_GET['filter_by'] ?? 'all', ['all', 'name', 'plate', 'contact', 'email']);
 $sort_by     = $_GET['sort'] ?? 'newest';
-$is_mechanic = $_SESSION['role'] === 'mechanic';
+$is_mechanic = is_mechanic();
 // Mechanics only ever see walk-in clients — force this regardless of any ?client_type= in the URL
 $filter_type = $is_mechanic ? 'walkin' : san_enum($_GET['client_type'] ?? 'all', ['all', 'insurance', 'walkin']);
 $where       = '';
@@ -190,8 +190,8 @@ $list_title = match (true) {
 
 // Per row: may the signed-in user change / delete this client? Same rule as client_editable().
 $row_can_edit = function (array $row) use ($me_id): bool {
-    if ($_SESSION['role'] === 'super_admin') return true;
-    if ($_SESSION['role'] !== 'admin') return false;
+    if (is_super_admin()) return true;
+    if (!is_admin()) return false;
     return (int)$row['created_by'] === $me_id || (int)$row['agent_id'] === $me_id;
 };
 
@@ -369,7 +369,7 @@ require_once '../../includes/topbar.php';
         <a href="client_list.php" class="btn-ghost"><?= icon('x-mark', 14) ?> Clear</a>
         <?php endif; ?>
 
-        <?php if ($_SESSION['role'] !== 'mechanic'): ?>
+        <?php if (!is_mechanic()): ?>
         <span class="client-toolbar-actions">
         <a href="add_client.php" class="btn-primary"><?= icon('plus', 14) ?> Add Client</a>
         <a href="import_clients.php" class="btn-ghost" title="Add many clients at once from a CSV file"><?= icon('arrow-up-tray', 14) ?> Import</a>

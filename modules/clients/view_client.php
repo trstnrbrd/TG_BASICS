@@ -5,7 +5,7 @@ require_once '../../config/validators.php';
 require_once '../../config/access.php';
 
 require_role(['admin', 'super_admin', 'mechanic']);
-$is_mechanic = $_SESSION['role'] === 'mechanic';
+$is_mechanic = is_mechanic();
 
 $client_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if ($client_id === 0) {

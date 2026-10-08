@@ -12,7 +12,7 @@ $exp_days = (int)getSetting($conn, 'renewal_expiring_days', '30');
 
 require_role(['admin', 'super_admin']);
 
-$is_super = $_SESSION['role'] === 'super_admin';
+$is_super = is_super_admin();
 
 // No vault password (owner's decision, 2026-09-24). Every admin opens Renewal Tracking on the policies of
 // THEIR OWN clients ("My Clients") and can switch to another agent or everyone with the same agent filter as

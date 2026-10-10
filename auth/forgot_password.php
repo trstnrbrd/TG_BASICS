@@ -42,8 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $ins->bind_param('iss', $user['user_id'], $token, $expires_at);
             $ins->execute();
 
-            $protocol   = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-            $reset_link = $protocol . '://' . $_SERVER['HTTP_HOST'] . '/TG-BASICS/auth/reset_password.php?token=' . $token;
+            $reset_link = app_url('auth/reset_password.php?token=' . $token);
             sendPasswordResetEmail($user['email'], $user['full_name'], $reset_link);
         }
 

@@ -2,6 +2,7 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
+require_once '../../config/access.php';
 require_once '../../includes/pagination.php';
 
 require_role(['admin', 'super_admin']);
@@ -11,7 +12,7 @@ $eligible_claims = $conn->query("
     SELECT COUNT(*) AS cnt
     FROM claims cl
     LEFT JOIN billing b ON b.claim_id = cl.claim_id
-    WHERE cl.status IN ('loa_received','pending','approved','resolved')
+    WHERE cl.status IN ('" . implode("','", CLAIM_BILLABLE_STATUSES) . "')
       AND b.billing_id IS NULL
 ")->fetch_assoc()['cnt'] ?? 0;
 
@@ -141,6 +142,14 @@ require_once '../../includes/topbar.php';
       </div>
 
       <?php if ($result->num_rows > 0): ?>
+      <style>
+      @media (min-width: 769px) {
+        .mob-billing-table thead th { padding: 0.45rem 0.75rem; }
+        .mob-billing-table tbody td { padding: 0.45rem 0.75rem; }
+        .mob-billing-table thead th:nth-child(2),
+        .mob-billing-table tbody td:nth-child(2) { text-align: left !important; }
+      }
+      </style>
       <table class="tg-table mob-card mob-billing-table">
         <thead>
           <tr>

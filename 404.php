@@ -3,8 +3,8 @@ http_response_code(404);
 require_once __DIR__ . '/includes/icons.php';
 
 // Determine back link
-$base = '/TG-BASICS/';
 require_once __DIR__ . '/config/session.php';
+$base = app_base_path();
 $logged_in = isset($_SESSION['user_id']);
 if ($logged_in) {
     if (is_mechanic()) {

@@ -1089,7 +1089,7 @@ $footer_extra_scripts = '<script src="../../assets/js/shared/money_input.js?v=' 
       result.style.display = "none";
 
       try {
-        const base = document.querySelector("meta[name=base_path]")?.content || "/TG-BASICS/";
+        const base = document.querySelector("meta[name=base_path]")?.content || "/";
         const res  = await fetch(base + "ajax/lookup_vehicle.php?plate=" + encodeURIComponent(plate));
         const data = await res.json();
 

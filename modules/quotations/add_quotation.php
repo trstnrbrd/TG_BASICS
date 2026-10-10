@@ -82,7 +82,7 @@ $service_labels = [
     'custom'         => 'Custom / Mixed',
 ];
 
-$is_mechanic = $_SESSION['role'] === 'mechanic';
+$is_mechanic = is_mechanic();
 
 // ── HANDLE POST ──
 $errors = [];

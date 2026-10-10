@@ -442,7 +442,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
 }
 
 $days     = (int)$policy['days_left'];
-$expired  = $policy['policy_end'] < date('Y-m-d');
+$expired  = policy_is_expired($policy['policy_end']);
 
 // Count linked claims
 $claims_count_res = $conn->prepare("SELECT COUNT(*) AS cnt FROM claims WHERE policy_id = ?");

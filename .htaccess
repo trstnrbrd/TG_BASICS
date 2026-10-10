@@ -1,4 +1,9 @@
+# Apache needs a fixed path here (it can't be worked out per request like config/app_url.php does), so this is the
+# one line to edit if the app ever moves out of /TG-BASICS/ — e.g. to "ErrorDocument 404 /404.php" at a domain root.
 ErrorDocument 404 /TG-BASICS/404.php
+
+# Web app manifest (installable app). Apache has no type for .webmanifest out of the box.
+AddType application/manifest+json .webmanifest
 
 # Force HTTPS in production only — checks both the direct flag and the
 # forwarded-proto header (some shared hosts terminate SSL at a proxy in

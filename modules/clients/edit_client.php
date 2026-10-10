@@ -38,7 +38,7 @@ if (!$client) {
 
 // Reassigning a client to another agent moves who may edit its policies and payments, so only the
 // Owner can do it here — otherwise an encoder could hand a client (and its payments) to themselves.
-$is_super      = $_SESSION['role'] === 'super_admin';
+$is_super      = is_super_admin();
 $agents        = $is_super ? insurance_agents($conn) : [];
 $cur_agent_id  = $client['agent_id'] !== null ? (int)$client['agent_id'] : 0;
 

@@ -91,6 +91,70 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     exit;
 }
 
+// ── HANDLE INSPECTION SIGN-OFF (AJAX) ──
+// The paper checklist was signed by the client and by the shop; this records the same two signatures. A signature,
+// once saved, is final — the UNIQUE (job_id, signer_role) key refuses a second one for the same side.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'sign_inspection') {
+    require_once '../../includes/api.php';
+    csrf_verify_json();
+
+    $signer_role = san_enum($_POST['signer_role'] ?? '', ['client', 'staff']);
+    if ($signer_role === '') api_error('Choose who is signing.');
+    // The shop's signature is always the person signed in. The client's name defaults to the client on record,
+    // but someone else (a driver, a family member) may sign on their behalf, so it can be typed.
+    $signer_name = $signer_role === 'staff'
+        ? (string)($_SESSION['full_name'] ?? '')
+        : san_str($_POST['signer_name'] ?? '', 150);
+    if ($signer_name === '') api_error('Enter the name of the person signing.');
+
+    $data = $_POST['signature'] ?? '';
+    if (!is_string($data) || !preg_match('#^data:image/png;base64,([A-Za-z0-9+/=]+)$#', $data, $m)) {
+        api_error('The signature could not be read. Please sign again.');
+    }
+    $png  = base64_decode($m[1], true);
+    $info = $png !== false ? getimagesizefromstring($png) : false;
+    if ($png === false || strlen($png) > 512000 || !$info || $info[2] !== IMAGETYPE_PNG
+        || $info[0] < 40 || $info[1] < 20 || $info[0] > 4000 || $info[1] > 3000) {
+        api_error('The signature could not be read. Please sign again.');
+    }
+
+    $dir = __DIR__ . '/../../uploads/repair_jobs/' . $job_id . '/';
+    if (!is_dir($dir)) mkdir($dir, 0755, true);
+    $fname = 'sig_' . $signer_role . '_' . bin2hex(random_bytes(8)) . '.png';
+    if (file_put_contents($dir . $fname, $png) === false) api_error('The signature could not be saved. Please try again.', 500);
+
+    try {
+        db_transaction($conn, function () use ($conn, $job_id, $job, $signer_role, $signer_name, $fname) {
+            $ins = $conn->prepare("INSERT INTO repair_job_signatures (job_id, signer_role, signer_name, file_name, captured_by) VALUES (?, ?, ?, ?, ?)");
+            $ins->bind_param('isssi', $job_id, $signer_role, $signer_name, $fname, $_SESSION['user_id']);
+            $ins->execute();
+            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'REPAIR_SIGNED', ?)");
+            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' recorded the ' . ($signer_role === 'client' ? 'client' : 'shop')
+                  . ' signature (' . $signer_name . ') on the inspection checklist of repair job ' . $job['job_number'] . '.';
+            $log->bind_param('is', $_SESSION['user_id'], $desc);
+            $log->execute();
+        });
+    } catch (mysqli_sql_exception $e) {
+        @unlink($dir . $fname);
+        if ($e->getCode() === 1062) api_error('This side has already been signed.', 409);
+        error_log('[TG-BASICS] sign_inspection failed: ' . $e->getMessage());
+        api_error('The signature could not be saved. Please try again.', 500);
+    }
+
+    api_success([
+        'signer_name' => $signer_name,
+        'signed_at'   => date('M d, Y · g:i A'),
+        'url'         => '../../uploads/repair_jobs/' . $job_id . '/' . $fname,
+    ], 'Signature saved.');
+}
+
+// ── FETCH SIGNATURES ──
+$sig_stmt = $conn->prepare("SELECT signer_role, signer_name, file_name, signed_at FROM repair_job_signatures WHERE job_id = ?");
+$sig_stmt->bind_param('i', $job_id);
+$sig_stmt->execute();
+$signatures = [];
+foreach ($sig_stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) $signatures[$row['signer_role']] = $row;
+
 // ── HANDLE STATUS UPDATE ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     csrf_verify();
@@ -115,9 +179,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $tok_row->execute();
                 $tok_data = $tok_row->get_result()->fetch_assoc();
                 $pub_token = $tok_data['public_token'] ?? '';
-                $pub_url   = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
-                           . '://' . $_SERVER['HTTP_HOST']
-                           . '/TG-BASICS/modules/public/client.php?token=' . urlencode($pub_token);
+                $pub_url   = app_url('modules/public/client.php?token=' . urlencode($pub_token));
 
                 $svc_labels = [
                     'repair_panel' => 'Per Panel Repair', 'repair_full' => 'Full Body Repair',
@@ -375,6 +437,61 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
   </div>
 
+  <!-- INSPECTION SIGN-OFF -->
+  <?php
+  $signed_count = count($signatures);
+  $sig_sides = [
+      'client' => ['Client', 'Confirms the condition recorded above', $job['full_name']],
+      'staff'  => ['Shop Representative', 'Inspected and recorded by', $_SESSION['full_name'] ?? ''],
+  ];
+  ?>
+  <div class="card" style="margin-bottom:1.25rem;" id="signoff-card">
+    <div class="card-header">
+      <div class="card-icon"><?= icon('pencil', 16) ?></div>
+      <div>
+        <div class="card-title">Inspection Sign-off</div>
+        <div class="card-sub">Client and shop signatures on the intake checklist</div>
+      </div>
+      <div style="margin-left:auto;" id="signoff-status">
+        <?php if ($signed_count === 2): ?>
+        <span class="badge badge-green"><?= icon('check', 11) ?> Fully signed</span>
+        <?php else: ?>
+        <span class="badge badge-yellow"><?= $signed_count ?> of 2 signed</span>
+        <?php endif; ?>
+      </div>
+    </div>
+    <div style="padding:1rem 1.25rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;">
+      <?php foreach ($sig_sides as $side => [$side_label, $side_hint, $default_name]):
+        $sig = $signatures[$side] ?? null; ?>
+      <div class="sig-slot" data-side="<?= $side ?>" style="border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+        <div style="padding:0.6rem 0.9rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:0.72rem;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;color:var(--gold);"><?= $side_label ?></span>
+          <span style="font-size:0.68rem;color:var(--text-muted);"><?= $side_hint ?></span>
+        </div>
+        <?php if ($sig): ?>
+        <div class="sig-body" style="background:#fff;height:120px;display:flex;align-items:center;justify-content:center;padding:0.5rem;">
+          <img src="../../uploads/repair_jobs/<?= $job_id ?>/<?= htmlspecialchars($sig['file_name']) ?>" alt="<?= $side_label ?> signature" style="max-height:100%;max-width:100%;object-fit:contain;"/>
+        </div>
+        <div style="padding:0.6rem 0.9rem;border-top:1px solid var(--border);">
+          <div style="font-size:0.8rem;font-weight:700;color:var(--text-primary);"><?= htmlspecialchars($sig['signer_name']) ?></div>
+          <div style="font-size:0.68rem;color:var(--text-muted);">Signed <?= date('M d, Y · g:i A', strtotime($sig['signed_at'])) ?></div>
+        </div>
+        <?php else: ?>
+        <div class="sig-body" style="height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.5rem;background:var(--bg-2);">
+          <span style="font-size:0.75rem;color:var(--text-muted);">Not signed yet</span>
+          <button type="button" class="btn-sm-gold" onclick="openSignModal('<?= $side ?>', <?= htmlspecialchars(json_encode($default_name), ENT_QUOTES) ?>)">
+            <?= icon('pencil', 12) ?> Sign
+          </button>
+        </div>
+        <div style="padding:0.6rem 0.9rem;border-top:1px solid var(--border);font-size:0.68rem;color:var(--text-muted);">
+          <?= $side === 'client' ? 'Hand the device to the client to sign' : 'Signs as ' . htmlspecialchars($default_name) ?>
+        </div>
+        <?php endif; ?>
+      </div>
+      <?php endforeach; ?>
+    </div>
+  </div>
+
   <!-- VEHICLE PHOTOS -->
   <div class="card" style="margin-bottom:1.25rem;">
     <div class="card-header">
@@ -502,6 +619,32 @@ document.addEventListener('DOMContentLoaded', function() {
     </form>
   </div>
 </div>
+<!-- SIGNATURE MODAL -->
+<div id="sig-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;align-items:center;justify-content:center;padding:1rem;">
+  <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:16px;padding:1.5rem;width:100%;max-width:580px;box-shadow:var(--shadow-lg);">
+    <div style="font-size:1rem;font-weight:700;color:var(--text-primary);" id="sig-title">Client Signature</div>
+    <div style="font-size:0.76rem;color:var(--text-muted);margin:0.25rem 0 1rem;" id="sig-attest"></div>
+    <div id="sig-name-wrap" style="margin-bottom:0.85rem;">
+      <label for="sig-name" style="display:block;font-size:0.72rem;font-weight:600;color:var(--text-muted);margin-bottom:0.3rem;">Name of person signing</label>
+      <input type="text" id="sig-name" class="field-input" maxlength="150" autocomplete="off"/>
+    </div>
+    <!-- White pad in both themes: the stored ink is dark, and a signature should look like one on paper -->
+    <div style="position:relative;background:#fff;border:1.5px dashed var(--gold-muted);border-radius:12px;height:210px;">
+      <canvas id="sig-canvas" style="width:100%;height:100%;display:block;border-radius:12px;cursor:crosshair;"></canvas>
+      <div style="position:absolute;left:8%;right:8%;bottom:46px;border-bottom:1px solid #D6CFC2;pointer-events:none;"></div>
+      <div id="sig-hint" style="position:absolute;left:0;right:0;bottom:22px;text-align:center;font-size:0.7rem;color:#9C9286;pointer-events:none;">Sign above the line</div>
+    </div>
+    <div id="sig-error" style="display:none;margin-top:0.6rem;font-size:0.75rem;color:#C0392B;"></div>
+    <div style="display:flex;gap:0.5rem;justify-content:space-between;margin-top:1rem;flex-wrap:wrap;">
+      <button type="button" class="btn-ghost" onclick="sigPad && sigPad.clear(); document.getElementById('sig-hint').style.display='';"><?= icon('arrow-path', 13) ?> Clear</button>
+      <div style="display:flex;gap:0.5rem;">
+        <button type="button" class="btn-ghost" onclick="closeSignModal()">Cancel</button>
+        <button type="button" class="btn-primary" id="sig-save" onclick="saveSignature()"><?= icon('check', 13) ?> Save Signature</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 document.getElementById('status-modal').addEventListener('click', function(e) {
   if (e.target === this) this.style.display = 'none';
@@ -510,8 +653,71 @@ document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') {
     document.getElementById('status-modal').style.display = 'none';
     closeLightbox();
+    closeSignModal();
   }
 });
+
+// ── Inspection sign-off ──
+let sigPad = null, sigSide = null;
+const SIG_TEXT = {
+  client: ['Client Signature', 'By signing, I confirm the condition of my vehicle as recorded in the Unit Inspection Checklist for <?= htmlspecialchars($job['job_number'], ENT_QUOTES) ?>.'],
+  staff:  ['Shop Representative Signature', 'By signing, I confirm I inspected this vehicle and recorded its condition in the checklist for <?= htmlspecialchars($job['job_number'], ENT_QUOTES) ?>.'],
+};
+function openSignModal(side, defaultName) {
+  sigSide = side;
+  document.getElementById('sig-title').textContent = SIG_TEXT[side][0];
+  document.getElementById('sig-attest').textContent = SIG_TEXT[side][1];
+  document.getElementById('sig-name-wrap').style.display = side === 'client' ? '' : 'none';
+  document.getElementById('sig-name').value = defaultName || '';
+  document.getElementById('sig-error').style.display = 'none';
+  document.getElementById('sig-hint').style.display = '';
+  document.getElementById('sig-modal').style.display = 'flex';
+  // The canvas is measured once it is visible, so it is sized to the modal on every open
+  const canvas = document.getElementById('sig-canvas');
+  if (!sigPad) {
+    sigPad = new SignaturePad(canvas);
+    canvas.addEventListener('pointerdown', () => { document.getElementById('sig-hint').style.display = 'none'; });
+  } else {
+    sigPad.resize();
+  }
+  sigPad.clear();
+}
+function closeSignModal() {
+  const m = document.getElementById('sig-modal');
+  if (m) m.style.display = 'none';
+}
+document.getElementById('sig-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeSignModal();
+});
+function sigError(msg) {
+  const el = document.getElementById('sig-error');
+  el.textContent = msg;
+  el.style.display = '';
+}
+async function saveSignature() {
+  if (!sigPad || sigPad.isEmpty()) return sigError('Please sign inside the box first.');
+  const name = document.getElementById('sig-name').value.trim();
+  if (sigSide === 'client' && !name) return sigError('Enter the name of the person signing.');
+  const btn = document.getElementById('sig-save');
+  btn.disabled = true;
+  const fd = new FormData();
+  fd.append('csrf_token', window._csrf || '');
+  fd.append('action', 'sign_inspection');
+  fd.append('signer_role', sigSide);
+  fd.append('signer_name', name);
+  fd.append('signature', sigPad.toDataURL());
+  try {
+    const res = await fetch(location.pathname + location.search, { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!data.ok) { btn.disabled = false; return sigError(data.message || 'The signature could not be saved.'); }
+    closeSignModal();
+    await Swal.fire({ icon: 'success', title: 'Signature saved', timer: 1300, showConfirmButton: false });
+    location.reload();
+  } catch (e) {
+    btn.disabled = false;
+    sigError('Could not reach the server. Check your connection and try again.');
+  }
+}
 
 // ── Lightbox ──
 function openLightbox(src) {
@@ -539,4 +745,7 @@ function confirmDeleteImg(btn) {
 }
 </script>
 
-<?php require_once '../../includes/footer.php'; ?>
+<?php
+$footer_extra_scripts = '<script src="../../assets/js/shared/signature_pad.js?v=' . filemtime(__DIR__ . '/../../assets/js/shared/signature_pad.js') . '"></script>';
+require_once '../../includes/footer.php';
+?>

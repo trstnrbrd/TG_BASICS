@@ -200,6 +200,16 @@ function UserDropdown({ fullName, initials, role, username, basePath, photo }) {
     ), "Edit Profile"
 
     ), /*#__PURE__*/
+    React.createElement("button", { className: "user-dropdown-item",
+      onClick: () => {handleClose();setTimeout(() => window.TG_PWA && window.TG_PWA.install(), 50);} }, /*#__PURE__*/
+    React.createElement("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none",
+      stroke: "currentColor", strokeWidth: "1.75", strokeLinecap: "round", strokeLinejoin: "round" }, /*#__PURE__*/
+    React.createElement("rect", { x: "5", y: "2", width: "14", height: "20", rx: "2" }), /*#__PURE__*/
+    React.createElement("path", { d: "M9 18h6" }), /*#__PURE__*/
+    React.createElement("path", { d: "M12 7v5m0 0l-2.2-2.2M12 12l2.2-2.2" })
+    ), "Install App"
+
+    ), /*#__PURE__*/
     React.createElement("a", { href: `${basePath}modules/admin/settings.php`, className: "user-dropdown-item", onClick: handleClose }, /*#__PURE__*/
     React.createElement("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none",
       stroke: "currentColor", strokeWidth: "1.75", strokeLinecap: "round", strokeLinejoin: "round" }, /*#__PURE__*/

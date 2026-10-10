@@ -25,6 +25,104 @@
     }
   }
 
+  function isStandalone() {
+    return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  }
+
+  // The browser only hands the page its install permission (beforeinstallprompt) a few seconds after load,
+  // and never at all on iOS Safari or Firefox. A click that lands before it arrives waits briefly for it —
+  // staying inside the click's few seconds of user activation, which prompt() needs.
+  function waitForPrompt(ms) {
+    return new Promise(function (resolve) {
+      if (deferred) return resolve(true);
+      const timer = setTimeout(function () {
+        window.removeEventListener("beforeinstallprompt", arrived);
+        resolve(!!deferred);
+      }, ms);
+      function arrived() {
+        clearTimeout(timer);
+        window.removeEventListener("beforeinstallprompt", arrived);
+        setTimeout(function () { resolve(!!deferred); }, 0); // after the capture listener below has stored it
+      }
+      window.addEventListener("beforeinstallprompt", arrived);
+    });
+  }
+
+  // When no permission comes, the exact menu steps for this browser, so nobody has to go looking.
+  function instructionsHtml() {
+    const ua = navigator.userAgent;
+    const list = function (steps) {
+      return "<ol style='text-align:left;margin:0;padding-left:1.2em;line-height:1.75'>" +
+        steps.map(function (s) { return "<li>" + s + "</li>"; }).join("") + "</ol>";
+    };
+    const already = "<p style='text-align:left;margin:0.9em 0 0;font-size:0.9em;opacity:0.75'>Already installed it? " +
+      "Open <strong>TG-BASICS</strong> from your Start menu, dock or home screen instead.</p>";
+
+    if (/iPad|iPhone|iPod/.test(ua) || (ua.includes("Macintosh") && navigator.maxTouchPoints > 1)) {
+      return list([
+        "Tap the <strong>Share</strong> button (the square with an arrow pointing up)",
+        "Scroll down and tap <strong>Add to Home Screen</strong>",
+        "Tap <strong>Add</strong>",
+      ]) + already;
+    }
+    if (/Android/.test(ua)) {
+      if (/SamsungBrowser/.test(ua)) {
+        return list(["Tap the <strong>☰</strong> menu at the bottom right", "Tap <strong>Add page to</strong> → <strong>Home screen</strong>"]) + already;
+      }
+      return list(["Tap the <strong>⋮</strong> menu at the top right", "Tap <strong>Install app</strong> (or <strong>Add to Home screen</strong>)"]) + already;
+    }
+    if (/Firefox\//.test(ua)) {
+      return "<p style='text-align:left;margin:0;line-height:1.6'>Firefox can't install web apps on a computer. " +
+        "Open TG-BASICS in <strong>Chrome</strong>, <strong>Edge</strong> or <strong>Brave</strong> and use the " +
+        "<strong>Install App</strong> option there.</p>";
+    }
+    if (/Edg\//.test(ua)) {
+      return list(["Click the <strong>⋯</strong> menu at the top right", "Choose <strong>Apps</strong> → <strong>Install this site as an app</strong>", "Click <strong>Install</strong>"]) + already;
+    }
+    if (navigator.brave) {
+      return list(["Click the <strong>☰</strong> menu at the top right", "Choose <strong>Save and share</strong> → <strong>Install page as app…</strong>", "Click <strong>Install</strong>"]) + already;
+    }
+    return list(["Click the <strong>⋮</strong> menu at the top right", "Choose <strong>Cast, save and share</strong> → <strong>Install page as app…</strong>", "Click <strong>Install</strong>"]) + already;
+  }
+
+  function showInstructions() {
+    if (window.Swal) {
+      Swal.fire({
+        title: "Install TG-BASICS",
+        html: instructionsHtml(),
+        confirmButtonText: "Got it",
+        confirmButtonColor: "#D4A017",
+      });
+    } else {
+      alert("To install: open your browser menu and choose \"Install app\" or \"Add to Home screen\".");
+    }
+  }
+
+  // Shared entry point — the floating chip and the permanent "Install App" item in the user menu both call this.
+  window.TG_PWA = {
+    isInstalled: isStandalone,
+    canPrompt: () => !!deferred,
+    install: async function () {
+      if (isStandalone()) {
+        if (window.showToast) showToast("TG-BASICS is already installed on this device.", "info");
+        else alert("TG-BASICS is already installed on this device.");
+        return;
+      }
+      if (!deferred) await waitForPrompt(2500);
+      if (deferred) {
+        // One click, then the browser's own "Install TG-BASICS?" confirmation — the most direct any site is allowed.
+        const ev = deferred;
+        deferred = null; // a captured prompt can only be shown once
+        ev.prompt();
+        await ev.userChoice;
+        const chip = document.getElementById("tg-install-chip");
+        if (chip) chip.remove();
+        return;
+      }
+      showInstructions();
+    },
+  };
+
   function showChip() {
     if (document.getElementById("tg-install-chip") || dismissed()) return;
     const chip = document.createElement("div");
@@ -38,12 +136,8 @@
       '<button type="button" class="tg-ic-x" aria-label="Not now">&times;</button>';
     document.body.appendChild(chip);
 
-    chip.querySelector(".tg-ic-go").addEventListener("click", async function () {
-      if (!deferred) return;
-      deferred.prompt();
-      await deferred.userChoice;
-      deferred = null;
-      chip.remove();
+    chip.querySelector(".tg-ic-go").addEventListener("click", function () {
+      window.TG_PWA.install();
     });
     chip.querySelector(".tg-ic-x").addEventListener("click", function () {
       try {

@@ -19,6 +19,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_logout'])) {
     exit;
 }
 
+// Reached with no live session — either a direct hit after already signing out, or the browser's
+// back-forward cache (bfcache) replaying this page from history. Bounce to login instead of showing a
+// confirm card whose "Stay" link and "Sign Out" button have nothing left to act on.
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit;
+}
+
 $full_name = $_SESSION['full_name'] ?? 'User';
 $first     = explode(' ', $full_name)[0];
 $back      = is_mechanic() ? '../modules/repair/dashboard_mechanic.php' : '../modules/admin/dashboard_admin.php';
@@ -86,5 +94,14 @@ $back      = is_mechanic() ? '../modules/repair/dashboard_mechanic.php' : '../mo
 
 </div>
 
+<script>
+// Cache-Control: no-store (set in config/session.php while the session is live) stops the regular HTTP
+// cache, but Chrome's back-forward cache has ignored no-store since M96, so the browser Back button can
+// still replay this exact page after the session that produced it is gone. Force a real reload when that
+// happens, so the PHP check above gets to run and send an already-signed-out visitor to login instead.
+window.addEventListener('pageshow', function (e) {
+  if (e.persisted) window.location.reload();
+});
+</script>
 </body>
 </html>

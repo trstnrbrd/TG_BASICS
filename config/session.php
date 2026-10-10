@@ -11,11 +11,12 @@ if (!isset($conn)) {
 }
 $conn->query("SET time_zone = '+08:00'");
 
+require_once __DIR__ . '/app_url.php';
+
 // Auto-detect HTTPS so the cookie is marked secure in production without
 // breaking local XAMPP (plain HTTP) — checks both the direct HTTPS flag
 // and the forwarded-proto header used by shared hosts that proxy SSL.
-$_is_https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-    || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
+$_is_https = app_is_https();
 $_is_local = (bool)preg_match('/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/', $_SERVER['HTTP_HOST'] ?? '');
 
 // Production only: never show PHP errors to visitors (they reveal file paths and SQL), log them instead,

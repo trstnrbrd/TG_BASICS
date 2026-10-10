@@ -148,8 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
         if ($ins->execute()) {
             $new_user_id      = $conn->insert_id;
-            $protocol         = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-            $activation_link  = $protocol . '://' . $_SERVER['HTTP_HOST'] . '/TG-BASICS/auth/activate.php?token=' . $token;
+            $activation_link  = app_url('auth/activate.php?token=' . $token);
 
             $sent = sendActivationEmail($new_email, $new_name, $activation_link);
 

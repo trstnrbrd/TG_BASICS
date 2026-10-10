@@ -1,0 +1,31 @@
+{
+  "name": "TG-BASICS",
+  "short_name": "TG-BASICS",
+  "description": "TG Customworks & Basic Car Insurance — clients, policies, claims and repair jobs in one system.",
+  "start_url": "auth/login.php?source=app",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1A1814",
+  "theme_color": "#1A1814",
+  "icons": [
+    {
+      "src": "assets/img/pwa/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/img/pwa/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/img/pwa/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

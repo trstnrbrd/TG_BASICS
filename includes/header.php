@@ -31,10 +31,13 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <meta name="format-detection" content="telephone=no, date=no, email=no, address=no"/>
-<meta name="base_path" content="/TG-BASICS/"/>
+<meta name="base_path" content="<?= htmlspecialchars(app_base_path()) ?>"/>
 <title><?= htmlspecialchars($page_title) ?> | TG-BASICS</title>
 <link rel="icon" type="image/png" href="<?= $base_path ?>assets/img/tg_logo.png"/>
-<link rel="apple-touch-icon" href="<?= $base_path ?>assets/img/tg_logo.png"/>
+<link rel="apple-touch-icon" href="<?= $base_path ?>assets/img/pwa/apple-touch-icon.png"/>
+<link rel="manifest" href="<?= $base_path ?>manifest.webmanifest"/>
+<meta name="theme-color" content="#1A1814"/>
+<script src="<?= $base_path ?>assets/js/shared/pwa.js?v=<?= filemtime(__DIR__ . '/../assets/js/shared/pwa.js') ?>" defer></script>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Big+Shoulders+Text:wght@700;800;900&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="<?= $base_path ?>assets/css/shared/app.css?v=<?= filemtime(__DIR__ . '/../assets/css/shared/app.css') ?>"/>
 <link rel="stylesheet" href="<?= $base_path ?>assets/css/shared/mobile_tables.css?v=<?= filemtime(__DIR__ . '/../assets/css/shared/mobile_tables.css') ?>"/>

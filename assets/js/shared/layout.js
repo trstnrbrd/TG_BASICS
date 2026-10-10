@@ -113,7 +113,7 @@ document.addEventListener('DOMContentLoaded', function () {
 // ── Global Transaction PIN verifier ──
 // Usage: const ok = await requirePin(); if (!ok) return;
 window.requirePin = async function() {
-  const base = document.querySelector('meta[name="base_path"]')?.content || '/TG-BASICS/';
+  const base = document.querySelector('meta[name="base_path"]')?.content || '/';
   const endpoint = base + 'ajax/verify_pin.php';
 
   // Check if user has a PIN (send empty pin = just checking existence)

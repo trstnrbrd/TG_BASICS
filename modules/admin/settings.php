@@ -156,9 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                 $ins->bind_param('iss', $user_id, $email, $token);
                 $ins->execute();
 
-                $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-                $host = $_SERVER['HTTP_HOST'];
-                $verifyLink = $protocol . '://' . $host . '/TG-BASICS/auth/verify_email.php?token=' . $token;
+                $verifyLink = app_url('auth/verify_email.php?token=' . $token);
 
                 sendEmailVerificationEmail($email, $name, $verifyLink);
 

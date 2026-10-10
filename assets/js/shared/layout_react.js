@@ -88,7 +88,7 @@ if (toastRoot) {
 async function loadExpiryBadge() {
   try {
     // Now a static file (was PHP-interpolated inline JSX) — same base_path source assets/js/shared/layout.js uses.
-    const base = document.querySelector('meta[name="base_path"]')?.content || '/TG-BASICS/';
+    const base = document.querySelector('meta[name="base_path"]')?.content || '/';
     const res = await fetch(base + 'modules/renewal/get_urgent_count.php');
     const data = await res.json();
     if (data.count > 0) {

@@ -247,9 +247,7 @@ require_once '../../includes/topbar.php';
         $rt->execute();
         $public_token = $rt->get_result()->fetch_assoc()['public_token'] ?? '';
     }
-    $public_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
-                . '://' . $_SERVER['HTTP_HOST']
-                . '/TG-BASICS/modules/public/client.php?token=' . urlencode($public_token);
+    $public_url = app_url('modules/public/client.php?token=' . urlencode($public_token));
     ?>
 
     <!-- CLIENT HEADER BANNER -->

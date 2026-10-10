@@ -7,7 +7,10 @@
 <meta name="format-detection" content="telephone=no, date=no, email=no, address=no"/>
 <title>TG-BASICS | Brokerage and Auto Shop Integrated Control System</title>
 <link rel="icon" type="image/png" href="assets/img/tg_logo.png"/>
-<link rel="apple-touch-icon" href="assets/img/tg_logo.png"/>
+<link rel="apple-touch-icon" href="assets/img/pwa/apple-touch-icon.png"/>
+<link rel="manifest" href="manifest.webmanifest"/>
+<meta name="theme-color" content="#1A1814"/>
+<script src="assets/js/shared/pwa.js?v=<?= filemtime(__DIR__ . '/assets/js/shared/pwa.js') ?>" defer></script>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="assets/css/index.css?v=<?= filemtime('assets/css/index.css') ?>"/>
 </head>

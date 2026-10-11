@@ -28,6 +28,7 @@
   position: relative;
 }
 .auth-form-title {
+  margin: 0;
   font-size: 1.7rem;
   font-weight: 800;
   color: var(--text-primary);

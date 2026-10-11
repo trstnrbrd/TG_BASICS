@@ -234,7 +234,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="auth-right-name">TG<span>-BASICS</span></div>
       </div>
 
-      <div class="auth-form-title">Welcome back.</div>
+      <h1 class="auth-form-title">Welcome back.</h1>
       <div class="auth-form-sub">Sign in to continue to TG-BASICS</div>
 
       <?php if ($error && !$lockout): ?>

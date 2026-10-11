@@ -1,4 +1,9 @@
-<?php require_once 'includes/icons.php'; ?>
+<?php
+require_once 'includes/icons.php';
+require_once __DIR__ . '/config/app_url.php';
+$_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Insurance in Pandi, Bulacan — '
+       . 'clients, policies, claims, renewals and repair jobs in one place.';
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,6 +11,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <meta name="format-detection" content="telephone=no, date=no, email=no, address=no"/>
 <title>TG-BASICS | Brokerage and Auto Shop Integrated Control System</title>
+<meta name="description" content="<?= htmlspecialchars($_desc) ?>"/>
+<!-- Link preview when the address is shared on Messenger / Facebook. og:image must be an absolute URL. -->
+<meta property="og:type" content="website"/>
+<meta property="og:site_name" content="TG-BASICS"/>
+<meta property="og:title" content="TG-BASICS — TG Customworks &amp; Basic Car Insurance"/>
+<meta property="og:description" content="<?= htmlspecialchars($_desc) ?>"/>
+<meta property="og:url" content="<?= htmlspecialchars(app_url('')) ?>"/>
+<meta property="og:image" content="<?= htmlspecialchars(app_url('assets/img/pwa/icon-512.png')) ?>"/>
+<meta property="og:image:width" content="512"/>
+<meta property="og:image:height" content="512"/>
+<meta property="og:image:alt" content="TG Customworks logo"/>
+<meta name="twitter:card" content="summary"/>
 <link rel="icon" type="image/png" href="assets/img/tg_logo.png"/>
 <link rel="apple-touch-icon" href="assets/img/pwa/apple-touch-icon.png"/>
 <link rel="manifest" href="manifest.webmanifest"/>

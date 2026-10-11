@@ -268,30 +268,83 @@ body {
   }
 }
 @media (max-width: 700px) {
+  /* One screen, no scrolling: the page is exactly the visible height (dvh follows the browser toolbars on
+     phones) and the form sits in the middle of it. overflow-y stays "auto" as the safety net for the moments
+     there genuinely is not room — an on-screen keyboard, or a very small phone held sideways. */
   .auth-split {
     flex-direction: column;
     align-items: stretch;
-    min-height: 100vh;
-    height: auto;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
+  /* The branding panel stops being a block above the form: its glow and rings become the backdrop and its
+     tagline becomes one line over the card. */
   .auth-left {
-    position: relative;
-    height: 260px;
-    inset: auto;
+    display: contents;
   }
   .auth-left-img {
-    inset: -30% -20% 0 -20%;
+    top: -25%;
+    left: -30%;
+    width: 160%;
+    height: 70%;
   }
   .auth-left-text {
     position: relative;
-    padding: 0 1.5rem 1.5rem;
+    top: auto;
+    left: auto;
+    transform: none;
     max-width: 100%;
+    padding: 0 1.25rem;
+    margin: auto 0 0.6rem;
+    text-align: center;
   }
   .auth-headline {
-    font-size: 1.9rem;
+    font-size: 1.05rem;
+    line-height: 1.2;
+    letter-spacing: -0.2px;
+    margin: 0;
   }
+  .auth-headline br {
+    display: none;
+  }
+  .auth-sub {
+    display: none;
+  }
+  /* auto margins centre the tagline + card as one group; with nothing above the card (logout, 2FA…) the card
+     is centred on its own. Both collapse to 0, top-aligned, when the content is taller than the screen. */
   .auth-right {
     justify-content: center;
-    padding: 1.5rem 1.25rem 3rem;
+    width: 100%;
+    margin: 0 0 auto;
+    padding: 0.25rem 1.25rem 1rem;
+  }
+  .auth-split:not(:has(.auth-left-text)) .auth-right {
+    margin-top: auto;
+    padding-top: 1rem;
+  }
+}
+/* Short phones (older iPhones, small Androids, a browser with its toolbars showing): the card alone is ~575px
+   tall, so tighten it instead of letting the page scroll. Nothing is hidden except the one-line tagline. */
+@media (max-width: 700px) and (max-height: 700px) {
+  .auth-left-text {
+    display: none;
+  }
+  .auth-right {
+    padding: 0.75rem 1rem;
+    margin: auto 0;
+  }
+  .auth-right-brand {
+    margin-bottom: 0.8rem;
+  }
+  .auth-right-logo,
+  .auth-right-logo-basic {
+    width: 38px;
+    height: 38px;
+  }
+  .auth-brand-sep {
+    height: 20px;
   }
 }

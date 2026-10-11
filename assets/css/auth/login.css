@@ -233,3 +233,33 @@
     transform: translateY(-8px) scale(0.96);
   }
 }
+
+/* Short phones: see the matching block at the end of auth-background.css */
+@media (max-width: 700px) and (max-height: 700px) {
+  .auth-form-wrap {
+    padding: 1.1rem 1.25rem 0.9rem;
+  }
+  .auth-form-title {
+    font-size: 1.45rem;
+  }
+  .auth-form-sub {
+    margin-bottom: 1rem;
+  }
+  .field {
+    margin-bottom: 0.7rem;
+  }
+  .field-input {
+    padding-top: 0.55rem;
+    padding-bottom: 0.55rem;
+  }
+  .btn-submit {
+    padding: 0.75rem;
+    margin-top: 0.4rem;
+  }
+  .auth-form-note {
+    margin-top: 0.9rem;
+    padding-top: 0.75rem;
+    font-size: 0.75rem;
+    line-height: 1.55;
+  }
+}

@@ -868,3 +868,37 @@
     padding: 0.35rem 0.5rem !important;
   }
 }
+
+/* Filter rows on the list pages (Renewal, Repair Jobs, Activity Log): the blocks above compacted every control to
+   28-30px, which is too small for a thumb. Same layout, just a 42px floor on the fields and the Search / Filter
+   / Clear buttons. min-height is not set by any of the rules above, so no specificity fight. */
+@media (max-width: 768px) {
+  .rnl-filter-select,
+  .rnl-filter-search .filter-input,
+  .rnl-filter-btn,
+  .rnl-filter-clear,
+  .rl-filter-search .filter-input,
+  .rl-filter-status,
+  .rl-filter-sort,
+  .rl-filter-btn,
+  .rl-filter-clear,
+  .al-filter-form .field-input,
+  .al-filter-form .field-select,
+  .al-f-btns .btn-primary,
+  .al-f-btns .btn-ghost {
+    min-height: 42px !important;
+    box-sizing: border-box;
+  }
+  /* app.css stacks every direct child div of a form; From / To read better side by side */
+  .al-filter-form .al-f-dates {
+    flex-direction: row !important;
+    gap: 0.5rem !important;
+  }
+  .al-filter-form .al-f-dates .field {
+    flex: 1 1 0 !important;   /* the shared ".field { flex: unset }" above would leave them content-wide */
+  }
+  /* Log entries are cards here: the name sits with the badge and text below it, not centred above them */
+  .tg-table.mob-activity-table td:nth-child(2) > div {
+    justify-content: flex-start;
+  }
+}

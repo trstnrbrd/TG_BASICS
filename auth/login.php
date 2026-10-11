@@ -209,7 +209,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="auth-left-img"></div>
     <!-- Bottom: text -->
     <div class="auth-left-text">
-      <div class="auth-headline">YOUR<br/>JOURNEY,<br/><em>OUR CARE.</em></div>
+      <div class="auth-headline">YOUR <br/>JOURNEY, <br/><em>OUR CARE.</em></div>
       <div class="auth-sub">Brokerage and Auto Shop Integrated Central System for TG Customworks and Basic Car Insurance.</div>
     </div>
     <!-- Decorative rings (absolutely positioned, outside grid flow) -->

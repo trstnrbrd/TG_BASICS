@@ -125,6 +125,11 @@
 
   function showChip() {
     if (document.getElementById("tg-install-chip") || dismissed()) return;
+    // Only inside the app (where the user menu has its own permanent "Install App" item). On the sign-in and
+    // landing pages a floating chip sits on top of the form's Sign In button on a phone.
+    if (!document.getElementById("user-dropdown-root")) return;
+    // Phones: it lands on top of the lists, and the More menu already has "Install App".
+    if (window.matchMedia("(max-width: 768px)").matches) return;
     const chip = document.createElement("div");
     chip.id = "tg-install-chip";
     chip.setAttribute("role", "dialog");
@@ -135,6 +140,8 @@
       '<button type="button" class="tg-ic-go">Install</button>' +
       '<button type="button" class="tg-ic-x" aria-label="Not now">&times;</button>';
     document.body.appendChild(chip);
+    // Don't linger over page content: a nudge, not a fixture. (Not remembered as "dismissed".)
+    setTimeout(function () { if (chip.isConnected) chip.remove(); }, 15000);
 
     chip.querySelector(".tg-ic-go").addEventListener("click", function () {
       window.TG_PWA.install();

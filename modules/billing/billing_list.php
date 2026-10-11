@@ -96,7 +96,7 @@ require_once '../../includes/topbar.php';
     <!-- FILTERS -->
     <form method="GET" action="" style="margin-bottom:1rem;">
       <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
-        <div style="position:relative;flex:1;min-width:200px;max-width:360px;">
+        <div style="position:relative;flex:1;width:100%;min-width:200px;max-width:360px;">
           <span style="position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;"><?= icon('magnifying-glass', 14) ?></span>
           <input type="text" name="search" class="filter-input"
             placeholder="Search by billing #, client, plate, or insurer..."

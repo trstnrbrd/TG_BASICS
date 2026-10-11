@@ -206,38 +206,52 @@ require_once '../../includes/navbar.php';
 <link rel="stylesheet" href="../../assets/css/shared/agent_filter.css?v=<?= filemtime(__DIR__ . '/../../assets/css/shared/agent_filter.css') ?>"/>
 <style>
 @media (max-width: 768px) {
-  /* Stats — keep 3-col, compact */
-  .client-stats-grid {
+  /* Phone layout, in the order a person uses it:
+       1. three numbers in one strip      2. whose clients      3. search (+ go)
+       4. three filters in one row        5. Add Client (+ Import)
+     The selectors are deliberately more specific than app.css's "stack every inline grid" rule and the old
+     clients.css block, which used to fight over this area (stat cards stacked full width, the toolbar wrapped
+     into an uneven pile). */
+  .content .client-stats-grid[style] {
     grid-template-columns: repeat(3, 1fr) !important;
-    gap: 0.5rem !important;
-    margin-bottom: 0.85rem !important;
+    gap: 0.45rem !important;
+    margin-bottom: 0.75rem !important;
   }
   .client-stats-grid .card {
-    padding: 0.6rem 0.75rem !important;
-    gap: 0.5rem !important;
+    padding: 0.55rem 0.65rem !important;
     flex-direction: column !important;
     align-items: flex-start !important;
+    gap: 0 !important;
+    border-radius: 10px !important;
   }
-  .client-stats-grid .card-icon {
-    width: 26px !important; height: 26px !important;
-    border-radius: 6px !important;
+  .client-stats-grid .card-icon { display: none !important; }
+  .client-stats-grid .stat-value { font-size: 1.15rem !important; }
+  .client-stats-grid .stat-label {
+    font-size: 0.58rem !important;
+    letter-spacing: 0.2px !important;
+    margin-top: 0.2rem !important;
+    line-height: 1.25;
   }
-  .client-stats-grid .card-icon svg { width: 12px !important; height: 12px !important; }
-  .client-stats-grid .stat-value { font-size: 1rem !important; }
-  .client-stats-grid .stat-label { font-size: 0.56rem !important; }
 
-  /* Toolbar — keep filters in a 3-col row, search full width */
+  .client-toolbar { margin-bottom: 0.85rem !important; }
   .client-toolbar > div {
     display: grid !important;
-    grid-template-columns: 1fr 1fr 1fr !important;
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
     gap: 0.5rem !important;
+    align-items: stretch !important;
   }
-  .client-toolbar > div > div:first-child { grid-column: 1 / -1; }  /* search full width */
-  .client-toolbar > div > .cl-agent-wrap { grid-column: 1 / -1; }   /* agent filter full width */
-  .client-toolbar > div > button[type="submit"],
-  .client-toolbar > div > a[href*="add_client"] { grid-column: span 1; justify-content: center; }
-  .client-toolbar > div > a[href*="client_list"] { grid-column: span 1; justify-content: center; }
+  .client-toolbar > div > .cl-agent-wrap       { grid-column: 1 / -1; }
+  .client-toolbar > div > div:not(.cl-agent-wrap) { grid-column: span 5; max-width: none !important; min-width: 0 !important; }
+  .client-toolbar > div > button[type="submit"]   { grid-column: span 1; padding-left: 0; padding-right: 0; font-size: 0; gap: 0; }
+  .client-toolbar > div > button[type="submit"] svg { width: 18px; height: 18px; }
+  .client-toolbar > div > select                  { grid-column: span 2; font-size: 0.74rem; padding-left: 0.55rem; padding-right: 1.5rem; background-position: right 0.4rem center; text-overflow: ellipsis; }
+  .client-toolbar > div:not(:has(select[name="client_type"])) > select { grid-column: span 3; }  /* mechanics: two filters */
+  /* Clear: a slim text action, not a second full-size button */
+  .client-toolbar > div > a[href*="client_list"]  { grid-column: 1 / -1; min-height: 0; padding: 0.15rem 0; border: 0; background: none; box-shadow: none; color: var(--text-muted); font-size: 0.74rem; }
   .client-toolbar-actions { display: contents; }
+  .client-toolbar > div > .client-toolbar-actions > a[href*="add_client"]    { grid-column: span 4; }
+  .client-toolbar > div > .client-toolbar-actions > a[href*="import_clients"] { grid-column: span 2; }
+  .client-toolbar a, .client-toolbar button { justify-content: center; }
 }
 
 @media (min-width: 769px) {

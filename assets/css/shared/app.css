@@ -389,6 +389,11 @@ body {
 .btn-sm-gold:hover { background: var(--gold-bright); color: #fff; }
 .btn-sm-danger { background: var(--danger); color: #fff; border: none; padding: 0.35rem 0.55rem; border-radius: 7px; font-size: 0.75rem; font-weight: 700; text-decoration: none; transition: all 0.15s; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.35rem; font-family: 'Plus Jakarta Sans', sans-serif; cursor: pointer; }
 .btn-sm-danger:hover { background: #a93226; color: #fff; }
+/* Phones: a finger needs ~40px. These sit side by side in table rows (View next to Delete), so too small a target
+   means deleting a record by mistake. Desktop sizes are untouched. */
+@media (max-width: 768px) {
+  .btn-sm-gold, .btn-sm-danger { min-height: 40px; min-width: 40px; justify-content: center; padding-left: 0.75rem; padding-right: 0.75rem; }
+}
 .mu-act-group { display: flex; gap: 0.4rem; justify-content: center; }
 .mu-act-form .btn-sm-gold, .mu-act-form .btn-sm-danger { padding: 0.35rem 0.55rem; }
 

@@ -978,7 +978,7 @@ require_once '../../includes/topbar.php';
         </div>
 
         <!-- Recovery Codes Modal -->
-        <div id="recovery-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.6);backdrop-filter:blur(2px);align-items:center;justify-content:center;padding:1rem;">
+        <div id="recovery-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.6);align-items:center;justify-content:center;padding:1rem;">
           <div style="background:var(--bg-3);border:1px solid var(--border);border-radius:16px;width:100%;max-width:460px;box-shadow:var(--shadow-lg);">
             <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--border);">
               <div style="font-weight:700;font-size:0.88rem;"><?= icon('key', 14) ?> &nbsp;Save Your Recovery Codes</div>

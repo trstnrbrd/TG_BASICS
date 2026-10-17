@@ -643,3 +643,76 @@ function sendClaimRequirementsEmail(
         return false;
     }
 }
+
+/**
+ * Daily urgent-renewal digest for staff (not for clients): the policies expiring within the urgent window
+ * that still have no renewal encoded. Sent by send_renewal_reminders() in config/renewal_reminders.php —
+ * each agent gets their own clients, the Owner gets all of them, mechanics get none. $renewalUrl is built
+ * by the caller with app_url(), the same way the activation and reset links are.
+ */
+function sendRenewalReminderEmail(string $toEmail, string $toName, array $policies, string $renewalUrl): bool {
+    try {
+        $mail = newMailer();
+        $mail->addAddress($toEmail, $toName);
+        embedEmailLogos($mail);
+
+        [$subject, $html] = buildRenewalReminderEmail($toName, $policies, $renewalUrl);
+        $mail->Subject = '=?UTF-8?B?' . base64_encode($subject) . '?=';
+        $mail->Body    = $html;
+
+        $mail->send();
+        return true;
+    } catch (\Throwable $e) {
+        return false;
+    }
+}
+
+/**
+ * The subject line and HTML of that digest, kept apart from the sending so the wording can be looked at
+ * without a mail server: tools/preview_renewal_email.php writes exactly this HTML to a file.
+ * Returns [subject, html].
+ */
+function buildRenewalReminderEmail(string $toName, array $policies, string $renewalUrl): array {
+        $count = count($policies);
+        $rows  = '';
+        foreach ($policies as $p) {
+            $days  = (int)$p['days_left'];
+            $when  = $days <= 0 ? 'Today' : $days . ' day' . ($days === 1 ? '' : 's');
+            $rows .= '<tr>'
+                   . '<td style="padding:9px 10px;border-bottom:1px solid #E8E3D8;">' . htmlspecialchars($p['client_name']) . '</td>'
+                   . '<td style="padding:9px 10px;border-bottom:1px solid #E8E3D8;">' . htmlspecialchars(strtoupper($p['plate_number'])) . '</td>'
+                   . '<td style="padding:9px 10px;border-bottom:1px solid #E8E3D8;">' . htmlspecialchars($p['policy_number']) . '<br>'
+                   . '<span style="color:#9C9286;font-size:12px;">' . htmlspecialchars($p['insurance_company']) . '</span></td>'
+                   . '<td style="padding:9px 10px;border-bottom:1px solid #E8E3D8;text-align:center;white-space:nowrap;">'
+                   . '<strong style="color:#B03A2E;">' . $when . '</strong><br>'
+                   . '<span style="color:#9C9286;font-size:12px;">' . date('M d, Y', strtotime($p['policy_end'])) . '</span></td>'
+                   . '</tr>';
+        }
+
+        $body = 'Dear <strong>' . htmlspecialchars($toName) . '</strong>,<br><br>'
+              . '<strong>' . $count . '</strong> polic' . ($count === 1 ? 'y is' : 'ies are')
+              . ' expiring within the next few days and ' . ($count === 1 ? 'has' : 'have')
+              . ' no renewal encoded yet.<br><br>'
+              . '<table style="width:100%;border-collapse:collapse;font-size:14px;">'
+              . '<tr style="background:#F4F1EC;">'
+              . '<th style="padding:9px 10px;text-align:left;">Client</th>'
+              . '<th style="padding:9px 10px;text-align:left;">Plate</th>'
+              . '<th style="padding:9px 10px;text-align:left;">Policy</th>'
+              . '<th style="padding:9px 10px;">Expires</th>'
+              . '</tr>' . $rows . '</table><br>'
+              . 'Please follow up with ' . ($count === 1 ? 'this client' : 'these clients') . ' before the coverage lapses.';
+
+        $notice = 'This is an automatic daily reminder from TG-BASICS, sent only while a policy is still unrenewed. Do not reply to this email.';
+
+        $subject = $count . ' Policy Renewal' . ($count === 1 ? '' : 's') . ' Expiring Soon | ' . _getCompanyName();
+        $html    = buildEmailTemplate(
+            'Renewal Reminder',
+            $count === 1 ? 'A policy is about to expire' : $count . ' policies are about to expire',
+            $body,
+            $renewalUrl,
+            'Open Renewal Tracking',
+            $notice
+        );
+
+        return [$subject, $html];
+}

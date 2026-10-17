@@ -1,0 +1,89 @@
+name: Daily Renewal Reminder
+
+# Triggers cron/send_renewal_reminders.php on both InfinityFree sites once a day:
+#   tgbasics.app                  — demo/staging
+#   tgbasics.infinityfreeapp.com  — production
+# This has nothing to do with deploying code — it only calls an already-deployed URL on a schedule, which is
+# the "cron job" InfinityFree itself stopped offering on free hosting in 2023.
+#
+# A plain HTTP request (what a real cron service like cron-job.org sends) gets InfinityFree's anti-bot
+# challenge page instead of running the PHP — that page is a JS-computed cookie puzzle, and it answers with
+# HTTP 200, so a plain fetch-and-forget cron would report "success" every day while nothing happens. A real
+# browser executes the JS and gets through it automatically, so this workflow drives a real (headless)
+# Chromium with Puppeteer instead of curl. See config/renewal_reminders.php for what the endpoint itself
+# does, and cron/send_renewal_reminders.php for the key check.
+#
+# Two separate secrets (repo Settings -> Secrets and variables -> Actions), one per site — deliberately not
+# the same value, so staging and production can be rotated independently:
+#   RENEWAL_CRON_KEY       matches cron_secret_key in tgbasics.app's system_settings
+#   RENEWAL_CRON_KEY_PROD  matches cron_secret_key in tgbasics.infinityfreeapp.com's system_settings
+# The production job does nothing (skipped, not failed) until this feature is merged to master and deployed
+# there and RENEWAL_CRON_KEY_PROD is set — see each job's "if:" below.
+
+on:
+  schedule:
+    - cron: '0 0 * * *'    # 00:00 UTC = 08:00 Asia/Manila. GitHub runs scheduled workflows "best effort",
+                            # so this can land a few minutes late — fine for a once-a-day reminder.
+  workflow_dispatch:        # Actions tab -> this workflow -> "Run workflow", for testing on demand
+
+jobs:
+  trigger-demo:
+    name: Trigger (demo — tgbasics.app)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Puppeteer (bundles its own Chromium)
+        run: npm install puppeteer@23.11.1
+
+      - name: Visit the reminder endpoint through a real browser
+        env:
+          CRON_URL: https://tgbasics.app/TG-BASICS/cron/send_renewal_reminders.php
+          CRON_KEY: ${{ secrets.RENEWAL_CRON_KEY }}
+        run: |
+          node <<'EOF'
+          const puppeteer = require('puppeteer');
+          (async () => {
+            const url = process.env.CRON_URL + '?key=' + process.env.CRON_KEY;
+            const browser = await puppeteer.launch({ args: ['--no-sandbox'] });
+            const page = await browser.newPage();
+            const res = await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+            const text = (await page.evaluate(() => document.body.innerText)).trim();
+            console.log('HTTP', res.status(), '-', text);
+            await browser.close();
+            if (!text.startsWith('OK -')) {
+              console.error('Unexpected reply — the endpoint may be down, the key may be wrong, or InfinityFree changed its challenge.');
+              process.exit(1);
+            }
+          })();
+          EOF
+
+  trigger-production:
+    name: Trigger (production — tgbasics.infinityfreeapp.com)
+    runs-on: ubuntu-latest
+    # Skips cleanly (shows as "skipped", not a failing red X) until RENEWAL_CRON_KEY_PROD exists — i.e.
+    # until this feature has actually been merged to master, deployed, and its SQL run on production.
+    if: ${{ vars.RENEWAL_PROD_READY == 'true' }}
+    steps:
+      - name: Install Puppeteer (bundles its own Chromium)
+        run: npm install puppeteer@23.11.1
+
+      - name: Visit the reminder endpoint through a real browser
+        env:
+          CRON_URL: https://tgbasics.infinityfreeapp.com/TG-BASICS/cron/send_renewal_reminders.php
+          CRON_KEY: ${{ secrets.RENEWAL_CRON_KEY_PROD }}
+        run: |
+          node <<'EOF'
+          const puppeteer = require('puppeteer');
+          (async () => {
+            const url = process.env.CRON_URL + '?key=' + process.env.CRON_KEY;
+            const browser = await puppeteer.launch({ args: ['--no-sandbox'] });
+            const page = await browser.newPage();
+            const res = await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+            const text = (await page.evaluate(() => document.body.innerText)).trim();
+            console.log('HTTP', res.status(), '-', text);
+            await browser.close();
+            if (!text.startsWith('OK -')) {
+              console.error('Unexpected reply — the endpoint may be down, the key may be wrong, or InfinityFree changed its challenge.');
+              process.exit(1);
+            }
+          })();
+          EOF

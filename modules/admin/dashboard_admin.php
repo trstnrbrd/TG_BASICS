@@ -11,6 +11,10 @@ $exp_days = (int)getSetting($conn, 'renewal_expiring_days', '30');
 
 require_role(['admin', 'super_admin']);
 
+require_once '../../config/mailer.php';
+require_once '../../config/renewal_reminders.php';
+send_renewal_reminders($conn);
+
 $full_name = $_SESSION['full_name'];
 $first_name = explode(' ', $full_name)[0];
 

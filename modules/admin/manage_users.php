@@ -224,7 +224,6 @@ require_once '../../includes/navbar.php';
   inset: 0;
   z-index: 1000;
   background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(2px);
   align-items: center;
   justify-content: center;
   padding: 1rem;

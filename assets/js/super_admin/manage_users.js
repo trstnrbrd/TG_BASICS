@@ -22,48 +22,69 @@
   });
 }),
   document.getElementById("js-create-btn") &&
-  document
-    .getElementById("js-create-btn")
-    .addEventListener("click", function () {
-      var first = document
-          .querySelector('[name="new_first_name"]')
-          .value.trim(),
-        last = document.querySelector('[name="new_last_name"]').value.trim(),
-        name = (first + " " + last).trim(),
-        email = document.querySelector('[name="new_email"]').value.trim(),
-        uname = document.querySelector('[name="new_username"]').value.trim(),
-        role = document.querySelector('[name="new_role"]').value;
-      first && last && email && uname && role
-        ? Swal.fire({
-            title: "Create account?",
-            html:
-              "Create an account for <b>" +
-              name +
-              "</b> as <b>" +
-              role.charAt(0).toUpperCase() +
-              role.slice(1) +
-              '</b>?<br><small style="color:#888;">An activation email will be sent to ' +
-              email +
-              ".</small>",
-            icon: "question",
-            showCancelButton: !0,
-            confirmButtonColor: "#B8860B",
-            cancelButtonColor: "#6c757d",
-            confirmButtonText: "Yes, create & send",
-            cancelButtonText: "Cancel",
-          }).then(function (result) {
-            if (result.isConfirmed) {
-              var f = document.getElementById("js-create-btn").closest("form");
-              f.requestSubmit ? f.requestSubmit() : f.submit();
-            }
-          })
-        : Swal.fire({
-            icon: "warning",
-            title: "Incomplete Fields",
-            text: "Please fill in all required fields before creating an account.",
-            confirmButtonColor: "#B8860B",
-          });
-    }));
+    document
+      .getElementById("js-create-btn")
+      .addEventListener("click", function () {
+        var first = document
+            .querySelector('[name="new_first_name"]')
+            .value.trim(),
+          last = document.querySelector('[name="new_last_name"]').value.trim(),
+          name = (first + " " + last).trim(),
+          email = document.querySelector('[name="new_email"]').value.trim(),
+          uname = document.querySelector('[name="new_username"]').value.trim(),
+          role = document.querySelector('[name="new_role"]').value;
+        first && last && email && uname && role
+          ? Swal.fire({
+              title: "Create account?",
+              html:
+                "Create an account for <b>" +
+                name +
+                "</b> as <b>" +
+                role.charAt(0).toUpperCase() +
+                role.slice(1) +
+                '</b>?<br><small style="color:#888;">An activation email will be sent to ' +
+                email +
+                ".</small>",
+              icon: "question",
+              showCancelButton: !0,
+              confirmButtonColor: "#B8860B",
+              cancelButtonColor: "#6c757d",
+              confirmButtonText: "Yes, create & send",
+              cancelButtonText: "Cancel",
+            }).then(function (result) {
+              if (result.isConfirmed) {
+                var btn = document.getElementById("js-create-btn"),
+                  f = btn.closest("form");
+                // The server saves the account and then sends the activation email before it answers, which takes
+                // a few seconds (the Gmail connection alone is about a second). Without this the confirm dialog
+                // closes and the page just sits there looking frozen; the disabled button also stops a second
+                // click from submitting the same account twice.
+                btn.disabled = !0;
+                Swal.fire({
+                  title: "Creating account…",
+                  text: "Sending the activation email. This can take a few seconds.",
+                  allowOutsideClick: !1,
+                  allowEscapeKey: !1,
+                  showConfirmButton: !1,
+                  didOpen: function () {
+                    Swal.showLoading();
+                  },
+                });
+                // two frames, so the loading dialog is painted before the browser starts waiting on the server
+                requestAnimationFrame(function () {
+                  requestAnimationFrame(function () {
+                    f.requestSubmit ? f.requestSubmit() : f.submit();
+                  });
+                });
+              }
+            })
+          : Swal.fire({
+              icon: "warning",
+              title: "Incomplete Fields",
+              text: "Please fill in all required fields before creating an account.",
+              confirmButtonColor: "#B8860B",
+            });
+      }));
 
 // Deactivate: locks the account out but keeps every record (asks for the transaction PIN like Delete)
 document.querySelectorAll(".js-deactivate-user").forEach(function (btn) {
@@ -107,4 +128,3 @@ document.querySelectorAll(".js-reactivate-user").forEach(function (btn) {
     form.requestSubmit ? form.requestSubmit() : form.submit();
   });
 });
-

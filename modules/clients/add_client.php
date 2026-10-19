@@ -205,7 +205,7 @@ require_once '../../includes/topbar.php';
       </div>
     </div>
     <!-- PRIVACY NOTICE MODAL -->
-    <div id="privacy-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.55);backdrop-filter:blur(2px);align-items:center;justify-content:center;padding:1rem;" onclick="if(event.target===this)privacyModalClose()">
+    <div id="privacy-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.55);align-items:center;justify-content:center;padding:1rem;" onclick="if(event.target===this)privacyModalClose()">
       <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:16px;width:100%;max-width:640px;height:85vh;max-height:720px;box-shadow:var(--shadow-lg);animation:ocr-modal-in 0.18s ease;display:flex;flex-direction:column;">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--border);flex-shrink:0;">
           <div style="display:flex;align-items:center;gap:0.6rem;">

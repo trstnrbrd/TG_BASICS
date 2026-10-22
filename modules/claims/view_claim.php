@@ -3,6 +3,8 @@ require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
+require_once '../../config/transaction_pin.php';
+require_once '../../config/uploads.php';
 require_once '../../includes/icons.php';
 require_once '../../config/mailer.php';
 require_once '../../includes/transaction.php';
@@ -121,7 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_upload'])) {
     $upd->execute();
 
     $counts = fetchDocCounts($conn, $claim_id);
-    $url    = '../../uploads/claims/' . $filename;
+    $url    = upload_url('claims', $filename);
     $is_pdf = $mime === 'application/pdf';
     api_success(['url' => $url, 'filename' => $filename, 'is_pdf' => $is_pdf] + $counts);
 }
@@ -193,7 +195,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_damage_upload'])
     }
 
     $counts = fetchDocCounts($conn, $claim_id);
-    $url    = '../../uploads/claims/' . $filename;
+    $url    = upload_url('claims', $filename);
     api_success(['photo_id' => $photo_id, 'url' => $url, 'filename' => $filename] + $counts);
 }
 
@@ -371,6 +373,10 @@ function deleteClaim($conn, $claim_id, $display_num, $user_id, $actor_name) {
 // button is offered for, so an in-progress claim can't be removed by a hand-made request.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_claim'])) {
     csrf_verify();
+    if (!pin_consume($conn)) {
+        header("Location: view_claim.php?id=$claim_id&error=" . urlencode(PIN_REQUIRED_MSG));
+        exit;
+    }
     if (!claim_is_deletable($claim['status'])) {
         header("Location: view_claim.php?id=$claim_id&error=" . urlencode('Only resolved, denied, or lack-of-requirements claims can be deleted.'));
         exit;
@@ -687,7 +693,7 @@ require_once '../../includes/topbar.php';
             $checked   = (bool)$claim[$d[0]];
             $file_col  = $d[0] . '_file';
             $file_name = $claim[$file_col] ?? '';
-            $file_url  = $file_name ? '../../uploads/claims/' . $file_name : '';
+            $file_url  = $file_name ? htmlspecialchars(upload_url('claims', $file_name)) : '';
             $is_pdf    = $file_name && str_ends_with(strtolower($file_name), '.pdf');
           ?>
           <div class="doc-item <?= $checked ? 'received' : '' ?> <?= $docs_locked ? 'locked' : '' ?>"
@@ -756,8 +762,9 @@ require_once '../../includes/topbar.php';
               <div id="damage-photo-grid" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.6rem;">
                 <?php foreach ($damage_photos as $dp_i => $dp): ?>
                 <div class="dmg-photo-wrap" id="dmg-wrap-<?= $dp['photo_id'] ?>" style="position:relative;">
-                  <a href="../../uploads/claims/<?= htmlspecialchars($dp['filename']) ?>" target="_blank">
-                    <img src="../../uploads/claims/<?= htmlspecialchars($dp['filename']) ?>"
+                  <?php $dp_url = htmlspecialchars(upload_url('claims', $dp['filename'])); ?>
+                  <a href="<?= $dp_url ?>" target="_blank">
+                    <img src="<?= $dp_url ?>"
                          alt="Damage evidence photo <?= $dp_i + 1 ?>" loading="lazy"
                          style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border);display:block;"/>
                   </a>

@@ -4,6 +4,7 @@ require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/settings.php';
 require_once '../../config/access.php';
+require_once '../../config/uploads.php';
 
 require_role(['admin', 'super_admin']);
 
@@ -64,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$can_edit_policy) {
 
 // Payable = total premium - commission (must match add_policy.php).
 // Installments are split against this, so balance and payment status track it too.
-$payable_amount = (float)$policy['total_premium'] - (float)$policy['markup'];
+$payable_amount = round((float)$policy['total_premium'] - (float)$policy['markup'], 2);
 if ($payable_amount < 0) $payable_amount = 0;
 
 // ── HANDLE DELETE ──
@@ -131,7 +132,7 @@ if ($has_installments && $_SERVER['REQUEST_METHOD'] !== 'POST') {
             $total_paid_past += (float)$inst['amount_paid'];
         }
     }
-    $auto_overdue = $total_due_past > 0 && $total_paid_past < $total_due_past;
+    $auto_overdue = $total_due_past > 0 && round($total_paid_past, 2) < round($total_due_past, 2);
     $current_status = $policy['payment_status'];
     if ($auto_overdue && $current_status !== 'Paid' && $current_status !== 'Overdue') {
         $ao_upd = $conn->prepare("UPDATE insurance_policies SET payment_status = 'Overdue' WHERE policy_id = ?");
@@ -141,8 +142,7 @@ if ($has_installments && $_SERVER['REQUEST_METHOD'] !== 'POST') {
     } elseif (!$auto_overdue && $current_status === 'Overdue') {
         // Recalculate back to correct status
         $total_paid_check = array_sum(array_column($installments, 'amount_paid'));
-        $bal_check = $payable_amount - $total_paid_check;
-        $revert = $bal_check <= 0 ? 'Paid' : ($total_paid_check > 0 ? 'Partial' : 'Unpaid');
+        $revert = policy_payment_status($payable_amount, (float)$total_paid_check);
         $rv_upd = $conn->prepare("UPDATE insurance_policies SET payment_status = ? WHERE policy_id = ?");
         $rv_upd->bind_param('si', $revert, $policy_id);
         $rv_upd->execute();
@@ -189,7 +189,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_receipt'])) {
     $log->bind_param('is', $uid, $desc);
     $log->execute();
 
-    api_success(['filename' => $filename]);
+    api_success(['filename' => $filename, 'url' => upload_url('receipts', $filename)]);
 }
 
 // ── HANDLE RECEIPT DELETE (AJAX) ──
@@ -250,11 +250,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['undo_payment'])) {
         $tot->bind_param('i', $policy_id);
         $tot->execute();
         [$total_paid, $due_past, $paid_past] = array_map('floatval', $tot->get_result()->fetch_row());
-        $new_balance = $payable_amount - $total_paid;
-        if ($new_balance <= 0)                            $new_status = 'Paid';
-        elseif ($due_past > 0 && $paid_past < $due_past)  $new_status = 'Overdue';
-        elseif ($total_paid > 0)                          $new_status = 'Partial';
-        else                                              $new_status = 'Unpaid';
+        $new_balance = round($payable_amount - $total_paid, 2);
+        $new_status  = policy_payment_status($payable_amount, $total_paid, $due_past > 0 && round($paid_past, 2) < round($due_past, 2));
 
         $upd = $conn->prepare("UPDATE insurance_policies SET amount_paid = ?, balance = ?, payment_status = ? WHERE policy_id = ?");
         $upd->bind_param('ddsi', $total_paid, $new_balance, $new_status, $policy_id);
@@ -328,7 +325,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
             foreach ($installments as $row) {
                 $check_total += (float)($amounts[$row['installment_no'] - 1] ?? 0);
             }
-            if ($check_total > $payable_amount) {
+            if (payment_exceeds($check_total, $payable_amount)) {
                 $pay_errors[] = 'Total amount paid (₱' . number_format($check_total, 2) . ') cannot exceed the total payable (₱' . number_format($payable_amount, 2) . ').';
                 $valid = false;
             }
@@ -358,7 +355,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
                         $upd_pp->execute();
                     }
 
-                    $new_balance  = $payable_amount - $total_paid;
+                    $total_paid   = round($total_paid, 2);
+                    $new_balance  = round($payable_amount - $total_paid, 2);
                     $today        = date('Y-m-d');
                     $due_past = 0; $paid_past = 0;
                     foreach ($installments as $row) {
@@ -368,16 +366,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
                             $paid_past += (float)($amounts[$idx] ?? 0);
                         }
                     }
-                    $has_overdue = $due_past > 0 && $paid_past < $due_past;
-                    if ($new_balance <= 0) {
-                        $new_status = 'Paid';
-                    } elseif ($has_overdue) {
-                        $new_status = 'Overdue';
-                    } elseif ($total_paid > 0) {
-                        $new_status = 'Partial';
-                    } else {
-                        $new_status = 'Unpaid';
-                    }
+                    $has_overdue = $due_past > 0 && round($paid_past, 2) < round($due_past, 2);
+                    $new_status  = policy_payment_status($payable_amount, $total_paid, $has_overdue);
 
                     $upd = $conn->prepare("UPDATE insurance_policies SET amount_paid = ?, balance = ?, payment_status = ? WHERE policy_id = ?");
                     $upd->bind_param('ddsi', $total_paid, $new_balance, $new_status, $policy_id);
@@ -404,13 +394,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
 
         if ($payment_amount <= 0)
             $pay_errors[] = 'Payment amount must be greater than zero.';
-        elseif ($payment_amount > (float)$policy['balance'])
+        elseif (payment_exceeds($payment_amount, (float)$policy['balance']))
             $pay_errors[] = 'Payment amount cannot exceed the remaining balance of PHP ' . number_format($policy['balance'], 2) . '.';
 
         if (empty($pay_errors)) {
-            $new_amount_paid = (float)$policy['amount_paid'] + $payment_amount;
-            $new_balance     = $payable_amount - $new_amount_paid;
-            $new_status      = ($new_balance <= 0) ? 'Paid' : 'Partial';
+            $new_amount_paid = round((float)$policy['amount_paid'] + $payment_amount, 2);
+            $new_balance     = round($payable_amount - $new_amount_paid, 2);
+            $new_status      = policy_payment_status($payable_amount, $new_amount_paid);
 
             $new_notes = $policy['notes'];
             if ($payment_notes !== '') {
@@ -879,7 +869,7 @@ require_once '../../includes/topbar.php';
                       <?php if (!empty($inst['receipt_file'])): ?>
                         <div style="display:flex;align-items:center;justify-content:center;gap:0.4rem;">
                           <button type="button" class="btn-sm-gold rc-view-btn"
-                            data-src="../../uploads/receipts/<?= htmlspecialchars($inst['receipt_file']) ?>"
+                            data-src="<?= htmlspecialchars(upload_url('receipts', $inst['receipt_file'])) ?>"
                             title="View Receipt" style="padding:0.3rem 0.5rem;">
                             <?= icon('eye', 13) ?>
                           </button>
@@ -1195,7 +1185,7 @@ require_once '../../includes/footer.php';
         .then(function(r){ return r.json(); })
         .then(function(data){
           if (data.ok) {
-            var src = '../../uploads/receipts/' + data.filename;
+            var src = data.url.replace(/&/g, '&amp;');
             cell.innerHTML =
               '<div style="display:flex;align-items:center;justify-content:center;gap:0.4rem;">' +
                 '<button type="button" class="btn-sm-gold rc-view-btn" data-src="' + src + '" title="View Receipt" style="padding:0.3rem 0.5rem;">' +
@@ -1275,7 +1265,7 @@ require_once '../../includes/footer.php';
       .then(function(r){ return r.json(); })
       .then(function(data){
         if (data.ok) {
-          var src = '../../uploads/receipts/' + data.filename;
+          var src = data.url.replace(/&/g, '&amp;');
           cell.innerHTML =
             '<div style="display:flex;align-items:center;justify-content:center;gap:0.4rem;">' +
               '<button type="button" class="btn-sm-gold rc-view-btn" data-src="' + src + '" title="View Receipt" style="padding:0.3rem 0.5rem;">' +

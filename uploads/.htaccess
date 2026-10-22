@@ -1,3 +1,19 @@
 # Prevent directory listing — files here are only meant to be reached by their
+
 # exact URL (as linked from within the app), never browsed as a folder listing.
+
 Options -Indexes
+
+# Client documents are only handed out by modules/files/file.php after a sign-in check (config/uploads.php).
+
+# The root .htaccess blocks these folders too; this is the second layer. Only avatars/ stays public.
+
+<If "%{REQUEST_URI} =~ m#/uploads/(claims|client_docs|receipts|repair_jobs)(/|$)#">
+Require all denied
+</If>
+
+# Nothing uploaded here is ever a script
+
+<FilesMatch "\.(php\d?|phtml|phar|pl|py|cgi|sh)$">
+Require all denied
+</FilesMatch>

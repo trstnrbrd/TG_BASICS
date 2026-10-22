@@ -34,6 +34,24 @@ function policy_is_expired(string $policy_end): bool
     return $policy_end < date('Y-m-d');
 }
 
+/**
+ * Payment status of a policy from its totals. Peso amounts are rounded to centavos before comparing: summing
+ * floats leaves tiny remainders (1028.14 + 1028.13 = 2056.2700000000004), which used to leave a fully paid
+ * policy "Partial" or reject an exact full payment as "exceeds the payable amount".
+ */
+function policy_payment_status(float $payable, float $total_paid, bool $has_overdue = false): string
+{
+    if (round($payable - $total_paid, 2) <= 0) return 'Paid';
+    if ($has_overdue) return 'Overdue';
+    return round($total_paid, 2) > 0 ? 'Partial' : 'Unpaid';
+}
+
+/** True when $paid is more than $payable by at least a centavo (float remainders below that don't count). */
+function payment_exceeds(float $paid, float $payable): bool
+{
+    return round($paid, 2) > round($payable, 2);
+}
+
 function client_in_scope(mysqli $conn, int $client_id): bool
 {
     if ($client_id <= 0) return false;

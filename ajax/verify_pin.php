@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../config/session.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/rate_limit.php';
+require_once __DIR__ . '/../config/transaction_pin.php';
 require_once __DIR__ . '/../includes/api.php';
 
 if (!isset($_SESSION['user_id'])) api_error('Unauthorized.', 401);
@@ -31,6 +32,7 @@ if ($pin === '') api_success(['has_pin' => true]);
 
 if (password_verify($pin, $row['transaction_pin'])) {
     rate_limit_clear($conn, 'verify_pin', $rl_key);
+    pin_grant();   // the delete/deactivate handler checks this (config/transaction_pin.php)
     api_success();
 }
 

@@ -5,6 +5,7 @@ require_once '../../config/validators.php';
 require_once '../../config/mailer.php';
 require_once '../../config/access.php';
 require_once '../../config/dev_access.php';
+require_once '../../config/transaction_pin.php';
 
 require_role(['super_admin']);
 
@@ -39,7 +40,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $del_id = (int)($_POST['user_id'] ?? 0);
     $target = mu_load_target($conn, $del_id);
 
-    if ($del_id === $admin_id) {
+    if (!pin_consume($conn)) {
+        $errors[] = PIN_REQUIRED_MSG;
+    } elseif ($del_id === $admin_id) {
         $errors[] = 'You cannot delete your own account.';
     } elseif (!$target) {
         $errors[] = 'Account not found.';
@@ -78,7 +81,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && in_array
     $tid    = (int)($_POST['user_id'] ?? 0);
     $target = mu_load_target($conn, $tid);
 
-    if ($tid === $admin_id) {
+    // Deactivating asks for the PIN in the page (manage_users.js); reactivating does not
+    if ($act === 'deactivate' && !pin_consume($conn)) {
+        $errors[] = PIN_REQUIRED_MSG;
+    } elseif ($tid === $admin_id) {
         $errors[] = 'You cannot deactivate your own account.';
     } elseif (!$target) {
         $errors[] = 'Account not found.';

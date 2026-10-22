@@ -192,11 +192,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $tot->execute();
             [$total_paid, $due_past, $paid_past] = array_map('floatval', $tot->get_result()->fetch_row());
             if (!$inst) $total_paid = (float)$current['amount_paid'];   // older policy without a schedule
-            $balance = $payable - $total_paid;
-            if ($balance <= 0)                               $status = 'Paid';
-            elseif ($due_past > 0 && $paid_past < $due_past) $status = 'Overdue';
-            elseif ($total_paid > 0)                         $status = 'Partial';
-            else                                             $status = 'Unpaid';
+            $balance = round($payable - $total_paid, 2);
+            $status  = policy_payment_status($payable, $total_paid, $due_past > 0 && round($paid_past, 2) < round($due_past, 2));
 
             $upd = $conn->prepare("
                 UPDATE insurance_policies SET insurance_company = ?, policy_number = ?, coverage_type = ?, policy_start = ?, policy_end = ?,

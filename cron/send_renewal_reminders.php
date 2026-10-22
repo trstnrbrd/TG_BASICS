@@ -1,21 +1,9 @@
 <?php
 /**
- * cron/send_renewal_reminders.php — the daily trigger for the urgent-renewal reminder emails.
- *
- * This is not a page anyone signs in to: an outside cron service (cron-job.org and the like — InfinityFree
- * disabled its own cron feature in 2023) fetches this URL once a day, and that request is what makes the
- * reminders go out even when nobody has opened the app. The work itself lives in
- * config/renewal_reminders.php, which modules/admin/dashboard_admin.php also calls as a safety net, so the
- * two paths can never drift apart.
- *
+ * Daily trigger for the renewal reminder emails, called once a day by an outside cron service:
  *   https://<host>/TG-BASICS/cron/send_renewal_reminders.php?key=<cron_secret_key>
- *
- * The key is the cron_secret_key row in system_settings, never a hardcoded string here — this file is
- * tracked by git and the repository is public. A wrong or missing key gets a flat 403 with no hint about
- * why, so the endpoint gives nothing away to anyone who finds the URL. hash_equals() compares in constant
- * time, so the response time cannot be used to guess the key character by character either.
- *
- * Reply is plain text, short, and ends in a line the cron service can show in its own log.
+ * The key comes from system_settings, not from this file, since this file is public on GitHub.
+ * No one is signed in here. The actual email logic is in config/renewal_reminders.php.
  */
 
 require_once __DIR__ . '/../config/db.php';

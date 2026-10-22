@@ -1,22 +1,17 @@
 <?php
 /**
- * config/app_url.php — where the app lives on the web, worked out from the request instead of hardcoded.
- *
- *   app_base_path()               "/TG-BASICS/" today; "/" if the app is ever moved to a domain root
- *   app_url('auth/activate.php')  full link for emails and QR codes: https://host/TG-BASICS/auth/activate.php
- *
- * Every link that leaves the browser (activation, password reset, email verification, the client QR/profile
- * link) goes through app_url(), so moving hosts or folders needs no code change.
+ * Builds the full URL to a page, for links sent in emails and QR codes.
+ *   app_url('auth/activate.php')  ->  https://host/TG-BASICS/auth/activate.php
  */
 
-/** True when the request came in over HTTPS, directly or through a host's SSL proxy (X-Forwarded-Proto). */
+/** True if the request is HTTPS. */
 function app_is_https(): bool
 {
     return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
         || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
 }
 
-/** URL path of the app folder, always with a leading and trailing slash. */
+/** The app's folder on the web, e.g. "/TG-BASICS/". */
 function app_base_path(): string
 {
     static $base = null;
@@ -24,8 +19,6 @@ function app_base_path(): string
 
     $root = str_replace('\\', '/', (string)realpath(dirname(__DIR__)));
 
-    // The running script's URL path minus its location inside the app folder:
-    // /TG-BASICS/modules/repair/view_repair.php - /modules/repair/view_repair.php = /TG-BASICS/
     $file = realpath($_SERVER['SCRIPT_FILENAME'] ?? '');
     $name = (string)($_SERVER['SCRIPT_NAME'] ?? '');
     if ($file !== false && $name !== '') {
@@ -38,11 +31,10 @@ function app_base_path(): string
         }
     }
 
-    // No web request to read it from (command-line tests): the app folder sits directly under the web root.
     return $base = '/' . basename($root) . '/';
 }
 
-/** Absolute URL to a path inside the app, for links sent out by email or encoded in QR codes. */
+/** Full URL to a page inside the app. */
 function app_url(string $path = ''): string
 {
     $host = $_SERVER['HTTP_HOST'] ?? 'localhost';

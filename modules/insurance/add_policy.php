@@ -26,8 +26,7 @@ if ($renew_from > 0) {
     $rs->execute();
     $renew_policy = $rs->get_result()->fetch_assoc();
 
-    // Renewing changes an existing policy, so — like its payments — only the client's insurance agent
-    // or the Owner may do it (same rule as view_policy.php; see config/access.php).
+    // only the client's agent or the Owner may renew a policy
     if (!$renew_policy || !policy_editable($renew_policy['client_agent_id'] !== null ? (int)$renew_policy['client_agent_id'] : null)) {
         header("Location: ../renewal/renewal_list.php");
         exit;
@@ -42,21 +41,18 @@ if ($vehicle_id === 0 && isset($_POST['vehicle_id_resolved'])) {
 if ($vehicle_id === 0 && $renew_policy) {
     $vehicle_id = (int)$renew_policy['vehicle_id'];
 }
-// A renewal is always for the renewed policy's own vehicle — never a caller-supplied one,
-// since the unscoped vehicle lookup below would otherwise load any client's vehicle.
+// a renewal always uses its own policy's vehicle, never one from the form
 if ($renew_policy) {
     $vehicle_id = (int)$renew_policy['vehicle_id'];
 }
 
-// Insurance company — from the Eligibility Check pick, a resubmitted form, or carried over on renewal
+// insurance company, from the form or carried over on renewal
 $allowed_companies = ['PhilBritish', 'Alpha Insurance & Surety Company Inc.'];
 $insurance_company  = san_str($_GET['company'] ?? $_POST['insurance_company'] ?? '', 60);
 if (!in_array($insurance_company, $allowed_companies, true)) {
     $insurance_company = $renew_policy['insurance_company'] ?? '';
 }
 
-// Issuing a NEW policy is open to every admin for any client (all admins see all clients — e.g. an admin
-// encoding a policy for the Owner's client); the policy then belongs to the client's insurance agent.
 $vehicle = null;
 if ($vehicle_id > 0) {
     $stmt = $conn->prepare("
@@ -140,10 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($policy_start !== '' && $policy_end !== '' && $policy_end <= $policy_start)
         $errors[] = 'Inception date must be after the starting date.';
 
-    // Two people saving the same policy number at the same moment could both pass the duplicate check below
-    // before either had inserted. A MySQL named lock on the number turns check + insert into one step (same
-    // technique as the plate check in add_client.php); MySQL frees it when this request ends.
-    // (No UNIQUE index on policy_number: a renewal may keep the old policy's number.)
+    // lock the policy number so two people can't save the same one at once
     $pn_lock = null;
     if ($policy_number !== '') {
         $pn_lock = named_lock_acquire($conn, 'policyno_' . md5(strtoupper($policy_number)));
@@ -207,9 +200,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (empty($errors)) {
         $created_by = (int)$_SESSION['user_id'];
-        // The policy, its whole installment schedule, the renewal stamps and the audit entry are saved together
-        // or not at all (includes/transaction.php) — a failure halfway used to leave a policy behind with only
-        // part of its payment schedule. A receipt file saved on the way is removed again if the save fails.
+        // policy + payment schedule + audit log saved together, or not at all
         $moved_receipts = [];
         $saved = false;
         try {

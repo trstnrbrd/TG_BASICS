@@ -1,23 +1,8 @@
 <?php
 /**
- * config/renewal_reminders.php — the once-a-day "a policy is about to expire, tell the people who handle it"
- * job. Only URGENT policies are included (renewal_urgent_days, 7 by default); the 30-day "Expiring" bucket is
- * deliberately left to the dashboard and Renewal Tracking, so the mailbox only fills up when a renewal is
- * genuinely close.
- *
- * It runs from two places and is safe to call from both, any number of times a day:
- *   - cron/send_renewal_reminders.php — the real trigger, called once a day by an outside cron service.
- *   - ajax/renewal_reminders.php — a same-day safety net for the days that trigger does not fire, called in the
- *     background by the admin dashboard after the page has loaded (so the page never waits on the mail server).
- * A policy is emailed at most once per calendar day because the send stamps
- * insurance_policies.last_urgent_reminder_sent; the second caller of the day finds nothing left to send.
- *
- * Who gets what (same scoping the Renewal Tracking page uses, so nobody is emailed about clients they
- * cannot open):
- *   - each Admin — only the policies of clients they are the insurance agent of
- *   - the Owner (super admin) — every urgent policy, including clients with no agent assigned
- *   - Mechanics — never, renewals are not part of that role
- * The hidden maintenance account is skipped too: insurance_agents() already leaves it out.
+ * Daily email: "these policies expire within 7 days".
+ * Called by the cron job, and by the admin dashboard as a backup.
+ * Each admin gets their own clients' policies. The owner gets all of them.
  */
 
 require_once __DIR__ . '/access.php';
@@ -25,12 +10,7 @@ require_once __DIR__ . '/settings.php';
 require_once __DIR__ . '/app_url.php';
 
 
-/**
- * The cron call and a dashboard load can land in the same second (the cron fires at 08:00, when the office opens
- * the dashboard). Only one run at a time is let through — a MySQL named lock that is not waited for — and that run
- * stamps the policies as reminded BEFORE the slow SMTP sends, so a run right after it finds nothing left to send.
- * Returns ['emails_sent' => n, 'policies' => n, 'skipped' => true when another run was already going].
- */
+/** Only one run at a time, so the cron and the dashboard can't send the same email twice. */
 function send_renewal_reminders(mysqli $conn): array
 {
     $lock = $conn->query("SELECT GET_LOCK('tgb_renewal_reminders', 0)")->fetch_row()[0] ?? 0;
@@ -46,7 +26,7 @@ function renewal_reminders_run(mysqli $conn): array
 {
     $urg_days = (int)getSetting($conn, 'renewal_urgent_days', '7');
 
-    // Not yet expired, not already replaced by a renewal, inside the urgent window, not emailed yet today.
+    // Active, not renewed, expiring soon, and not emailed yet today
     $stmt = $conn->prepare("
         SELECT p.policy_id, p.policy_number, p.insurance_company, p.policy_end,
                DATEDIFF(p.policy_end, CURDATE()) AS days_left,
@@ -70,14 +50,11 @@ function renewal_reminders_run(mysqli $conn): array
     while ($row = $res->fetch_assoc()) $policies[] = $row;
     if (!$policies) return ['emails_sent' => 0, 'policies' => 0];
 
-    // Stamp every policy first, even if a send below fails: a mail server that is down today should not turn
-    // tomorrow's one reminder into two, and a second run starting while these emails go out must find nothing.
-    // The policy stays urgent and is picked up again the next day.
+    // Mark them as reminded BEFORE sending, so another run won't send them again
     $ids = implode(',', array_map('intval', array_column($policies, 'policy_id')));
     $conn->query("UPDATE insurance_policies SET last_urgent_reminder_sent = CURDATE() WHERE policy_id IN ($ids)");
 
-    // Bucket by agent. A client with no agent lands in bucket 0, which no real user_id ever matches, so
-    // those policies reach the Owner only — the same place "Unassigned" clients show up in the filters.
+    // Group by agent (0 = no agent, only the owner sees those)
     $by_agent = [];
     foreach ($policies as $p) $by_agent[(int)($p['agent_id'] ?? 0)][] = $p;
 
@@ -86,20 +63,18 @@ function renewal_reminders_run(mysqli $conn): array
 
     foreach (insurance_agents($conn) as $uid => $agent) {
         $list = $agent['role'] === 'super_admin' ? $policies : ($by_agent[$uid] ?? []);
-        if (!$list) continue;                                   // nothing of theirs is urgent today
+        if (!$list) continue;                                   // nothing urgent for this user
 
         $u = $conn->prepare("SELECT email, full_name FROM users WHERE user_id = ?");
         $u->bind_param('i', $uid);
         $u->execute();
         $row = $u->get_result()->fetch_assoc();
-        if (empty($row['email'])) continue;                     // no address on file, nothing to send to
+        if (empty($row['email'])) continue;                     // no email address
 
         if (sendRenewalReminderEmail($row['email'], $row['full_name'], $list, $link)) $emails_sent++;
     }
 
-    // No session behind this one (the cron caller is anonymous), so the entry is logged with no user.
-    // A run that reached nobody is spelled out rather than left as a quiet "0 emails", because the usual
-    // cause is the SMTP settings, and the Activity Log is where someone would go looking for it.
+    // Write the result to the Activity Log (no user: the cron is not signed in)
     $n    = count($policies);
     $desc = $emails_sent === 0
           ? 'Renewal reminders could not be sent for ' . $n . ' urgent polic' . ($n === 1 ? 'y' : 'ies')

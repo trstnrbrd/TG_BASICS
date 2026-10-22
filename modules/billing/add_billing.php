@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($incident_date !== '' && !validate_date($incident_date)) $errors[] = 'Incident date is not a valid date.';
     if ($repair_date   !== '' && !validate_date($repair_date))   $errors[] = 'Repair date is not a valid date.';
 
-    // Only claims the dropdown offers (approved / in-progress) can be billed — the form is not the only way in
+    // only approved claims can be billed
     if (empty($errors)) {
         $cs = $conn->prepare("SELECT status FROM claims WHERE claim_id = ?");
         $cs->bind_param('i', $claim_id);
@@ -78,14 +78,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (empty($errors)) {
-        // Billing number: BILL-YYYYMMDD-XXXX. Wrapped in a retry: two people billing at the same instant can
-        // compute the same next number — this recomputes and retries instead of the request crashing with
-        // an uncaught duplicate-key error (see insert_with_sequential_number() for why).
         $inc_date = $incident_date ?: null;
         $rep_date = $repair_date   ?: null;
-        // The billing record and its audit entry are saved together or not at all (includes/transaction.php).
-        // The claim row is locked first, so two people billing the same claim at once cannot both pass the
-        // duplicate check.
+        // lock the claim first, so two people can't both bill it at once
         $created = null;
         try {
             $created = db_transaction($conn, function () use ($conn, $claim_id, $billed_to, $inc_date, $rep_date, $parts_cost, $labor_cost, $other_cost, $deductible) {

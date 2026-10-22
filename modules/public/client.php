@@ -5,8 +5,7 @@ require_once __DIR__ . '/../../includes/icons.php';
 
 $token = isset($_GET['token']) ? trim($_GET['token']) : '';
 
-// This page is opened through a secret link (the client's QR code): keep it out of search engines and
-// caches, and don't hand the link (it contains the token) to other sites through the Referer header.
+// this page is opened with a secret QR code link, so keep it out of search engines
 header('X-Robots-Tag: noindex, nofollow, noarchive');
 header('Referrer-Policy: no-referrer');
 header('Cache-Control: private, no-store');
@@ -59,11 +58,9 @@ body{font-family:"Plus Jakarta Sans","Segoe UI",sans-serif;background:linear-gra
     exit;
 }
 
-// ── Privacy masking (owner's request, 2026-09-24) ──
-// Anyone holding the QR code / link sees this page, so the client's contact details are only partly shown —
-// enough for the client to recognise them. They are masked HERE, so the full values never reach the browser.
+// ── Privacy: only show part of the client's contact details, not the full value ──
 
-/** 09485283482 -> 0948•••••82 (first 4 and last 2 digits). */
+/** 09485283482 -> 0948•••••82 */
 function pub_mask_phone(string $phone): string
 {
     $d = preg_replace('/\D/', '', $phone);
@@ -71,7 +68,7 @@ function pub_mask_phone(string $phone): string
     return substr($d, 0, 4) . str_repeat('•', strlen($d) - 6) . substr($d, -2);
 }
 
-/** kerby@gmail.com -> ke•••@gmail.com (first 2 letters of the name part; the provider stays). */
+/** kerby@gmail.com -> ke•••@gmail.com */
 function pub_mask_email(string $email): string
 {
     $at = strrpos($email, '@');
@@ -80,12 +77,12 @@ function pub_mask_email(string $email): string
     return mb_substr($name, 0, min(2, max(1, mb_strlen($name) - 1))) . '•••' . substr($email, $at);
 }
 
-/** "Pulong Buhangin, Sta.Maria, Bulacan, 3022" -> "•••, Sta.Maria, Bulacan" (street/barangay and ZIP hidden). */
+/** "Pulong Buhangin, Sta.Maria, Bulacan, 3022" -> "•••, Sta.Maria, Bulacan" */
 function pub_mask_address(string $address): string
 {
     $parts = array_values(array_filter(array_map('trim', explode(',', $address)), fn($p) => $p !== '' && !ctype_digit($p)));
     if (count($parts) < 2) return '•••';
-    $keep = count($parts) >= 3 ? 2 : 1;   // town + province; the first part (street / barangay) is always hidden
+    $keep = count($parts) >= 3 ? 2 : 1;   // town and province only
     return '•••, ' . implode(', ', array_slice($parts, -$keep));
 }
 

@@ -1,17 +1,15 @@
 <?php
 /**
- * config/uploads.php — links to uploaded files that hold client data.
+ * Links to uploaded client files (claims, documents, receipts, repair photos).
+ * These folders are blocked from direct access — files are only served through
+ * modules/files/file.php, which checks that the user is signed in first.
+ * Staff profile photos (uploads/avatars/) are the only public ones.
  *
- * Claim documents, client documents, payment receipts and repair-job photos/signatures (driver's licenses,
- * OR/CR, affidavits) are closed to direct requests (.htaccess at the app root and in uploads/), so knowing or
- * guessing a file's URL is not enough to open it. The browser gets them through modules/files/file.php, which
- * checks the signed-in user first. Staff profile photos (uploads/avatars/) stay a plain public link.
- *
- *   upload_url('claims', $filename)                  <img src="<?= htmlspecialchars(upload_url(...)) ?>">
- *   upload_url('repair_jobs', $filename, $job_id)    folders kept per record take the record id
+ *   upload_url('claims', $filename)
+ *   upload_url('repair_jobs', $filename, $job_id)   // 'repair_jobs' keeps one folder per job
  */
 
-// folder => who may open its files, and whether files sit in a per-record subfolder (uploads/<folder>/<id>/)
+// folder => roles allowed to see its files, and whether files are in a per-record subfolder
 const UPLOAD_FOLDERS = [
     'claims'      => ['roles' => ['admin', 'super_admin'],             'per_record' => false],
     'receipts'    => ['roles' => ['admin', 'super_admin'],             'per_record' => false],
@@ -19,10 +17,10 @@ const UPLOAD_FOLDERS = [
     'repair_jobs' => ['roles' => ['admin', 'super_admin', 'mechanic'], 'per_record' => true],
 ];
 
-// Only these are ever served (the upload handlers accept nothing else)
+// Only these file types are ever served
 const UPLOAD_SERVE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
 
-/** Browser link to an uploaded file in one of UPLOAD_FOLDERS. The file name stays last, so "...pdf" checks still work. */
+/** Link to an uploaded file, served through file.php. */
 function upload_url(string $folder, string $name, int $record_id = 0): string
 {
     $q = ['t' => $folder];

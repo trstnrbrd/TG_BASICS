@@ -26,7 +26,7 @@ if (!empty($_SESSION['rate_limit_error'])) {
     $lockout = true;
     unset($_SESSION['rate_limit_error']);
 }
-// Why the user was sent back here (idle timeout, account deactivated/changed — set by config/session.php)
+// idle timeout or account changed (set by config/session.php)
 if (!empty($_SESSION['login_notice'])) {
     $error = $_SESSION['login_notice'];
     unset($_SESSION['login_notice']);
@@ -64,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if ($user && password_verify($password, $user['password'])) {
                 if (!$user['is_active']) {
-                    // Still holding its activation token = invited but never activated; no token = an administrator switched it off
+                    // has a token = invited but never activated; no token = deactivated by an admin
                     $error = ($user['activation_token'] === null || $user['activation_token'] === '')
                         ? 'Your account has been deactivated. Please contact your administrator.'
                         : 'Your account is not yet activated. Please check your email for the activation link.';
@@ -73,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $reset->bind_param('s', $username);
                     $reset->execute();
 
-                    // The developer account never shows its real name, even in audit logs.
+                    // the developer account never shows its real name
                     $display_name = !empty($user['is_hidden']) ? 'Developer' : $user['full_name'];
 
                     // Check if authenticator TOTP is enabled (takes priority over email 2FA)
@@ -102,9 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $ins->bind_param('is', $user['user_id'], $code);
                         $ins->execute();
 
-                        // OTP goes to the account's own inbox, so the real name here isn't a leak.
-                        // If it can't be sent, stop here — sending the user to the "enter your code"
-                        // screen for a code that will never arrive is a lockout with no explanation.
+                        // if the email fails, don't send the user to a code screen with no code coming
                         if (!send2FACodeEmail($user['email'], $user['full_name'], $code)) {
                             error_log('[TG-BASICS] 2FA email failed to send for user_id=' . (int)$user['user_id']);
                             header("Location: login.php?otp_failed=1");

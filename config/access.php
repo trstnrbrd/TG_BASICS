@@ -1,43 +1,43 @@
 <?php
 
 /*
- * Claim/policy business rules shared by billing, claims and renewal pages — "is this related record in the
- * right state for this action", not just "is the input well-formed". Each rule used to be a copy-pasted status
- * list or date compare in every page that needed it (senior dev review, 2026-10-08); one drifting out of sync
- * with the others silently let through — or silently blocked — an action that should have gone the other way.
+ * Business rules and access rules used by many pages.
+ * Kept in one place so every page follows the same rule.
  */
+
+// Claim statuses where each action is allowed
 const CLAIM_DOCS_OPEN_STATUSES = ['compiling', 'sent_admin', 'lack_of_requirements'];
 const CLAIM_DELETABLE_STATUSES = ['resolved', 'denied', 'lack_of_requirements'];
 const CLAIM_BILLABLE_STATUSES  = ['loa_received', 'pending', 'approved', 'resolved'];
 
-/** Can the claim's requirement documents still be uploaded or removed, and its status moved forward? */
+/** Can documents still be uploaded or removed for this claim? */
 function claim_docs_open(string $status): bool
 {
     return in_array($status, CLAIM_DOCS_OPEN_STATUSES, true);
 }
 
-/** Can this claim be deleted? Only once it is fully settled one way or another. */
+/** Can this claim be deleted? Only when it is already finished. */
 function claim_is_deletable(string $status): bool
 {
     return in_array($status, CLAIM_DELETABLE_STATUSES, true);
 }
 
-/** Can a billing record be created against this claim? */
+/** Can we create a billing for this claim? */
 function claim_is_billable(string $status): bool
 {
     return in_array($status, CLAIM_BILLABLE_STATUSES, true);
 }
 
-/** Has a policy's coverage period already ended? (policy_end is a DATE column, so a plain string compare works.) */
+/** Is the policy already expired? */
 function policy_is_expired(string $policy_end): bool
 {
     return $policy_end < date('Y-m-d');
 }
 
 /**
- * Payment status of a policy from its totals. Peso amounts are rounded to centavos before comparing: summing
- * floats leaves tiny remainders (1028.14 + 1028.13 = 2056.2700000000004), which used to leave a fully paid
- * policy "Partial" or reject an exact full payment as "exceeds the payable amount".
+ * Paid, Overdue, Partial or Unpaid.
+ * Amounts are rounded to centavos first, because adding decimals in PHP is not exact
+ * (1028.14 + 1028.13 = 2056.2700000000004).
  */
 function policy_payment_status(float $payable, float $total_paid, bool $has_overdue = false): string
 {
@@ -46,12 +46,13 @@ function policy_payment_status(float $payable, float $total_paid, bool $has_over
     return round($total_paid, 2) > 0 ? 'Partial' : 'Unpaid';
 }
 
-/** True when $paid is more than $payable by at least a centavo (float remainders below that don't count). */
+/** Is the amount paid more than what the client owes? (compared in centavos) */
 function payment_exceeds(float $paid, float $payable): bool
 {
     return round($paid, 2) > round($payable, 2);
 }
 
+/** Can this user open the client? Admins: all clients. Mechanics: walk-in clients only (no policy). */
 function client_in_scope(mysqli $conn, int $client_id): bool
 {
     if ($client_id <= 0) return false;
@@ -70,6 +71,7 @@ function client_in_scope(mysqli $conn, int $client_id): bool
     return $stmt->get_result()->num_rows > 0;
 }
 
+/** Can this user edit the client? Owner: all. Admin: only clients they added or handle as agent. */
 function client_editable(mysqli $conn, int $client_id): bool
 {
     if ($client_id <= 0) return false;
@@ -89,7 +91,7 @@ function client_editable(mysqli $conn, int $client_id): bool
     return $stmt->get_result()->num_rows > 0;
 }
 
-
+/** Can this user edit the policy? Owner: all. Admin: only if they are the client's agent. */
 function policy_editable(?int $agent_id): bool
 {
     $role = $_SESSION['role'] ?? '';
@@ -97,7 +99,7 @@ function policy_editable(?int $agent_id): bool
     return $role === 'admin' && $agent_id !== null && $agent_id > 0 && $agent_id === (int)($_SESSION['user_id'] ?? 0);
 }
 
-
+/** SQL filter for Renewal Tracking: the owner sees all, an admin sees only their own clients. */
 function renewal_scope_sql(string $client_alias = 'c'): string
 {
     $role = $_SESSION['role'] ?? '';
@@ -106,10 +108,7 @@ function renewal_scope_sql(string $client_alias = 'c'): string
     return '1=0';
 }
 
-/**
- * Who a client can belong to: active admins and super admins — never mechanics, and never the hidden
- * oversight account (its real name must not surface anywhere in the UI). Returns [user_id => row].
- */
+/** Users who can be a client's insurance agent: active admins and the owner (not the hidden developer account). */
 function insurance_agents(mysqli $conn): array
 {
     $res = $conn->query("
@@ -122,12 +121,7 @@ function insurance_agents(mysqli $conn): array
     return $agents;
 }
 
-/**
- * Active clients whose full name is exactly $name (case and extra spaces ignored), with their plates — for the
- * "this name already exists" warning on Add Client and the bulk import (owner's staff are encoding ~1,000
- * clients, so the same person being added twice is likely). A warning only: two people can share a name.
- * Returns [['client_id'=>…, 'full_name'=>…, 'plates'=>'ABC 123, XYZ 789'], …].
- */
+/** Clients with the same name, for the "this name already exists" warning. Only a warning: two people can share a name. */
 function same_name_clients(mysqli $conn, string $name, int $limit = 5): array
 {
     $name = strtoupper(trim(preg_replace('/\s+/', ' ', $name)));
@@ -145,7 +139,7 @@ function same_name_clients(mysqli $conn, string $name, int $limit = 5): array
     return $st->get_result()->fetch_all(MYSQLI_ASSOC);
 }
 
-/** Dropdown label for an insurance agent: "Name — Owner" for the super admin, "(you)" for the signed-in user. */
+/** Agent name for dropdowns, e.g. "Juan — Owner" or "Maria (you)". */
 function agent_option_label(array $agent): string
 {
     $label = $agent['full_name'] . ($agent['role'] === 'super_admin' ? ' — Owner' : '');
@@ -153,11 +147,7 @@ function agent_option_label(array $agent): string
     return $label;
 }
 
-/**
- * What still hangs off this client and would be destroyed (or orphaned) by deleting them?
- * Returns e.g. "1 policy(s), 2 repair job(s)", or '' when the client can be deleted safely.
- * Vehicles alone are not a blocker — they go with the client.
- */
+/** Records that stop a client from being deleted, e.g. "1 policy(s)". Empty = safe to delete. */
 function client_delete_blockers(mysqli $conn, int $client_id): string
 {
     $stmt = $conn->prepare("
@@ -178,10 +168,9 @@ function client_delete_blockers(mysqli $conn, int $client_id): string
 }
 
 /**
- * Which user accounts have left a mark on the system? Deleting such an account would either erase
- * its audit trail (audit_logs cascades) or leave orphaned "created by" ids on real records, so those
- * accounts are deactivated instead. Returns [user_id => true], or null if it could not be worked out
- * (callers then treat every account as having history — the safe direction).
+ * Users who already did something in the system (logs, clients, jobs ...).
+ * These can only be deactivated, not deleted, so their history is kept.
+ * Returns null on error (then every user is treated as having history, to be safe).
  */
 function users_with_history(mysqli $conn): ?array
 {
@@ -214,12 +203,7 @@ function user_has_history(mysqli $conn, int $user_id): bool
     return $set === null || isset($set[$user_id]);
 }
 
-/**
- * Unregistering a vehicle deletes its policies (the confirm dialog says so), but the database
- * also cascades to the vehicle's repair jobs -> quotations -> e-receipts, and orphans any claim
- * filed against its policies. Those are financial records nobody was warned about, so they block.
- * Returns e.g. "2 repair job(s), 1 claim(s)", or '' when the vehicle can be unregistered.
- */
+/** Records that stop a vehicle from being removed (repair jobs, claims). Empty = safe to remove. */
 function vehicle_unregister_blockers(mysqli $conn, int $vehicle_id): string
 {
     $stmt = $conn->prepare("

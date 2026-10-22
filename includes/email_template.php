@@ -716,3 +716,100 @@ function buildRenewalReminderEmail(string $toName, array $policies, string $rene
 
         return [$subject, $html];
 }
+
+/** Weekly email to staff: policies with unpaid installments past their due date (config/overdue_reminders.php). */
+function sendOverduePaymentEmail(string $toEmail, string $toName, array $policies, string $policyBaseUrl): bool {
+    try {
+        $mail = newMailer();
+        $mail->addAddress($toEmail, $toName);
+        embedEmailLogos($mail);
+
+        [$subject, $html] = buildOverduePaymentEmail($toName, $policies, $policyBaseUrl);
+        $mail->Subject = '=?UTF-8?B?' . base64_encode($subject) . '?=';
+        $mail->Body    = $html;
+
+        $mail->send();
+        return true;
+    } catch (\Throwable $e) {
+        return false;
+    }
+}
+
+/** Subject and HTML of the overdue payment email. Returns [subject, html]. */
+function buildOverduePaymentEmail(string $toName, array $policies, string $policyBaseUrl): array {
+        $count = count($policies);
+        $total = 0.0;
+        $rows  = '';
+        foreach ($policies as $p) {
+            $total += (float)$p['overdue_amount'];
+            $rows  .= '<tr>'
+                    . '<td style="padding:9px 10px;border-bottom:1px solid #E8E3D8;">' . htmlspecialchars($p['client_name']) . '</td>'
+                    . '<td style="padding:9px 10px;border-bottom:1px solid #E8E3D8;">' . htmlspecialchars(strtoupper($p['plate_number'])) . '</td>'
+                    . '<td style="padding:9px 10px;border-bottom:1px solid #E8E3D8;">'
+                    . '<a href="' . htmlspecialchars($policyBaseUrl . (int)$p['policy_id']) . '" style="color:#B8860B;">' . htmlspecialchars($p['policy_number']) . '</a></td>'
+                    . '<td style="padding:9px 10px;border-bottom:1px solid #E8E3D8;text-align:right;white-space:nowrap;">'
+                    . '<strong style="color:#B03A2E;">PHP ' . number_format((float)$p['overdue_amount'], 2) . '</strong><br>'
+                    . '<span style="color:#9C9286;font-size:12px;">due since ' . date('M d, Y', strtotime($p['oldest_due'])) . '</span></td>'
+                    . '</tr>';
+        }
+
+        $body = 'Dear <strong>' . htmlspecialchars($toName) . '</strong>,<br><br>'
+              . '<strong>' . $count . '</strong> polic' . ($count === 1 ? 'y has' : 'ies have')
+              . ' unpaid installments past the due date, <strong>PHP ' . number_format($total, 2) . '</strong> in total.<br><br>'
+              . '<table style="width:100%;border-collapse:collapse;font-size:14px;">'
+              . '<tr style="background:#F4F1EC;">'
+              . '<th style="padding:9px 10px;text-align:left;">Client</th>'
+              . '<th style="padding:9px 10px;text-align:left;">Plate</th>'
+              . '<th style="padding:9px 10px;text-align:left;">Policy</th>'
+              . '<th style="padding:9px 10px;text-align:right;">Overdue</th>'
+              . '</tr>' . $rows . '</table><br>'
+              . 'Please follow up with ' . ($count === 1 ? 'this client' : 'these clients') . ' about the payment.';
+
+        $notice = 'This is an automatic weekly reminder from TG-BASICS. Do not reply to this email.';
+
+        $subject = $count . ' Overdue Policy Payment' . ($count === 1 ? '' : 's') . ' | ' . _getCompanyName();
+        $html    = buildEmailTemplate(
+            'Payment Reminder',
+            $count === 1 ? 'A payment is overdue' : $count . ' payments are overdue',
+            $body,
+            app_url('modules/renewal/renewal_list.php?agent=all'),
+            'Open Policies',
+            $notice
+        );
+
+        return [$subject, $html];
+}
+
+/** Email to the owner: the weekly full backup is saved and ready to download (includes/full_backup.php). */
+function sendWeeklyBackupEmail(string $toEmail, string $toName, array $info, string $settingsUrl): bool {
+    try {
+        $mail = newMailer();
+        $mail->addAddress($toEmail, $toName);
+        embedEmailLogos($mail);
+
+        $body = 'Dear <strong>' . htmlspecialchars($toName) . '</strong>,<br><br>'
+              . 'This week\'s backup of TG-BASICS is ready:<br><br>'
+              . '<table style="border-collapse:collapse;font-size:14px;">'
+              . '<tr><td style="padding:4px 14px 4px 0;color:#9C9286;">Records</td><td><strong>' . number_format($info['rows']) . '</strong> rows in ' . (int)$info['tables'] . ' tables</td></tr>'
+              . '<tr><td style="padding:4px 14px 4px 0;color:#9C9286;">Photos &amp; documents</td><td><strong>' . number_format($info['files']) . '</strong> files</td></tr>'
+              . '<tr><td style="padding:4px 14px 4px 0;color:#9C9286;">File size</td><td><strong>' . htmlspecialchars(full_backup_size_label((int)$info['size'])) . '</strong></td></tr>'
+              . '</table><br>'
+              . 'It is saved on the server. Please download it (your password is needed) and keep it somewhere safe, '
+              . 'like your Google Drive or a USB drive, so you still have a copy if the server has a problem.';
+
+        $mail->Subject = '=?UTF-8?B?' . base64_encode('Weekly Backup Ready | ' . _getCompanyName()) . '?=';
+        $mail->Body    = buildEmailTemplate(
+            'Weekly Backup',
+            'Your backup is ready to download',
+            $body,
+            $settingsUrl,
+            'Download in Settings',
+            'This is an automatic weekly email from TG-BASICS. The backup file is not attached, to keep client data safe. Do not reply to this email.'
+        );
+
+        $mail->send();
+        return true;
+    } catch (\Throwable $e) {
+        return false;
+    }
+}

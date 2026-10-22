@@ -1,11 +1,14 @@
 <?php
+/*
+ * Loaded by every page. Starts the session, sets the timezone, adds security headers,
+ * and defines the role checks (require_role, is_mechanic, ...).
+ */
 date_default_timezone_set('Asia/Manila');
 
-// A signed-in session ends after this much inactivity (shared shop computers / phones left open).
+// Sign the user out after 1 hour of no activity
 if (!defined('SESSION_IDLE_SECONDS')) define('SESSION_IDLE_SECONDS', 3600);
 
-// MySQL's NOW()/CURRENT_TIMESTAMP depend on the session timezone, which
-// normally comes from config/db.php — gitignored, so set it here too.
+// Use Philippine time in MySQL too
 if (!isset($conn)) {
     require_once __DIR__ . '/db.php';
 }
@@ -13,15 +16,11 @@ $conn->query("SET time_zone = '+08:00'");
 
 require_once __DIR__ . '/app_url.php';
 
-// Auto-detect HTTPS so the cookie is marked secure in production without
-// breaking local XAMPP (plain HTTP) — checks both the direct HTTPS flag
-// and the forwarded-proto header used by shared hosts that proxy SSL.
+// HTTPS on the live site, plain HTTP on local XAMPP
 $_is_https = app_is_https();
 $_is_local = (bool)preg_match('/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/', $_SERVER['HTTP_HOST'] ?? '');
 
-// Production only: never show PHP errors to visitors (they reveal file paths and SQL), log them instead,
-// and turn any uncaught exception (e.g. a database constraint error) into a plain error page
-// instead of a raw fatal error. Local XAMPP keeps the normal developer error output.
+// Live site: hide PHP errors from users (log them instead) and show a simple error page with a reference code
 if (!$_is_local) {
     ini_set('display_errors', '0');
     ini_set('log_errors', '1');
@@ -47,26 +46,25 @@ if (!$_is_local) {
 
 if (session_status() === PHP_SESSION_NONE) {
     session_set_cookie_params([
-        'lifetime' => 0,              // Cookie expires when browser closes
+        'lifetime' => 0,              // deleted when the browser closes
         'path'     => '/',
         'domain'   => '',
-        'secure'   => $_is_https,     // true automatically once served over HTTPS
-        'httponly' => true,           // JavaScript cannot read the session cookie
-        'samesite' => 'Strict',       // Cookie not sent on cross-site requests
+        'secure'   => $_is_https,     // only sent over HTTPS
+        'httponly' => true,           // JavaScript cannot read it
+        'samesite' => 'Strict',       // not sent from other websites (blocks CSRF)
     ]);
     session_start();
 }
 
-// Rotate session ID every 30 minutes to prevent session fixation.
+// Change the session ID every 30 minutes (prevents session hijacking)
 if (!isset($_SESSION['_last_regen'])) {
     $_SESSION['_last_regen'] = time();
 } elseif (time() - $_SESSION['_last_regen'] > 1800) {
-    session_regenerate_id(true); // true = delete old session file
+    session_regenerate_id(true); // true = delete the old session
     $_SESSION['_last_regen'] = time();
 }
 
-// Idle timeout: a signed-in session with no request for SESSION_IDLE_SECONDS is ended. Clearing the
-// session data (not just the flag) means every page's own login guard then sends the user to sign in.
+// Idle too long -> clear the session, so the user has to sign in again
 if (isset($_SESSION['user_id'])) {
     if (isset($_SESSION['_last_seen']) && time() - $_SESSION['_last_seen'] > SESSION_IDLE_SECONDS) {
         $_SESSION = ['login_notice' => 'You were signed out after a long period of inactivity. Please sign in again.'];
@@ -75,9 +73,8 @@ if (isset($_SESSION['user_id'])) {
     }
 }
 
-// Once per minute (and on the first request after sign-in): make sure the account still exists, is still
-// active and still has the same role — otherwise sign it out. Without this, deleting/deactivating a user or
-// changing their role had no effect until they happened to log out. Also refreshes last_active.
+// Every minute: check the account is still active with the same role, or sign it out.
+// So a deactivated user is kicked out right away, not only when they log out.
 if (isset($_SESSION['user_id'])) {
     $never_stamped = !isset($_SESSION['_last_active_update']);
     $due_for_update = isset($_SESSION['_last_active_update']) && time() - $_SESSION['_last_active_update'] > 60;
@@ -104,24 +101,19 @@ if (isset($_SESSION['user_id'])) {
 }
 
 if (!headers_sent()) {
-    header('X-Frame-Options: SAMEORIGIN');                       // no embedding in other sites (clickjacking)
-    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: SAMEORIGIN');                       // other sites can't put our pages in a frame
+    header('X-Content-Type-Options: nosniff');                   // browser must trust our file types
     header('Referrer-Policy: strict-origin-when-cross-origin');
     header('Permissions-Policy: camera=(self), microphone=(), geolocation=()');
-    if ($_is_https) header('Strict-Transport-Security: max-age=15552000');
+    if ($_is_https) header('Strict-Transport-Security: max-age=15552000');   // always use HTTPS
     if (isset($_SESSION['user_id'])) {
-        // Signed-in pages hold client/insurance data: don't let the browser keep them, so the Back button
-        // after logout can't show them again on a shared computer.
+        // Don't cache signed-in pages, so Back after logout can't show client data
         header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
         header('Pragma: no-cache');
     }
 }
 
-/**
- * Page guard: the signed-in user must have one of $roles, otherwise the browser is sent to the sign-in page.
- * Every admin/mechanic page starts with require_role(['admin', 'super_admin']) (or with the mechanic role added).
- * JSON endpoints keep their own api_error(401/403) reply.
- */
+/** Page guard: only these roles may open the page; everyone else goes to the sign-in page. */
 function require_role(array $roles): void
 {
     if (isset($_SESSION['user_id']) && in_array($_SESSION['role'] ?? '', $roles, true)) return;
@@ -129,7 +121,7 @@ function require_role(array $roles): void
     exit;
 }
 
-/** Relative link from the current page to auth/login.php, whatever folder the page is in. */
+/** Link to the sign-in page from the current folder. */
 function login_url(): string
 {
     $script = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
@@ -137,16 +129,16 @@ function login_url(): string
     return str_repeat('../', substr_count($m[1], '/')) . 'auth/login.php';
 }
 
-
+/** Same as require_role(), but answers with a JSON error (for AJAX). */
 function require_role_json(array $roles, string $message = 'Unauthorized.', int $status = 401): void
 {
     if (isset($_SESSION['user_id']) && in_array($_SESSION['role'] ?? '', $roles, true)) return;
     api_error($message, $status);
 }
 
-
+// Role checks
 function is_super_admin(): bool { return ($_SESSION['role'] ?? '') === 'super_admin'; }
 function is_admin(): bool       { return ($_SESSION['role'] ?? '') === 'admin'; }
 function is_mechanic(): bool    { return ($_SESSION['role'] ?? '') === 'mechanic'; }
-/** Front-office staff: admin or super admin — the pairing used wherever mechanics are excluded. */
+/** Admin or owner (not a mechanic) */
 function is_staff(): bool       { return in_array($_SESSION['role'] ?? '', ['admin', 'super_admin'], true); }

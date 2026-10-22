@@ -1,8 +1,6 @@
 <?php
 /**
- * config/validators.php
- * Centralized input sanitization and validation helpers for TG-BASICS.
- * Used across all auth and module pages.
+ * Input validation, CSRF protection, and other helpers used across the app.
  */
 
 // ── LENGTH LIMITS ──────────────────────────────────────────────────────────
@@ -70,11 +68,7 @@ const ALLOWED_DOC_FIELDS = [
 
 // ── SANITIZERS ────────────────────────────────────────────────────────────
 
-/**
- * Trim and enforce max length. Returns string or '' if oversized.
- * Takes mixed because it's fed raw request data — `?field[]=x` arrives as an array,
- * which must come back as '' rather than crash the page with a TypeError.
- */
+/** Trim and limit length. Returns '' if too long or not a plain string. */
 function san_str(mixed $value, int $max = MAX_TEXT): string {
     if (!is_scalar($value)) return '';
     $v = trim((string)$value);
@@ -83,33 +77,22 @@ function san_str(mixed $value, int $max = MAX_TEXT): string {
 }
 
 /**
- * Re-displays a submitted value in a "sticky" form field (re-filled after a validation error), HTML-escaped.
- * $default takes the place of a plain '' or of a longer `$_POST[...] ?? $other['thing'] ?? '...'` fallback
- * chain — resolve that chain yourself and pass the result in, e.g. old('sum_insured', $renew_policy['sum_insured'] ?? '').
- * Usage: value="<?= old('full_name') ?>" in place of value="<?= htmlspecialchars($_POST['full_name'] ?? '') ?>".
- *
- * Same reasoning as san_str(): raw request data can arrive as an array (?field[]=x, from a tampered request),
- * and htmlspecialchars() throws an uncaught TypeError on an array — is_scalar() guards that here too, so a
- * crafted request can't crash the page (confirmed 2026-09-25 pre-deployment audit: 45 sticky-value call sites
- * across 8 "Add ___" forms and Settings all shared this same htmlspecialchars($_POST[...]) pattern).
+ * Re-fill a form field with what the user typed, after a validation error.
+ * Usage: value="<?= old('full_name') ?>"
  */
 function old(string $key, mixed $default = ''): string {
     $v = $_POST[$key] ?? $default;
     return htmlspecialchars(is_scalar($v) ? (string)$v : '');
 }
 
-/**
- * Cast to positive integer. Returns 0 if invalid or negative.
- */
+/** Cast to a whole number. Returns 0 if invalid. */
 function san_int(mixed $value, int $min = 0, int $max = PHP_INT_MAX): int {
     $v = (int)$value;
     if ($v < $min || $v > $max) return 0;
     return $v;
 }
 
-/**
- * Cast to non-negative float. Returns 0.0 if invalid or negative.
- */
+/** Cast to a decimal number. Returns 0.0 if invalid. */
 function san_float(mixed $value, float $min = 0.0, float $max = 999_999_999.99): float {
     if (!is_numeric($value)) return 0.0;
     $v = (float)$value;
@@ -117,18 +100,13 @@ function san_float(mixed $value, float $min = 0.0, float $max = 999_999_999.99):
     return $v;
 }
 
-/**
- * Peso amount typed into a money input (assets/js/shared/money_input.js), which shows thousands separators
- * while typing — "500,000.50" / "₱ 500,000" are read as 500000.5. Everything else behaves like san_float().
- */
+/** Same as san_float(), but also accepts "500,000.50" or "₱ 500,000" from the money input field. */
 function san_money(mixed $value, float $min = 0.0, float $max = 999_999_999.99): float {
     if (is_string($value)) $value = str_replace([',', ' ', '₱'], '', $value);
     return san_float($value, $min, $max);
 }
 
-/**
- * Whitelist check — returns value if in list, '' otherwise.
- */
+/** Returns the value only if it is in the allowed list, otherwise ''. */
 function san_enum(mixed $value, array $allowed): string {
     if (!is_scalar($value)) return '';
     $v = trim((string)$value);
@@ -137,38 +115,28 @@ function san_enum(mixed $value, array $allowed): string {
 
 // ── VALIDATORS ────────────────────────────────────────────────────────────
 
-/**
- * Full name: letters, spaces, hyphens, apostrophes. Max MAX_NAME.
- */
+/** Full name: letters, spaces, hyphens, apostrophes only. */
 function validate_name(string $v): bool {
     return $v !== '' && mb_strlen($v) <= MAX_NAME && preg_match('/^[\pL\s\'\-\.]+$/u', $v);
 }
 
-/**
- * Email address — RFC-compliant + max length.
- */
+/** Valid email address format. */
 function validate_email(string $v): bool {
     return mb_strlen($v) <= MAX_EMAIL && filter_var($v, FILTER_VALIDATE_EMAIL) !== false;
 }
 
-/**
- * Philippine mobile number: 09XXXXXXXXX (11 digits).
- */
+/** Philippine mobile number: 09XXXXXXXXX. */
 function validate_phone(string $v): bool {
     $digits = preg_replace('/\D/', '', $v);
     return preg_match('/^09\d{9}$/', $digits) === 1;
 }
 
-/**
- * Username: 3–50 alphanumeric or underscore chars.
- */
+/** Username: 3–50 letters, numbers, or underscores. */
 function validate_username(string $v): bool {
     return preg_match('/^[a-zA-Z0-9_]{3,' . MAX_USERNAME . '}$/', $v) === 1;
 }
 
-/**
- * Password: 8–128 chars, at least 1 uppercase, 1 digit, 1 special char.
- */
+/** Password: 8–128 chars, needs an uppercase letter, a number, and a special character. */
 function validate_password(string $v): bool {
     if (mb_strlen($v) < 8 || mb_strlen($v) > MAX_PASSWORD) return false;
     if (!preg_match('/[A-Z]/', $v))          return false;
@@ -177,70 +145,53 @@ function validate_password(string $v): bool {
     return true;
 }
 
-/**
- * Date string in Y-m-d format.
- */
+/** Date in YYYY-MM-DD format. */
 function validate_date(string $v): bool {
     if ($v === '') return false;
     $d = DateTime::createFromFormat('Y-m-d', $v);
     return $d && $d->format('Y-m-d') === $v;
 }
 
-/**
- * Date that is not in the future.
- */
+/** Valid date, and not a future date. */
 function validate_date_not_future(string $v): bool {
     return validate_date($v) && strtotime($v) <= time();
 }
 
-/**
- * Plate number: alphanumeric + spaces/hyphens, max MAX_PLATE.
- */
+/** Vehicle plate number: letters, numbers, spaces, hyphens. */
 function validate_plate(string $v): bool {
     return $v !== '' && mb_strlen($v) <= MAX_PLATE && preg_match('/^[A-Z0-9\-\s]+$/', strtoupper($v));
 }
 
-/**
- * Year model: 4-digit integer, 1960–(current year + 1).
- */
+/** Vehicle year, from 1960 up to next year. */
 function validate_year(int $v): bool {
     return $v >= 1960 && $v <= ((int)date('Y') + 1);
 }
 
-/**
- * Policy number: alphanumeric + hyphens, max MAX_POLICY_NUM.
- */
+/** Policy number: letters, numbers, hyphens. */
 function validate_policy_number(string $v): bool {
     return $v !== '' && mb_strlen($v) <= MAX_POLICY_NUM && preg_match('/^[A-Z0-9\-]+$/i', $v);
 }
 
-/**
- * Activation / reset token: 64 hex characters exactly.
- */
+/** Activation / password reset token: exactly 64 hex characters. */
 function validate_token(string $v): bool {
     return preg_match('/^[a-f0-9]{64}$/', $v) === 1;
 }
 
-/**
- * Search query: max MAX_SEARCH, strip control characters.
- */
+/** Clean up a search box value. */
 function validate_search(string $v): string {
     $v = trim(preg_replace('/[\x00-\x1F\x7F]/', '', $v));
     return mb_strlen($v) <= MAX_SEARCH ? $v : mb_substr($v, 0, MAX_SEARCH);
 }
 
-/**
- * Numeric premium/amount: non-negative float within reasonable bounds.
- */
+/** A valid peso amount (0 or more). */
 function validate_amount(mixed $v): bool {
     return is_numeric($v) && (float)$v >= 0 && (float)$v <= 999_999_999.99;
 }
 
 // ── CSRF PROTECTION ───────────────────────────────────────────────────────────
+// A hidden token on every form, so a request must come from our own page, not another website.
 
-/**
- * Return the current session CSRF token, generating one if needed.
- */
+/** Get the session's CSRF token (makes one if it doesn't exist yet). */
 function csrf_token(): string {
     if (empty($_SESSION['csrf_token'])) {
         $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -248,16 +199,11 @@ function csrf_token(): string {
     return $_SESSION['csrf_token'];
 }
 
-/**
- * Verify the CSRF token submitted with a form.
- * Call at the top of every POST handler. Terminates with 403 on failure.
- */
+/** Check the form's CSRF token. Stops the page with a 403 error if it's wrong or missing. */
 function csrf_verify(): void {
     $submitted = $_POST['csrf_token'] ?? '';
-    // is_string(): hash_equals() throws a TypeError on an array-valued csrf_token field.
     if (!is_string($submitted) || !isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $submitted)) {
         http_response_code(403);
-        // The app's fetch() calls ask for JSON (footer.php sets Accept); a plain form post gets the text message
         if (str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json')) {
             header('Content-Type: application/json');
             echo json_encode(['ok' => false, 'msg' => 'Your session expired. Please refresh the page and try again.', 'error' => 'Invalid or missing CSRF token.']);
@@ -267,10 +213,7 @@ function csrf_verify(): void {
     }
 }
 
-/**
- * Same check as csrf_verify(), for AJAX endpoints whose callers parse the reply as JSON —
- * csrf_verify()'s plain-text die() would break them with a JSON parse error.
- */
+/** Same as csrf_verify(), but always answers in JSON (for AJAX calls). */
 function csrf_verify_json(): void {
     $submitted = $_POST['csrf_token'] ?? '';
     if (!is_string($submitted) || !isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $submitted)) {
@@ -281,23 +224,12 @@ function csrf_verify_json(): void {
     }
 }
 
-/**
- * Output a hidden CSRF input field for use inside <form> tags.
- * Usage: <?= csrf_field() ?>
- */
 // ── SEQUENTIAL NUMBER GENERATION (RJ-/BILL-/Q- style) ──────────────────────
 
 /**
- * Job/billing/quotation numbers are "highest number for today, plus one" — reading the current max and
- * inserting it are two separate queries, so two people saving in the same instant can compute the same
- * next number. The unique key then rejects whichever INSERT lands second, and without this, that surfaces
- * to the user as an uncaught duplicate-key crash (confirmed under concurrent load, 2026-09-22 pre-launch
- * test: 9 of 30 truly-simultaneous repair-job submissions failed this way).
- *
- * $table/$column are always fixed strings the caller writes in code, never request input.
- * $attempt receives the freshly computed number and must perform (only) the INSERT for it, returning
- * whatever the caller wants back — checklist rows, audit logging, etc. happen after this, once it succeeds.
- * On a collision, this recomputes a fresh number and retries; any other database error is not retried.
+ * Makes the next number for a job/billing/quotation (highest number + 1).
+ * If two people save at the same time and get the same number, this retries with a new one
+ * instead of crashing.
  */
 function insert_with_sequential_number(mysqli $conn, string $table, string $column, string $prefix, callable $attempt, int $max_tries = 5): mixed {
     $like = $prefix . '%';
@@ -313,7 +245,7 @@ function insert_with_sequential_number(mysqli $conn, string $table, string $colu
         } catch (mysqli_sql_exception $e) {
             $collided = str_contains($e->getMessage(), 'Duplicate entry') && str_contains($e->getMessage(), "'$column'");
             if (!$collided || $try === $max_tries) throw $e;
-            // someone else claimed this exact number just now — loop around and compute a fresh one
+            // someone else just took this number — try again with a new one
         }
     }
 }
@@ -321,17 +253,9 @@ function insert_with_sequential_number(mysqli $conn, string $table, string $colu
 // ── CLOSING CHECK-THEN-WRITE RACES (e.g. "is this plate number free?") ─────
 
 /**
- * Runs $work() while holding a MySQL named lock scoped to $name, so two requests racing on the same
- * real-world value (e.g. "is plate ABC 123 already registered?") can't both pass a uniqueness check
- * before either has written — confirmed under load, 2026-09-22 pre-launch test: 10 truly-simultaneous
- * "New Client" submissions for the same plate number created 2 duplicate clients, because the check and
- * the insert were two separate, unsynchronized queries with nothing to serialize them.
- *
- * $work must perform BOTH the check and the write together (the lock covers all of it) and return
- * whatever the caller needs back — including null, if that is a meaningful result for the caller.
- * Returns ['locked' => false] if the lock itself could not be acquired within $wait_seconds — genuinely
- * rare (another request for this exact same value is running long) — otherwise ['locked' => true,
- * 'result' => <whatever $work returned>], so a null from $work is never confused with a failed lock.
+ * Runs $work() while holding a lock on $name, so two requests can't both pass a
+ * "does this already exist?" check and insert a duplicate at the same time.
+ * Returns ['locked' => false] if the lock could not be taken, else ['locked' => true, 'result' => ...].
  */
 function with_named_lock(mysqli $conn, string $name, callable $work, int $wait_seconds = 5): array {
     $lock_name = named_lock_acquire($conn, $name, $wait_seconds);
@@ -345,12 +269,7 @@ function with_named_lock(mysqli $conn, string $name, callable $work, int $wait_s
     }
 }
 
-/**
- * The two halves of with_named_lock(), for a check-then-write that is spread over a long page flow
- * (Add / Edit Policy: duplicate policy-number check ... insert). Returns the lock's name to pass to
- * named_lock_release(), or null if it could not be taken within $wait_seconds. MySQL also frees the
- * lock by itself when the request's connection closes, so a page that exit()s after saving is fine.
- */
+/** Takes a lock by name. Returns the lock name (pass it to named_lock_release()), or null if it timed out. */
 function named_lock_acquire(mysqli $conn, string $name, int $wait_seconds = 5): ?string {
     $lock_name = named_lock_name($name);
     $stmt = $conn->prepare('SELECT GET_LOCK(?, ?)');
@@ -359,11 +278,12 @@ function named_lock_acquire(mysqli $conn, string $name, int $wait_seconds = 5): 
     return (int)$stmt->get_result()->fetch_row()[0] === 1 ? $lock_name : null;
 }
 
-/** The MySQL lock name for $name (the client import takes many plate locks in one query, so it needs the same names). */
+/** Turns $name into a valid MySQL lock name. */
 function named_lock_name(string $name): string {
     return 'tgb_' . substr(preg_replace('/[^A-Za-z0-9_]/', '_', $name), 0, 55);
 }
 
+/** Releases a lock taken by named_lock_acquire(). */
 function named_lock_release(mysqli $conn, string $lock_name): void {
     $rel = $conn->prepare('SELECT RELEASE_LOCK(?)');
     $rel->bind_param('s', $lock_name);
@@ -371,6 +291,7 @@ function named_lock_release(mysqli $conn, string $lock_name): void {
     $rel->get_result();
 }
 
+/** Hidden CSRF input for a <form>. Usage: <?= csrf_field() ?> */
 function csrf_field(): string {
     return '<input type="hidden" name="csrf_token" value="' . htmlspecialchars(csrf_token()) . '"/>';
 }

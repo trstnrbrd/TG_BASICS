@@ -8,6 +8,7 @@ require_once '../../config/mailer.php';
 require_once '../../config/rate_limit.php';
 require_once '../../config/transaction_pin.php';
 require_once '../../includes/db_backup.php';
+require_once '../../includes/full_backup.php';
 require_once '../../config/dev_access.php';
 
 require_role(['admin', 'super_admin', 'mechanic']);
@@ -1114,6 +1115,22 @@ require_once '../../includes/topbar.php';
             <button type="button" class="btn-primary" id="db-backup-btn"><?= icon('arrow-down-tray', 14) ?> Download Backup</button>
             <?php endif; ?>
           </div>
+          <?php $full = full_backup_latest(); ?>
+          <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);">
+            <div style="flex:1 1 260px;min-width:0;">
+              <div class="field-label" style="margin-bottom:0.2rem;">Weekly full backup (records + photos &amp; documents)</div>
+              <?php if ($full): ?>
+              <div id="db-full-backup-last" style="font-size:0.92rem;font-weight:700;color:var(--text-primary);"><?= date('M j, Y, g:i A', strtotime($full['at'])) ?></div>
+              <div style="font-size:0.75rem;color:var(--text-muted);"><?= htmlspecialchars(full_backup_size_label($full['size'])) ?> · made automatically every week</div>
+              <?php else: ?>
+              <div id="db-full-backup-last" style="font-size:0.92rem;font-weight:700;color:var(--text-primary);">Not made yet</div>
+              <div style="font-size:0.75rem;color:var(--text-muted);">The first one is made automatically this week.</div>
+              <?php endif; ?>
+            </div>
+            <?php if ($full && !is_developer()): ?>
+            <button type="button" class="btn-ghost" id="db-full-backup-btn"><?= icon('arrow-down-tray', 14) ?> Download Weekly Backup</button>
+            <?php endif; ?>
+          </div>
           <?php if ($bk['overdue'] && !is_developer()): ?>
           <div class="alert alert-warning" role="status" style="margin:1rem 0 0;">
             <?= icon('exclamation-triangle', 15) ?>
@@ -1123,7 +1140,8 @@ require_once '../../includes/topbar.php';
           <ul style="margin:1rem 0 0;padding-left:1.1rem;font-size:0.76rem;color:var(--text-secondary);line-height:1.7;">
             <li>Do this at least once a week. Keep the file in a safe place, like your Google Drive or a USB drive.</li>
             <li>The file holds all client records and account details. Do not send it through group chats or share it.</li>
-            <li>It contains the records only; uploaded photos and documents are not included.</li>
+            <li>Download Backup has the records only. The weekly full backup also has every uploaded photo and document.</li>
+            <li>The weekly file (.tar.gz) opens with 7-Zip, WinRAR, or Windows 11 (right-click &gt; Extract All).</li>
             <li>To restore it, give the file to the system developer (phpMyAdmin &gt; Import).</li>
           </ul>
         </div>

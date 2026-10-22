@@ -61,8 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $record && !$record['used'] && strt
 
             // Log it
             $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'PASSWORD_RESET', ?)");
-            // This page has no session to take the masked name from, so mask it here: the
-            // hidden account's real name must never be written into audit text.
+            // mask the developer account's real name in the audit log
             $actor = !empty($record['is_hidden']) ? 'Developer' : $record['full_name'];
             $desc  = $actor . ' reset their password via email link.';
             $log->bind_param('is', $record['user_id'], $desc);

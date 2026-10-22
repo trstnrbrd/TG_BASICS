@@ -40,6 +40,7 @@ jobs:
             config/mailer.php
             config/ocr.php
             uploads/**
+            backups/**
             data_gathering (documentation)/**
             selenium_tests/**
             tools/**

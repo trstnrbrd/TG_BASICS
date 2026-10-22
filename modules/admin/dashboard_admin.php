@@ -10,10 +10,7 @@ $urg_days = (int)getSetting($conn, 'renewal_urgent_days', '7');
 $exp_days = (int)getSetting($conn, 'renewal_expiring_days', '30');
 
 require_role(['admin', 'super_admin']);
-
-require_once '../../config/mailer.php';
-require_once '../../config/renewal_reminders.php';
-send_renewal_reminders($conn);
+require_once '../../config/validators.php';   // csrf_token() for the reminder call below
 
 $full_name = $_SESSION['full_name'];
 $first_name = explode(' ', $full_name)[0];
@@ -686,6 +683,13 @@ require_once '../../includes/topbar.php';
     }
   }));
 })();
+
+// Backup for the daily cron job (reminder emails, cleanup), run in the background after the page loads
+window.addEventListener('load', function () {
+  var fd = new FormData();
+  fd.append('csrf_token', <?= json_encode(csrf_token()) ?>);
+  fetch('../../ajax/daily_jobs.php', { method: 'POST', body: fd }).catch(function () {});
+});
 </script>
 
 <?php require_once '../../includes/footer.php'; ?>

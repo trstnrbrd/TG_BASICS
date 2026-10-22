@@ -50,8 +50,7 @@ if (!client_in_scope($conn, (int)$policy['client_id'])) {
     exit;
 }
 
-// ...but only the client's insurance agent, or the Owner, may change it — payments, receipts, renewal,
-// delete (owner's rule, 2026-09-24). Everyone else gets the page read-only; every POST below is a change.
+// only the client's agent or the Owner may change the policy; everyone else is read-only
 $can_edit_policy = policy_editable($policy['agent_id'] !== null ? (int)$policy['agent_id'] : null);
 $view_only_msg   = 'Only the insurance agent of this client (' . ($policy['agent_name'] ?? 'not assigned yet') . ') or the Owner can update this policy.';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$can_edit_policy) {
@@ -63,8 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$can_edit_policy) {
     exit;
 }
 
-// Payable = total premium - commission (must match add_policy.php).
-// Installments are split against this, so balance and payment status track it too.
+// what the client owes = total premium - commission
 $payable_amount = round((float)$policy['total_premium'] - (float)$policy['markup'], 2);
 if ($payable_amount < 0) $payable_amount = 0;
 
@@ -210,11 +208,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_receipt'])) {
     api_success();
 }
 
-// ── HANDLE UNDO OF ONE SAVED PAYMENT ──
-// A saved installment is locked in the table, so a wrong entry (amount, mode, OR no.) could not be fixed
-// (owner's request, 2026-09-24). The agent or the Owner can now undo it: the installment goes back to unpaid
-// to be entered again, the policy totals are recomputed, and the activity log keeps what was undone.
-// The attached receipt (if any) is kept — it can be removed separately.
+// ── UNDO A SAVED PAYMENT (fix a wrong entry) ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['undo_payment'])) {
     csrf_verify();
     $payment_id = (int)($_POST['payment_id'] ?? 0);
@@ -332,9 +326,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
         }
 
         if ($valid) {
-            // Every installment row, the policy's own totals and the audit entry are saved together or not at
-            // all (includes/transaction.php) — a failure halfway used to leave paid installments behind a
-            // policy balance that still said they were unpaid.
+            // payments + policy totals + audit log saved together, or not at all
             try {
                 db_transaction($conn, function () use ($conn, $installments, $amounts, $pay_modes, $ctrl_numbers, $payable_amount, $policy_id, $policy) {
                     $total_paid = 0;
@@ -342,8 +334,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
                         $inst_no  = $row['installment_no'];
                         $idx      = $inst_no - 1;
                         $amt_paid = $amounts[$idx] ?? 0.0;
-                        // Keep the original payment date when this installment's amount didn't change — only a new or
-                        // edited payment is stamped "now" (otherwise saving installment 3 re-dates installments 1 and 2).
+                        // keep the old payment date if the amount didn't change
                         $unchanged = abs((float)$row['amount_paid'] - $amt_paid) < 0.005 && !empty($row['paid_at']);
                         $paid_at   = $amt_paid > 0 ? ($unchanged ? $row['paid_at'] : date('Y-m-d H:i:s')) : null;
                         $pay_mode = !empty($pay_modes[$idx])    ? $pay_modes[$idx]    : null;

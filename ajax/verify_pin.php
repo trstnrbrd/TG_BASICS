@@ -11,10 +11,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') api_error('Invalid request.', 400);
 
 $user_id = $_SESSION['user_id'];
 
-// Attempts are counted per account (shared by every PIN-check endpoint), not per IP.
+// attempts are counted per account, not per IP
 $rl_key = 'uid:' . (int)$user_id;
 
-// If no pin sent, this is just an existence check — don't count it as an attempt.
+// no pin sent = just checking if a PIN is set, not a real attempt
 $pin = $_POST['pin'] ?? '';
 
 if ($pin !== '' && rate_limit_blocked($conn, 'verify_pin', $rl_key)) {
@@ -32,7 +32,7 @@ if ($pin === '') api_success(['has_pin' => true]);
 
 if (password_verify($pin, $row['transaction_pin'])) {
     rate_limit_clear($conn, 'verify_pin', $rl_key);
-    pin_grant();   // the delete/deactivate handler checks this (config/transaction_pin.php)
+    pin_grant();
     api_success();
 }
 

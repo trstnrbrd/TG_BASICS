@@ -5,12 +5,12 @@ require_once '../../config/validators.php';
 require_once '../../config/settings.php';
 require_once '../../config/rate_limit.php';
 require_once '../../includes/db_backup.php';
+require_once '../../includes/full_backup.php';
 require_once '../../config/dev_access.php';
 require_once '../../includes/api.php';
 
-// Owner only: the file holds every client's data and every account's password hash
+// owner only, not even the developer account
 if (isset($_SESSION['user_id']) && is_developer()) {
-    // The developer account is a super admin too, but never takes the whole database home
     if ($_SERVER['REQUEST_METHOD'] === 'POST') api_error('Only the owner can download a database backup.', 403);
     header('Location: settings.php');
     exit;
@@ -21,9 +21,7 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'super_admin')
 }
 $uid = (int)$_SESSION['user_id'];
 
-// ── Step 1 (AJAX from Settings): confirm the password, get a one-time download link good for 60 seconds ──
-// Asked again even though the Owner is signed in, so a computer left logged in cannot be used to walk off
-// with the whole database.
+// ── Step 1: confirm the password, get a one-time link good for 60 seconds ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify_json();
     $rl_key = 'uid:' . $uid;
@@ -40,25 +38,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         api_error('Incorrect password.', 403);
     }
     rate_limit_clear($conn, 'db_backup', $rl_key);
+    // 'db' = make a records-only backup now; 'full' = the latest weekly backup (records + uploaded files)
+    $mode = ($_POST['mode'] ?? '') === 'full' ? 'full' : 'db';
+    if ($mode === 'full' && !full_backup_latest()) api_error('No weekly backup has been made yet.', 404);
     $token = bin2hex(random_bytes(16));
-    $_SESSION['db_backup_token'] = ['token' => $token, 'expires' => time() + 60];
+    $_SESSION['db_backup_token'] = ['token' => $token, 'expires' => time() + 60, 'mode' => $mode];
     api_success(['url' => 'backup_database.php?token=' . $token]);
 }
 
 // ── Step 2: the download ──
 $grant = $_SESSION['db_backup_token'] ?? null;
-unset($_SESSION['db_backup_token']);   // one use only
+unset($_SESSION['db_backup_token']);
 $given = is_string($_GET['token'] ?? null) ? $_GET['token'] : '';
 if (!is_array($grant) || $given === '' || !hash_equals($grant['token'], $given) || time() > $grant['expires']) {
     header('Location: settings.php?backup=expired#db-backup');
     exit;
 }
-session_write_close();   // a big database takes a while — don't hold up the Owner's other tabs meanwhile
+session_write_close();
 @set_time_limit(600);
 while (ob_get_level() > 0) ob_end_clean();
+
+// The latest weekly backup: send the saved file as it is
+if (($grant['mode'] ?? 'db') === 'full') {
+    $latest = full_backup_latest();
+    if (!$latest) { header('Location: settings.php?backup=expired#db-backup'); exit; }
+    header('Content-Type: application/gzip');
+    header('Content-Disposition: attachment; filename="' . $latest['name'] . '"');
+    header('Content-Length: ' . $latest['size']);
+    header('Cache-Control: no-store');
+    header('X-Content-Type-Options: nosniff');
+    readfile($latest['path']);
+    flush();
+
+    setSetting($conn, 'backup_last_at', date('Y-m-d H:i:s'));
+    setSetting($conn, 'backup_last_by', (string)$uid);
+    $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' downloaded the weekly full backup of ' . date('M j, Y', strtotime($latest['at'])) . ' (' . full_backup_size_label($latest['size']) . ').';
+    $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'DATABASE_BACKUP', ?)");
+    $log->bind_param('is', $uid, $desc);
+    $log->execute();
+    exit;
+}
 @ini_set('zlib.output_compression', '0');
 
-// Compressed (.sql.gz, about a tenth of the size) when the server has zlib; phpMyAdmin imports both
+// compressed (.sql.gz) when possible
 $gzip = function_exists('deflate_init');
 $ctx  = $gzip ? deflate_init(ZLIB_ENCODING_GZIP, ['level' => 6]) : null;
 $out  = $gzip ? function (string $s) use ($ctx) { echo deflate_add($ctx, $s, ZLIB_NO_FLUSH); }
@@ -72,7 +94,7 @@ try {
     $stats = db_backup_write($conn, $out);
 } catch (Throwable $e) {
     error_log('[TG-BASICS] database backup failed: ' . $e->getMessage());
-    // The download has already started, so say so inside the file — a broken backup must not pass for a good one
+    // mark the file as broken, since the download already started
     $out("\n-- BACKUP FAILED: this file is incomplete and cannot be used. Please download a new backup.\n");
     if ($gzip) echo deflate_add($ctx, '', ZLIB_FINISH);
     exit;

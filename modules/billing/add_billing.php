@@ -92,6 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $lock = $conn->prepare("SELECT claim_id FROM claims WHERE claim_id = ? FOR UPDATE");
                 $lock->bind_param('i', $claim_id);
                 $lock->execute();
+                $lock->get_result()->free();   // read the locked row, or the next query fails with "Commands out of sync"
 
                 $dup = $conn->prepare("SELECT billing_id FROM billing WHERE claim_id = ?");
                 $dup->bind_param('i', $claim_id);

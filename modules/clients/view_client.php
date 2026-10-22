@@ -3,6 +3,8 @@ require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
+require_once '../../config/transaction_pin.php';
+require_once '../../config/uploads.php';
 
 require_role(['admin', 'super_admin', 'mechanic']);
 $is_mechanic = is_mechanic();
@@ -27,6 +29,10 @@ $can_edit = client_editable($conn, $client_id);
 // for someone allowed to change it (the UI hides the button from everyone else).
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) {
     csrf_verify();
+    if (!pin_consume($conn)) {
+        header("Location: view_client.php?id=" . $client_id . "&error=" . urlencode(PIN_REQUIRED_MSG));
+        exit;
+    }
     if (!$can_edit || (int)$_POST['delete_client_id'] !== $client_id) {
         http_response_code(403);
         exit('Not allowed.');
@@ -90,6 +96,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 // ── HANDLE DOC DELETE ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_doc') {
     csrf_verify();
+    if (!pin_consume($conn)) {
+        header("Location: view_client.php?id=$client_id&error=" . urlencode(PIN_REQUIRED_MSG));
+        exit;
+    }
     if ($can_edit) {
         $doc_id = (int)($_POST['doc_id'] ?? 0);
         if ($doc_id) {
@@ -573,7 +583,7 @@ require_once '../../includes/topbar.php';
         </div>
         <?php else: ?>
         <?php foreach ($documents as $doc):
-          $pdf_url = '../../uploads/client_docs/' . $client_id . '/' . htmlspecialchars($doc['file_name']);
+          $pdf_url = htmlspecialchars(upload_url('client_docs', $doc['file_name'], $client_id));
         ?>
         <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;">
           <!-- File header row -->

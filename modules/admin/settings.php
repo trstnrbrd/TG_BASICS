@@ -6,6 +6,7 @@ require_once '../../config/validators.php';
 require_once '../../config/settings.php';
 require_once '../../config/mailer.php';
 require_once '../../config/rate_limit.php';
+require_once '../../config/transaction_pin.php';
 require_once '../../includes/db_backup.php';
 require_once '../../config/dev_access.php';
 
@@ -553,6 +554,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             }
             if (password_verify($pin, $pin_row['transaction_pin'])) {
                 rate_limit_clear($conn, 'verify_pin', $rl_key);
+                pin_grant();
                 api_success();
             } else {
                 rate_limit_record($conn, 'verify_pin', $rl_key);

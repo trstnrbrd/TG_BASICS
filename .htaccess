@@ -15,6 +15,12 @@ RewriteCond %{HTTP_HOST} !^localhost [NC]
 RewriteCond %{HTTP_HOST} !^127\.0\.0\.1
 RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
+# Uploaded client documents (licenses, OR/CR, affidavits, receipts, repair photos) are never served directly —
+# only through modules/files/file.php, which checks the signed-in user first (config/uploads.php). This rule
+# lives here, not only in uploads/.htaccess, because the deploy workflow skips uploads/ entirely.
+# Staff profile photos (uploads/avatars/) stay public.
+RewriteRule ^uploads/(claims|client_docs|receipts|repair_jobs)(/|$) - [F,L]
+
 # Compress pages, CSS and JS on the way out (a 300 KB list page is ~40 KB compressed). Skipped where the module is off.
 <IfModule mod_deflate.c>
   AddOutputFilterByType DEFLATE text/html text/css text/plain application/javascript text/javascript application/json image/svg+xml

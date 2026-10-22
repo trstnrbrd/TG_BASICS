@@ -4,6 +4,7 @@ require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/mailer.php';
 require_once '../../includes/transaction.php';
+require_once '../../config/uploads.php';
 
 require_role(['admin', 'super_admin', 'mechanic']);
 
@@ -144,7 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'sign_
     api_success([
         'signer_name' => $signer_name,
         'signed_at'   => date('M d, Y · g:i A'),
-        'url'         => '../../uploads/repair_jobs/' . $job_id . '/' . $fname,
+        'url'         => upload_url('repair_jobs', $fname, $job_id),
     ], 'Signature saved.');
 }
 
@@ -470,7 +471,7 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
         <?php if ($sig): ?>
         <div class="sig-body" style="background:#fff;height:120px;display:flex;align-items:center;justify-content:center;padding:0.5rem;">
-          <img src="../../uploads/repair_jobs/<?= $job_id ?>/<?= htmlspecialchars($sig['file_name']) ?>" alt="<?= $side_label ?> signature" style="max-height:100%;max-width:100%;object-fit:contain;"/>
+          <img src="<?= htmlspecialchars(upload_url('repair_jobs', $sig['file_name'], $job_id)) ?>" alt="<?= $side_label ?> signature" style="max-height:100%;max-width:100%;object-fit:contain;"/>
         </div>
         <div style="padding:0.6rem 0.9rem;border-top:1px solid var(--border);">
           <div style="font-size:0.8rem;font-weight:700;color:var(--text-primary);"><?= htmlspecialchars($sig['signer_name']) ?></div>
@@ -531,7 +532,7 @@ document.addEventListener('DOMContentLoaded', function() {
       <?php else: ?>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:0.75rem;">
         <?php foreach ($images as $img):
-          $img_url = '../../uploads/repair_jobs/' . $job_id . '/' . htmlspecialchars($img['file_name']);
+          $img_url = htmlspecialchars(upload_url('repair_jobs', $img['file_name'], $job_id));
         ?>
         <div style="position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--border);aspect-ratio:4/3;background:var(--bg-2);">
           <img src="<?= $img_url ?>" alt="Vehicle photo" loading="lazy"

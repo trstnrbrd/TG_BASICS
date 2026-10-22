@@ -105,7 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $sum_insured       = san_money($_POST['sum_insured'] ?? '');
     $basic_premium     = san_money($_POST['basic_premium'] ?? ''); // stores commission
     $total_premium     = san_money($_POST['total_premium'] ?? '');
-    $payable_amount    = $total_premium - $basic_premium; // total client must pay
+    $payable_amount    = round($total_premium - $basic_premium, 2); // total client must pay
     $participation_fee = san_money($_POST['participation_fee'] ?? '0');
     $policy_start      = san_str($_POST['policy_start'] ?? '', 10);
     $policy_end        = san_str($_POST['policy_end'] ?? '', 10);
@@ -167,15 +167,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Compute total paid and balance from installments
     // Payable = total_premium - commission; installments split against payable
+    // Only the first $num_months amounts are saved as installments, so only those count toward the total
     $amount_paid = 0;
-    foreach ($installment_amounts as $amt) {
+    foreach (array_slice($installment_amounts, 0, $num_months) as $amt) {
         $amount_paid += (float)$amt;
     }
-    $balance = $payable_amount - $amount_paid;
+    $amount_paid = round($amount_paid, 2);
+    $balance     = round($payable_amount - $amount_paid, 2);
 
     // Validate: total paid cannot exceed payable amount
     if (empty($errors) && $payable_amount > 0) {
-        if ($amount_paid > $payable_amount) {
+        if (payment_exceeds($amount_paid, $payable_amount)) {
             $errors[] = 'Total amount paid (₱' . number_format($amount_paid, 2) . ') cannot exceed the payable amount (₱' . number_format($payable_amount, 2) . ').';
         }
     }
@@ -201,15 +203,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             break;
         }
     }
-    if ($balance <= 0) {
-        $payment_status = 'Paid';
-    } elseif ($has_overdue) {
-        $payment_status = 'Overdue';
-    } elseif ($amount_paid > 0) {
-        $payment_status = 'Partial';
-    } else {
-        $payment_status = 'Unpaid';
-    }
+    $payment_status = policy_payment_status($payable_amount, $amount_paid, $has_overdue);
 
     if (empty($errors)) {
         $created_by = (int)$_SESSION['user_id'];

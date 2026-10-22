@@ -3,6 +3,7 @@ require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
+require_once '../../config/transaction_pin.php';
 
 require_role(['admin', 'super_admin']);
 
@@ -32,6 +33,11 @@ $vehicle = $stmt->get_result()->fetch_assoc();
 
 if (!$vehicle) {
     header("Location: client_list.php?error=Vehicle not found.");
+    exit;
+}
+
+if (!pin_consume($conn)) {
+    header("Location: view_client.php?id=" . (int)$vehicle['client_id'] . "&error=" . urlencode(PIN_REQUIRED_MSG));
     exit;
 }
 

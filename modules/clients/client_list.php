@@ -3,6 +3,7 @@ require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
+require_once '../../config/transaction_pin.php';
 require_once '../../includes/agent_filter.php';
 require_once '../../includes/pagination.php';
 
@@ -37,6 +38,10 @@ if (isset($_GET['ajax_ac']) && isset($_GET['q'])) {
 // Handle delete
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) {
     csrf_verify();
+    if (!pin_consume($conn)) {
+        header("Location: client_list.php?error=" . urlencode(PIN_REQUIRED_MSG));
+        exit;
+    }
     // Only the Owner, the admin who encoded the client, or its insurance agent may delete it
     // (mechanics never can — the UI hides the button from everyone else).
     $del_id = (int)$_POST['delete_client_id'];

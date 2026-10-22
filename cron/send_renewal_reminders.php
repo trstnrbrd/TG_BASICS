@@ -37,5 +37,6 @@ if ($secret === '' || $given === '' || !hash_equals($secret, $given)) {
 
 $result = send_renewal_reminders($conn);
 
-echo 'OK - ' . $result['emails_sent'] . ' email(s) sent for '
-   . $result['policies'] . " urgent policy/policies\n";
+echo !empty($result['skipped'])
+    ? "OK - another reminder run was already in progress, nothing sent by this one\n"
+    : 'OK - ' . $result['emails_sent'] . ' email(s) sent for ' . $result['policies'] . " urgent policy/policies\n";

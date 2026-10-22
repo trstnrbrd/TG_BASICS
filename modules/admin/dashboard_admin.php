@@ -10,10 +10,7 @@ $urg_days = (int)getSetting($conn, 'renewal_urgent_days', '7');
 $exp_days = (int)getSetting($conn, 'renewal_expiring_days', '30');
 
 require_role(['admin', 'super_admin']);
-
-require_once '../../config/mailer.php';
-require_once '../../config/renewal_reminders.php';
-send_renewal_reminders($conn);
+require_once '../../config/validators.php';   // csrf_token() for the reminder call below
 
 $full_name = $_SESSION['full_name'];
 $first_name = explode(' ', $full_name)[0];
@@ -686,6 +683,14 @@ require_once '../../includes/topbar.php';
     }
   }));
 })();
+
+// Renewal reminder emails, safety net for days the daily cron does not fire (ajax/renewal_reminders.php).
+// Sent after the page has loaded and nobody waits for the answer, so the dashboard never waits on the mail server.
+window.addEventListener('load', function () {
+  var fd = new FormData();
+  fd.append('csrf_token', <?= json_encode(csrf_token()) ?>);
+  fetch('../../ajax/renewal_reminders.php', { method: 'POST', body: fd }).catch(function () {});
+});
 </script>
 
 <?php require_once '../../includes/footer.php'; ?>

@@ -684,12 +684,11 @@ require_once '../../includes/topbar.php';
   }));
 })();
 
-// Renewal reminder emails, safety net for days the daily cron does not fire (ajax/renewal_reminders.php).
-// Sent after the page has loaded and nobody waits for the answer, so the dashboard never waits on the mail server.
+// Backup for the daily cron job (reminder emails, cleanup), run in the background after the page loads
 window.addEventListener('load', function () {
   var fd = new FormData();
   fd.append('csrf_token', <?= json_encode(csrf_token()) ?>);
-  fetch('../../ajax/renewal_reminders.php', { method: 'POST', body: fd }).catch(function () {});
+  fetch('../../ajax/daily_jobs.php', { method: 'POST', body: fd }).catch(function () {});
 });
 </script>
 

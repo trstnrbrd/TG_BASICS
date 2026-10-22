@@ -1,0 +1,71 @@
+name: Weekly Full Backup
+
+# Calls cron/weekly_backup.php once a week on both sites. It saves one .tar.gz (database + uploaded photos and
+# documents) in backups/ on the server and emails the owner, who downloads it in Settings with their password.
+# Uses a real browser (Puppeteer) for the same reason as renewal_reminders.yml: InfinityFree's anti-bot page
+# blocks plain requests. Same secrets as renewal_reminders.yml (cron_secret_key covers every cron endpoint).
+
+on:
+  schedule:
+    - cron: '0 18 * * 6'    # Saturday 18:00 UTC = Sunday 02:00 Asia/Manila (nobody is using the system)
+  workflow_dispatch:        # Actions tab -> this workflow -> "Run workflow", for testing on demand
+
+jobs:
+  backup-demo:
+    name: Backup (demo — tgbasics.app)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Puppeteer (bundles its own Chromium)
+        run: npm install puppeteer@23.11.1
+
+      - name: Visit the backup endpoint through a real browser
+        env:
+          CRON_URL: https://tgbasics.app/TG-BASICS/cron/weekly_backup.php
+          CRON_KEY: ${{ secrets.RENEWAL_CRON_KEY }}
+        run: |
+          node <<'EOF'
+          const puppeteer = require('puppeteer');
+          (async () => {
+            const url = process.env.CRON_URL + '?key=' + process.env.CRON_KEY;
+            const browser = await puppeteer.launch({ args: ['--no-sandbox'] });
+            const page = await browser.newPage();
+            const res = await page.goto(url, { waitUntil: 'networkidle2', timeout: 300000 });
+            const text = (await page.evaluate(() => document.body.innerText)).trim();
+            console.log('HTTP', res.status(), '-', text);
+            await browser.close();
+            if (!text.startsWith('OK -')) {
+              console.error('Backup did not finish — the endpoint may be down, the key may be wrong, or the backup failed.');
+              process.exit(1);
+            }
+          })();
+          EOF
+
+  backup-production:
+    name: Backup (production — tgbasics.infinityfreeapp.com)
+    runs-on: ubuntu-latest
+    if: ${{ vars.RENEWAL_PROD_READY == 'true' }}
+    steps:
+      - name: Install Puppeteer (bundles its own Chromium)
+        run: npm install puppeteer@23.11.1
+
+      - name: Visit the backup endpoint through a real browser
+        env:
+          CRON_URL: https://tgbasics.infinityfreeapp.com/TG-BASICS/cron/weekly_backup.php
+          CRON_KEY: ${{ secrets.RENEWAL_CRON_KEY_PROD }}
+        run: |
+          node <<'EOF'
+          const puppeteer = require('puppeteer');
+          (async () => {
+            const url = process.env.CRON_URL + '?key=' + process.env.CRON_KEY;
+            const browser = await puppeteer.launch({ args: ['--no-sandbox'] });
+            const page = await browser.newPage();
+            const res = await page.goto(url, { waitUntil: 'networkidle2', timeout: 300000 });
+            const text = (await page.evaluate(() => document.body.innerText)).trim();
+            console.log('HTTP', res.status(), '-', text);
+            await browser.close();
+            if (!text.startsWith('OK -')) {
+              console.error('Backup did not finish — the endpoint may be down, the key may be wrong, or the backup failed.');
+              process.exit(1);
+            }
+          })();
+          EOF

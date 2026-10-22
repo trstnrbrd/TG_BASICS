@@ -22,6 +22,9 @@ uploads/client_docs/*
 uploads/receipts/*
 !uploads/receipts/.gitkeep
 
+# ── SERVER BACKUPS (whole database + uploads, made by the weekly cron) ───────
+backups/
+
 # ── VENDOR / DEPENDENCIES ────────────────────────────────────────────────────
 vendor/
 

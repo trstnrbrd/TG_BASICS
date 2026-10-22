@@ -1,6 +1,8 @@
 name: Daily Renewal Reminder
 
-# Triggers cron/send_renewal_reminders.php on both InfinityFree sites once a day:
+# Triggers cron/send_renewal_reminders.php on both InfinityFree sites once a day. That endpoint runs the daily
+# jobs: renewal reminders, overdue payment reminders (sent once a week), and expired token cleanup.
+# (The weekly full backup has its own workflow: weekly_backup.yml.)
 #   tgbasics.app                  — demo/staging
 #   tgbasics.infinityfreeapp.com  — production
 # This has nothing to do with deploying code — it only calls an already-deployed URL on a schedule, which is

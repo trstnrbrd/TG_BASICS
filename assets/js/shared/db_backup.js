@@ -14,12 +14,11 @@
     Swal.fire({ icon: "warning", title: "Download link expired", text: "Please press Download Backup again.", confirmButtonColor: "#B8860B" });
   }
 
-  var btn = document.getElementById("db-backup-btn");
-  if (!btn) return;
-  btn.addEventListener("click", function () {
+  // mode "db" = make a records-only backup now; "full" = the latest weekly backup (records + photos & documents)
+  function askAndDownload(mode, title) {
     Swal.fire({
       icon: "question",
-      title: "Download database backup",
+      title: title,
       text: "Enter your password to continue.",
       input: "password",
       inputPlaceholder: "Your password",
@@ -37,6 +36,7 @@
         var fd = new FormData();
         fd.append("csrf_token", window._csrf || "");
         fd.append("password", password);
+        fd.append("mode", mode);
         return fetch("backup_database.php", { method: "POST", body: fd, credentials: "same-origin" })
           .then(function (r) { return r.json().catch(function () { return {}; }); })
           .then(function (d) {
@@ -55,5 +55,10 @@
         confirmButtonColor: "#B8860B"
       });
     });
-  });
+  }
+
+  var btn = document.getElementById("db-backup-btn");
+  if (btn) btn.addEventListener("click", function () { askAndDownload("db", "Download database backup"); });
+  var fullBtn = document.getElementById("db-full-backup-btn");
+  if (fullBtn) fullBtn.addEventListener("click", function () { askAndDownload("full", "Download weekly full backup"); });
 })();

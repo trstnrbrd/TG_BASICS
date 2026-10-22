@@ -5,6 +5,7 @@ require_once '../../config/validators.php';
 require_once '../../config/settings.php';
 require_once '../../config/rate_limit.php';
 require_once '../../includes/db_backup.php';
+require_once '../../includes/full_backup.php';
 require_once '../../config/dev_access.php';
 require_once '../../includes/api.php';
 
@@ -37,8 +38,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         api_error('Incorrect password.', 403);
     }
     rate_limit_clear($conn, 'db_backup', $rl_key);
+    // 'db' = make a records-only backup now; 'full' = the latest weekly backup (records + uploaded files)
+    $mode = ($_POST['mode'] ?? '') === 'full' ? 'full' : 'db';
+    if ($mode === 'full' && !full_backup_latest()) api_error('No weekly backup has been made yet.', 404);
     $token = bin2hex(random_bytes(16));
-    $_SESSION['db_backup_token'] = ['token' => $token, 'expires' => time() + 60];
+    $_SESSION['db_backup_token'] = ['token' => $token, 'expires' => time() + 60, 'mode' => $mode];
     api_success(['url' => 'backup_database.php?token=' . $token]);
 }
 
@@ -53,6 +57,27 @@ if (!is_array($grant) || $given === '' || !hash_equals($grant['token'], $given) 
 session_write_close();
 @set_time_limit(600);
 while (ob_get_level() > 0) ob_end_clean();
+
+// The latest weekly backup: send the saved file as it is
+if (($grant['mode'] ?? 'db') === 'full') {
+    $latest = full_backup_latest();
+    if (!$latest) { header('Location: settings.php?backup=expired#db-backup'); exit; }
+    header('Content-Type: application/gzip');
+    header('Content-Disposition: attachment; filename="' . $latest['name'] . '"');
+    header('Content-Length: ' . $latest['size']);
+    header('Cache-Control: no-store');
+    header('X-Content-Type-Options: nosniff');
+    readfile($latest['path']);
+    flush();
+
+    setSetting($conn, 'backup_last_at', date('Y-m-d H:i:s'));
+    setSetting($conn, 'backup_last_by', (string)$uid);
+    $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' downloaded the weekly full backup of ' . date('M j, Y', strtotime($latest['at'])) . ' (' . full_backup_size_label($latest['size']) . ').';
+    $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'DATABASE_BACKUP', ?)");
+    $log->bind_param('is', $uid, $desc);
+    $log->execute();
+    exit;
+}
 @ini_set('zlib.output_compression', '0');
 
 // compressed (.sql.gz) when possible

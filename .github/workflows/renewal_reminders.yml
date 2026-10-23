@@ -1,32 +1,13 @@
 name: Daily Renewal Reminder
 
 # Triggers cron/send_renewal_reminders.php on both InfinityFree sites once a day. That endpoint runs the daily
-# jobs: renewal reminders, overdue payment reminders (sent once a week), and expired token cleanup.
-# (The weekly full backup has its own workflow: weekly_backup.yml.)
-#   tgbasics.app                  — demo/staging
-#   tgbasics.infinityfreeapp.com  — production
-# This has nothing to do with deploying code — it only calls an already-deployed URL on a schedule, which is
-# the "cron job" InfinityFree itself stopped offering on free hosting in 2023.
-#
-# A plain HTTP request (what a real cron service like cron-job.org sends) gets InfinityFree's anti-bot
-# challenge page instead of running the PHP — that page is a JS-computed cookie puzzle, and it answers with
-# HTTP 200, so a plain fetch-and-forget cron would report "success" every day while nothing happens. A real
-# browser executes the JS and gets through it automatically, so this workflow drives a real (headless)
-# Chromium with Puppeteer instead of curl. See config/renewal_reminders.php for what the endpoint itself
-# does, and cron/send_renewal_reminders.php for the key check.
-#
-# Two separate secrets (repo Settings -> Secrets and variables -> Actions), one per site — deliberately not
-# the same value, so staging and production can be rotated independently:
-#   RENEWAL_CRON_KEY       matches cron_secret_key in tgbasics.app's system_settings
-#   RENEWAL_CRON_KEY_PROD  matches cron_secret_key in tgbasics.infinityfreeapp.com's system_settings
-# The production job does nothing (skipped, not failed) until this feature is merged to master and deployed
-# there and RENEWAL_CRON_KEY_PROD is set — see each job's "if:" below.
 
 on:
   schedule:
-    - cron: '0 0 * * *'    # 00:00 UTC = 08:00 Asia/Manila. GitHub runs scheduled workflows "best effort",
-                            # so this can land a few minutes late — fine for a once-a-day reminder.
-  workflow_dispatch:        # Actions tab -> this workflow -> "Run workflow", for testing on demand
+    - cron:
+        "0 0 * * *" # 00:00 UTC = 08:00 Asia/Manila. GitHub runs scheduled workflows "best effort",
+        # so this can land a few minutes late — fine for a once-a-day reminder.
+  workflow_dispatch: # Actions tab -> this workflow -> "Run workflow", for testing on demand
 
 jobs:
   trigger-demo:

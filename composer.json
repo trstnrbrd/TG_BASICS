@@ -1,5 +1,6 @@
 {
-    "require-dev": {
-        "phpunit/phpunit": "^11.5"
-    }
+  "description": "Development dependency for running the project's automated tests. (unit testing)",
+  "require-dev": {
+    "phpunit/phpunit": "^11.5"
+  }
 }

@@ -1,11 +1,6 @@
-/* TG-BASICS service worker — makes the app installable and gives it a branded offline screen.
- *
- * What it deliberately does NOT do: cache pages or data. Signed-in pages carry client, policy and payment records
- * and are sent with Cache-Control: no-store (config/session.php) so a shared shop computer or phone can't show them
- * again after logout. Only static files (CSS, JS, images, fonts under assets/) are cached, and only for speed.
- * Bump VERSION whenever this file changes so old caches are dropped.
- */
-const VERSION = "v1";
+// Service worker: makes TG-BASICS installable as an app and shows a branded offline page.
+// It never caches client/policy data — only static files (CSS, JS, images) are cached, for speed.
+const VERSION = "v2"; // bump this whenever sw.js changes, so old caches get cleared
 const STATIC_CACHE = "tg-static-" + VERSION;
 const OFFLINE_URL = "offline.html";
 const PRECACHE = [OFFLINE_URL];
@@ -55,14 +50,13 @@ self.addEventListener("fetch", (event) => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
 
-  // Pages: always from the network, never stored. Only when the network is gone does the offline screen show.
+  // Pages always load fresh from the network; offline.html only shows if there's no connection.
   if (req.mode === "navigate") {
     event.respondWith(fetch(req).catch(() => caches.match(OFFLINE_URL)));
     return;
   }
 
-  // Static files: answer from cache at once, refresh it in the background (stale-while-revalidate).
-  // Every include carries ?v=<filemtime>, so a changed file has a new URL and is fetched fresh anyway.
+  // Static files: show the cached copy instantly, then quietly fetch a fresh one in the background.
   if (isStaticAsset(url)) {
     event.respondWith(
       caches.open(STATIC_CACHE).then(async (cache) => {
@@ -78,5 +72,5 @@ self.addEventListener("fetch", (event) => {
       }),
     );
   }
-  // Everything else (uploads, AJAX, other sites' CDNs) goes straight to the network, untouched.
+  // Everything else (uploads, AJAX, external scripts) just goes straight to the network.
 });

@@ -27,8 +27,8 @@ jobs:
           server-dir: /htdocs/TG-BASICS/
           # Never delete files that only exist on the demo server
           dangerous-clean-slate: false
-          # Same exclusions as production. config/db.php, mailer.php and ocr.php are
-          # hand-edited on the demo host (they hold the demo database login), so they
+          # Same exclusions as production. config/db.php and ocr.php are hand-edited
+          # on the demo host (they hold the demo database login and OCR key), so they
           # must never be overwritten from git.
           exclude: |
             **/.git*
@@ -37,7 +37,6 @@ jobs:
             vendor/**
             node_modules/**
             config/db.php
-            config/mailer.php
             config/ocr.php
             uploads/**
             backups/**

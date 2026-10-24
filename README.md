@@ -125,7 +125,7 @@ TG-BASICS/
 │   ├── access.php                 # who may see / change which client and policy
 │   ├── validators.php             # input sanitizing + validation helpers
 │   ├── settings.php               # key–value system settings
-│   └── *.example.php              # templates for db.php, mailer.php, ocr.php (real ones are git-ignored)
+│   └── *.example.php              # templates for db.php and ocr.php (real ones are git-ignored)
 ├── includes/                      # header, navbar, topbar, footer, icons, agent filter
 ├── modules/
 │   ├── admin/                     # dashboard, monthly report, users, activity log, settings
@@ -161,9 +161,9 @@ TG-BASICS/
 3. **Create the config files** from their templates, then fill in your own values:
    ```bash
    cp config/db.example.php     config/db.php       # database credentials
-   cp config/mailer.example.php config/mailer.php   # Gmail address + App Password
    cp config/ocr.example.php    config/ocr.php      # OCR.space API key
    ```
+   Email needs no file: the Gmail address and App Password are entered in **Settings** and stored in the database.
 
 4. **Open** <http://localhost/TG-BASICS/> and sign in with an account from your database.
 
@@ -178,7 +178,7 @@ dev ──(tested, merged after shop hours)──▶ master ──(GitHub Action
 
 - Day-to-day work goes to the **`dev`** branch — pushing it does **not** touch the live site.
 - Pushing to **`master`** runs [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml), which uploads the code to InfinityFree over FTP.
-- `config/db.php`, `config/mailer.php`, `config/ocr.php`, `uploads/`, `tests/` and `*.sql` are never uploaded — production config is edited by hand in InfinityFree's File Manager.
+- `config/db.php`, `config/ocr.php`, `uploads/`, `tests/` and `*.sql` are never uploaded — production config is edited by hand in InfinityFree's File Manager.
 
 > [!WARNING]
 > **Database changes are manual and go first.** When a release needs new columns, run the SQL in production phpMyAdmin (after exporting a backup) **before** merging to `master` — code that expects a missing column breaks those pages until the SQL is run.

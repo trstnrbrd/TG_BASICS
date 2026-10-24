@@ -2,7 +2,6 @@
 # These files contain DB passwords, SMTP credentials, etc.
 # Copy the .example versions and fill in real values locally.
 config/db.php
-config/mailer.php
 config/ocr.php
 
 # ── ENVIRONMENT FILES ─────────────────────────────────────────────────────────

@@ -419,7 +419,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             }
             // Email (simplified — no host/port/encryption)
             foreach (['smtp_username', 'smtp_password', 'smtp_sender_name', 'smtp_sender_email'] as $k) {
-                if ($k === 'smtp_password' && is_developer()) continue;   // hidden from the developer, so never overwritten by it
+                // never sent to the browser, so a blank field means "keep the saved one"
+                if ($k === 'smtp_password' && (is_developer() || trim($_POST[$k] ?? '') === '')) continue;
                 setSetting($conn, $k, trim($_POST[$k] ?? ''));
             }
 
@@ -1212,9 +1213,9 @@ require_once '../../includes/topbar.php';
                 <input type="password" class="field-input" value="" placeholder="Hidden from the developer account" disabled/>
                 <span class="field-hint">Only the owner can see or change the email app password.</span>
                 <?php else: ?>
-                <input type="password" name="smtp_password" class="field-input"
-                  value="<?= htmlspecialchars($settings['smtp_password']) ?>"/>
-                <span class="field-hint">App-specific password from your email provider.</span>
+                <input type="password" name="smtp_password" class="field-input" value="" autocomplete="new-password"
+                  placeholder="<?= $settings['smtp_password'] !== '' ? 'Saved — type a new one to replace it' : 'Not set' ?>"/>
+                <span class="field-hint">App-specific password from your email provider. Leave blank to keep the saved one.</span>
                 <?php endif; ?>
               </div>
             </div>

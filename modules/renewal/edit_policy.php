@@ -64,6 +64,7 @@ $money  = fn($v) => 'PHP ' . number_format((float)$v, 2);
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
 
+    $notes_unchanged = is_string($_POST['notes'] ?? null) && trim($_POST['notes']) === trim((string)($policy['notes'] ?? ''));
     $in = [
         'insurance_company' => san_enum($_POST['insurance_company'] ?? '', $companies),
         'policy_number'     => san_str($_POST['policy_number'] ?? '', MAX_POLICY_NUM),
@@ -76,19 +77,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'participation_fee' => san_money($_POST['participation_fee'] ?? '0'),
         'payment_terms'     => san_enum($_POST['payment_terms'] ?? '', $term_options),
         'mortgagee'         => san_str($_POST['mortgagee'] ?? '', MAX_MORTGAGEE),
-        'notes'             => san_str($_POST['notes'] ?? '', MAX_TEXT),
+        // Older notes can be longer than MAX_NOTE (payment notes from view_policy.php are appended to them):
+        // left as they are, they save untouched instead of blocking every other change to the policy.
+        'notes'             => $notes_unchanged ? (string)$policy['notes'] : san_str($_POST['notes'] ?? '', MAX_NOTE),
     ];
 
+    // Too long / too large: an error, never a silent blank or ₱0 (see money_too_large() / text_too_long())
+    $max_money = '₱' . number_format(MAX_MONEY, 2);
+    $too_big   = [];
+    foreach (['sum_insured' => 'Sum insured', 'total_premium' => 'Total premium', 'basic_premium' => 'Commission', 'participation_fee' => 'Participation fee'] as $f => $label) {
+        if ($too_big[$f] = money_too_large($_POST[$f] ?? '')) $errors[] = "$label is too large (max $max_money).";
+    }
+    if (text_too_long($_POST['mortgagee'] ?? '', MAX_MORTGAGEE)) $errors[] = 'Mortgagee is too long (max ' . MAX_MORTGAGEE . ' characters).';
+    if (!$notes_unchanged && text_too_long($_POST['notes'] ?? '', MAX_NOTE)) $errors[] = 'Notes are too long (max ' . MAX_NOTE . ' characters).';
+
     if ($in['insurance_company'] === '')                 $errors[] = 'Please choose the insurance company.';
-    if ($in['policy_number'] === '')                     $errors[] = 'Policy number is required.';
+    if (text_too_long($_POST['policy_number'] ?? '', MAX_POLICY_NUM)) $errors[] = 'Policy number is too long (max ' . MAX_POLICY_NUM . ' characters).';
+    elseif ($in['policy_number'] === '')                 $errors[] = 'Policy number is required.';
     elseif (!validate_policy_number($in['policy_number'])) $errors[] = 'Policy number contains invalid characters.';
     if ($in['coverage_type'] === '')                     $errors[] = 'Coverage type is required or invalid.';
     if (!validate_date($in['policy_start']))             $errors[] = 'Starting date is required and must be a valid date.';
     if (!validate_date($in['policy_end']))               $errors[] = 'Inception date is required and must be a valid date.';
     if (validate_date($in['policy_start']) && validate_date($in['policy_end']) && $in['policy_end'] <= $in['policy_start'])
         $errors[] = 'Inception date must be after the starting date.';
-    if ($in['sum_insured'] <= 0)                         $errors[] = 'Sum insured must be a valid positive number.';
-    if ($in['total_premium'] <= 0)                       $errors[] = 'Total premium must be a valid positive number.';
+    if ($in['sum_insured'] <= 0 && !$too_big['sum_insured'])     $errors[] = 'Sum insured must be a valid positive number.';
+    if ($in['total_premium'] <= 0 && !$too_big['total_premium']) $errors[] = 'Total premium must be a valid positive number.';
     if ($in['total_premium'] > 0 && $in['markup'] > $in['total_premium']) $errors[] = 'Commission cannot exceed the total premium.';
     if ($in['payment_terms'] === '')                     $errors[] = 'Payment terms are invalid.';
 
@@ -294,7 +307,7 @@ require_once '../../includes/topbar.php';
             </div>
             <div class="field">
               <label class="field-label">Policy Number <span class="req">*</span></label>
-              <input type="text" name="policy_number" class="field-input" maxlength="<?= MAX_POLICY_NUM ?>" value="<?= htmlspecialchars($v('policy_number', 'policy_number')) ?>"/>
+              <input type="text" name="policy_number" class="field-input" maxlength="<?= MAX_POLICY_NUM ?>" data-allow="policyno" value="<?= htmlspecialchars($v('policy_number', 'policy_number')) ?>"/>
             </div>
             <div class="field">
               <label class="field-label">Coverage Type <span class="req">*</span></label>
@@ -386,7 +399,7 @@ require_once '../../includes/topbar.php';
           <!-- NOTES -->
           <div class="field-section">Notes</div>
           <div class="field" style="margin-bottom:0.5rem;">
-            <textarea name="notes" class="field-textarea" placeholder="Any remarks about this policy..."><?= htmlspecialchars($v('notes', 'notes')) ?></textarea>
+            <textarea name="notes" class="field-textarea" maxlength="<?= MAX_NOTE ?>" placeholder="Any remarks about this policy..."><?= htmlspecialchars($v('notes', 'notes')) ?></textarea>
           </div>
 
         </div>

@@ -107,7 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $policy_end        = san_str($_POST['policy_end'] ?? '', 10);
     $payment_terms     = san_enum($_POST['payment_terms'] ?? '1 time', ALLOWED_PAYMENT_TERMS);
     $mortgagee         = san_str($_POST['mortgagee'] ?? '', MAX_MORTGAGEE);
-    $notes             = san_str($_POST['notes'] ?? '', MAX_TEXT);
+    $notes             = san_str($_POST['notes'] ?? '', MAX_NOTE);
 
     // Payment terms → months count
     $terms_map  = ['1 time' => 1, '2 months' => 2, '3 months' => 3, '4 months' => 4, '6 months' => 6, '12 months' => 12];
@@ -121,14 +121,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $installment_modes   = array_map(fn($v) => san_enum($v, ALLOWED_PAYMENT_MODES), is_array($raw_modes) ? $raw_modes : []);
     $installment_ctrls   = array_map(fn($v) => san_str($v, 50), is_array($raw_ctrls) ? $raw_ctrls : []);
 
+    // Too long / too large: an error, never a silent blank or ₱0 (see money_too_large() / text_too_long())
+    $max_money = '₱' . number_format(MAX_MONEY, 2);
+    $too_big   = [];
+    foreach (['sum_insured' => 'Sum insured', 'total_premium' => 'Total premium', 'basic_premium' => 'Commission', 'participation_fee' => 'Participation fee'] as $f => $label) {
+        if ($too_big[$f] = money_too_large($_POST[$f] ?? '')) $errors[] = "$label is too large (max $max_money).";
+    }
+    foreach ((is_array($raw_amounts) ? $raw_amounts : []) as $k => $v) {
+        if (money_too_large($v)) $errors[] = 'Payment ' . ($k + 1) . " is too large (max $max_money).";
+    }
+    foreach ((is_array($raw_ctrls) ? $raw_ctrls : []) as $k => $v) {
+        if (text_too_long($v, MAX_PAYMENT_REF)) $errors[] = 'Payment ' . ($k + 1) . ' reference number is too long (max ' . MAX_PAYMENT_REF . ' characters).';
+    }
+    if (text_too_long($_POST['mortgagee'] ?? '', MAX_MORTGAGEE)) $errors[] = 'Mortgagee is too long (max ' . MAX_MORTGAGEE . ' characters).';
+    if (text_too_long($_POST['notes'] ?? '', MAX_NOTE))          $errors[] = 'Notes are too long (max ' . MAX_NOTE . ' characters).';
+
     // Validation
     if (!in_array($insurance_company, $allowed_companies, true)) $errors[] = 'Please select which insurance company this policy is filed under.';
-    if ($policy_number === '')   $errors[] = 'Policy number is required.';
+    if (text_too_long($_POST['policy_number'] ?? '', MAX_POLICY_NUM)) $errors[] = 'Policy number is too long (max ' . MAX_POLICY_NUM . ' characters).';
+    elseif ($policy_number === '')   $errors[] = 'Policy number is required.';
     elseif (!validate_policy_number($policy_number)) $errors[] = 'Policy number contains invalid characters.';
     if ($coverage_type === '')   $errors[] = 'Coverage type is required or invalid.';
-    if ($sum_insured <= 0)       $errors[] = 'Sum insured must be a valid positive number.';
+    if ($sum_insured <= 0 && !$too_big['sum_insured'])     $errors[] = 'Sum insured must be a valid positive number.';
     if ($basic_premium < 0)      $errors[] = 'Commission must be a valid number (0 or more).';
-    if ($total_premium <= 0)     $errors[] = 'Total premium must be a valid positive number.';
+    if ($total_premium <= 0 && !$too_big['total_premium']) $errors[] = 'Total premium must be a valid positive number.';
     if ($total_premium > 0 && $basic_premium > $total_premium)
         $errors[] = 'Commission cannot exceed the total premium.';
     if ($policy_start === '' || !validate_date($policy_start)) $errors[] = 'Starting date is required and must be a valid date.';
@@ -498,7 +514,7 @@ require_once '../../includes/topbar.php';
             </div>
             <div class="field">
               <label class="field-label">Policy Number <span class="req">*</span></label>
-              <input type="text" name="policy_number" class="field-input"
+              <input type="text" name="policy_number" class="field-input" maxlength="<?= MAX_POLICY_NUM ?>" data-allow="policyno"
                 value="<?= old('policy_number') ?>"/>
               <?php if ($renew_policy): ?><span class="field-hint">Enter the new policy number from the PhilBritish renewal notice.</span><?php endif; ?>
             </div>
@@ -605,7 +621,7 @@ require_once '../../includes/topbar.php';
                 <option value="<?= htmlspecialchars($b) ?>" <?= ($mort_select_val === $b) ? 'selected' : '' ?>><?= htmlspecialchars($b) ?></option>
                 <?php endforeach; ?>
               </select>
-              <input type="text" id="mortgagee_other_input" class="field-input"
+              <input type="text" id="mortgagee_other_input" class="field-input" maxlength="<?= MAX_MORTGAGEE ?>"
                 placeholder="Type financing company name"
                 value="<?= htmlspecialchars($mort_is_other ? $prefill_mort : '') ?>"
                 style="margin-top:0.5rem;display:<?= $mort_is_other ? 'block' : 'none' ?>;"/>
@@ -643,7 +659,7 @@ require_once '../../includes/topbar.php';
           <div class="field-section">Additional Notes</div>
           <div class="field" style="margin-bottom:0.5rem;">
             <label class="field-label">Notes (Optional)</label>
-            <textarea name="notes" class="field-textarea" placeholder="Any remarks about this policy..."><?= old('notes') ?></textarea>
+            <textarea name="notes" class="field-textarea" maxlength="<?= MAX_NOTE ?>" placeholder="Any remarks about this policy..."><?= old('notes') ?></textarea>
           </div>
           <?php if ($renew_from > 0): ?>
           <input type="hidden" name="renew_from" value="<?= $renew_from ?>"/>
@@ -668,6 +684,7 @@ require_once '../../includes/topbar.php';
 <?php
 $footer_scripts = '';
 $footer_extra_scripts = '<script src="../../assets/js/shared/money_input.js?v=' . filemtime(__DIR__ . '/../../assets/js/shared/money_input.js') . '"></script>' . "\n"
+    . '<script>var TG_MAX_PAYMENT_REF = ' . MAX_PAYMENT_REF . ';</script>' . "\n"   // the script below is a nowdoc: no PHP inside it
     . <<<'ADDPOLICY_SCRIPT'
 <script>
   (function () {
@@ -748,7 +765,7 @@ $footer_extra_scripts = '<script src="../../assets/js/shared/money_input.js?v=' 
           "<td style=\"text-align:center;font-weight:600;white-space:nowrap;\">" + label + "</td>" +
           "<td style=\"text-align:center;\">" + (dueDate || "—") + "</td>" +
           "<td style=\"text-align:center;\">" + modeSelect + "</td>" +
-          "<td style=\"text-align:center;\"><input type=\"text\" name=\"installment_ctrl[]\" class=\"field-input\" style=\"width:120px;\" placeholder=\"Ref / OR No.\"/></td>" +
+          "<td style=\"text-align:center;\"><input type=\"text\" name=\"installment_ctrl[]\" class=\"field-input\" maxlength=\"" + TG_MAX_PAYMENT_REF + "\" style=\"width:120px;\" placeholder=\"Ref / OR No.\"/></td>" +
           "<td style=\"text-align:center;\">" + (amtDue > 0 ? fmt(amtDue) : "—") + "</td>" +
           "<td style=\"text-align:center;\"><input type=\"text\" inputmode=\"decimal\" autocomplete=\"off\" " +
             "name=\"installment_amount[]\" class=\"field-input inst-amount-input money-input\" " +

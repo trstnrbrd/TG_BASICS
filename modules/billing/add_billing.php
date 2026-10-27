@@ -45,7 +45,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $labor_cost    = (float)str_replace(',', '', $_POST['labor_cost']  ?? '0');
     $other_cost    = (float)str_replace(',', '', $_POST['other_cost']  ?? '0');
     $deductible    = (float)str_replace(',', '', $_POST['deductible']  ?? '0');
-    $notes         = san_str($_POST['notes'] ?? '', 1000);
+    $notes         = san_str($_POST['notes'] ?? '', MAX_NOTE);
+    if (text_too_long($_POST['notes'] ?? '', MAX_NOTE)) $errors[] = 'Notes are too long (max ' . MAX_NOTE . ' characters).';
 
     if ($claim_id === 0) $errors[] = 'A linked claim is required.';
     if ($billed_to === '') $errors[] = 'Billed To (insurance company) is required.';
@@ -324,7 +325,7 @@ require_once '../../includes/topbar.php';
               </div>
             </div>
             <div style="padding:1.25rem;">
-              <textarea name="notes" class="field-input" rows="5"
+              <textarea name="notes" class="field-input" rows="5" maxlength="<?= MAX_NOTE ?>"
                 style="width:100%;resize:vertical;"
                 placeholder="Any additional notes about this billing..."><?= old('notes') ?></textarea>
             </div>

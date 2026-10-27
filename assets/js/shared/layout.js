@@ -173,3 +173,35 @@ window.requirePin = async function() {
     if (!e.defaultPrevented) document.documentElement.classList.add('tg-loading');
   });
 })();
+
+// <input data-digits="11">: digits only, at most that many. Not maxlength, so a pasted "0917-123-4567" keeps
+// all its digits before the dashes are dropped. The server checks the number again on save.
+// <input data-tel>: a phone number that may be a landline, so digits plus + ( ) spaces and dashes.
+// <input data-allow="name|code">: drop characters the server would refuse anyway (config/validators.php):
+//   name -> validate_name(): letters (ñ, é ...), spaces, ' - .      code -> plate / engine / chassis: letters, digits, spaces, -
+//   policyno -> validate_policy_number(): letters, digits, -
+var TG_ALLOW = { name: /[^\p{L}\s'.\-]+/gu, code: /[^A-Za-z0-9\s-]+/g, policyno: /[^A-Za-z0-9-]+/g };
+document.addEventListener('input', function (e) {
+  var el = e.target, clean;
+  if (!el.matches) return;
+  if (el.matches('input[data-digits]')) {
+    var max = parseInt(el.getAttribute('data-digits'), 10) || 0;
+    clean = el.value.replace(/\D+/g, '');
+    if (max) clean = clean.slice(0, max);
+  } else if (el.matches('input[data-tel]')) {
+    clean = el.value.replace(/[^0-9+()\s-]+/g, '');
+    // at most data-tel digits: cut the text where the next digit would go over
+    var maxd = parseInt(el.getAttribute('data-tel'), 10) || 0, seen = 0, cut = clean.length;
+    if (maxd) {
+      for (var i = 0; i < clean.length; i++) {
+        if (/\d/.test(clean[i]) && ++seen > maxd) { cut = i; break; }
+      }
+      clean = clean.slice(0, cut).replace(/[\s-]+$/, '');
+    }
+  } else if (el.matches('input[data-allow]') && TG_ALLOW[el.getAttribute('data-allow')]) {
+    clean = el.value.replace(TG_ALLOW[el.getAttribute('data-allow')], '');
+  } else {
+    return;
+  }
+  if (clean !== el.value) el.value = clean;
+});

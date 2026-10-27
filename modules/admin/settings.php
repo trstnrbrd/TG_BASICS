@@ -413,10 +413,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
 
         // ── SYSTEM SETTINGS (Owner only — all in one save) ──
         case 'system_settings':
-            // Company
+            // Company — all checked before anything is saved, so a bad field never leaves half the form saved
+            $company = [];
             foreach (['company_name', 'company_address', 'company_contact', 'company_email'] as $k) {
-                setSetting($conn, $k, trim($_POST[$k] ?? ''));
+                $company[$k] = is_string($_POST[$k] ?? null) ? trim($_POST[$k]) : '';
             }
+            if (mb_strlen($company['company_name']) > MAX_NAME)       api_error('Company name is too long (max ' . MAX_NAME . ' characters).');
+            if (mb_strlen($company['company_address']) > MAX_ADDRESS) api_error('Company address is too long (max ' . MAX_ADDRESS . ' characters).');
+            // mobile or landline, e.g. 09XXXXXXXXX, (044) 123-4567, +63 917 123 4567
+            $cc_digits = strlen(preg_replace('/\D/', '', $company['company_contact']));
+            if ($company['company_contact'] !== '' && (!preg_match('/^[0-9+()\s-]{1,' . MAX_COMPANY_CONTACT . '}$/', $company['company_contact']) || $cc_digits < 7 || $cc_digits > PHONE_DIGITS)) {
+                api_error('Company contact number must have 7 to ' . PHONE_DIGITS . ' digits, e.g. 09XXXXXXXXX or (044) 123-4567.');
+            }
+            if ($company['company_email'] !== '' && !validate_email($company['company_email'])) api_error('Please enter a valid company email address.');
+            foreach ($company as $k => $v) setSetting($conn, $k, $v);
             // Email (simplified — no host/port/encryption)
             foreach (['smtp_username', 'smtp_password', 'smtp_sender_name', 'smtp_sender_email'] as $k) {
                 // never sent to the browser, so a blank field means "keep the saved one"
@@ -1164,23 +1174,23 @@ require_once '../../includes/topbar.php';
             <div class="form-grid">
               <div class="field span-2">
                 <label class="field-label">Business Name</label>
-                <input type="text" name="company_name" class="field-input"
+                <input type="text" name="company_name" class="field-input" maxlength="<?= MAX_NAME ?>"
                   value="<?= htmlspecialchars($settings['company_name']) ?>"/>
               </div>
               <div class="field span-2">
                 <label class="field-label">Address</label>
-                <input type="text" name="company_address" class="field-input"
+                <input type="text" name="company_address" class="field-input" maxlength="<?= MAX_ADDRESS ?>"
                   value="<?= htmlspecialchars($settings['company_address']) ?>"/>
               </div>
               <div class="field">
                 <label class="field-label">Contact Number</label>
-                <input type="text" name="company_contact" class="field-input"
+                <input type="tel" name="company_contact" class="field-input" maxlength="<?= MAX_COMPANY_CONTACT ?>" autocomplete="tel" data-tel="<?= PHONE_DIGITS ?>"
                   value="<?= htmlspecialchars($settings['company_contact']) ?>"
                   placeholder="09XXXXXXXXX or 044-XXX-XXXX"/>
               </div>
               <div class="field">
                 <label class="field-label">Email Address</label>
-                <input type="email" name="company_email" class="field-input"
+                <input type="email" name="company_email" class="field-input" maxlength="<?= MAX_EMAIL ?>"
                   value="<?= htmlspecialchars($settings['company_email']) ?>"
                   placeholder="name@email.com"/>
               </div>

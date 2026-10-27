@@ -48,7 +48,8 @@ $success = false;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
     $full_name      = strtoupper(san_str($_POST['full_name'] ?? '', MAX_NAME));
-    $contact_number = san_str($_POST['contact_number'] ?? '', MAX_PHONE);
+    // read whole, not through san_str(): an over-long value there turns into '' and would save as "no contact number"
+    $contact_number = normalize_phone(is_string($_POST['contact_number'] ?? null) ? $_POST['contact_number'] : '');
     $email          = san_str($_POST['email'] ?? '', MAX_EMAIL);
     $fb_raw         = is_string($_POST['facebook_name'] ?? null) ? trim($_POST['facebook_name']) : '';
     $facebook_name  = san_str($fb_raw, MAX_FACEBOOK);   // optional
@@ -162,20 +163,20 @@ require_once '../../includes/topbar.php';
           <div class="form-grid">
             <div class="field">
               <label class="field-label">Full Name <span class="req">*</span></label>
-              <input type="text" name="full_name" class="field-input"
+              <input type="text" name="full_name" maxlength="<?= MAX_NAME ?>" data-allow="name" class="field-input"
                 placeholder="FIRST MIDDLE LAST"
                 value="<?= htmlspecialchars($client['full_name']) ?>"
                 style="text-transform:uppercase;"/>
             </div>
             <div class="field">
               <label class="field-label">Contact Number</label>
-              <input type="text" name="contact_number" class="field-input"
-                placeholder="09XXXXXXXXX"
+              <input type="tel" name="contact_number" class="field-input" inputmode="numeric" autocomplete="tel"
+                data-digits="<?= PHONE_DIGITS ?>" placeholder="09XXXXXXXXX"
                 value="<?= htmlspecialchars($client['contact_number'] ?? '') ?>"/>
             </div>
             <div class="field">
               <label class="field-label">Email Address</label>
-              <input type="email" name="email" class="field-input"
+              <input type="email" name="email" maxlength="<?= MAX_EMAIL ?>" class="field-input"
                 placeholder="name@email.com"
                 value="<?= htmlspecialchars($client['email'] ?? '') ?>"/>
             </div>
@@ -188,7 +189,7 @@ require_once '../../includes/topbar.php';
             </div>
             <div class="field span-2">
               <label class="field-label">Address <span class="req">*</span></label>
-              <input type="text" name="address" class="field-input"
+              <input type="text" name="address" maxlength="<?= MAX_ADDRESS ?>" class="field-input"
                 placeholder="Street, Barangay, Municipality, Province"
                 value="<?= htmlspecialchars($client['address']) ?>"/>
             </div>

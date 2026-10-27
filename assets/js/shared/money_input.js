@@ -3,7 +3,10 @@
 // added later too (event delegation). Anything reading the value must drop the commas first; the server does
 // the same with san_money() in config/validators.php.
 (function () {
-  // Keep digits and one ".", at most 2 decimals, no leading zeros; then group the whole part by 3
+  // Whole-peso digits allowed: 8 = up to 99,999,999.99, MAX_MONEY in config/validators.php (DECIMAL(10,2) columns)
+  var MAX_WHOLE = 8;
+
+  // Keep digits and one ".", at most 2 decimals, no leading zeros, at most MAX_WHOLE whole digits; group by 3
   function format(raw) {
     var s = String(raw).replace(/[^\d.]/g, "");
     var dot = s.indexOf(".");
@@ -15,7 +18,7 @@
             .slice(dot + 1)
             .replace(/\./g, "")
             .slice(0, 2);
-    whole = whole.replace(/^0+(?=\d)/, "");
+    whole = whole.replace(/^0+(?=\d)/, "").slice(0, MAX_WHOLE);
     if (whole === "" && cents !== null) whole = "0";
     whole = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     return cents === null ? whole : whole + "." + cents;

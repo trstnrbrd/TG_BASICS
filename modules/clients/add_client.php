@@ -29,7 +29,8 @@ $success     = false;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
     $full_name      = strtoupper(san_str($_POST['full_name'] ?? '', MAX_NAME));
-    $contact_number = san_str($_POST['contact_number'] ?? '', MAX_PHONE);
+    // read whole, not through san_str(): an over-long value there turns into '' and would save as "no contact number"
+    $contact_number = normalize_phone(is_string($_POST['contact_number'] ?? null) ? $_POST['contact_number'] : '');
     $email          = san_str($_POST['email'] ?? '', MAX_EMAIL);
     $fb_raw         = is_string($_POST['facebook_name'] ?? null) ? trim($_POST['facebook_name']) : '';
     $facebook_name  = san_str($fb_raw, MAX_FACEBOOK);   // optional (owner's request, 2026-09-24)
@@ -39,8 +40,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $model          = san_str($_POST['model'] ?? '', MAX_MAKE_MODEL);
     $year_model     = san_int($_POST['year_model'] ?? 0, 1960, (int)date('Y') + 1);
     $color          = san_str($_POST['color'] ?? '', MAX_COLOR);
-    $motor_number   = san_str($_POST['motor_number'] ?? '', MAX_MOTOR_SN);
-    $serial_number  = san_str($_POST['serial_number'] ?? '', MAX_MOTOR_SN);
+    $motor_number   = strtoupper(san_str($_POST['motor_number'] ?? '', MAX_MOTOR_SN));   // same as Add / Edit Vehicle
+    $serial_number  = strtoupper(san_str($_POST['serial_number'] ?? '', MAX_MOTOR_SN));
     $consent_signed = isset($_POST['consent_signed']) && $_POST['consent_signed'] === '1';
     $agent_id       = san_int($_POST['agent_id'] ?? 0, 1);
     // "Save & Check Eligibility" button: after saving, go straight to the eligibility check for the new vehicle
@@ -63,6 +64,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($address === '')                            $addError('address', 'Address is required.');
     if ($plate_number === '')                       $addError('plate_number', 'Plate number is required.');
     elseif (!validate_plate($plate_number))         $addError('plate_number', 'Plate number contains invalid characters.');
+    if (!validate_vehicle_code($motor_number))      $addError('motor_number', 'Engine number may only contain letters, numbers, spaces and dashes.');
+    if (!validate_vehicle_code($serial_number))     $addError('serial_number', 'Chassis number may only contain letters, numbers, spaces and dashes.');
     if ($make === '')                               $addError('make', 'Vehicle make is required.');
     if ($model === '')                              $addError('model', 'Vehicle model is required.');
     if ($year_model === 0)                          $addError('year_model', 'Year model must be a valid year (1960–' . ((int)date('Y') + 1) . ').');
@@ -284,7 +287,7 @@ require_once '../../includes/topbar.php';
           <div class="form-grid" style="margin-bottom:1rem;">
             <div class="field">
               <label class="field-label">Full Name <span class="req">*</span></label>
-              <input type="text" name="full_name" class="field-input"
+              <input type="text" name="full_name" maxlength="<?= MAX_NAME ?>" data-allow="name" class="field-input"
                 placeholder="FIRST MIDDLE LAST"
                 value="<?= old('full_name') ?>"
                 style="text-transform:uppercase;"
@@ -294,13 +297,13 @@ require_once '../../includes/topbar.php';
             </div>
             <div class="field">
               <label class="field-label">Contact Number</label>
-              <input type="text" name="contact_number" class="field-input"
-                placeholder="09*********"
+              <input type="tel" name="contact_number" class="field-input" inputmode="numeric" autocomplete="tel"
+                data-digits="<?= PHONE_DIGITS ?>" placeholder="09XXXXXXXXX"
                 value="<?= old('contact_number') ?>"/>
             </div>
             <div class="field">
               <label class="field-label">Email Address</label>
-              <input type="email" name="email" class="field-input"
+              <input type="email" name="email" maxlength="<?= MAX_EMAIL ?>" class="field-input"
                 placeholder="username@email.com"
                 value="<?= old('email') ?>"/>
             </div>
@@ -313,7 +316,7 @@ require_once '../../includes/topbar.php';
             </div>
             <div class="field span-2">
               <label class="field-label">Address <span class="req">*</span></label>
-              <input type="text" name="address" class="field-input"
+              <input type="text" name="address" maxlength="<?= MAX_ADDRESS ?>" class="field-input"
                 placeholder="San Roque, Pandi, Bulacan"
                 value="<?= old('address') ?>"/>
             </div>
@@ -325,20 +328,20 @@ require_once '../../includes/topbar.php';
             <!-- Row 1: Plate | Make | Model -->
             <div class="field">
               <label class="field-label">Plate Number <span class="req">*</span></label>
-              <input type="text" name="plate_number" class="field-input"
+              <input type="text" name="plate_number" maxlength="<?= MAX_PLATE ?>" data-allow="code" class="field-input"
                 placeholder="ABC 1234"
                 value="<?= old('plate_number') ?>"
                 style="text-transform:uppercase;"/>
             </div>
             <div class="field">
               <label class="field-label">Make <span class="req">*</span></label>
-              <input type="text" name="make" class="field-input"
+              <input type="text" name="make" maxlength="<?= MAX_MAKE_MODEL ?>" class="field-input"
                 placeholder="Toyota / Honda / Mitsubishi"
                 value="<?= old('make') ?>"/>
             </div>
             <div class="field">
               <label class="field-label">Model <span class="req">*</span></label>
-              <input type="text" name="model" class="field-input"
+              <input type="text" name="model" maxlength="<?= MAX_MAKE_MODEL ?>" class="field-input"
                 placeholder="Innova / Civic / L300"
                 value="<?= old('model') ?>"/>
             </div>
@@ -346,14 +349,13 @@ require_once '../../includes/topbar.php';
             <!-- Row 2: Year | Color (spans 2 cols) -->
             <div class="field">
               <label class="field-label">Year Model <span class="req">*</span></label>
-              <input type="number" name="year_model" class="field-input"
-                min="1990" max="<?= date('Y') + 1 ?>"
+              <input type="text" name="year_model" class="field-input" inputmode="numeric" data-digits="4"
                 placeholder="YYYY"
                 value="<?= old('year_model') ?>"/>
             </div>
             <div class="field span-2">
               <label class="field-label">Color</label>
-              <input type="text" name="color" class="field-input"
+              <input type="text" name="color" maxlength="<?= MAX_COLOR ?>" class="field-input"
                 placeholder="Pearl White / Black / Silver"
                 value="<?= old('color') ?>"/>
             </div>
@@ -361,7 +363,7 @@ require_once '../../includes/topbar.php';
             <!-- Row 3: Engine Number (full width) -->
             <div class="field span-3">
               <label class="field-label">Engine Number</label>
-              <input type="text" name="motor_number" class="field-input"
+              <input type="text" name="motor_number" maxlength="<?= MAX_MOTOR_SN ?>" data-allow="code" class="field-input"
                 placeholder="Alphanumeric, from OR-CR"
                 value="<?= old('motor_number') ?>"
                 style="text-transform:uppercase;"/>
@@ -371,7 +373,7 @@ require_once '../../includes/topbar.php';
             <!-- Row 4: Chassis Number (full width) -->
             <div class="field span-3">
               <label class="field-label">Chassis Number</label>
-              <input type="text" name="serial_number" class="field-input"
+              <input type="text" name="serial_number" maxlength="<?= MAX_MOTOR_SN ?>" data-allow="code" class="field-input"
                 placeholder="17-character VIN"
                 value="<?= old('serial_number') ?>"
                 style="text-transform:uppercase;"/>

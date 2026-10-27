@@ -9,7 +9,11 @@ const MAX_EMAIL       = 255;
 const MAX_USERNAME    = 50;
 const MAX_PASSWORD    = 128;
 const MAX_ADDRESS     = 300;
-const MAX_PHONE       = 15;
+const PHONE_DIGITS    = 11;     // 09XXXXXXXXX
+const MAX_COMPANY_CONTACT = 20; // Settings: mobile or landline, e.g. "(044) 123-4567"
+const MAX_MONEY       = 99_999_999.99;   // policy amounts are DECIMAL(10,2) in the database (money_input.js: 8 digits)
+const MAX_PAYMENT_REF = 50;               // installment control / OR number
+const MAX_NOTE        = 125;              // every notes / description / remarks box (panel: short notes only)
 const MAX_PLATE       = 20;
 const MAX_MAKE_MODEL  = 60;
 const MAX_COLOR       = 50;
@@ -101,9 +105,20 @@ function san_float(mixed $value, float $min = 0.0, float $max = 999_999_999.99):
 }
 
 /** Same as san_float(), but also accepts "500,000.50" or "₱ 500,000" from the money input field. */
-function san_money(mixed $value, float $min = 0.0, float $max = 999_999_999.99): float {
+function san_money(mixed $value, float $min = 0.0, float $max = MAX_MONEY): float {
     if (is_string($value)) $value = str_replace([',', ' ', '₱'], '', $value);
     return san_float($value, $min, $max);
+}
+
+/** An amount typed above MAX_MONEY. san_money() turns it into 0, which would read as "left blank" — say so instead. */
+function money_too_large(mixed $raw): bool {
+    if (is_string($raw)) $raw = str_replace([',', ' ', '₱'], '', $raw);
+    return is_numeric($raw) && (float)$raw > MAX_MONEY;
+}
+
+/** Text typed longer than $max. san_str() turns it into '', which would save as "left blank" — say so instead. */
+function text_too_long(mixed $raw, int $max): bool {
+    return is_string($raw) && mb_strlen(trim($raw)) > $max;
 }
 
 /** Returns the value only if it is in the allowed list, otherwise ''. */
@@ -125,10 +140,14 @@ function validate_email(string $v): bool {
     return mb_strlen($v) <= MAX_EMAIL && filter_var($v, FILTER_VALIDATE_EMAIL) !== false;
 }
 
-/** Philippine mobile number: 09XXXXXXXXX. */
+/** Philippine mobile number: exactly 09 + 9 digits. Spaces and dashes are allowed; letters or anything else are not. */
 function validate_phone(string $v): bool {
-    $digits = preg_replace('/\D/', '', $v);
-    return preg_match('/^09\d{9}$/', $digits) === 1;
+    return preg_match('/^09\d{9}$/', normalize_phone($v)) === 1;
+}
+
+/** The digits-only form a phone number is saved in: "0917-123 4567" -> "09171234567". */
+function normalize_phone(string $v): string {
+    return preg_replace('/[\s-]+/', '', trim($v));
 }
 
 /** Username: 3–50 letters, numbers, or underscores. */
@@ -158,6 +177,11 @@ function validate_date_not_future(string $v): bool {
 }
 
 /** Vehicle plate number: letters, numbers, spaces, hyphens. */
+/** Engine (motor) or chassis (VIN) number from the OR-CR: letters, digits, spaces and dashes. Optional, so '' passes. */
+function validate_vehicle_code(string $v): bool {
+    return $v === '' || (mb_strlen($v) <= MAX_MOTOR_SN && preg_match('/^[A-Z0-9\-\s]+$/', strtoupper($v)) === 1);
+}
+
 function validate_plate(string $v): bool {
     return $v !== '' && mb_strlen($v) <= MAX_PLATE && preg_match('/^[A-Z0-9\-\s]+$/', strtoupper($v));
 }

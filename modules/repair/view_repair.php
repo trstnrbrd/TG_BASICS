@@ -219,7 +219,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     if ($_POST['action'] === 'update_notes') {
-        $notes = san_str($_POST['additional_damages'] ?? '', 1000);
+        if (text_too_long($_POST['additional_damages'] ?? '', MAX_NOTE)) {
+            header("Location: view_repair.php?id=$job_id&error=" . urlencode('Notes are too long (max ' . MAX_NOTE . ' characters).'));
+            exit;
+        }
+        $notes = san_str($_POST['additional_damages'] ?? '', MAX_NOTE);
         $upd   = $conn->prepare("UPDATE repair_jobs SET additional_damages = ? WHERE job_id = ?");
         $upd->bind_param('si', $notes, $job_id);
         $upd->execute();
@@ -597,7 +601,7 @@ document.addEventListener('DOMContentLoaded', function() {
       <form method="POST" style="display:flex;flex-direction:column;gap:0.75rem;">
         <?= csrf_field() ?>
         <input type="hidden" name="action" value="update_notes"/>
-        <textarea name="additional_damages" rows="4"
+        <textarea name="additional_damages" rows="4" maxlength="<?= MAX_NOTE ?>"
           style="width:100%;padding:0.65rem 0.85rem;border:1px solid var(--border);border-radius:10px;background:var(--bg-2);color:var(--text-primary);font-size:0.82rem;resize:vertical;font-family:inherit;"
           placeholder="Additional damages upon inspection..."><?= htmlspecialchars($job['additional_damages'] ?? '') ?></textarea>
         <div style="display:flex;justify-content:flex-end;">

@@ -270,7 +270,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <!-- The animated button is drawn by React (loaded from a CDN). This plain button sits here first and is
              replaced when React loads — so sign-in still works if the CDN is slow, blocked, or offline. -->
-        <div id="submit-root"><button type="submit" class="btn-submit" id="fallback-submit-btn">Sign In to TG-BASICS</button></div>
+        <div id="submit-root"><button type="submit" class="btn-submit" id="fallback-submit-btn">Sign In</button></div>
       </form>
 
       <div class="auth-form-note">

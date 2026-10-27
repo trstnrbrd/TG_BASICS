@@ -153,7 +153,7 @@ $invalid = !$record || $record['used'] || strtotime($record['expires_at']) < tim
           <strong style="color:var(--text-primary);">You may now sign in.</strong>
         </p>
         <a href="login.php" class="btn-submit">
-          <?= icon('lock-closed', 14) ?> Sign In to TG-BASICS
+          <?= icon('lock-closed', 14) ?> Sign In
         </a>
 
       <?php elseif ($invalid): ?>

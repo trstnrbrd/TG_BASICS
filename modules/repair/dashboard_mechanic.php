@@ -73,9 +73,9 @@ require_once '../../includes/topbar.php';
     <!-- STAT CARDS -->
     <?php
     $mech_stats = [
-        ['icon' => 'wrench',       'theme' => 'gold',  'label' => 'Active Repair Jobs', 'value' => $active_jobs,     'trend' => 'In progress'],
-        ['icon' => 'check-circle', 'theme' => 'green', 'label' => 'Completed Today',     'value' => $completed_today, 'trend' => 'Today'],
-        ['icon' => 'clock',        'theme' => 'amber', 'label' => 'Pending Jobs',        'value' => $pending_jobs,    'trend' => 'Awaiting start'],
+        ['icon' => 'wrench',       'theme' => 'gold',  'label' => 'Active Repair Jobs', 'value' => $active_jobs,     'trend' => 'In progress',    'href' => 'repair_list.php?status=in_progress'],
+        ['icon' => 'check-circle', 'theme' => 'green', 'label' => 'Completed Today',     'value' => $completed_today, 'trend' => 'Today',          'href' => 'repair_list.php?status=completed'],
+        ['icon' => 'clock',        'theme' => 'amber', 'label' => 'Pending Jobs',        'value' => $pending_jobs,    'trend' => 'Awaiting start', 'href' => 'repair_list.php?status=pending'],
     ];
     $theme_map = [
         'gold'  => ['accent' => 'linear-gradient(90deg,#D4A017,#E8D5A3)', 'icon_bg' => 'var(--gold-light)',  'icon_color' => 'var(--gold)'],
@@ -86,7 +86,7 @@ require_once '../../includes/topbar.php';
     <div class="dash-stats">
       <?php foreach ($mech_stats as $s):
           $t = $theme_map[$s['theme']]; ?>
-      <div class="dash-stat">
+      <a class="dash-stat" href="<?= htmlspecialchars($s['href']) ?>" aria-label="<?= htmlspecialchars($s['label'] . ': ' . $s['value']) ?>">
         <div class="dash-stat-accent" style="background:<?= $t['accent'] ?>;"></div>
         <div class="dash-stat-top">
           <div class="dash-stat-icon" style="background:<?= $t['icon_bg'] ?>;color:<?= $t['icon_color'] ?>;">
@@ -98,7 +98,7 @@ require_once '../../includes/topbar.php';
         </div>
         <div class="dash-stat-value"><?= $s['value'] ?></div>
         <div class="dash-stat-label"><?= $s['label'] ?></div>
-      </div>
+      </a>
       <?php endforeach; ?>
     </div>
 

@@ -303,3 +303,44 @@
     display: none;
   }
 }
+
+/* Status modal radios (view_repair.php): hand-drawn, because native accent-color recolors the centre dot
+   on light colours (the gold "For Pickup" became a solid disc). --rc is the status colour, set inline. */
+.status-radio {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  background: var(--bg-3);
+  position: relative;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.status-radio:checked {
+  border-color: var(--rc);
+}
+.status-radio:checked::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--rc);
+  transform: translate(-50%, -50%);
+}
+.status-radio:focus-visible {
+  outline: 2px solid var(--rc);
+  outline-offset: 2px;
+}
+.status-radio:disabled {
+  cursor: not-allowed;
+}
+.status-radio:not(:disabled):not(:checked) {
+  border-color: var(--text-muted);
+}

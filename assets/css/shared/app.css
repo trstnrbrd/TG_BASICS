@@ -189,7 +189,9 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; }
+/* scrollbar-gutter: keep the scrollbar's space reserved, so a page that grows past the screen (e.g. a
+   client row expanding on hover) doesn't shift sideways when the scrollbar appears */
+html { scroll-behavior: smooth; scrollbar-gutter: stable; }
 
 /* Prevent mobile browsers from auto-linking phone numbers, dates, etc. */
 a[href^="tel"], a[href^="sms"], a[x-apple-data-detectors] {

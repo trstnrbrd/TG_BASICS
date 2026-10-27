@@ -28,6 +28,25 @@ function claim_is_billable(string $status): bool
     return in_array($status, CLAIM_BILLABLE_STATUSES, true);
 }
 
+// Repair job statuses in the order a job moves through them. 'cancelled' is a dead end, reachable from any open status.
+const REPAIR_STATUS_FLOW = ['pending', 'in_progress', 'for_pickup', 'completed'];
+
+/**
+ * May a repair job move from $from to $to?
+ * $forward_only (mechanics): only to a later status or to cancelled, and never out of completed / cancelled.
+ * Otherwise (owner, admins): any other status, so a wrong update can be corrected.
+ */
+function repair_status_change_allowed(string $from, string $to, bool $forward_only): bool
+{
+    if ($from === $to) return false;
+    if (!$forward_only) return true;
+    if ($from === 'completed' || $from === 'cancelled') return false;
+    if ($to === 'cancelled') return true;
+    $i = array_search($from, REPAIR_STATUS_FLOW, true);
+    $j = array_search($to, REPAIR_STATUS_FLOW, true);
+    return $i !== false && $j !== false && $j > $i;
+}
+
 /** Is the policy already expired? */
 function policy_is_expired(string $policy_end): bool
 {

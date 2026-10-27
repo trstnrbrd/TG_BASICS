@@ -124,7 +124,6 @@ function observeCounter(el, target, suffix, duration) {
     (revealGroup(".js-reveal", 24, 0),
       revealGroup(".feat-row", 28, 0),
       revealGroup(".sec-card", 24, 100),
-      revealGroup(".tech-card", 24, 90),
       revealGroup(".service-pillar", 24, 150),
       revealGroup(".testimonial-card", 24, 90),
       revealGroup(".footer-inner > div", 20, 80),

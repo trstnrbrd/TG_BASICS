@@ -381,7 +381,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
     } else {
         // Legacy single-amount update (policies without installment rows)
         $payment_amount = san_float($_POST['payment_amount'] ?? '', 0.0);
-        $payment_notes  = san_str($_POST['payment_notes'] ?? '', MAX_TEXT);
+        $payment_notes  = san_str($_POST['payment_notes'] ?? '', MAX_NOTE);
+        if (text_too_long($_POST['payment_notes'] ?? '', MAX_NOTE))
+            $pay_errors[] = 'Payment notes are too long (max ' . MAX_NOTE . ' characters).';
 
         if ($payment_amount <= 0)
             $pay_errors[] = 'Payment amount must be greater than zero.';
@@ -901,7 +903,7 @@ require_once '../../includes/topbar.php';
               </div>
               <div class="field">
                 <label class="field-label">Payment Notes</label>
-                <input type="text" name="payment_notes" class="field-input"
+                <input type="text" name="payment_notes" class="field-input" maxlength="<?= MAX_NOTE ?>"
                   placeholder="Cash / GCash / Bank transfer"
                   value="<?= old('payment_notes') ?>"/>
                 <span class="field-hint">Optional remarks for this payment.</span>

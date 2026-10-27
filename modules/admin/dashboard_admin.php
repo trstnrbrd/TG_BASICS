@@ -193,10 +193,14 @@ require_once '../../includes/topbar.php';
     <div class="dash-stats">
       <?php
       $stats = [
-          ['icon' => 'user',         'theme' => 'gold',  'label' => 'Total Clients',  'value' => $total_clients,  'trend' => ($recent_clients > 0 ? '+' . $recent_clients . ' this month' : 'No new'),  'up' => $recent_clients > 0],
-          ['icon' => 'shield-check', 'theme' => 'green', 'label' => 'Active Policies', 'value' => $active_policies, 'trend' => $total_policies . ' total', 'up' => false],
-          ['icon' => 'clock',        'theme' => ($urgent_policies > 0 ? 'red' : 'amber'), 'label' => 'Expiring Soon', 'value' => $expiring_soon, 'trend' => ($urgent_policies > 0 ? $urgent_policies . ' urgent' : 'Within ' . $exp_days . ' days'), 'up' => false],
-          ['icon' => 'vehicle',      'theme' => 'blue',  'label' => 'Total Vehicles', 'value' => $total_vehicles, 'trend' => ($recent_vehicles > 0 ? '+' . $recent_vehicles . ' this month' : 'Registered'), 'up' => $recent_vehicles > 0],
+          ['icon' => 'user',         'theme' => 'gold',  'label' => 'Total Clients',  'value' => $total_clients,  'trend' => ($recent_clients > 0 ? '+' . $recent_clients . ' this month' : 'No new'),  'up' => $recent_clients > 0,
+           'href' => '../clients/client_list.php?agent=all'],
+          ['icon' => 'shield-check', 'theme' => 'green', 'label' => 'Active Policies', 'value' => $active_policies, 'trend' => $total_policies . ' total', 'up' => false,
+           'href' => '../renewal/renewal_list.php?agent=all'],
+          ['icon' => 'clock',        'theme' => ($urgent_policies > 0 ? 'red' : 'amber'), 'label' => 'Expiring Soon', 'value' => $expiring_soon, 'trend' => ($urgent_policies > 0 ? $urgent_policies . ' urgent' : 'Within ' . $exp_days . ' days'), 'up' => false,
+           'href' => '../renewal/renewal_list.php?agent=all&filter=' . ($urgent_policies > 0 ? 'urgent' : 'expiring')],
+          ['icon' => 'vehicle',      'theme' => 'blue',  'label' => 'Total Vehicles', 'value' => $total_vehicles, 'trend' => ($recent_vehicles > 0 ? '+' . $recent_vehicles . ' this month' : 'Registered'), 'up' => $recent_vehicles > 0,
+           'href' => '../clients/client_list.php?agent=all'],
       ];
       $theme_map = [
           'gold'  => ['accent' => 'linear-gradient(90deg,#D4A017,#E8D5A3)', 'icon_bg' => 'var(--gold-light)',   'icon_color' => 'var(--gold)'],
@@ -208,7 +212,7 @@ require_once '../../includes/topbar.php';
       foreach ($stats as $s):
           $t = $theme_map[$s['theme']];
       ?>
-      <div class="dash-stat">
+      <a class="dash-stat" href="<?= htmlspecialchars($s['href']) ?>" aria-label="<?= htmlspecialchars($s['label'] . ': ' . $s['value']) ?>">
         <div class="dash-stat-accent" style="background:<?= $t['accent'] ?>;"></div>
         <div class="dash-stat-top">
           <div class="dash-stat-icon" style="background:<?= $t['icon_bg'] ?>;color:<?= $t['icon_color'] ?>;">
@@ -220,7 +224,7 @@ require_once '../../includes/topbar.php';
         </div>
         <div class="dash-stat-value"><?= $s['value'] ?></div>
         <div class="dash-stat-label"><?= $s['label'] ?></div>
-      </div>
+      </a>
       <?php endforeach; ?>
     </div>
 

@@ -93,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $other  = $num($_POST['other_cost'] ?? '0');
         $deduct = $num($_POST['deductible'] ?? '0');
         $billed = san_str($_POST['billed_to']      ?? '', 255);
-        $notes  = san_str($_POST['notes']           ?? '', 1000);
+        $notes  = san_str($_POST['notes']           ?? '', MAX_NOTE);
         $inc_d  = san_str($_POST['incident_date']   ?? '', 10) ?: null;
         $rep_d  = san_str($_POST['repair_date']     ?? '', 10) ?: null;
 
@@ -102,6 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         foreach (['Parts' => $parts, 'Labor' => $labor, 'Other' => $other, 'Deductible' => $deduct] as $label => $amt) {
             if ($amt < 0 || $amt > 999999999.99) { $bad = $label . ' amount must be a number between 0 and 999,999,999.99.'; break; }
         }
+        if (!$bad && text_too_long($_POST['notes'] ?? '', MAX_NOTE)) $bad = 'Notes are too long (max ' . MAX_NOTE . ' characters).';
         if (!$bad && $inc_d !== null && !validate_date($inc_d)) $bad = 'Incident date is not a valid date.';
         if (!$bad && $rep_d !== null && !validate_date($rep_d)) $bad = 'Repair date is not a valid date.';
         if ($bad) { header("Location: view_billing.php?id=$billing_id&error=" . urlencode($bad)); exit; }
@@ -446,7 +447,7 @@ require_once '../../includes/topbar.php';
 
             <div>
               <label class="field-label">Notes</label>
-              <textarea name="notes" class="field-input" rows="1" style="width:100%;resize:vertical;"><?= htmlspecialchars($billing['notes'] ?? '') ?></textarea>
+              <textarea name="notes" class="field-input" rows="1" maxlength="<?= MAX_NOTE ?>" style="width:100%;resize:vertical;"><?= htmlspecialchars($billing['notes'] ?? '') ?></textarea>
             </div>
 
             <div style="display:flex;justify-content:flex-end;">

@@ -5,6 +5,7 @@ require_once '../../config/validators.php';
 require_once '../../config/mailer.php';
 require_once '../../includes/transaction.php';
 require_once '../../config/uploads.php';
+require_once '../../config/access.php';
 
 require_role(['admin', 'super_admin', 'mechanic']);
 
@@ -163,16 +164,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] === 'update_status') {
         $new_status = san_enum($_POST['status'] ?? '', ['pending','in_progress','for_pickup','completed','cancelled']);
         if ($new_status) {
-            // The status change and its audit entry are saved together or not at all (includes/transaction.php)
-            db_transaction($conn, function () use ($conn, $job_id, $job, $new_status) {
-                $upd = $conn->prepare("UPDATE repair_jobs SET status = ? WHERE job_id = ?");
-                $upd->bind_param('si', $new_status, $job_id);
+            if (!repair_status_change_allowed($job['status'], $new_status, is_mechanic())) {
+                header("Location: view_repair.php?id=$job_id&error=" . urlencode('This job can no longer go back to that status.'));
+                exit;
+            }
+            // The status change and its audit entry are saved together or not at all (includes/transaction.php).
+            // "AND status = ?" makes it a no-op if someone else changed the status since this page was loaded.
+            $changed = db_transaction($conn, function () use ($conn, $job_id, $job, $new_status) {
+                $upd = $conn->prepare("UPDATE repair_jobs SET status = ? WHERE job_id = ? AND status = ?");
+                $upd->bind_param('sis', $new_status, $job_id, $job['status']);
                 $upd->execute();
+                if ($upd->affected_rows !== 1) return false;
                 $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'REPAIR_STATUS_UPDATED', ?)");
                 $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' updated repair job ' . $job['job_number'] . ' status to ' . $new_status . '.';
                 $log->bind_param('is', $_SESSION['user_id'], $desc);
                 $log->execute();
+                return true;
             });
+            if (!$changed) {
+                header("Location: view_repair.php?id=$job_id&error=" . urlencode('The status was changed by someone else. Please check it and try again.'));
+                exit;
+            }
 
             if ($new_status === 'completed' && !empty($job['email'])) {
                 $tok_row = $conn->prepare("SELECT public_token FROM clients WHERE client_id = ?");
@@ -207,7 +219,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     if ($_POST['action'] === 'update_notes') {
-        $notes = san_str($_POST['additional_damages'] ?? '', 1000);
+        if (text_too_long($_POST['additional_damages'] ?? '', MAX_NOTE)) {
+            header("Location: view_repair.php?id=$job_id&error=" . urlencode('Notes are too long (max ' . MAX_NOTE . ' characters).'));
+            exit;
+        }
+        $notes = san_str($_POST['additional_damages'] ?? '', MAX_NOTE);
         $upd   = $conn->prepare("UPDATE repair_jobs SET additional_damages = ? WHERE job_id = ?");
         $upd->bind_param('si', $notes, $job_id);
         $upd->execute();
@@ -290,13 +306,24 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 <?php endif; ?>
+<?php if (!empty($_GET['error'])): ?>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  Swal.fire({ toast:true, position:'top-end', icon:'error', titleText:<?= json_encode(san_str($_GET['error'],200)) ?>, showConfirmButton:false, timer:4000, timerProgressBar:true });
+});
+</script>
+<?php endif; ?>
 
   <!-- BACK + HEADER ROW -->
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:0.75rem;">
     <a href="repair_list.php" class="back-link" onclick="goBack('repair_list.php'); return false;" style="margin-bottom:0;"><?= icon('arrow-left', 14) ?></a>
     <div style="display:flex;align-items:center;gap:0.5rem;">
       <span class="badge <?= $sb[1] ?>"><?= $sb[0] ?></span>
-      <?php if (in_array($role, ['admin','super_admin','mechanic'])): ?>
+      <?php
+        // statuses this user may pick next; a mechanic on a completed / cancelled job has none, so no button
+        $next_statuses = array_filter(array_keys($status_map), fn($s) => repair_status_change_allowed($job['status'], $s, is_mechanic()));
+      ?>
+      <?php if ($next_statuses): ?>
       <button onclick="document.getElementById('status-modal').style.display='flex'" class="btn-primary" style="padding:0.45rem 1rem;font-size:0.8rem;">
         <?= icon('arrow-right', 13) ?> Update Status
       </button>
@@ -574,7 +601,7 @@ document.addEventListener('DOMContentLoaded', function() {
       <form method="POST" style="display:flex;flex-direction:column;gap:0.75rem;">
         <?= csrf_field() ?>
         <input type="hidden" name="action" value="update_notes"/>
-        <textarea name="additional_damages" rows="4"
+        <textarea name="additional_damages" rows="4" maxlength="<?= MAX_NOTE ?>"
           style="width:100%;padding:0.65rem 0.85rem;border:1px solid var(--border);border-radius:10px;background:var(--bg-2);color:var(--text-primary);font-size:0.82rem;resize:vertical;font-family:inherit;"
           placeholder="Additional damages upon inspection..."><?= htmlspecialchars($job['additional_damages'] ?? '') ?></textarea>
         <div style="display:flex;justify-content:flex-end;">
@@ -597,6 +624,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 <!-- STATUS UPDATE MODAL -->
+<?php if ($next_statuses): ?>
 <div id="status-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;">
   <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:16px;padding:1.75rem;width:100%;max-width:360px;box-shadow:var(--shadow-lg);">
     <div style="font-size:1rem;font-weight:700;color:var(--text-primary);margin-bottom:0.25rem;">Update Job Status</div>
@@ -605,14 +633,20 @@ document.addEventListener('DOMContentLoaded', function() {
       <?= csrf_field() ?>
       <input type="hidden" name="action" value="update_status"/>
       <div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:1.25rem;">
-        <?php foreach ($status_map as $val => [$lbl, $badge, $clr]): ?>
-        <label style="display:flex;align-items:center;gap:0.65rem;padding:0.65rem 0.85rem;border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:background 0.1s;"
-               onmouseover="this.style.background='var(--bg-3)'" onmouseout="this.style.background=''">
-          <input type="radio" name="status" value="<?= $val ?>" <?= $job['status'] === $val ? 'checked' : '' ?> style="accent-color:<?= $clr ?>;width:15px;height:15px;"/>
+        <?php foreach ($status_map as $val => [$lbl, $badge, $clr]):
+            $is_current = $job['status'] === $val;
+            $can_pick   = in_array($val, $next_statuses, true); ?>
+        <label class="status-opt<?= $can_pick ? '' : ' is-locked' ?>" style="display:flex;align-items:center;gap:0.65rem;padding:0.65rem 0.85rem;border:1px solid var(--border);border-radius:10px;cursor:<?= $can_pick ? 'pointer' : 'not-allowed' ?>;transition:background 0.1s;<?= $can_pick ? '' : 'opacity:0.45;' ?>"
+               <?php if ($can_pick): ?>onmouseover="this.style.background='var(--bg-3)'" onmouseout="this.style.background=''"<?php endif; ?>>
+          <input type="radio" name="status" value="<?= $val ?>" class="status-radio" <?= $is_current ? 'checked' : '' ?> <?= $can_pick ? '' : 'disabled' ?> style="--rc:<?= $clr ?>;"/>
           <span class="badge <?= $badge ?>"><?= $lbl ?></span>
+          <?php if ($is_current): ?><span style="margin-left:auto;font-size:0.68rem;color:var(--text-muted);">Current</span><?php endif; ?>
         </label>
         <?php endforeach; ?>
       </div>
+      <?php if (is_mechanic()): ?>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin:-0.5rem 0 1rem;">A job can only move forward. Ask an admin if a status was set by mistake.</div>
+      <?php endif; ?>
       <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
         <button type="button" onclick="document.getElementById('status-modal').style.display='none'" class="btn-ghost">Cancel</button>
         <button type="submit" class="btn-primary"><?= icon('check', 13) ?> Save</button>
@@ -620,6 +654,7 @@ document.addEventListener('DOMContentLoaded', function() {
     </form>
   </div>
 </div>
+<?php endif; ?>
 <!-- SIGNATURE MODAL -->
 <div id="sig-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;align-items:center;justify-content:center;padding:1rem;">
   <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:16px;padding:1.5rem;width:100%;max-width:580px;box-shadow:var(--shadow-lg);">
@@ -647,12 +682,14 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 <script>
-document.getElementById('status-modal').addEventListener('click', function(e) {
+// no modal when this user has no status left to pick (a mechanic on a completed / cancelled job)
+var statusModal = document.getElementById('status-modal');
+if (statusModal) statusModal.addEventListener('click', function(e) {
   if (e.target === this) this.style.display = 'none';
 });
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') {
-    document.getElementById('status-modal').style.display = 'none';
+    if (statusModal) statusModal.style.display = 'none';
     closeLightbox();
     closeSignModal();
   }

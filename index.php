@@ -81,11 +81,6 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
       <p class="hero-sub">
         TG-BASICS centralizes client records, insurance policies, repair workflows, and billing for TG Customworks and Basic Car Insurance into a single platform.
       </p>
-      <div class="hero-actions">
-        <a href="auth/login.php" class="btn-primary-hero">
-          <?= icon('lock-closed', 14) ?> Sign In to TG-BASICS
-        </a>
-      </div>
     </div>
 
     <!-- VISUAL CARD -->
@@ -912,7 +907,7 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
       <p class="cta-desc">TG-BASICS is built exclusively for the team. Sign in to access client records, policies, claims, repair jobs, and billing — all from a single dashboard.</p>
       <div class="cta-actions">
         <a href="auth/login.php" class="btn-primary-hero">
-          <?= icon('lock-closed', 14) ?> Sign In to TG-BASICS
+          <?= icon('lock-closed', 14) ?> Sign In
         </a>
       </div>
     </div>

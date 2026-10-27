@@ -392,7 +392,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
     $allowed_statuses = ['compiling','sent_admin','sent_head_office','waiting_loa','loa_received','pending','approved','denied','lack_of_requirements','resolved'];
     $new_status    = san_enum($_POST['new_status'] ?? '', $allowed_statuses);
     $denial_reason = san_str($_POST['denial_reason'] ?? '', MAX_TEXT);
-    $notes         = san_str($_POST['notes'] ?? '', MAX_TEXT);
+    $notes         = san_str($_POST['notes'] ?? '', MAX_NOTE);
+    if (text_too_long($_POST['notes'] ?? '', MAX_NOTE)) {
+        header("Location: view_claim.php?id=$claim_id&error=" . urlencode('Notes are too long (max ' . MAX_NOTE . ' characters).'));
+        exit;
+    }
 
     // Guard: block all status changes if policy is expired (except deny/resolve by admin)
     if ($policy_expired && !in_array($new_status, ['denied', 'lack_of_requirements', 'resolved'])) {
@@ -923,7 +927,7 @@ require_once '../../includes/topbar.php';
               </div>
               <div class="field" style="margin-bottom:0.75rem;">
                 <label class="field-label">Notes <span style="color:var(--text-muted);font-weight:400;">(optional)</span></label>
-                <textarea name="notes" class="field-input" rows="2" placeholder="Add a note..."><?= htmlspecialchars($claim['notes'] ?? '') ?></textarea>
+                <textarea name="notes" class="field-input" rows="2" maxlength="<?= MAX_NOTE ?>" placeholder="Add a note..."><?= htmlspecialchars($claim['notes'] ?? '') ?></textarea>
               </div>
               <button type="submit" id="btn-update-status" class="btn-primary" style="width:100%;<?= $docs_done === 0 ? 'opacity:0.45;cursor:not-allowed;' : '' ?>" <?= $docs_done === 0 ? 'disabled' : '' ?>>
                 <?= icon('check-circle',14) ?> Update Status

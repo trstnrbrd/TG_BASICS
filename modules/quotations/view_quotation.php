@@ -106,7 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_admin) {
     if ($action === 'convert' && $qt['status'] === 'approved' && !$qt['receipt_id']) {
         $amount_paid   = san_float($_POST['amount_paid'] ?? 0);
         $pay_method    = san_enum($_POST['payment_method'] ?? 'cash', ['cash','e_wallet','bank_transfer']);
-        $receipt_notes = san_str($_POST['receipt_notes'] ?? '', 500);
+        $receipt_notes = san_str($_POST['receipt_notes'] ?? '', MAX_NOTE);
         $balance       = max(0, $qt['total'] - $amount_paid);
         $pay_status    = $amount_paid <= 0 ? 'unpaid' : ($balance > 0 ? 'partial' : 'paid');
 
@@ -430,7 +430,7 @@ document.addEventListener('DOMContentLoaded',function(){
         </div>
         <div class="field">
           <label class="field-label">Statement Notes</label>
-          <textarea name="receipt_notes" class="field-input" rows="2" placeholder="Optional notes on statement..." style="resize:vertical;"></textarea>
+          <textarea name="receipt_notes" class="field-input" rows="2" maxlength="<?= MAX_NOTE ?>" placeholder="Optional notes on statement..." style="resize:vertical;"></textarea>
         </div>
       </div>
       <div style="display:flex;gap:0.5rem;justify-content:flex-end;">

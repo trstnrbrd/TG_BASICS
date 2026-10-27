@@ -143,7 +143,7 @@ function SubmitButton() {
     React.createElement("div", { className: "spinner" }), "Signing in..."
     ) : /*#__PURE__*/
 
-    React.createElement(React.Fragment, null, "Sign In to TG-BASICS")
+    React.createElement(React.Fragment, null, "Sign In")
 
     ));
 

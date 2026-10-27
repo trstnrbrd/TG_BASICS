@@ -47,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $policy_id    = (int)($_POST['policy_id'] ?? 0);
     $claim_type   = san_enum($_POST['claim_type'] ?? '', ALLOWED_CLAIM_TYPES);
     $incident_date = san_str($_POST['incident_date'] ?? '', 10);
-    $description  = san_str($_POST['description'] ?? '', MAX_TEXT);
+    $description  = san_str($_POST['description'] ?? '', MAX_NOTE);
 
     if (!$client_id)            $errors[] = 'Please select a client.';
     if (!$policy_id)            $errors[] = 'Please select a policy.';
@@ -55,7 +55,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($incident_date === '')  $errors[] = 'Incident date is required.';
     elseif (!validate_date($incident_date) || $incident_date > date('Y-m-d'))
                                 $errors[] = 'Incident date must be a valid past date.';
-    if ($description === '')    $errors[] = 'Incident description is required.';
+    if (text_too_long($_POST['description'] ?? '', MAX_NOTE)) $errors[] = 'Incident description is too long (max ' . MAX_NOTE . ' characters).';
+    elseif ($description === '') $errors[] = 'Incident description is required.';
 
     if (empty($errors)) {
         // The claim and its audit entry are saved together or not at all (includes/transaction.php)
@@ -254,7 +255,7 @@ require_once '../../includes/topbar.php';
 
               <div class="field span-2">
                 <label class="field-label">Incident Description <span style="color:var(--danger);">*</span></label>
-                <textarea name="description" class="field-input" rows="4"
+                <textarea name="description" class="field-input" rows="4" maxlength="<?= MAX_NOTE ?>"
                   placeholder="Briefly describe what happened..."
                   required><?= old('description') ?></textarea>
               </div>

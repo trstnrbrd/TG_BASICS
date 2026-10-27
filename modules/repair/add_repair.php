@@ -54,7 +54,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'repair_panel','repair_full','paint_panel','paint_full',
         'washover_basic','washover_full','custom'
     ]);
-    $additional  = san_str($_POST['additional_damages'] ?? '', 1000);
+    $additional  = san_str($_POST['additional_damages'] ?? '', MAX_NOTE);
+    if (text_too_long($_POST['additional_damages'] ?? '', MAX_NOTE)) $errors[] = 'Additional damages note is too long (max ' . MAX_NOTE . ' characters).';
 
     if ($client_id  === 0) $errors[] = 'Client is required.';
     if ($vehicle_id === 0) $errors[] = 'Vehicle is required.';
@@ -284,7 +285,7 @@ require_once '../../includes/topbar.php';
 
             <div class="field">
               <label class="field-label">Additional Damages / Remarks</label>
-              <textarea name="additional_damages" class="field-input" rows="3"
+              <textarea name="additional_damages" class="field-input" rows="3" maxlength="<?= MAX_NOTE ?>"
                 placeholder="Additional damages upon inspection..."
                 style="resize:vertical;"></textarea>
             </div>

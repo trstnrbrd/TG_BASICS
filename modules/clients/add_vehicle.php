@@ -43,6 +43,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($plate_number === '')  $errors[] = 'Plate number is required.';
     elseif (!validate_plate($plate_number)) $errors[] = 'Plate number contains invalid characters.';
+    if (!validate_vehicle_code($motor_number))  $errors[] = 'Engine number may only contain letters, numbers, spaces and dashes.';
+    if (!validate_vehicle_code($serial_number)) $errors[] = 'Chassis number may only contain letters, numbers, spaces and dashes.';
     if ($make === '')          $errors[] = 'Vehicle make is required.';
     if ($model === '')         $errors[] = 'Vehicle model is required.';
     if ($year_model === 0)     $errors[] = 'Year model must be a valid year (1960–' . ((int)date('Y') + 1) . ').';
@@ -203,20 +205,20 @@ require_once '../../includes/topbar.php';
             <!-- Row 1: Plate | Make | Model -->
             <div class="field">
               <label class="field-label">Plate Number <span class="req">*</span></label>
-              <input type="text" name="plate_number" class="field-input"
+              <input type="text" name="plate_number" maxlength="<?= MAX_PLATE ?>" data-allow="code" class="field-input"
                 placeholder="ABC 1234"
                 value="<?= old('plate_number') ?>"
                 style="text-transform:uppercase;" autofocus/>
             </div>
             <div class="field">
               <label class="field-label">Make <span class="req">*</span></label>
-              <input type="text" name="make" class="field-input"
+              <input type="text" name="make" maxlength="<?= MAX_MAKE_MODEL ?>" class="field-input"
                 placeholder="Toyota / Honda / Mitsubishi"
                 value="<?= old('make') ?>"/>
             </div>
             <div class="field">
               <label class="field-label">Model <span class="req">*</span></label>
-              <input type="text" name="model" class="field-input"
+              <input type="text" name="model" maxlength="<?= MAX_MAKE_MODEL ?>" class="field-input"
                 placeholder="Innova / Civic / L300"
                 value="<?= old('model') ?>"/>
             </div>
@@ -224,14 +226,13 @@ require_once '../../includes/topbar.php';
             <!-- Row 2: Year | Color (2-col) -->
             <div class="field">
               <label class="field-label">Year Model <span class="req">*</span></label>
-              <input type="number" name="year_model" class="field-input"
-                min="1990" max="<?= date('Y') + 1 ?>"
+              <input type="text" name="year_model" class="field-input" inputmode="numeric" data-digits="4"
                 placeholder="YYYY"
                 value="<?= old('year_model') ?>"/>
             </div>
             <div class="field span-2">
               <label class="field-label">Color</label>
-              <input type="text" name="color" class="field-input"
+              <input type="text" name="color" maxlength="<?= MAX_COLOR ?>" class="field-input"
                 placeholder="Pearl White / Black / Silver"
                 value="<?= old('color') ?>"/>
             </div>
@@ -239,7 +240,7 @@ require_once '../../includes/topbar.php';
             <!-- Row 3: Engine Number (full width) -->
             <div class="field span-3">
               <label class="field-label">Engine Number</label>
-              <input type="text" name="motor_number" class="field-input"
+              <input type="text" name="motor_number" maxlength="<?= MAX_MOTOR_SN ?>" data-allow="code" class="field-input"
                 placeholder="Alphanumeric, from OR-CR"
                 value="<?= old('motor_number') ?>"
                 style="text-transform:uppercase;"/>
@@ -249,7 +250,7 @@ require_once '../../includes/topbar.php';
             <!-- Row 4: Chassis Number (full width) -->
             <div class="field span-3">
               <label class="field-label">Chassis Number</label>
-              <input type="text" name="serial_number" class="field-input"
+              <input type="text" name="serial_number" maxlength="<?= MAX_MOTOR_SN ?>" data-allow="code" class="field-input"
                 placeholder="17-character VIN"
                 value="<?= old('serial_number') ?>"
                 style="text-transform:uppercase;"/>

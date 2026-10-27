@@ -94,7 +94,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_mechanic) {
     $qtys       = $_POST['qty']        ?? [];
     $prices     = $_POST['unit_price'] ?? [];
     $discount   = san_float($_POST['discount'] ?? 0);
-    $notes      = san_str($_POST['notes'] ?? '', 1000);
+    $notes      = san_str($_POST['notes'] ?? '', MAX_NOTE);
+    if (text_too_long($_POST['notes'] ?? '', MAX_NOTE)) $errors[] = 'Notes are too long (max ' . MAX_NOTE . ' characters).';
     $status     = san_enum($_POST['status'] ?? 'draft', ['draft', 'pending_approval']);
 
     $items = [];
@@ -375,7 +376,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <div><div class="card-title">Notes</div><div class="card-sub">Optional remarks for this quotation</div></div>
       </div>
       <div style="padding:1rem 1.25rem;">
-        <textarea name="notes" class="field-input" rows="3" placeholder="Special instructions, payment arrangements, color requests..." style="resize:vertical;width:100%;"><?= old('notes') ?></textarea>
+        <textarea name="notes" class="field-input" rows="3" maxlength="<?= MAX_NOTE ?>" placeholder="Special instructions, payment arrangements, color requests..." style="resize:vertical;width:100%;"><?= old('notes') ?></textarea>
       </div>
     </div>
     <div class="card" style="margin-bottom:0;min-width:220px;">

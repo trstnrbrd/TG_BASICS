@@ -3,7 +3,6 @@ require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
-require_once '../../config/transaction_pin.php';
 require_once '../../includes/agent_filter.php';
 require_once '../../includes/pagination.php';
 
@@ -33,51 +32,6 @@ if (isset($_GET['ajax_ac']) && isset($_GET['q'])) {
     $stmt->execute();
     echo json_encode($stmt->get_result()->fetch_all(MYSQLI_ASSOC));
     exit;
-}
-
-// Handle delete
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) {
-    csrf_verify();
-    if (!pin_consume($conn)) {
-        header("Location: client_list.php?error=" . urlencode(PIN_REQUIRED_MSG));
-        exit;
-    }
-    // Only the Owner, the admin who encoded the client, or its insurance agent may delete it
-    // (mechanics never can — the UI hides the button from everyone else).
-    $del_id = (int)$_POST['delete_client_id'];
-    $cstmt  = $conn->prepare("SELECT full_name FROM clients WHERE client_id = ? AND deleted_at IS NULL");
-    $cstmt->bind_param('i', $del_id);
-    $cstmt->execute();
-    $cdata = $cstmt->get_result()->fetch_assoc();
-    if ($cdata && !client_editable($conn, $del_id)) {
-        http_response_code(403);
-        exit('Not allowed.');
-    }
-    if ($cdata) {
-        // Come back to the same agent view the delete was made from (the form posts to the current URL)
-        $back_agent = isset($_GET['agent']) && is_scalar($_GET['agent']) ? 'agent=' . urlencode((string)$_GET['agent']) . '&' : '';
-
-        // Block deletion only if active policies, repair jobs, or claims exist
-        // Vehicles alone are NOT a blocker — they are removed on client deletion
-        $linked_msg = client_delete_blockers($conn, $del_id);
-        if ($linked_msg !== '') {
-            header("Location: client_list.php?" . $back_agent . "error=" . urlencode('"' . $cdata['full_name'] . '" cannot be deleted — they still have ' . $linked_msg . ' on record.'));
-            exit;
-        }
-
-        // Remove vehicles first (no blocking records remain)
-        $conn->query("DELETE FROM vehicles WHERE client_id = " . $del_id);
-
-        $dstmt = $conn->prepare("UPDATE clients SET deleted_at = NOW() WHERE client_id = ?");
-        $dstmt->bind_param('i', $del_id);
-        $dstmt->execute();
-        $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'CLIENT_DELETED', ?)");
-        $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' deleted client "' . $cdata['full_name'] . '".';
-        $log->bind_param('is', $_SESSION['user_id'], $desc);
-        $log->execute();
-        header("Location: client_list.php?" . $back_agent . "success=" . urlencode('"' . $cdata['full_name'] . '" has been deleted.'));
-        exit;
-    }
 }
 
 $full_name = $_SESSION['full_name'];
@@ -191,13 +145,6 @@ $list_title = match (true) {
     $agent_filter === 'none'       => 'Unassigned Clients',
     $agent_filter === (string)$me_id => 'My Clients',
     default                        => 'Clients of ' . $agent_names[(int)$agent_filter],
-};
-
-// Per row: may the signed-in user change / delete this client? Same rule as client_editable().
-$row_can_edit = function (array $row) use ($me_id): bool {
-    if (is_super_admin()) return true;
-    if (!is_admin()) return false;
-    return (int)$row['created_by'] === $me_id || (int)$row['agent_id'] === $me_id;
 };
 
 $page_title  = 'Client Records';
@@ -445,13 +392,6 @@ require_once '../../includes/topbar.php';
           </div>
           <div class="cl-card-right">
             <?= $badge ?>
-            <?php if ($row_can_edit($row)): ?>
-            <form method="POST" action="" style="display:inline;" onclick="event.preventDefault();event.stopPropagation();">
-              <?= csrf_field() ?>
-              <input type="hidden" name="delete_client_id" value="<?= $row['client_id'] ?>"/>
-              <button type="button" class="btn-sm-danger js-delete-client cl-card-del" data-name="<?= htmlspecialchars($row['full_name'], ENT_QUOTES) ?>" aria-label="Delete <?= htmlspecialchars($row['full_name'], ENT_QUOTES) ?>"><?= icon('trash', 13) ?></button>
-            </form>
-            <?php endif; ?>
           </div>
         </a>
         <?php endforeach; ?>
@@ -530,13 +470,6 @@ require_once '../../includes/topbar.php';
               <td>
                 <div style="display:inline-flex;gap:0.4rem;align-items:center;" onclick="event.stopPropagation()">
                   <a href="view_client.php?id=<?= $row['client_id'] ?>" class="btn-sm-gold" title="View" style="padding:0.35rem 0.55rem;"><?= icon('eye', 14) ?></a>
-                  <?php if ($row_can_edit($row)): ?>
-                  <form method="POST" action="" style="display:inline;">
-                    <?= csrf_field() ?>
-                    <input type="hidden" name="delete_client_id" value="<?= $row['client_id'] ?>"/>
-                    <button type="button" class="btn-sm-danger js-delete-client" title="Delete" data-name="<?= htmlspecialchars($row['full_name'], ENT_QUOTES) ?>"><?= icon('trash', 14) ?></button>
-                  </form>
-                  <?php endif; ?>
                 </div>
               </td>
             </tr>
@@ -590,7 +523,6 @@ require_once '../../includes/topbar.php';
   </div>
 </div>
 
-<script src="../../assets/js/shared/client_list.js?v=<?= filemtime(__DIR__.'/../../assets/js/shared/client_list.js') ?>"></script>
 <script src="../../assets/js/shared/agent_filter.js?v=<?= filemtime(__DIR__.'/../../assets/js/shared/agent_filter.js') ?>"></script>
 <script>
 (function() {

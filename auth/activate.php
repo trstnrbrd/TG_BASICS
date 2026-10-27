@@ -117,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user && !$user['is_active']) {
           <strong style="color:var(--text-primary);">Welcome to TG-BASICS.</strong>
         </p>
         <a href="login.php" class="btn-submit">
-          <?= icon('lock-closed', 14) ?> Sign In to TG-BASICS
+          <?= icon('lock-closed', 14) ?> Sign In
         </a>
 
       <?php elseif ($error && !$user): ?>

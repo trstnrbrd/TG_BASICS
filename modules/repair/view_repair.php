@@ -620,6 +620,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 <!-- STATUS UPDATE MODAL -->
+<?php if ($next_statuses): ?>
 <div id="status-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;">
   <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:16px;padding:1.75rem;width:100%;max-width:360px;box-shadow:var(--shadow-lg);">
     <div style="font-size:1rem;font-weight:700;color:var(--text-primary);margin-bottom:0.25rem;">Update Job Status</div>
@@ -649,6 +650,7 @@ document.addEventListener('DOMContentLoaded', function() {
     </form>
   </div>
 </div>
+<?php endif; ?>
 <!-- SIGNATURE MODAL -->
 <div id="sig-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;align-items:center;justify-content:center;padding:1rem;">
   <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:16px;padding:1.5rem;width:100%;max-width:580px;box-shadow:var(--shadow-lg);">
@@ -676,12 +678,14 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 <script>
-document.getElementById('status-modal').addEventListener('click', function(e) {
+// no modal when this user has no status left to pick (a mechanic on a completed / cancelled job)
+var statusModal = document.getElementById('status-modal');
+if (statusModal) statusModal.addEventListener('click', function(e) {
   if (e.target === this) this.style.display = 'none';
 });
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') {
-    document.getElementById('status-modal').style.display = 'none';
+    if (statusModal) statusModal.style.display = 'none';
     closeLightbox();
     closeSignModal();
   }

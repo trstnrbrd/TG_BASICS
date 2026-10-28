@@ -16,6 +16,10 @@ $conn->query("SET time_zone = '+08:00'");
 
 require_once __DIR__ . '/app_url.php';
 
+// Live updates: after a save, every open page refreshes itself (includes/realtime.php)
+require_once __DIR__ . '/../includes/realtime.php';
+realtime_watch_request($conn);
+
 // HTTPS on the live site, plain HTTP on local XAMPP
 $_is_https = app_is_https();
 $_is_local = (bool)preg_match('/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/', $_SERVER['HTTP_HOST'] ?? '');
@@ -64,11 +68,17 @@ if (!isset($_SESSION['_last_regen'])) {
     $_SESSION['_last_regen'] = time();
 }
 
+// A request the user did not make: the live-update poll (ajax/live.php) or a page reloading itself because
+// someone else saved (assets/js/shared/realtime.js sets the tg_live_reload cookie just before). It must not count
+// as activity, or a shop computer left open would never be signed out while others keep working.
+$_tg_passive = defined('TG_PASSIVE_REQUEST') || ($_COOKIE['tg_live_reload'] ?? '') === '1';
+if (isset($_COOKIE['tg_live_reload']) && !headers_sent()) setcookie('tg_live_reload', '', ['expires' => 1, 'path' => '/', 'samesite' => 'Strict']);
+
 // Idle too long -> clear the session, so the user has to sign in again
 if (isset($_SESSION['user_id'])) {
     if (isset($_SESSION['_last_seen']) && time() - $_SESSION['_last_seen'] > SESSION_IDLE_SECONDS) {
         $_SESSION = ['login_notice' => 'You were signed out after a long period of inactivity. Please sign in again.'];
-    } else {
+    } elseif (!$_tg_passive || !isset($_SESSION['_last_seen'])) {
         $_SESSION['_last_seen'] = time();
     }
 }
@@ -91,7 +101,7 @@ if (isset($_SESSION['user_id'])) {
         $stmt->close();
         if (!$acct || !(int)$acct['is_active'] || $acct['role'] !== ($_SESSION['role'] ?? null)) {
             $_SESSION = ['login_notice' => 'Your account is no longer active or its access was changed. Please sign in again.'];
-        } else {
+        } elseif (!$_tg_passive) {   // "online" means the person, not a tab refreshing itself
             $stmt = $conn->prepare("UPDATE users SET last_active = NOW() WHERE user_id = ?");
             $stmt->bind_param('i', $uid);
             $stmt->execute();

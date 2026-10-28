@@ -7,6 +7,7 @@
 
 function api_send(array $body, int $status = 200): void
 {
+    $GLOBALS['tg_api_ok'] = !empty($body['ok']);   // read by realtime_watch_request() (includes/realtime.php)
     http_response_code($status);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode($body, JSON_UNESCAPED_UNICODE);

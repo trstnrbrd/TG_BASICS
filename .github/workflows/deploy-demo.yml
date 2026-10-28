@@ -38,6 +38,7 @@ jobs:
             node_modules/**
             config/db.php
             config/ocr.php
+            config/pusher.php
             uploads/**
             backups/**
             data_gathering (documentation)/**

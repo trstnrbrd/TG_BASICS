@@ -2,6 +2,7 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
+require_once '../../config/access.php';
 require_once '../../config/mailer.php';
 
 require_role(['admin', 'super_admin', 'mechanic']);
@@ -102,9 +103,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_admin) {
         exit;
     }
 
+    // Amount paid on a billing statement: a valid amount, never more than the quotation total. A bad value is an
+    // error, not a silent ₱0 ("unpaid") or a balance quietly floored at zero.
+    $pay_error = function () use ($qt, $qt_id): array {
+        [$amt, $err] = read_money($_POST['amount_paid'] ?? '', 'Amount paid', true);
+        if ($err === '' && payment_exceeds($amt, (float)$qt['total'])) {
+            $err = 'Amount paid cannot be more than the total of ₱' . number_format((float)$qt['total'], 2) . '.';
+        }
+        if ($err === '' && text_too_long($_POST['receipt_notes'] ?? '', MAX_NOTE)) $err = 'Notes are too long (max ' . MAX_NOTE . ' characters).';
+        if ($err !== '') {
+            header("Location: view_quotation.php?id=$qt_id&error=" . urlencode($err));
+            exit;
+        }
+        return [$amt];
+    };
+
     // Convert to receipt
     if ($action === 'convert' && $qt['status'] === 'approved' && !$qt['receipt_id']) {
-        $amount_paid   = san_float($_POST['amount_paid'] ?? 0);
+        [$amount_paid] = $pay_error();
         $pay_method    = san_enum($_POST['payment_method'] ?? 'cash', ['cash','e_wallet','bank_transfer']);
         $receipt_notes = san_str($_POST['receipt_notes'] ?? '', MAX_NOTE);
         $balance       = max(0, $qt['total'] - $amount_paid);
@@ -171,7 +187,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_admin) {
 
     // Update payment on existing receipt
     if ($action === 'update_payment' && $qt['receipt_id']) {
-        $amount_paid   = san_float($_POST['amount_paid'] ?? 0);
+        [$amount_paid] = $pay_error();
         $pay_method    = san_enum($_POST['payment_method'] ?? 'cash', ['cash','e_wallet','bank_transfer']);
         $balance       = max(0, $qt['total'] - $amount_paid);
         $pay_status    = $amount_paid <= 0 ? 'unpaid' : ($balance > 0 ? 'partial' : 'paid');
@@ -203,6 +219,13 @@ require_once '../../includes/topbar.php';
 
 <div class="content">
 
+<?php if (!empty($_GET['error'])): ?>
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  Swal.fire({toast:true,position:'top-end',icon:'error',titleText:<?= json_encode(san_str($_GET['error'],200)) ?>,showConfirmButton:false,timer:5000,timerProgressBar:true});
+});
+</script>
+<?php endif; ?>
 <?php if (!empty($_GET['success'])): ?>
 <script>
 document.addEventListener('DOMContentLoaded',function(){
@@ -386,7 +409,7 @@ document.addEventListener('DOMContentLoaded',function(){
         <?= csrf_field() ?><input type="hidden" name="action" value="update_payment"/>
         <div class="field" style="flex:1;min-width:140px;">
           <label class="field-label">Amount Paid</label>
-          <input type="number" name="amount_paid" class="field-input" value="<?= $qt['amount_paid'] ?>" min="0" step="0.01" max="<?= $qt['total'] ?>" required/>
+          <input type="number" name="amount_paid" class="field-input" data-money value="<?= $qt['amount_paid'] ?>" min="0" step="0.01" max="<?= $qt['total'] ?>" required/>
         </div>
         <div class="field" style="flex:1;min-width:140px;">
           <label class="field-label">Method</label>
@@ -418,7 +441,7 @@ document.addEventListener('DOMContentLoaded',function(){
       <div style="display:flex;flex-direction:column;gap:0.85rem;margin-bottom:1.25rem;">
         <div class="field">
           <label class="field-label">Amount Paid <span class="req">*</span></label>
-          <input type="number" name="amount_paid" class="field-input" value="<?= $qt['total'] ?>" min="0" step="0.01" max="<?= $qt['total'] ?>" required/>
+          <input type="number" name="amount_paid" class="field-input" data-money value="<?= $qt['total'] ?>" min="0" step="0.01" max="<?= $qt['total'] ?>" required/>
         </div>
         <div class="field">
           <label class="field-label">Payment Method</label>

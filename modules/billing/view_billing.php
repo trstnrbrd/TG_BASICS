@@ -86,21 +86,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'update_costs') {
-        // Blank = 0; anything that is not a plain number comes back as -1 and is rejected below
-        $num = function ($v) { $v = is_string($v) ? str_replace(',', '', trim($v)) : ''; return $v === '' ? 0.0 : (is_numeric($v) ? (float)$v : -1.0); };
-        $parts  = $num($_POST['parts_cost'] ?? '0');
-        $labor  = $num($_POST['labor_cost'] ?? '0');
-        $other  = $num($_POST['other_cost'] ?? '0');
-        $deduct = $num($_POST['deductible'] ?? '0');
+        // Each amount checked by read_money() (blank = 0); the amount due must never go below zero
+        [$parts,  $e1] = read_money($_POST['parts_cost'] ?? '', 'Parts cost');
+        [$labor,  $e2] = read_money($_POST['labor_cost'] ?? '', 'Labor cost');
+        [$other,  $e3] = read_money($_POST['other_cost'] ?? '', 'Other cost');
+        [$deduct, $e4] = read_money($_POST['deductible'] ?? '', 'Deductible');
         $billed = san_str($_POST['billed_to']      ?? '', 255);
         $notes  = san_str($_POST['notes']           ?? '', MAX_NOTE);
         $inc_d  = san_str($_POST['incident_date']   ?? '', 10) ?: null;
         $rep_d  = san_str($_POST['repair_date']     ?? '', 10) ?: null;
 
-        // The form already enforces min=0, but a hand-made request must not put negative or malformed values on a bill
         $bad = null;
-        foreach (['Parts' => $parts, 'Labor' => $labor, 'Other' => $other, 'Deductible' => $deduct] as $label => $amt) {
-            if ($amt < 0 || $amt > 999999999.99) { $bad = $label . ' amount must be a number between 0 and 999,999,999.99.'; break; }
+        foreach ([$e1, $e2, $e3, $e4] as $e) if (!$bad && $e !== '') $bad = $e;
+        if (!$bad && round($deduct, 2) > round($parts + $labor + $other, 2)) {
+            $bad = 'The deductible cannot be more than the total cost of repair (₱' . number_format($parts + $labor + $other, 2) . ').';
         }
         if (!$bad && text_too_long($_POST['notes'] ?? '', MAX_NOTE)) $bad = 'Notes are too long (max ' . MAX_NOTE . ' characters).';
         if (!$bad && $inc_d !== null && !validate_date($inc_d)) $bad = 'Incident date is not a valid date.';
@@ -410,7 +409,7 @@ require_once '../../includes/topbar.php';
                 <label class="field-label">Total Parts</label>
                 <div class="field-prefix-wrap">
                   <span class="field-prefix">₱</span>
-                  <input type="number" name="parts_cost" class="field-input field-with-prefix"
+                  <input type="number" name="parts_cost" class="field-input field-with-prefix" data-money max="<?= MAX_MONEY ?>"
                     value="<?= $billing['parts_cost'] ?>" min="0" step="0.01" id="ep_parts" oninput="editCalc()"/>
                 </div>
               </div>
@@ -418,7 +417,7 @@ require_once '../../includes/topbar.php';
                 <label class="field-label">Labor &amp; Materials</label>
                 <div class="field-prefix-wrap">
                   <span class="field-prefix">₱</span>
-                  <input type="number" name="labor_cost" class="field-input field-with-prefix"
+                  <input type="number" name="labor_cost" class="field-input field-with-prefix" data-money max="<?= MAX_MONEY ?>"
                     value="<?= $billing['labor_cost'] ?>" min="0" step="0.01" id="ep_labor" oninput="editCalc()"/>
                 </div>
               </div>
@@ -426,7 +425,7 @@ require_once '../../includes/topbar.php';
                 <label class="field-label">Other Charges</label>
                 <div class="field-prefix-wrap">
                   <span class="field-prefix">₱</span>
-                  <input type="number" name="other_cost" class="field-input field-with-prefix"
+                  <input type="number" name="other_cost" class="field-input field-with-prefix" data-money max="<?= MAX_MONEY ?>"
                     value="<?= $billing['other_cost'] ?>" min="0" step="0.01" id="ep_other" oninput="editCalc()"/>
                 </div>
               </div>
@@ -434,7 +433,7 @@ require_once '../../includes/topbar.php';
                 <label class="field-label">Less: Deductible</label>
                 <div class="field-prefix-wrap">
                   <span class="field-prefix">₱</span>
-                  <input type="number" name="deductible" class="field-input field-with-prefix"
+                  <input type="number" name="deductible" class="field-input field-with-prefix" data-money max="<?= MAX_MONEY ?>"
                     value="<?= $billing['deductible'] ?>" min="0" step="0.01" id="ep_deduct" oninput="editCalc()"/>
                 </div>
               </div>

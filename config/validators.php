@@ -116,6 +116,24 @@ function money_too_large(mixed $raw): bool {
     return is_numeric($raw) && (float)$raw > MAX_MONEY;
 }
 
+/**
+ * A peso amount the user typed, checked the same way on every payment form.
+ * Accepts "1500", "1,500.50", "₱ 1,500". Blank is 0 (or an error when $required).
+ * Returns [amount, error message or ''], $label naming the field in the message, e.g. "Amount paid".
+ */
+function read_money(mixed $raw, string $label, bool $required = false): array {
+    if ($raw === null || (is_string($raw) && trim($raw) === '')) {
+        return [0.0, $required ? "$label is required." : ''];
+    }
+    if (!is_string($raw) && !is_int($raw) && !is_float($raw)) return [0.0, "$label must be a valid amount."];
+    $v = str_replace([',', ' ', '₱'], '', trim((string)$raw));
+    if (!is_numeric($v) || preg_match('/[eE]/', $v)) return [0.0, "$label must be a valid amount."];
+    if ((float)$v < 0)                                return [0.0, "$label cannot be negative."];
+    if ((float)$v > MAX_MONEY)                        return [0.0, "$label is too large (max ₱" . number_format(MAX_MONEY, 2) . ').'];
+    if (preg_match('/\.\d{3,}$/', $v))                return [0.0, "$label can only have up to 2 decimal places (centavos)."];
+    return [round((float)$v, 2), ''];
+}
+
 /** Text typed longer than $max. san_str() turns it into '', which would save as "left blank" — say so instead. */
 function text_too_long(mixed $raw, int $max): bool {
     return is_string($raw) && mb_strlen(trim($raw)) > $max;

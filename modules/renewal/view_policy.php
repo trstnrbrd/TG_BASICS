@@ -288,17 +288,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
         $raw_modes    = $_POST['payment_mode']       ?? [];
         $raw_ctrls    = $_POST['control_number']     ?? [];
 
-        // Sanitize arrays
-        $amounts      = array_map(fn($v) => san_float($v, 0.0), is_array($raw_amounts) ? $raw_amounts : []);
+        // Sanitize arrays. Each amount: a valid peso amount, 0 to MAX_MONEY, centavos only (read_money()) — a
+        // bad one is an error, never a silent ₱0 that would leave the payment unrecorded.
+        $amounts = [];
+        $valid   = true;
+        foreach ((is_array($raw_amounts) ? $raw_amounts : []) as $k => $v) {
+            [$amounts[$k], $err] = read_money($v, 'Payment ' . ($k + 1) . ' amount');
+            if ($err !== '') { $pay_errors[] = $err; $valid = false; }
+        }
         $pay_modes    = array_map(fn($v) => san_enum(is_string($v) ? $v : '', ALLOWED_PAYMENT_MODES), is_array($raw_modes) ? $raw_modes : []);
-        $ctrl_numbers = array_map(fn($v) => san_str(is_string($v) ? $v : '', 60), is_array($raw_ctrls) ? $raw_ctrls : []);
-
-        $valid = true;
-        foreach ($raw_amounts as $k => $v) {
-            if (!is_numeric($v) || (float)$v < 0) {
-                $pay_errors[] = 'Installment #' . ($k + 1) . ' amount must be a valid non-negative number.';
+        $ctrl_numbers = [];
+        foreach ((is_array($raw_ctrls) ? $raw_ctrls : []) as $k => $v) {
+            if (text_too_long($v, MAX_PAYMENT_REF)) {
+                $pay_errors[] = 'Payment ' . ($k + 1) . ' control / OR number is too long (max ' . MAX_PAYMENT_REF . ' characters).';
                 $valid = false;
             }
+            $ctrl_numbers[$k] = san_str(is_string($v) ? $v : '', MAX_PAYMENT_REF);
         }
         // Mode of payment required for any installment with amount > 0
         if ($valid) {
@@ -380,12 +385,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
 
     } else {
         // Legacy single-amount update (policies without installment rows)
-        $payment_amount = san_float($_POST['payment_amount'] ?? '', 0.0);
+        [$payment_amount, $amount_err] = read_money($_POST['payment_amount'] ?? '', 'Payment amount', true);
         $payment_notes  = san_str($_POST['payment_notes'] ?? '', MAX_NOTE);
         if (text_too_long($_POST['payment_notes'] ?? '', MAX_NOTE))
             $pay_errors[] = 'Payment notes are too long (max ' . MAX_NOTE . ' characters).';
 
-        if ($payment_amount <= 0)
+        if ($amount_err !== '')
+            $pay_errors[] = $amount_err;
+        elseif ($payment_amount <= 0)
             $pay_errors[] = 'Payment amount must be greater than zero.';
         elseif (payment_exceeds($payment_amount, (float)$policy['balance']))
             $pay_errors[] = 'Payment amount cannot exceed the remaining balance of PHP ' . number_format($policy['balance'], 2) . '.';
@@ -825,7 +832,7 @@ require_once '../../includes/topbar.php';
                         <input type="hidden" name="control_number[]" value="<?= htmlspecialchars($v_ctrl) ?>"/>
                         <span style="font-size:0.82rem;font-weight:600;color:var(--text-primary);"><?= htmlspecialchars($v_ctrl ?: '—') ?></span>
                       <?php else: ?>
-                        <input type="text" name="control_number[]" class="field-input"
+                        <input type="text" name="control_number[]" class="field-input" maxlength="<?= MAX_PAYMENT_REF ?>"
                           style="width:130px;" placeholder="Ref / OR No."
                           value="<?= htmlspecialchars($v_ctrl) ?>"/>
                       <?php endif; ?>
@@ -848,7 +855,7 @@ require_once '../../includes/topbar.php';
                         </div>
                         <?php endif; ?>
                       <?php else: ?>
-                        <input type="number" step="0.01" min="0"
+                        <input type="number" step="0.01" min="0" max="<?= MAX_MONEY ?>" data-money
                           name="installment_amount[]"
                           class="field-input inst-paid-input"
                           style="width:110px;text-align:right;"
@@ -896,7 +903,7 @@ require_once '../../includes/topbar.php';
             <div class="form-grid" style="margin-bottom:1rem;">
               <div class="field">
                 <label class="field-label">Payment Amount (PHP) <span class="req">*</span></label>
-                <input type="number" step="0.01" min="0.01" max="<?= $policy['balance'] ?>" name="payment_amount" id="payment_amount" class="field-input"
+                <input type="number" step="0.01" min="0.01" max="<?= $policy['balance'] ?>" data-money name="payment_amount" id="payment_amount" class="field-input"
                   placeholder="0.00" value="<?= old('payment_amount') ?>"/>
                 <span class="field-hint">Remaining balance: PHP <?= number_format($policy['balance'], 2) ?></span>
                 <span class="field-hint" id="balance-after" style="font-weight:600;"></span>

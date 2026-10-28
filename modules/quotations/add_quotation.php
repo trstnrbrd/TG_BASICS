@@ -93,18 +93,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_mechanic) {
     $areas      = $_POST['area']       ?? [];
     $qtys       = $_POST['qty']        ?? [];
     $prices     = $_POST['unit_price'] ?? [];
-    $discount   = san_float($_POST['discount'] ?? 0);
+    [$discount, $disc_err] = read_money($_POST['discount'] ?? '', 'Discount');
+    if ($disc_err !== '') $errors[] = $disc_err;
     $notes      = san_str($_POST['notes'] ?? '', MAX_NOTE);
     if (text_too_long($_POST['notes'] ?? '', MAX_NOTE)) $errors[] = 'Notes are too long (max ' . MAX_NOTE . ' characters).';
     $status     = san_enum($_POST['status'] ?? 'draft', ['draft', 'pending_approval']);
 
+    // Each line: a bad quantity, price or description is an error naming the line, never a silently dropped
+    // line or a ₱0 price (san_float() used to turn anything out of range into 0).
     $items = [];
-    foreach ($descs as $i => $raw_desc) {
-        $desc  = san_str($raw_desc, 255);
+    foreach ((is_array($descs) ? $descs : []) as $i => $raw_desc) {
+        $line = 'Item ' . ((int)$i + 1);
+        if (text_too_long($raw_desc, MAX_ITEM_DESC)) { $errors[] = "$line: description is too long (max " . MAX_ITEM_DESC . ' characters).'; continue; }
+        $desc  = san_str($raw_desc, MAX_ITEM_DESC);
+        if ($desc === '') continue;   // a blank row is just left out
         $area  = san_str($areas[$i] ?? '', 50);
-        $qty   = san_float($qtys[$i] ?? 1, 0.01);
-        $price = san_float($prices[$i] ?? 0);
-        if ($desc === '') continue;
+        $raw_q = is_string($qtys[$i] ?? null) ? str_replace(',', '', trim($qtys[$i])) : '';
+        if (!is_numeric($raw_q) || preg_match('/[eE]/', $raw_q) || (float)$raw_q <= 0 || (float)$raw_q > MAX_QTY || preg_match('/\.\d{3,}$/', $raw_q)) {
+            $errors[] = "$line: quantity must be a number from 0.01 to " . MAX_QTY . ' (up to 2 decimals).';
+            continue;
+        }
+        $qty = round((float)$raw_q, 2);
+        [$price, $price_err] = read_money($prices[$i] ?? '', "$line: unit price", true);
+        if ($price_err !== '') { $errors[] = $price_err; continue; }
+        if ($qty * $price > MAX_MONEY) { $errors[] = "$line: amount is too large (max ₱" . number_format(MAX_MONEY, 2) . ').'; continue; }
         $items[] = [
             'desc'       => $desc,
             'area'       => $area,
@@ -115,11 +127,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_mechanic) {
         ];
     }
 
-    if (empty($items)) $errors[] = 'Add at least one line item.';
+    if (empty($items) && empty($errors)) $errors[] = 'Add at least one line item.';
+    $subtotal = round(array_sum(array_column($items, 'subtotal')), 2);
+    if (empty($errors) && $subtotal > MAX_MONEY) $errors[] = 'The quotation subtotal is too large (max ₱' . number_format(MAX_MONEY, 2) . ').';
+    if (empty($errors) && round($discount, 2) > $subtotal) {
+        $errors[] = 'The discount cannot be more than the subtotal (₱' . number_format($subtotal, 2) . ').';
+    }
 
     if (empty($errors)) {
-        $subtotal = array_sum(array_column($items, 'subtotal'));
-        $total    = max(0, $subtotal - $discount);
+        $total    = round($subtotal - $discount, 2);
 
         $conn->begin_transaction();
         try {
@@ -194,7 +210,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_mechanic) {
 // ── PRE-BUILD ITEMS: use existing if edit mode, else suggest from checklist ──
 $suggested = [];
 $svc = $job['service_type'];
-if ($edit_mode && !empty($edit_items)) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors && is_array($_POST['desc'] ?? null)) {
+    // the form came back with an error: show the lines exactly as they were typed, not the suggestions again
+    foreach ($_POST['desc'] as $i => $d) {
+        $q = $_POST['qty'][$i] ?? '1'; $p = $_POST['unit_price'][$i] ?? '0';
+        $q = is_scalar($q) ? (string)$q : '1'; $p = is_scalar($p) ? (string)$p : '0';
+        $suggested[] = [
+            'desc'       => is_scalar($d) ? (string)$d : '',
+            'area'       => is_scalar($_POST['area'][$i] ?? null) ? (string)$_POST['area'][$i] : '',
+            'qty'        => $q,
+            'unit_price' => $p,
+            'subtotal'   => is_numeric($q) && is_numeric($p) ? (float)$q * (float)$p : 0,
+        ];
+    }
+} elseif ($edit_mode && !empty($edit_items)) {
     foreach ($edit_items as $ei) {
         $suggested[] = [
             'desc'       => $ei['description'],
@@ -326,7 +355,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <tbody id="items-body">
           <?php foreach ($suggested as $i => $it): ?>
           <tr class="item-row" data-idx="<?= $i ?>">
-            <td><input type="text" name="desc[]" class="field-input item-desc" value="<?= htmlspecialchars($it['desc']) ?>" placeholder="Service / part description" required style="width:100%;min-width:180px;"/></td>
+            <td><input type="text" name="desc[]" class="field-input item-desc" maxlength="<?= MAX_ITEM_DESC ?>" value="<?= htmlspecialchars($it['desc']) ?>" placeholder="Service / part description" required style="width:100%;min-width:180px;"/></td>
             <td>
               <select name="area[]" class="field-select item-area" style="font-size:0.78rem;padding:0.38rem 0.6rem;">
                 <option value="">— General —</option>
@@ -335,8 +364,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 <?php endforeach; ?>
               </select>
             </td>
-            <td><input type="number" name="qty[]" class="field-input item-qty" value="<?= $it['qty'] ?>" min="0.01" step="0.01" style="text-align:center;width:65px;" required/></td>
-            <td><input type="number" name="unit_price[]" class="field-input item-price" value="<?= $it['unit_price'] ?>" min="0" step="0.01" style="text-align:right;width:120px;" required/></td>
+            <td><input type="number" name="qty[]" class="field-input item-qty" value="<?= htmlspecialchars((string)$it['qty']) ?>" min="0.01" max="<?= MAX_QTY ?>" step="0.01" style="text-align:center;width:65px;" required/></td>
+            <td><input type="number" name="unit_price[]" class="field-input item-price" data-money value="<?= htmlspecialchars((string)$it['unit_price']) ?>" min="0" max="<?= MAX_MONEY ?>" step="0.01" style="text-align:right;width:120px;" required/></td>
             <td style="text-align:right;font-weight:700;font-size:0.82rem;color:var(--text-primary);white-space:nowrap;" class="item-sub">PHP <?= number_format($it['subtotal'], 2) ?></td>
             <td style="text-align:center;">
               <button type="button" class="btn-remove-row" title="Remove" style="background:none;border:none;cursor:pointer;color:var(--danger);padding:0.25rem;"><?= icon('trash', 14) ?></button>
@@ -357,7 +386,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <span class="qt-total-label">Discount</span>
         <span style="display:flex;align-items:center;gap:0.35rem;">
           <span style="font-size:0.82rem;color:var(--text-muted);">PHP</span>
-          <input type="number" name="discount" id="discount-input" value="0" min="0" step="0.01"
+          <input type="number" name="discount" id="discount-input" data-money value="<?= htmlspecialchars(is_scalar($_POST['discount'] ?? null) ? (string)$_POST['discount'] : ($edit_mode && isset($edit_qt['discount']) ? (string)$edit_qt['discount'] : '0')) ?>" min="0" step="0.01"
             style="width:110px;text-align:right;padding:0.35rem 0.55rem;border:1px solid var(--border);border-radius:8px;background:var(--bg-2);color:var(--text-primary);font-size:0.82rem;font-family:monospace;"/>
         </span>
       </div>
@@ -426,7 +455,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- HIDDEN ROW TEMPLATE -->
 <template id="row-template">
   <tr class="item-row">
-    <td><input type="text" name="desc[]" class="field-input item-desc" placeholder="Service / part description" required style="width:100%;min-width:180px;"/></td>
+    <td><input type="text" name="desc[]" class="field-input item-desc" maxlength="<?= MAX_ITEM_DESC ?>" placeholder="Service / part description" required style="width:100%;min-width:180px;"/></td>
     <td>
       <select name="area[]" class="field-select item-area" style="font-size:0.78rem;padding:0.38rem 0.6rem;">
         <option value="">— General —</option>
@@ -435,8 +464,8 @@ document.addEventListener('DOMContentLoaded', function() {
         <?php endforeach; ?>
       </select>
     </td>
-    <td><input type="number" name="qty[]" class="field-input item-qty" value="1" min="0.01" step="0.01" style="text-align:center;width:65px;" required/></td>
-    <td><input type="number" name="unit_price[]" class="field-input item-price" value="0" min="0" step="0.01" style="text-align:right;width:120px;" required/></td>
+    <td><input type="number" name="qty[]" class="field-input item-qty" value="1" min="0.01" max="<?= MAX_QTY ?>" step="0.01" style="text-align:center;width:65px;" required/></td>
+    <td><input type="number" name="unit_price[]" class="field-input item-price" data-money value="0" min="0" max="<?= MAX_MONEY ?>" step="0.01" style="text-align:right;width:120px;" required/></td>
     <td style="text-align:right;font-weight:700;font-size:0.82rem;color:var(--text-primary);white-space:nowrap;" class="item-sub">PHP 0.00</td>
     <td style="text-align:center;">
       <button type="button" class="btn-remove-row" title="Remove" style="background:none;border:none;cursor:pointer;color:var(--danger);padding:0.25rem;"><?= icon('trash', 14) ?></button>

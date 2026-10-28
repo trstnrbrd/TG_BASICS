@@ -162,6 +162,7 @@ TG-BASICS/
    ```bash
    cp config/db.example.php     config/db.php       # database credentials
    cp config/ocr.example.php    config/ocr.php      # OCR.space API key
+   cp config/pusher.example.php config/pusher.php   # Pusher keys for live updates (optional)
    ```
    Email needs no file: the Gmail address and App Password are entered in **Settings** and stored in the database.
 
@@ -178,7 +179,7 @@ dev ──(tested, merged after shop hours)──▶ master ──(GitHub Action
 
 - Day-to-day work goes to the **`dev`** branch — pushing it does **not** touch the live site.
 - Pushing to **`master`** runs [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml), which uploads the code to InfinityFree over FTP.
-- `config/db.php`, `config/ocr.php`, `uploads/`, `tests/` and `*.sql` are never uploaded — production config is edited by hand in InfinityFree's File Manager.
+- `config/db.php`, `config/ocr.php`, `config/pusher.php`, `uploads/`, `tests/` and `*.sql` are never uploaded — production config is edited by hand in InfinityFree's File Manager.
 
 > [!WARNING]
 > **Database changes are manual and go first.** When a release needs new columns, run the SQL in production phpMyAdmin (after exporting a backup) **before** merging to `master` — code that expects a missing column breaks those pages until the SQL is run.

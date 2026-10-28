@@ -3,6 +3,7 @@
 # Copy the .example versions and fill in real values locally.
 config/db.php
 config/ocr.php
+config/pusher.php
 
 # ── ENVIRONMENT FILES ─────────────────────────────────────────────────────────
 .env

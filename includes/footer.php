@@ -32,11 +32,23 @@ $footer_extra_scripts  = $footer_extra_scripts  ?? '';
       init = init || {};
       var headers = new Headers(init.headers || {});
       if (!headers.has('Accept')) headers.set('Accept', 'application/json');
+      // live updates: a save made from this page doesn't make this page reload (includes/realtime.php)
+      var tab = window.TG_LIVE_tab && window.TG_LIVE_tab();
+      if (tab && !headers.has('X-Live-Tab')) headers.set('X-Live-Tab', tab);
+      if (String(init.method || 'GET').toUpperCase() === 'POST' && window.TG_LIVE_ownSave) window.TG_LIVE_ownSave();
       init.headers = headers;
       return nativeFetch.call(window, input, init);
     };
   })();
 </script>
+
+<!-- Live updates: pages reload themselves when someone else saves (assets/js/shared/realtime.js) -->
+<?php $tg_live = realtime_client_config(); ?>
+<?php if ($tg_live): ?>
+<script src="https://js.pusher.com/8.4.0/pusher.min.js"></script>
+<?php endif; ?>
+<script>window.TG_LIVE = <?= json_encode($tg_live + ['base' => $base_path]) ?>;</script>
+<script src="<?= $base_path ?>assets/js/shared/realtime.js?v=<?= filemtime(__DIR__ . '/../assets/js/shared/realtime.js') ?>"></script>
 
 <?php if ($footer_extra_scripts): ?>
   <?= $footer_extra_scripts ?>

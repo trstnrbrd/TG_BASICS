@@ -4,24 +4,26 @@
  */
 
 // ── LENGTH LIMITS ──────────────────────────────────────────────────────────
-const MAX_NAME        = 100;
-const MAX_EMAIL       = 255;
+const MAX_NAME        = 100;    // clients.full_name is VARCHAR(100)
+const MAX_EMAIL       = 100;    // clients.email is VARCHAR(100)
 const MAX_USERNAME    = 50;
-const MAX_PASSWORD    = 128;
-const MAX_ADDRESS     = 300;
+const MAX_PASSWORD    = 125;
+const MAX_ADDRESS     = 125;
 const PHONE_DIGITS    = 11;     // 09XXXXXXXXX
 const MAX_COMPANY_CONTACT = 20; // Settings: mobile or landline, e.g. "(044) 123-4567"
-const MAX_MONEY       = 99_999_999.99;   // policy amounts are DECIMAL(10,2) in the database (money_input.js: 8 digits)
+const MAX_MONEY       = 99_999_999.99;   // policy, payment, receipt and quotation amounts are DECIMAL(10,2) (typing stops at 8 digits)
 const MAX_PAYMENT_REF = 50;               // installment control / OR number
 const MAX_NOTE        = 125;              // every notes / description / remarks box (panel: short notes only)
-const MAX_PLATE       = 20;
+const MAX_QTY         = 999;              // quotation line quantity (column DECIMAL(6,2))
+const MAX_ITEM_DESC   = 255;              // quotation line description
+const MAX_PLATE       = 8;
 const MAX_MAKE_MODEL  = 60;
 const MAX_COLOR       = 50;
 const MAX_MOTOR_SN    = 50;
 const MAX_POLICY_NUM  = 60;
 const MAX_MORTGAGEE   = 100;
 const MAX_FACEBOOK    = 100;    // client's Facebook name (optional)
-const MAX_TEXT        = 2000;   // descriptions, notes
+const MAX_TEXT        = 500;   // descriptions, notes
 const MAX_SEARCH      = 100;
 const MAX_TOKEN       = 128;
 
@@ -116,6 +118,24 @@ function money_too_large(mixed $raw): bool {
     return is_numeric($raw) && (float)$raw > MAX_MONEY;
 }
 
+/**
+ * A peso amount the user typed, checked the same way on every payment form.
+ * Accepts "1500", "1,500.50", "₱ 1,500". Blank is 0 (or an error when $required).
+ * Returns [amount, error message or ''], $label naming the field in the message, e.g. "Amount paid".
+ */
+function read_money(mixed $raw, string $label, bool $required = false): array {
+    if ($raw === null || (is_string($raw) && trim($raw) === '')) {
+        return [0.0, $required ? "$label is required." : ''];
+    }
+    if (!is_string($raw) && !is_int($raw) && !is_float($raw)) return [0.0, "$label must be a valid amount."];
+    $v = str_replace([',', ' ', '₱'], '', trim((string)$raw));
+    if (!is_numeric($v) || preg_match('/[eE]/', $v)) return [0.0, "$label must be a valid amount."];
+    if ((float)$v < 0)                                return [0.0, "$label cannot be negative."];
+    if ((float)$v > MAX_MONEY)                        return [0.0, "$label is too large (max ₱" . number_format(MAX_MONEY, 2) . ').'];
+    if (preg_match('/\.\d{3,}$/', $v))                return [0.0, "$label can only have up to 2 decimal places (centavos)."];
+    return [round((float)$v, 2), ''];
+}
+
 /** Text typed longer than $max. san_str() turns it into '', which would save as "left blank" — say so instead. */
 function text_too_long(mixed $raw, int $max): bool {
     return is_string($raw) && mb_strlen(trim($raw)) > $max;
@@ -155,7 +175,7 @@ function validate_username(string $v): bool {
     return preg_match('/^[a-zA-Z0-9_]{3,' . MAX_USERNAME . '}$/', $v) === 1;
 }
 
-/** Password: 8–128 chars, needs an uppercase letter, a number, and a special character. */
+/** Password: 8 to MAX_PASSWORD chars, needs an uppercase letter, a number, and a special character. */
 function validate_password(string $v): bool {
     if (mb_strlen($v) < 8 || mb_strlen($v) > MAX_PASSWORD) return false;
     if (!preg_match('/[A-Z]/', $v))          return false;

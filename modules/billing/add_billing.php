@@ -41,17 +41,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $billed_to     = san_str($_POST['billed_to']     ?? '', 255);
     $incident_date = san_str($_POST['incident_date']  ?? '', 10);
     $repair_date   = san_str($_POST['repair_date']    ?? '', 10);
-    $parts_cost    = (float)str_replace(',', '', $_POST['parts_cost']  ?? '0');
-    $labor_cost    = (float)str_replace(',', '', $_POST['labor_cost']  ?? '0');
-    $other_cost    = (float)str_replace(',', '', $_POST['other_cost']  ?? '0');
-    $deductible    = (float)str_replace(',', '', $_POST['deductible']  ?? '0');
+    // Each amount checked by read_money(): a typo is an error, never a silent ₱0
+    [$parts_cost, $e1] = read_money($_POST['parts_cost'] ?? '', 'Parts cost');
+    [$labor_cost, $e2] = read_money($_POST['labor_cost'] ?? '', 'Labor cost');
+    [$other_cost, $e3] = read_money($_POST['other_cost'] ?? '', 'Other cost');
+    [$deductible, $e4] = read_money($_POST['deductible'] ?? '', 'Deductible');
+    foreach ([$e1, $e2, $e3, $e4] as $e) if ($e !== '') $errors[] = $e;
+    // the amount due is (parts + labor + other) - deductible: it must never go below zero
+    if ($e1 . $e2 . $e3 . $e4 === '' && round($deductible, 2) > round($parts_cost + $labor_cost + $other_cost, 2)) {
+        $errors[] = 'The deductible cannot be more than the total cost of repair (₱' . number_format($parts_cost + $labor_cost + $other_cost, 2) . ').';
+    }
     $notes         = san_str($_POST['notes'] ?? '', MAX_NOTE);
     if (text_too_long($_POST['notes'] ?? '', MAX_NOTE)) $errors[] = 'Notes are too long (max ' . MAX_NOTE . ' characters).';
 
     if ($claim_id === 0) $errors[] = 'A linked claim is required.';
     if ($billed_to === '') $errors[] = 'Billed To (insurance company) is required.';
-    if ($parts_cost < 0 || $labor_cost < 0 || $other_cost < 0) $errors[] = 'Costs must be 0 or positive.';
-    if ($deductible < 0) $errors[] = 'Deductible must be 0 or positive.';
     if ($incident_date !== '' && !validate_date($incident_date)) $errors[] = 'Incident date is not a valid date.';
     if ($repair_date   !== '' && !validate_date($repair_date))   $errors[] = 'Repair date is not a valid date.';
 
@@ -268,7 +272,7 @@ require_once '../../includes/topbar.php';
                   <label class="field-label">Total Parts</label>
                   <div class="field-prefix-wrap">
                     <span class="field-prefix">₱</span>
-                    <input type="number" name="parts_cost" class="field-input field-with-prefix"
+                    <input type="number" name="parts_cost" class="field-input field-with-prefix" data-money max="<?= MAX_MONEY ?>"
                       value="<?= old('parts_cost', '0') ?>"
                       min="0" step="0.01" id="parts_cost" oninput="calcTotal()"/>
                   </div>
@@ -277,7 +281,7 @@ require_once '../../includes/topbar.php';
                   <label class="field-label">Labor &amp; Materials</label>
                   <div class="field-prefix-wrap">
                     <span class="field-prefix">₱</span>
-                    <input type="number" name="labor_cost" class="field-input field-with-prefix"
+                    <input type="number" name="labor_cost" class="field-input field-with-prefix" data-money max="<?= MAX_MONEY ?>"
                       value="<?= old('labor_cost', '0') ?>"
                       min="0" step="0.01" id="labor_cost" oninput="calcTotal()"/>
                   </div>
@@ -286,7 +290,7 @@ require_once '../../includes/topbar.php';
                   <label class="field-label">Other Charges</label>
                   <div class="field-prefix-wrap">
                     <span class="field-prefix">₱</span>
-                    <input type="number" name="other_cost" class="field-input field-with-prefix"
+                    <input type="number" name="other_cost" class="field-input field-with-prefix" data-money max="<?= MAX_MONEY ?>"
                       value="<?= old('other_cost', '0') ?>"
                       min="0" step="0.01" id="other_cost" oninput="calcTotal()"/>
                   </div>
@@ -295,7 +299,7 @@ require_once '../../includes/topbar.php';
                   <label class="field-label">Less: Deductible / Participation Fee</label>
                   <div class="field-prefix-wrap">
                     <span class="field-prefix">₱</span>
-                    <input type="number" name="deductible" class="field-input field-with-prefix"
+                    <input type="number" name="deductible" class="field-input field-with-prefix" data-money max="<?= MAX_MONEY ?>"
                       value="<?= old('deductible', $prefill_claim['participation_fee'] ?? '0') ?>"
                       min="0" step="0.01" id="deductible" oninput="calcTotal()"/>
                   </div>

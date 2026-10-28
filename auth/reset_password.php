@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $record && !$record['used'] && strt
     $confirm_pw   = san_str($_POST['confirm_password'] ?? '', MAX_PASSWORD);
 
     if (!validate_password($new_password)) {
-        $error = 'Password must be 8–128 characters and include an uppercase letter, a number, and a special character.';
+        $error = 'Password must be 8–' . MAX_PASSWORD . ' characters and include an uppercase letter, a number, and a special character.';
     } elseif ($new_password !== $confirm_pw) {
         $error = 'Passwords do not match.';
     } else {

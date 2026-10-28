@@ -196,7 +196,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                     exit;
                 }
                 if (!validate_password($new_pw)) {
-                    api_error('Password must be 8–128 characters and include an uppercase letter, a number, and a special character.');
+                    api_error('Password must be 8–' . MAX_PASSWORD . ' characters and include an uppercase letter, a number, and a special character.');
                     exit;
                 }
                 if ($new_pw !== $cfm_pw) {

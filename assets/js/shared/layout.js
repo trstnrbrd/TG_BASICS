@@ -198,6 +198,11 @@ document.addEventListener('input', function (e) {
       }
       clean = clean.slice(0, cut).replace(/[\s-]+$/, '');
     }
+  } else if (el.matches('input[data-money]')) {
+    // a peso amount: at most 8 whole digits (MAX_MONEY in config/validators.php) and 2 decimals
+    var m = el.value.match(/^(\d*)(\.\d*)?/);
+    if (!m || el.value === '') return;
+    clean = m[1].slice(0, 8) + (m[2] ? m[2].slice(0, 3) : '');   // m[2] includes the "."
   } else if (el.matches('input[data-allow]') && TG_ALLOW[el.getAttribute('data-allow')]) {
     clean = el.value.replace(TG_ALLOW[el.getAttribute('data-allow')], '');
   } else {

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../../includes/branding.php';
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../config/settings.php';
 require_once __DIR__ . '/../../includes/icons.php';
@@ -21,7 +22,7 @@ function pub_not_found(): never {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Profile Not Found — TG-BASICS</title>
-<link rel="icon" type="image/png" href="../../assets/img/tg_logo.png">
+<link rel="icon" type="image/png" href="<?= brand_logo('tg', '../../') ?>">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -40,8 +41,8 @@ body{font-family:"Plus Jakarta Sans","Segoe UI",sans-serif;background:linear-gra
 <body>
 <div class="err-wrap">
   <div class="err-logos">
-    <img src="../../assets/img/tg_logo.png" alt="TG Customworks">
-    <img src="../../assets/img/LogoBasicCar.png" alt="Basic Car Insurance">
+    <img src="<?= brand_logo('tg', '../../') ?>" alt="TG Customworks">
+    <img src="<?= brand_logo('basic', '../../') ?>" alt="Basic Car Insurance">
   </div>
   <div class="err-code">404 — Not Found</div>
   <div class="err-icon">
@@ -214,7 +215,7 @@ $initials = strtoupper(substr(implode('', array_map(fn($w) => $w[0], $words)), 0
 <meta name="robots" content="noindex, nofollow, noarchive">
 <meta name="referrer" content="no-referrer">
 <title><?= htmlspecialchars($client['full_name']) ?> — <?= htmlspecialchars($company_name) ?></title>
-<link rel="icon" type="image/png" href="../../assets/img/tg_logo.png">
+<link rel="icon" type="image/png" href="<?= brand_logo('tg', '../../') ?>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Big+Shoulders+Text:wght@800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../../assets/css/public/client.css?v=<?= filemtime(__DIR__ . '/../../assets/css/public/client.css') ?>"/>
@@ -228,7 +229,7 @@ $initials = strtoupper(substr(implode('', array_map(fn($w) => $w[0], $words)), 0
 <!-- PAGE LOADER -->
 <div id="pub-loader" style="position:fixed;inset:0;z-index:9999;background:linear-gradient(160deg,#1c1a17 0%,#252118 50%,#1a1710 100%);display:flex;align-items:center;justify-content:center;">
   <div style="display:flex;flex-direction:column;align-items:center;gap:1.25rem;">
-    <img src="../../assets/img/tg_logo.png" alt="TG" style="width:64px;height:64px;object-fit:contain;animation:loaderPulse 1.2s ease-in-out infinite;">
+    <img src="<?= brand_logo('tg', '../../') ?>" alt="TG" style="width:64px;height:64px;object-fit:contain;animation:loaderPulse 1.2s ease-in-out infinite;">
     <div style="width:28px;height:28px;border:2.5px solid rgba(212,160,23,0.2);border-top-color:#d4a017;border-radius:50%;animation:loaderSpin 0.75s linear infinite;"></div>
   </div>
 </div>
@@ -236,8 +237,8 @@ $initials = strtoupper(substr(implode('', array_map(fn($w) => $w[0], $words)), 0
 <!-- TOP NAV -->
 <nav class="pub-nav">
   <div class="pub-nav-logos">
-    <img src="../../assets/img/tg_logo.png" alt="TG Customworks" class="pub-nav-img">
-    <img src="../../assets/img/LogoBasicCar.png" alt="Basic Car Insurance" class="pub-nav-img">
+    <img src="<?= brand_logo('tg', '../../') ?>" alt="TG Customworks" class="pub-nav-img">
+    <img src="<?= brand_logo('basic', '../../') ?>" alt="Basic Car Insurance" class="pub-nav-img">
   </div>
   <div class="pub-nav-brand">
     <div class="pub-nav-brand-name">TG<span>-BASICS</span></div>

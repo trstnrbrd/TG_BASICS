@@ -1,6 +1,8 @@
 <?php
 use PHPMailer\PHPMailer\PHPMailer;
 
+require_once __DIR__ . '/branding.php';
+
 /**
  * includes/email_template.php — every outgoing email's content: the shared template, the logo, and the
  * twelve send*Email() functions. This file is tracked by git (unlike config/mailer.php, which holds the
@@ -30,11 +32,12 @@ function _getCompanyAddress(): string {
  * block by default until the person clicks "show images". buildEmailTemplate()'s header references them as
  * cid:tg_logo / cid:basic_logo. The *_email.png files are small (resized copies of the real assets/img logos,
  * which are multi-megabyte originals meant for the web app, not for attaching to every email) — made once
- * with Resize-Logo in PowerShell (System.Drawing), not regenerated on the fly.
+ * with Resize-Logo in PowerShell (System.Drawing), not regenerated on the fly. A custom logo set in settings
+ * (includes/branding.php) is embedded as is, so keep that file small.
  */
 function embedEmailLogos(PHPMailer $mail): void {
-    $mail->addEmbeddedImage(__DIR__ . '/../assets/img/tg_logo_email.png', 'tg_logo', 'tg_logo.png');
-    $mail->addEmbeddedImage(__DIR__ . '/../assets/img/LogoBasicCar_email.png', 'basic_logo', 'basic_logo.png');
+    $mail->addEmbeddedImage(__DIR__ . '/../' . brand_logo_file('tg', true), 'tg_logo', basename(brand_logo_file('tg', true)));
+    $mail->addEmbeddedImage(__DIR__ . '/../' . brand_logo_file('basic', true), 'basic_logo', basename(brand_logo_file('basic', true)));
 }
 
 /**

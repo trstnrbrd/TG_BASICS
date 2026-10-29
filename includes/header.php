@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/branding.php';
 $page_title = $page_title ?? 'TG-BASICS';
 $base_path  = $base_path  ?? '../';
 $role_label = match($_SESSION['role'] ?? '') {
@@ -33,7 +34,7 @@ if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
 <meta name="format-detection" content="telephone=no, date=no, email=no, address=no"/>
 <meta name="base_path" content="<?= htmlspecialchars(app_base_path()) ?>"/>
 <title><?= htmlspecialchars($page_title) ?> | TG-BASICS</title>
-<link rel="icon" type="image/png" href="<?= $base_path ?>assets/img/tg_logo.png"/>
+<link rel="icon" type="image/png" href="<?= brand_logo('tg', $base_path) ?>"/>
 <link rel="apple-touch-icon" href="<?= $base_path ?>assets/img/pwa/apple-touch-icon.png"/>
 <link rel="manifest" href="<?= $base_path ?>manifest.webmanifest"/>
 <meta name="theme-color" content="#1A1814"/>

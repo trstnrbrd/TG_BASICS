@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/config/db.php';
+require_once __DIR__ . '/includes/branding.php';
 http_response_code(404);
 require_once __DIR__ . '/includes/icons.php';
 
@@ -24,16 +26,16 @@ if ($logged_in) {
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>404 — Page Not Found | TG-BASICS</title>
-<link rel="icon" type="image/png" href="<?= $base ?>assets/img/tg_logo.png"/>
+<link rel="icon" type="image/png" href="<?= brand_logo('tg', $base) ?>"/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="<?= $base ?>assets/css/404.css?v=<?= filemtime(__DIR__.'/assets/css/404.css') ?>"/>
 </head>
 <body>
 
 <a href="<?= $base ?>" class="brand">
-  <img src="<?= $base ?>assets/img/tg_logo.png" alt="TG"/>
+  <img src="<?= brand_logo('tg', $base) ?>" alt="TG"/>
   <div class="brand-sep"></div>
-  <img src="<?= $base ?>assets/img/LogoBasicCar.png" alt="Basic Car Insurance" style="width:28px;height:28px;border-radius:6px;"/>
+  <img src="<?= brand_logo('basic', $base) ?>" alt="Basic Car Insurance" style="width:28px;height:28px;border-radius:6px;"/>
   <div class="brand-name">TG<span>-BASICS</span></div>
 </a>
 

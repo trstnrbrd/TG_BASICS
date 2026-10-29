@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../../includes/branding.php';
 require_once __DIR__ . '/../../config/session.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
@@ -214,9 +215,9 @@ require_once '../../includes/topbar.php';
 
   <!-- PRINT HEADER (hidden on screen, visible on print) -->
   <div class="mr-print-header" style="display:none;align-items:center;gap:1rem;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:2px solid #B8860B;">
-    <img src="../../assets/img/tg_logo.png" style="height:44px;width:auto;object-fit:contain;" alt="TG">
+    <img src="<?= brand_logo('tg', '../../') ?>" style="height:44px;width:auto;object-fit:contain;" alt="TG">
     <div style="width:1px;height:40px;background:#ddd;"></div>
-    <img src="../../assets/img/LogoBasicCar.png" style="height:44px;width:auto;object-fit:contain;" alt="Basic Car">
+    <img src="<?= brand_logo('basic', '../../') ?>" style="height:44px;width:auto;object-fit:contain;" alt="Basic Car">
     <div style="width:1px;height:40px;background:#ddd;"></div>
     <div>
       <div style="font-size:1rem;font-weight:800;color:#1a1710;"><?= htmlspecialchars($company_name) ?></div>

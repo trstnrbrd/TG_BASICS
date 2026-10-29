@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/branding.php';
 require_once __DIR__ . "/../config/session.php";
 require_once '../config/db.php';
 require_once '../config/settings.php';
@@ -179,7 +180,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <meta name="format-detection" content="telephone=no, date=no, email=no, address=no"/>
 <title>Sign In | TG-BASICS</title>
-<link rel="icon" type="image/png" href="../assets/img/tg_logo.png"/>
+<link rel="icon" type="image/png" href="<?= brand_logo('tg', '../') ?>"/>
 <link rel="apple-touch-icon" href="../assets/img/pwa/apple-touch-icon.png"/>
 <link rel="manifest" href="../manifest.webmanifest"/>
 <meta name="theme-color" content="#1A1814"/>
@@ -224,9 +225,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <div class="auth-right-brand">
         <a href="../" class="auth-brand-link">
           <div class="auth-brand-logos">
-            <div class="auth-right-logo" style="background-image:url('../assets/img/tg_logo.png')"></div>
+            <div class="auth-right-logo" style="background-image:url('<?= brand_logo('tg', '../') ?>')"></div>
             <div class="auth-brand-sep"></div>
-            <div class="auth-right-logo-basic" style="background-image:url('../assets/img/LogoBasicCar.png')"></div>
+            <div class="auth-right-logo-basic" style="background-image:url('<?= brand_logo('basic', '../') ?>')"></div>
           </div>
         </a>
         <div class="auth-right-name">TG<span>-BASICS</span></div>

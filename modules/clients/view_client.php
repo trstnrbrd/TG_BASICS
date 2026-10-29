@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../../includes/branding.php';
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
@@ -355,7 +356,7 @@ require_once '../../includes/topbar.php';
           <div style="position:relative;background:#fff;padding:6px;border-radius:8px;border:1px solid var(--border);box-shadow:var(--shadow);flex-shrink:0;line-height:0;">
             <div id="qr-canvas-wrap" style="width:90px;height:90px;display:block;"></div>
             <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px #fff;">
-              <img src="<?= $base_path ?>assets/img/tg_logo.png" alt="" style="width:16px;height:16px;object-fit:contain;border-radius:50%;"/>
+              <img src="<?= brand_logo('tg', $base_path) ?>" alt="" style="width:16px;height:16px;object-fit:contain;border-radius:50%;"/>
             </div>
           </div>
           <div style="display:flex;flex-direction:column;gap:0.35rem;min-width:0;">
@@ -919,7 +920,7 @@ require_once '../../includes/topbar.php';
     ctx.drawImage(canvas, 0, 0, out.width, out.height);
     // Draw TG logo in center
     var logo = new Image();
-    logo.src = '<?= $base_path ?>assets/img/tg_logo.png';
+    logo.src = '<?= brand_logo('tg', $base_path) ?>';
     logo.onload = function() {
       var size = Math.round(out.width * 0.18);
       var x    = Math.round((out.width  - size) / 2);

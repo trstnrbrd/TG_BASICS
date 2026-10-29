@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/branding.php';
 $active_page = $active_page ?? '';
 $base_path   = $base_path   ?? '../';
 
@@ -21,9 +22,9 @@ $dash_url = is_mechanic()
 
   <a href="<?= $dash_url ?>" class="sidebar-logo" title="Go to Dashboard">
     <div class="sidebar-logo-imgs">
-      <img src="<?= $base_path ?>assets/img/tg_logo.png" alt="TG" class="sidebar-logo-img"/>
+      <img src="<?= brand_logo('tg', $base_path) ?>" alt="TG" class="sidebar-logo-img"/>
       <div class="sidebar-logo-sep"></div>
-      <img src="<?= $base_path ?>assets/img/LogoBasicCar.png" alt="BASICS" class="sidebar-logo-img no-ring"/>
+      <img src="<?= brand_logo('basic', $base_path) ?>" alt="BASICS" class="sidebar-logo-img no-ring"/>
     </div>
     <div class="sidebar-logo-name">TG<span>-BASICS</span></div>
   </a>

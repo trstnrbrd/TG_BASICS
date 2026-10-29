@@ -1,6 +1,10 @@
 <?php
+require_once __DIR__ . '/includes/branding.php';
 require_once 'includes/icons.php';
 require_once __DIR__ . '/config/app_url.php';
+require_once __DIR__ . '/config/db.php';
+require_once __DIR__ . '/includes/testimonials.php';
+$testimonials = load_testimonials($conn);
 $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Insurance in Pandi, Bulacan — '
        . 'clients, policies, claims, renewals and repair jobs in one place.';
 ?>
@@ -23,7 +27,7 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
 <meta property="og:image:height" content="512"/>
 <meta property="og:image:alt" content="TG Customworks logo"/>
 <meta name="twitter:card" content="summary"/>
-<link rel="icon" type="image/png" href="assets/img/tg_logo.png"/>
+<link rel="icon" type="image/png" href="<?= brand_logo('tg') ?>"/>
 <link rel="apple-touch-icon" href="assets/img/pwa/apple-touch-icon.png"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <meta name="theme-color" content="#1A1814"/>
@@ -37,9 +41,9 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
 <nav class="topnav">
   <a href="index.php" class="nav-brand">
     <div class="nav-logos">
-      <img src="assets/img/tg_logo.png" alt="TG Customworks" class="nav-logo-img"/>
+      <img src="<?= brand_logo('tg') ?>" alt="TG Customworks" class="nav-logo-img"/>
       <div class="nav-logo-sep"></div>
-      <img src="assets/img/LogoBasicCar.png" alt="Basic Car Insurance" class="nav-logo-img no-ring"/>
+      <img src="<?= brand_logo('basic') ?>" alt="Basic Car Insurance" class="nav-logo-img no-ring"/>
     </div>
     <div>
       <div class="nav-brand-name">TG<span>-BASICS</span></div>
@@ -87,9 +91,9 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
     <div class="hero-right">
       <div class="hero-card-main">
         <div class="hero-card-topbar">
-          <img src="assets/img/tg_logo.png" alt="TG Customworks" class="hc-logo-img"/>
+          <img src="<?= brand_logo('tg') ?>" alt="TG Customworks" class="hc-logo-img"/>
           <div class="hc-logo-sep"></div>
-          <img src="assets/img/LogoBasicCar.png" alt="Basic Car Insurance" class="hc-logo-img no-ring"/>
+          <img src="<?= brand_logo('basic') ?>" alt="Basic Car Insurance" class="hc-logo-img no-ring"/>
           <span class="hc-brand">TG<span>-BASICS</span></span>
           <div class="hc-dot"></div>
         </div>
@@ -213,7 +217,7 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
       <!-- INSURANCE PILLAR -->
       <div class="service-pillar service-pillar--insurance">
         <div class="service-pillar-head">
-          <img src="assets/img/LogoBasicCar.png" alt="Basic Car Insurance" class="service-pillar-logo"/>
+          <img src="<?= brand_logo('basic') ?>" alt="Basic Car Insurance" class="service-pillar-logo"/>
           <div>
             <div class="service-pillar-name">Basic Car Insurance</div>
             <div class="service-pillar-tag">PhilBritish &amp; Alpha Insurance-Accredited Broker</div>
@@ -252,7 +256,7 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
       <!-- REPAIR PILLAR -->
       <div class="service-pillar service-pillar--repair">
         <div class="service-pillar-head">
-          <img src="assets/img/tg_logo.png" alt="TG Customworks" class="service-pillar-logo"/>
+          <img src="<?= brand_logo('tg') ?>" alt="TG Customworks" class="service-pillar-logo"/>
           <div>
             <div class="service-pillar-name">TG Customworks</div>
             <div class="service-pillar-tag">Auto Repair &amp; Paint Shop</div>
@@ -839,7 +843,8 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
     </div>
   </div>
 </section>
-<!-- CLIENT TESTIMONIALS -->
+<!-- CLIENT TESTIMONIALS (from the testimonials table; hidden when there are none) -->
+<?php if ($testimonials): ?>
 <section id="testimonials" class="page-section page-section--open">
   <div class="section-open-inner js-reveal-container">
     <div class="section-head js-reveal">
@@ -848,31 +853,11 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
       <p class="section-desc">Feedback shared by TG Customworks and Basic Car Insurance clients, lightly rephrased for clarity.</p>
     </div>
 
-    <?php
-    // 'year' is the review's actual posting year — the "X years ago" label is computed
-    // below so it stays correct without manual edits as time passes.
-    $testimonials = [
-      ['name' => 'Jjpot G.',         'source' => 'Facebook Review', 'year' => 2020, 'rating' => 5, 'quote' => 'Sobrang linis at maayos ang trabaho — makikita mo talaga ang kalidad sa sasakyan ko.'],
-      ['name' => 'John Jack D.',     'source' => 'Facebook Review', 'year' => 2020, 'rating' => 5, 'quote' => 'Napakagaling ng kalidad ng trabaho, mabilis pa at pulido ang resulta. Mabait din po ang may-ari, si Mr. Carpio, sa mga kliyente.'],
-      ['name' => 'Joseph Albert O.', 'source' => 'Google Review',   'year' => 2021, 'rating' => 5, 'quote' => 'The service was perfect, and the owner, Mr. Carpio, was very accommodating to his clients.'],
-      ['name' => 'John Michael A.',  'source' => 'Google Review',   'year' => 2021, 'rating' => 5, 'quote' => 'Their work is solid.'],
-      ['name' => 'Ana Katrina V.',   'source' => 'Google Review',   'year' => 2024, 'rating' => 5, 'quote' => 'Maayos ang serbisyo nila.'],
-    ];
-    $current_year = (int)date('Y');
-    foreach ($testimonials as &$t) {
-        $diff = max(0, $current_year - $t['year']);
-        $t['meta'] = $t['source'] . ' · ' . ($diff === 0 ? 'This year' : ($diff === 1 ? '1 year ago' : $diff . ' years ago'));
-    }
-    unset($t);
-    ?>
 
     <div class="testimonial-carousel-wrap">
       <div class="testimonial-carousel" id="testimonial-carousel">
         <?php foreach ($testimonials as $t): ?>
-        <div class="testimonial-card<?= !empty($t['placeholder']) ? ' testimonial-card--placeholder' : '' ?>">
-          <?php if (!empty($t['placeholder'])): ?>
-          <div class="testimonial-placeholder-badge">Placeholder</div>
-          <?php endif; ?>
+        <div class="testimonial-card">
           <div class="testimonial-stars">
             <?php for ($i = 1; $i <= 5; $i++): ?>
               <svg class="rating-star<?= $i <= $t['rating'] ? ' is-filled' : '' ?>" width="15" height="15" viewBox="0 0 20 20"><path d="M10 1.5l2.472 5.007 5.528.803-4 3.899.944 5.507L10 14.14l-4.944 2.576.944-5.507-4-3.899 5.528-.803z"/></svg>
@@ -880,7 +865,7 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
           </div>
           <p class="testimonial-quote">&ldquo;<?= htmlspecialchars($t['quote']) ?>&rdquo;</p>
           <div class="testimonial-author">
-            <div class="testimonial-avatar"><?= strtoupper(substr(trim($t['name'], '[]'), 0, 1)) ?></div>
+            <div class="testimonial-avatar"><?= htmlspecialchars(mb_strtoupper(mb_substr(trim($t['name']), 0, 1))) ?></div>
             <div>
               <div class="testimonial-name"><?= htmlspecialchars($t['name']) ?></div>
               <div class="testimonial-meta"><?= htmlspecialchars($t['meta']) ?></div>
@@ -896,6 +881,7 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
     </div>
   </div>
 </section>
+<?php endif; ?>
 
 <!-- CTA -->
 <section id="contact" class="cta-section js-reveal">
@@ -921,9 +907,9 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
     <!-- Brand col -->
     <div class="footer-brand-col">
       <div class="footer-brand-name">
-        <img src="assets/img/tg_logo.png" alt="TG Customworks" class="footer-logo-img"/>
+        <img src="<?= brand_logo('tg') ?>" alt="TG Customworks" class="footer-logo-img"/>
         <div class="footer-logo-sep"></div>
-        <img src="assets/img/LogoBasicCar.png" alt="Basic Car Insurance" class="footer-logo-img no-ring"/>
+        <img src="<?= brand_logo('basic') ?>" alt="Basic Car Insurance" class="footer-logo-img no-ring"/>
         TG<span>-BASICS</span>
       </div>
       <p class="footer-brand-desc">Brokerage and Auto Shop Integrated Central System. Built exclusively for TG Customworks and Basic Car Insurance.</p>

@@ -32,12 +32,14 @@ function _getCompanyAddress(): string {
  * block by default until the person clicks "show images". buildEmailTemplate()'s header references them as
  * cid:tg_logo / cid:basic_logo. The *_email.png files are small (resized copies of the real assets/img logos,
  * which are multi-megabyte originals meant for the web app, not for attaching to every email) — made once
- * with Resize-Logo in PowerShell (System.Drawing), not regenerated on the fly. A custom logo set in settings
- * (includes/branding.php) is embedded as is, so keep that file small.
+ * with Resize-Logo in PowerShell (System.Drawing), not regenerated on the fly. Their paths are the
+ * logo_tg_email_path / logo_basic_email_path settings (includes/branding.php); one not set up is skipped.
  */
 function embedEmailLogos(PHPMailer $mail): void {
-    $mail->addEmbeddedImage(__DIR__ . '/../' . brand_logo_file('tg', true), 'tg_logo', basename(brand_logo_file('tg', true)));
-    $mail->addEmbeddedImage(__DIR__ . '/../' . brand_logo_file('basic', true), 'basic_logo', basename(brand_logo_file('basic', true)));
+    foreach (['tg' => 'tg_logo', 'basic' => 'basic_logo'] as $which => $cid) {
+        $file = brand_logo_file($which, true);
+        if ($file !== '') $mail->addEmbeddedImage(__DIR__ . '/../' . $file, $cid, basename($file));
+    }
 }
 
 /**

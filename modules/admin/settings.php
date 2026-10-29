@@ -1323,7 +1323,7 @@ require_once '../../includes/topbar.php';
             <div class="field-section" id="insurance-companies" style="margin-top:1.5rem;">Insurance Companies</div>
             <span class="field-hint" style="display:block;margin-bottom:0.75rem;">The companies a policy can be filed under. A deactivated company is not offered for new policies; its existing policies stay.</span>
             <?php if (!$ins_ready): ?>
-            <div class="info-box"><?= icon('information-circle', 14) ?><span>The insurance companies table is not set up on this server yet, so the two original companies are used. Run the database update to manage them here.</span></div>
+            <div class="info-box"><?= icon('information-circle', 14) ?><span>The insurance companies table is not set up on this server yet, so no company can be chosen for a policy. Run the database update to manage them here.</span></div>
             <?php else: ?>
             <div class="tg-table-wrap" style="margin-bottom:1rem;">
               <table class="tg-table" id="ins-co-table">

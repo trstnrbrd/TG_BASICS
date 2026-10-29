@@ -6,6 +6,7 @@ require_once '../../config/settings.php';
 require_once '../../config/access.php';
 require_once '../../includes/transaction.php';
 require_once '../../includes/insurance_companies.php';
+require_once '../../includes/mortgagees.php';
 
 require_role(['admin', 'super_admin']);
 
@@ -599,7 +600,7 @@ require_once '../../includes/topbar.php';
           <!-- PAYMENT SCHEDULE -->
           <div class="field-section">Payment Schedule</div>
           <?php
-          $ph_banks = ['Toyota Financial Services Philippines','BDO Unibank','BPI (Bank of the Philippine Islands)','Metrobank','PNB (Philippine National Bank)','Land Bank of the Philippines','DBP (Development Bank of the Philippines)','China Bank','Security Bank','UnionBank','RCBC','EastWest Bank','PSBank','AUB (Asia United Bank)','CTBC Bank Philippines','PBCOM','Maybank Philippines','Bank of Commerce','UCPB','Sterling Bank of Asia','Philippine Savings Bank (PSBank)','GCash (GSave)','Maya Bank','Tonik Bank','GoTyme Bank','UNObank','Other'];
+          $ph_banks = array_merge(mortgagees_active($conn), ['Other']);   // from the mortgagees table (phpMyAdmin); "Other" = type a name
           $prefill_mort = $_POST['mortgagee'] ?? ($renew_policy['mortgagee'] ?? '');
           $mort_is_other = $prefill_mort !== '' && !in_array($prefill_mort, $ph_banks);
           $mort_select_val = $mort_is_other ? 'Other' : $prefill_mort;

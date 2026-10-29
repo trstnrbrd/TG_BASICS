@@ -6,12 +6,6 @@
 // its existing policies still show and can still be tracked.
 require_once __DIR__ . '/transaction.php';
 
-// Used only until the table exists (servers where the SQL has not been run yet), so nothing breaks in between.
-const INSURANCE_COMPANIES_FALLBACK = [
-    ['company_id' => 0, 'name' => 'PhilBritish', 'short_name' => 'PhilBritish', 'billing_name' => 'PhilBritish Insurance Corp.', 'is_active' => 1, 'sort_order' => 1],
-    ['company_id' => 0, 'name' => 'Alpha Insurance & Surety Company Inc.', 'short_name' => 'Alpha Insurance', 'billing_name' => 'Alpha Insurance & Surety Company Inc.', 'is_active' => 1, 'sort_order' => 2],
-];
-
 /** Every company, active or not, in display order. Cached for the request. */
 function insurance_companies_all(mysqli $conn): array {
     static $cache = null;
@@ -19,9 +13,9 @@ function insurance_companies_all(mysqli $conn): array {
     try {
         $res = $conn->query("SELECT company_id, name, short_name, billing_name, is_active, sort_order
                              FROM insurance_companies ORDER BY sort_order, name");
-        $cache = $res ? $res->fetch_all(MYSQLI_ASSOC) : INSURANCE_COMPANIES_FALLBACK;
+        $cache = $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
     } catch (mysqli_sql_exception $e) {
-        $cache = INSURANCE_COMPANIES_FALLBACK;
+        $cache = [];   // table not set up yet: no companies until the SQL is run
     }
     foreach ($cache as &$co) {
         $co['company_id'] = (int)$co['company_id'];

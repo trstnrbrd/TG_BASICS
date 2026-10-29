@@ -152,6 +152,20 @@ foreach ($phstmt->get_result()->fetch_all(MYSQLI_ASSOC) as $ph) {
     if (repair_job_is_open($ph['status'])) $photos_by_job[(int)$ph['job_id']][] = $ph;
 }
 
+// Live updates: a fingerprint of everything this page shows. When the shop saves something (a Pusher signal, or
+// the 30-second poll when Pusher is unreachable), the page asks ?state=1 and reloads only if ITS fingerprint
+// changed, so one client's page never reloads because of another client's repair. Signals carry no client data.
+$live_state = md5(json_encode([$client['full_name'], $client['contact_number'], $client['email'], $client['address'],
+    $vehicles, $policies, $repair_jobs, $photos_by_job]));
+if (isset($_GET['state'])) {
+    header('Content-Type: application/json');
+    header('Cache-Control: no-store');
+    echo json_encode(['state' => $live_state]);
+    exit;
+}
+require_once __DIR__ . '/../../includes/realtime.php';
+$live_cfg = realtime_client_config();   // public values only (key, cluster); empty = polling only
+
 $status_progress = [
     'pending'     => 10,
     'in_progress' => 50,
@@ -482,6 +496,16 @@ gsap.registerPlugin(ScrollTrigger);
 window.addEventListener('DOMContentLoaded', function () {
   var loader = document.getElementById('pub-loader');
 
+  // A reload made by a live update: no intro animation, back to where the client was
+  var liveY = null;
+  try { liveY = sessionStorage.getItem('pub_live_reload'); sessionStorage.removeItem('pub_live_reload'); } catch (e) {}
+  if (liveY !== null) {
+    loader.style.display = 'none';
+    gsap.set('.pub-nav, .pub-gold-bar, .pub-card, .pub-footer', { autoAlpha: 1, y: 0 });
+    window.scrollTo(0, parseInt(liveY, 10) || 0);
+    return;
+  }
+
   // Hide page content — target specific elements, NOT their parents
   gsap.set('.pub-nav, .pub-gold-bar, .pub-card, .pub-footer', { autoAlpha: 0 });
 
@@ -511,6 +535,46 @@ window.addEventListener('DOMContentLoaded', function () {
     }
   });
 });
+</script>
+<?php if ($live_cfg): ?>
+<script src="https://js.pusher.com/8.4.0/pusher.min.js"></script>
+<?php endif; ?>
+<script>
+// Live updates on the client's page: when the shop saves something, check whether THIS page changed and reload if so
+(function () {
+  var cfg = <?= json_encode($live_cfg + ['pollMs' => 30000]) ?>;
+  var mine = <?= json_encode($live_state) ?>;
+  var url = <?= json_encode('client.php?token=' . $token . '&state=1') ?>;
+  var busy = false, again = false, pollTimer = null;
+  function check() {
+    if (document.hidden) return;
+    if (busy) { again = true; return; }
+    busy = true;
+    fetch(url, { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        if (j && j.state && j.state !== mine) {
+          try { sessionStorage.setItem('pub_live_reload', String(window.scrollY)); } catch (e) {}
+          location.reload();
+        }
+      })
+      .catch(function () {})
+      .then(function () { busy = false; if (again) { again = false; check(); } });
+  }
+  function polling(on) {
+    if (on && !pollTimer) pollTimer = setInterval(check, cfg.pollMs);
+    if (!on && pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  }
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) check(); });
+  window.TG_PUB_check = check;   // for tests
+  if (!cfg.key || !window.Pusher) return polling(true);
+  var pusher = new Pusher(cfg.key, { cluster: cfg.cluster });
+  pusher.subscribe('tg-live').bind('changed', function (d) {
+    if (!d || !d.topic || ['clients', 'repairs', 'policies', 'quotations'].indexOf(d.topic) !== -1) check();
+  });
+  pusher.connection.bind('state_change', function (s) { polling(s.current !== 'connected'); });
+  window.TG_PUB_connected = function () { return pusher.connection.state === 'connected'; };
+})();
 </script>
 </body>
 </html>

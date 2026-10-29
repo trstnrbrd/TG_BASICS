@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../../includes/insurance_companies.php';
 require_once __DIR__ . '/../../config/session.php';
 require_once '../../config/db.php';
 
@@ -98,7 +99,7 @@ require_once '../../includes/topbar.php';
         <!-- Section 7 -->
         <div>
           <div style="font-size:0.7rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);font-weight:700;margin-bottom:0.6rem;">7. Data Sharing</div>
-          <p>Personal data collected through TG-BASICS is <strong style="color:var(--text-primary);">not shared, sold, or disclosed</strong> to third parties except when required by law, or when necessary for the processing of insurance policies and claims with the insuring company the client is enrolled under — either PhilBritish Insurance Corporation or Alpha Insurance &amp; Surety Company Inc.</p>
+          <p>Personal data collected through TG-BASICS is <strong style="color:var(--text-primary);">not shared, sold, or disclosed</strong> to third parties except when required by law, or when necessary for the processing of insurance policies and claims with the insuring company the client is enrolled under — <?= htmlspecialchars(insurance_companies_phrase($conn, 'billing_name', 'or')) ?>.</p>
         </div>
 
         <!-- Section 8 -->

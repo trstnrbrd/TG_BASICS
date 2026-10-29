@@ -3,6 +3,7 @@ require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
+require_once '../../includes/insurance_companies.php';
 
 require_role(['admin', 'super_admin']);
 
@@ -35,7 +36,9 @@ if (!policy_editable($policy['agent_id'] !== null ? (int)$policy['agent_id'] : n
     exit;
 }
 
-$companies     = ['PhilBritish', 'Alpha Insurance & Surety Company Inc.'];
+// the active companies (Settings), plus the policy's own company if it has since been deactivated
+$companies     = array_column(insurance_companies_active($conn), 'name');
+if (!in_array($policy['insurance_company'], $companies, true)) $companies[] = $policy['insurance_company'];
 $term_options  = ['1 time', '3 months', '4 months', '6 months'];
 $terms_map     = ['1 time' => 1, '2 months' => 2, '3 months' => 3, '4 months' => 4, '6 months' => 6, '12 months' => 12];
 if (!in_array($policy['payment_terms'], $term_options, true) && isset($terms_map[$policy['payment_terms']])) {

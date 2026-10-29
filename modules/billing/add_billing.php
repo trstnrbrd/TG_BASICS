@@ -4,6 +4,7 @@ require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../includes/transaction.php';
+require_once '../../includes/insurance_companies.php';
 
 require_role(['admin', 'super_admin']);
 
@@ -19,18 +20,19 @@ if ($prefill_claim_id) {
                c.full_name, c.client_id,
                ip.policy_number,
                ip.participation_fee,
-               v.make, v.model, v.plate_number,
-               COALESCE(ins.insurer_name, 'PhilBritish Insurance Corp.') AS insurer_name
+               ip.insurance_company,
+               v.make, v.model, v.plate_number
         FROM claims cl
         INNER JOIN clients c         ON cl.client_id  = c.client_id
         INNER JOIN insurance_policies ip ON cl.policy_id  = ip.policy_id
         LEFT  JOIN vehicles v        ON ip.vehicle_id = v.vehicle_id
-        LEFT  JOIN (SELECT 'PhilBritish Insurance Corp.' AS insurer_name) ins ON 1=1
         WHERE cl.claim_id = ?
     ");
     $pf->bind_param('i', $prefill_claim_id);
     $pf->execute();
     $prefill_claim = $pf->get_result()->fetch_assoc();
+    // "Billed To" starts as the billing name of the company the claim's policy is under (Settings)
+    if ($prefill_claim) $prefill_claim['insurer_name'] = insurance_company_billing_name($conn, $prefill_claim['insurance_company']);
 }
 
 // ── HANDLE POST ──
@@ -237,7 +239,7 @@ require_once '../../includes/topbar.php';
               <div>
                 <label class="field-label">Billed To (Insurance Company) <span style="color:var(--danger)">*</span></label>
                 <input type="text" name="billed_to" class="field-input"
-                  value="<?= old('billed_to', $prefill_claim['insurer_name'] ?? 'PhilBritish Insurance Corp.') ?>"
+                  value="<?= old('billed_to', $prefill_claim['insurer_name'] ?? (insurance_companies_active($conn)[0]['billing_name'] ?? '')) ?>"
                   placeholder="Insurance company name" required style="width:100%;"/>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">

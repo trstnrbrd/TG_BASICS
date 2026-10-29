@@ -268,7 +268,7 @@ function sendVaultPasswordChangeEmail(string $toEmail, string $toName, string $n
             </div>',
             '',
             '',
-            'Keep this password confidential. Share it only with Admins you personally authorize to access PhilBritish and Alpha Insurance renewal records.'
+            'Keep this password confidential. Share it only with Admins you personally authorize to access insurance renewal records.'
         );
 
         $mail->send();
@@ -293,7 +293,7 @@ function sendVaultRelockedNotice(string $toEmail, string $toName): bool {
         $mail->Body = buildEmailTemplate(
             'Security Notice',
             'Renewal Tracking has been re-locked',
-            'Dear <strong>' . htmlspecialchars($toName) . '</strong>,<br><br>The Renewal Tracking vault password was just changed. Your access has been automatically locked and you will need to enter the new password the next time you open PhilBritish or Alpha Insurance renewal records.<br><br>Please contact the Super Admin to obtain the new password.',
+            'Dear <strong>' . htmlspecialchars($toName) . '</strong>,<br><br>The Renewal Tracking vault password was just changed. Your access has been automatically locked and you will need to enter the new password the next time you open insurance renewal records.<br><br>Please contact the Super Admin to obtain the new password.',
             '',
             '',
             'This is a routine security measure — no action is needed unless you need renewed access to Renewal Tracking.'

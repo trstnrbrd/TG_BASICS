@@ -4,6 +4,7 @@ require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/settings.php';
 require_once '../../includes/pagination.php';
+require_once '../../includes/insurance_companies.php';
 
 require_role(['admin', 'super_admin']);
 
@@ -167,7 +168,7 @@ require_once '../../includes/topbar.php';
     <!-- INFO BOX -->
     <div class="info-box" style="margin-bottom:1.25rem;">
       <?= icon('information-circle', 16) ?>
-      <span>Both PhilBritish and Alpha Insurance &amp; Surety Company Inc. cover vehicles that are <strong><?= (int)getSetting($conn, 'eligibility_max_age', '10') ?> years old or newer</strong> based on the year model. Vehicles older than <?= (int)getSetting($conn, 'eligibility_max_age', '10') ?> years are not eligible for new policy coverage with either company.</span>
+      <span><?= count(insurance_companies_active($conn)) === 2 ? 'Both ' : '' ?><?= htmlspecialchars(insurance_companies_phrase($conn)) ?> cover vehicles that are <strong><?= (int)getSetting($conn, 'eligibility_max_age', '10') ?> years old or newer</strong> based on the year model. Vehicles older than <?= (int)getSetting($conn, 'eligibility_max_age', '10') ?> years are not eligible for new policy coverage<?= count(insurance_companies_active($conn)) > 1 ? ' with any of them' : '' ?>.</span>
     </div>
 
     <!-- SEARCH CARD -->
@@ -317,14 +318,12 @@ require_once '../../includes/topbar.php';
           <?php if ($eligibility['eligible'] && !$eligibility['has_active_policy']): ?>
           <div class="field-section" style="margin-top:1.25rem;">Insure With <span class="req">*</span></div>
           <div id="company-pick-group" style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+            <?php foreach (insurance_companies_active($conn) as $co): ?>
             <label class="company-pick-option" style="flex:1;min-width:220px;display:flex;align-items:center;gap:0.6rem;padding:0.85rem 1rem;border:1.5px solid var(--border);border-radius:9px;cursor:pointer;transition:border-color 0.15s,background 0.15s;">
-              <input type="radio" name="insurance_company_pick" value="PhilBritish" class="tg-radio-gold"/>
-              <span style="font-weight:700;font-size:0.85rem;color:var(--text-primary);">PhilBritish</span>
+              <input type="radio" name="insurance_company_pick" value="<?= htmlspecialchars($co['name']) ?>" class="tg-radio-gold"/>
+              <span style="font-weight:700;font-size:0.85rem;color:var(--text-primary);"><?= htmlspecialchars($co['name']) ?></span>
             </label>
-            <label class="company-pick-option" style="flex:1;min-width:220px;display:flex;align-items:center;gap:0.6rem;padding:0.85rem 1rem;border:1.5px solid var(--border);border-radius:9px;cursor:pointer;transition:border-color 0.15s,background 0.15s;">
-              <input type="radio" name="insurance_company_pick" value="Alpha Insurance & Surety Company Inc." class="tg-radio-gold"/>
-              <span style="font-weight:700;font-size:0.85rem;color:var(--text-primary);">Alpha Insurance &amp; Surety Company Inc.</span>
-            </label>
+            <?php endforeach; ?>
           </div>
           <span class="field-hint" id="company-pick-hint">Select which company this policy will be filed under before proceeding.</span>
           <?php endif; ?>

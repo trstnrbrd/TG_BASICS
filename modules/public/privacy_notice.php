@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../../includes/insurance_companies.php';
 require_once __DIR__ . '/../../includes/branding.php';
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../config/settings.php';
@@ -111,7 +112,7 @@ $company_email   = getSetting($conn, 'company_email',   'tgcustomworksbulacan@gm
 
         <div class="priv-section">
           <div class="priv-eyebrow">7. Data Sharing</div>
-          <p class="priv-body">Your personal data is <strong>not shared, sold, or disclosed</strong> to third parties except when required by law, or when necessary for the processing of your insurance policy or claim with the insuring company you are enrolled under — either PhilBritish Insurance Corporation or Alpha Insurance &amp; Surety Company Inc.</p>
+          <p class="priv-body">Your personal data is <strong>not shared, sold, or disclosed</strong> to third parties except when required by law, or when necessary for the processing of your insurance policy or claim with the insuring company you are enrolled under — <?= htmlspecialchars(insurance_companies_phrase($conn, 'billing_name', 'or')) ?>.</p>
         </div>
 
         <div class="priv-section">

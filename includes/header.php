@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/branding.php';
+require_once __DIR__ . '/insurance_companies.php';
 $page_title = $page_title ?? 'TG-BASICS';
 $base_path  = $base_path  ?? '../';
 $role_label = match($_SESSION['role'] ?? '') {
@@ -227,14 +228,12 @@ function _mob_icon(string $name): string {
       <div class="mob-more-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/></svg></div>
       <span>Eligibility &amp; Policy</span>
     </a>
-    <a href="<?= $base_path ?>modules/renewal/renewal_list.php?company=PhilBritish" class="mob-more-item" onclick="mobPolicyClose()">
+    <?php foreach (insurance_companies_tracked($conn) as $mob_co): ?>
+    <a href="<?= $base_path ?>modules/renewal/renewal_list.php?company=<?= urlencode($mob_co['name']) ?>" class="mob-more-item" onclick="mobPolicyClose()">
       <div class="mob-more-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/></svg></div>
-      <span>PhilBritish</span>
+      <span><?= htmlspecialchars($mob_co['short_name']) ?></span>
     </a>
-    <a href="<?= $base_path ?>modules/renewal/renewal_list.php?company=<?= urlencode('Alpha Insurance & Surety Company Inc.') ?>" class="mob-more-item" onclick="mobPolicyClose()">
-      <div class="mob-more-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/></svg></div>
-      <span>Alpha Insurance</span>
-    </a>
+    <?php endforeach; ?>
     <a href="<?= $base_path ?>modules/claims/claims_list.php" class="mob-more-item" onclick="mobPolicyClose()">
       <div class="mob-more-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/></svg></div>
       <span>Claims List</span>

@@ -269,7 +269,16 @@ function csrf_verify_json(): void {
     }
 }
 
-// ── SEQUENTIAL NUMBER GENERATION (RJ-/BILL-/Q- style) ──────────────────────
+// ── SEQUENTIAL NUMBER GENERATION (RJ-/QT-/BL-/BS- style) ──────────────────────
+
+/**
+ * The start of a record number for this month: record_number_prefix('RJ') -> "RJ-202610-".
+ * Numbers run RJ-202610-0001, -0002 … and start again at 0001 each month (the month is part of the prefix).
+ * RJ = repair job, QT = quotation, BL = billing, BS = billing statement (a converted quotation).
+ */
+function record_number_prefix(string $code): string {
+    return $code . '-' . date('Ym') . '-';
+}
 
 /**
  * Makes the next number for a job/billing/quotation (highest number + 1).

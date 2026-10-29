@@ -122,7 +122,7 @@ require_once '../../includes/topbar.php';
         <table class="tg-table repair-jobs-table dash-jobs-table">
           <thead>
             <tr>
-              <th>Job #</th>
+              <th>Repair ID</th>
               <th>Client</th>
               <th>Vehicle</th>
               <th>Service</th>

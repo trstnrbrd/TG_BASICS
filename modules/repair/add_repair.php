@@ -78,9 +78,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (empty($errors)) {
-        // Job number: RJ-YYYYMMDD-XXXX — continues from the highest number already used today. (Counting
-        // today's rows breaks after a delete: it hands out a number that still exists, and the unique key
-        // then rejects every new job for the rest of the day.) Wrapped in a retry: two mechanics saving at
+        // Repair ID: RJ-YYYYMM-XXXX (record_number_prefix()) — continues from the highest number already used this month. (Counting
+        // this month's rows breaks after a delete: it hands out a number that still exists, and the unique key
+        // then rejects every new job for the rest of the month.) Wrapped in a retry: two mechanics saving at
         // the same instant can compute the same next number — this recomputes and retries instead of the
         // request crashing with an uncaught duplicate-key error.
         $rel = $release_date ?: null;
@@ -88,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $created = null;
         try {
             $created = db_transaction($conn, function () use ($conn, $client_id, $vehicle_id, $repair_date, $rel, $service_type, $additional, $checklist_area_keys) {
-                [$job_id, $job_num] = insert_with_sequential_number($conn, 'repair_jobs', 'job_number', 'RJ-' . date('Ymd') . '-',
+                [$job_id, $job_num] = insert_with_sequential_number($conn, 'repair_jobs', 'job_number', record_number_prefix('RJ'),
                     function (string $num) use ($conn, $client_id, $vehicle_id, $repair_date, $rel, $service_type, $additional) {
                         $ins = $conn->prepare("
                             INSERT INTO repair_jobs (client_id, vehicle_id, job_number, repair_date, release_date, service_type, additional_damages, created_by)

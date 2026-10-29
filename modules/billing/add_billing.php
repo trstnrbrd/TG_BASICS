@@ -99,7 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $dup->execute();
                 if ($dup->get_result()->num_rows > 0) return ['duplicate' => true];
 
-                [$billing_id, $bill_num] = insert_with_sequential_number($conn, 'billing', 'billing_number', 'BILL-' . date('Ymd') . '-',
+                [$billing_id, $bill_num] = insert_with_sequential_number($conn, 'billing', 'billing_number', record_number_prefix('BL'),
                     function (string $num) use ($conn, $claim_id, $billed_to, $inc_date, $rep_date, $parts_cost, $labor_cost, $other_cost, $deductible) {
                         $ins = $conn->prepare("
                             INSERT INTO billing

@@ -411,7 +411,7 @@ function sendReceiptEmail(
             <td style="font-family:' . $font . ';font-size:13px;font-weight:700;color:#1A1814;">' . htmlspecialchars($receiptNumber) . '</td>
           </tr>
           <tr>
-            <td style="font-family:' . $font . ';font-size:12px;color:#9C9286;padding-top:4px;">Job #</td>
+            <td style="font-family:' . $font . ';font-size:12px;color:#9C9286;padding-top:4px;">Repair ID</td>
             <td style="font-family:' . $font . ';font-size:13px;color:#3C3830;padding-top:4px;">' . htmlspecialchars($jobNumber) . '</td>
           </tr>
           <tr>
@@ -523,7 +523,7 @@ function sendRepairCompletedEmail(
         $body = 'Dear <strong>' . htmlspecialchars($toName) . '</strong>,<br><br>'
               . 'Great news! Your vehicle is now ready for pickup at '
               . '<strong>' . htmlspecialchars(_getCompanyName()) . '</strong>.<br><br>'
-              . '<strong>Job #:</strong> ' . htmlspecialchars($jobNumber) . '<br>'
+              . '<strong>Repair ID:</strong> ' . htmlspecialchars($jobNumber) . '<br>'
               . '<strong>Vehicle:</strong> ' . htmlspecialchars($vehicle) . ' (' . htmlspecialchars($plateNumber) . ')<br>'
               . '<strong>Service:</strong> ' . htmlspecialchars($serviceType) . '<br>'
               . $release_line

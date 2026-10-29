@@ -842,7 +842,7 @@ require_once '../../includes/topbar.php';
       <table class="tg-table mob-card mob-client-repairs-table">
         <thead>
           <tr>
-            <th>Job #</th>
+            <th>Repair ID</th>
             <th>Vehicle</th>
             <th>Service</th>
             <th>Repair Date</th>

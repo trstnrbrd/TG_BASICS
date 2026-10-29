@@ -123,7 +123,7 @@ require_once '../../includes/topbar.php';
         <div class="rl-filter-search" style="position:relative;flex:1;min-width:200px;max-width:360px;">
           <span style="position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;"><?= icon('magnifying-glass', 14) ?></span>
           <input type="text" name="search" class="filter-input"
-            placeholder="Search by client, plate, or job #..."
+            placeholder="Search by client, plate, or Repair ID..."
             value="<?= htmlspecialchars($search) ?>" style="padding-left:2.4rem;width:100%;"/>
         </div>
         <select name="status" class="filter-input rl-filter-status" style="width:160px;">
@@ -162,7 +162,7 @@ require_once '../../includes/topbar.php';
       <table class="tg-table repair-jobs-table">
         <thead>
           <tr>
-            <th>Job #</th>
+            <th>Repair ID</th>
             <th>Client</th>
             <th>Vehicle</th>
             <th>Service</th>

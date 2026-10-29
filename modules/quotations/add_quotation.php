@@ -170,7 +170,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_mechanic) {
                 // ── INSERT new quotation ── (retries on a same-instant quotation_number collision — see
                 // insert_with_sequential_number(); the surrounding try/catch already rolls back on any
                 // other failure, this just avoids that for the common concurrent case)
-                [$qt_id, $qt_num] = insert_with_sequential_number($conn, 'quotations', 'quotation_number', 'Q-' . date('Ymd') . '-',
+                [$qt_id, $qt_num] = insert_with_sequential_number($conn, 'quotations', 'quotation_number', record_number_prefix('QT'),
                     function (string $num) use ($conn, $job_id, $status, $subtotal, $discount, $total, $notes) {
                         $ins = $conn->prepare("
                             INSERT INTO quotations (job_id, quotation_number, status, subtotal, discount, total, notes, created_by)

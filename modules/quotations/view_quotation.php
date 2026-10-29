@@ -128,9 +128,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_admin) {
 
         $conn->begin_transaction();
         try {
-            // Billing statement number: BS-YYYYMMDD-XXXX. Retries on a same-instant collision — see
+            // Billing statement number: BS-YYYYMM-XXXX. Retries on a same-instant collision — see
             // insert_with_sequential_number() — instead of failing the whole conversion for it.
-            $rc_num = insert_with_sequential_number($conn, 'receipts', 'receipt_number', 'BS-' . date('Ymd') . '-',
+            $rc_num = insert_with_sequential_number($conn, 'receipts', 'receipt_number', record_number_prefix('BS'),
                 function (string $num) use ($conn, $qt_id, $amount_paid, $balance, $pay_method, $pay_status, $receipt_notes) {
                     $ins = $conn->prepare("
                         INSERT INTO receipts (quotation_id, receipt_number, amount_paid, balance, payment_method, payment_status, notes, issued_by)
@@ -286,7 +286,7 @@ document.addEventListener('DOMContentLoaded',function(){
       <?php
       $qt_details = [
         ['Quotation #',  $qt['quotation_number']],
-        ['Job #',        $qt['job_number']],
+        ['Repair ID',    $qt['job_number']],
         ['Service Type', $svc],
         ['Repair Date',  date('F d, Y', strtotime($qt['repair_date']))],
         ['Status',       $sc[0]],

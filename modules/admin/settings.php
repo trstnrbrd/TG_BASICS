@@ -10,6 +10,7 @@ require_once '../../config/transaction_pin.php';
 require_once '../../includes/db_backup.php';
 require_once '../../includes/full_backup.php';
 require_once '../../config/dev_access.php';
+require_once '../../includes/insurance_companies.php';
 
 require_role(['admin', 'super_admin', 'mechanic']);
 
@@ -31,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
     }
 
     $section    = san_str($_POST['section'] ?? '', 30);
-    $admin_only = ['system_settings'];
+    $admin_only = ['system_settings', 'insurance_company_save', 'insurance_company_active'];
 
     if (in_array($section, $admin_only) && !$is_super) {
         api_error('Unauthorized.', 401);
@@ -409,6 +410,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             $_SESSION['theme'] = $theme;
 
             api_success([], 'Design preferences saved.');
+            break;
+
+        // ── INSURANCE COMPANIES (Owner only) — add/edit one company, or turn it on/off for new policies ──
+        case 'insurance_company_save':
+            $err = insurance_company_save($conn, (int)$user_id, (int)($_POST['company_id'] ?? 0), $_POST);
+            $err === '' ? api_success([], 'Insurance company saved.') : api_error($err);
+            break;
+
+        case 'insurance_company_active':
+            $err = insurance_company_set_active($conn, (int)$user_id, (int)($_POST['company_id'] ?? 0), ($_POST['active'] ?? '') === '1');
+            $err === '' ? api_success([], ($_POST['active'] ?? '') === '1' ? 'Company activated.' : 'Company deactivated.') : api_error($err);
             break;
 
         // ── SYSTEM SETTINGS (Owner only — all in one save) ──
@@ -1280,7 +1292,7 @@ require_once '../../includes/topbar.php';
             <div class="card-icon"><?= icon('shield-check', 16) ?></div>
             <div>
               <div class="card-title">Insurance Settings</div>
-              <div class="card-sub">Configure eligibility rules and renewal thresholds</div>
+              <div class="card-sub">Eligibility rules, renewal thresholds and the insurance companies</div>
             </div>
           </div>
           <div class="card-body">
@@ -1304,6 +1316,67 @@ require_once '../../includes/topbar.php';
                 <span class="field-hint">Policies within this range marked "Expiring".</span>
               </div>
             </div>
+            <!-- Insurance Companies (panel revision): the companies policies are filed under. Saved on their own by
+                 assets/js/shared/insurance_companies.js; the inputs carry data-f, not name, so "Save All Settings"
+                 never sends them. Rows: includes/insurance_companies.php -->
+            <?php $ins_ready = insurance_companies_table_ready($conn); ?>
+            <div class="field-section" id="insurance-companies" style="margin-top:1.5rem;">Insurance Companies</div>
+            <span class="field-hint" style="display:block;margin-bottom:0.75rem;">The companies a policy can be filed under. A deactivated company is not offered for new policies; its existing policies stay.</span>
+            <?php if (!$ins_ready): ?>
+            <div class="info-box"><?= icon('information-circle', 14) ?><span>The insurance companies table is not set up on this server yet, so no company can be chosen for a policy. Run the database update to manage them here.</span></div>
+            <?php else: ?>
+            <div class="tg-table-wrap" style="margin-bottom:1rem;">
+              <table class="tg-table" id="ins-co-table">
+                <thead><tr><th>Order</th><th>Company Name</th><th>Short Label</th><th>Billed To Name</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody>
+                  <?php foreach (insurance_companies_all($conn) as $co): ?>
+                  <tr data-id="<?= $co['company_id'] ?>" data-name="<?= htmlspecialchars($co['name']) ?>" data-short="<?= htmlspecialchars($co['short_name']) ?>"
+                      data-billing="<?= htmlspecialchars($co['billing_name']) ?>" data-order="<?= (int)$co['sort_order'] ?>">
+                    <td style="text-align:center;"><?= (int)$co['sort_order'] ?></td>
+                    <td style="text-align:center;font-weight:600;"><?= htmlspecialchars($co['name']) ?></td>
+                    <td style="text-align:center;"><?= htmlspecialchars($co['short_name']) ?></td>
+                    <td style="text-align:center;"><?= htmlspecialchars($co['billing_name']) ?></td>
+                    <td style="text-align:center;"><span class="badge <?= $co['is_active'] ? 'badge-green' : 'badge-gray' ?>"><?= $co['is_active'] ? 'Active' : 'Inactive' ?></span></td>
+                    <td style="text-align:center;white-space:nowrap;">
+                      <button type="button" class="btn-ghost js-ins-edit" style="font-size:0.72rem;padding:0.3rem 0.7rem;"><?= icon('pencil', 12) ?> Edit</button>
+                      <button type="button" class="btn-ghost js-ins-active" data-active="<?= $co['is_active'] ? '0' : '1' ?>" style="font-size:0.72rem;padding:0.3rem 0.7rem;"><?= $co['is_active'] ? 'Deactivate' : 'Activate' ?></button>
+                    </td>
+                  </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+            <div id="ins-co-form">
+              <input type="hidden" data-f="company_id" value="0"/>
+              <div class="field-section" id="ins-co-form-title" style="font-size:0.62rem;">Add a Company</div>
+              <div class="form-grid">
+                <div class="field">
+                  <label class="field-label">Company Name <span class="req">*</span></label>
+                  <input type="text" data-f="name" class="field-input" maxlength="<?= MAX_COMPANY_NAME ?>" required/>
+                  <span class="field-hint">Saved on every policy under this company. Renaming moves its existing policies too.</span>
+                </div>
+                <div class="field">
+                  <label class="field-label">Short Label</label>
+                  <input type="text" data-f="short_name" class="field-input" maxlength="<?= MAX_COMPANY_SHORT ?>"/>
+                  <span class="field-hint">Shown in the sidebar and renewal list, e.g. "Alpha Insurance". Blank = the company name.</span>
+                </div>
+                <div class="field">
+                  <label class="field-label">Billed To Name</label>
+                  <input type="text" data-f="billing_name" class="field-input" maxlength="<?= MAX_COMPANY_BILLING ?>"/>
+                  <span class="field-hint">Pre-filled in "Billed To" on a claim billing, e.g. "PhilBritish Insurance Corp.". Blank = the company name.</span>
+                </div>
+                <div class="field">
+                  <label class="field-label">Order</label>
+                  <input type="text" data-f="sort_order" class="field-input" inputmode="numeric" data-digits="3"/>
+                  <span class="field-hint">Lower shows first. Blank = last (new) or unchanged (edit).</span>
+                </div>
+              </div>
+              <div style="display:flex;gap:0.5rem;margin-top:0.75rem;">
+                <button type="button" class="btn-primary" id="ins-co-save"><?= icon('check', 14) ?> <span>Add Company</span></button>
+                <button type="button" class="btn-ghost" id="ins-co-cancel" style="display:none;">Cancel</button>
+              </div>
+            </div>
+            <?php endif; ?>
           </div>
         </div>
 
@@ -1412,7 +1485,8 @@ require_once '../../includes/topbar.php';
 $footer_scripts = ''; // JS moved to assets/js/shared/settings.js
 $footer_extra_scripts = '<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>'
     . '<script src="../../assets/js/shared/settings.js?v=' . filemtime(__DIR__ . '/../../assets/js/shared/settings.js') . '"></script>'
-    . ($is_super ? '<script src="../../assets/js/shared/db_backup.js?v=' . filemtime(__DIR__ . '/../../assets/js/shared/db_backup.js') . '"></script>' : '');
+    . ($is_super ? '<script src="../../assets/js/shared/db_backup.js?v=' . filemtime(__DIR__ . '/../../assets/js/shared/db_backup.js') . '"></script>'
+                 . '<script src="../../assets/js/shared/insurance_companies.js?v=' . filemtime(__DIR__ . '/../../assets/js/shared/insurance_companies.js') . '"></script>' : '');
 
 ?>
 

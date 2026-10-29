@@ -1,6 +1,17 @@
 <?php
+require_once __DIR__ . '/includes/branding.php';
 require_once 'includes/icons.php';
 require_once __DIR__ . '/config/app_url.php';
+require_once __DIR__ . '/config/db.php';
+require_once __DIR__ . '/includes/testimonials.php';
+$testimonials = load_testimonials($conn);
+require_once __DIR__ . '/includes/insurance_companies.php';
+// partner insurers for the page text, already escaped (Settings > Insurance Companies)
+$ins_tag      = htmlspecialchars(insurance_companies_phrase($conn, 'short_name', '&'));    // PhilBritish & Alpha Insurance
+$ins_and      = htmlspecialchars(insurance_companies_phrase($conn, 'short_name', 'and'));
+$ins_legal_or = htmlspecialchars(insurance_companies_phrase($conn, 'billing_name', 'or'));
+$ins_legal    = htmlspecialchars(insurance_companies_phrase($conn, 'billing_name', 'and'));
+$ins_first    = htmlspecialchars(insurance_companies_active($conn)[0]['billing_name'] ?? '');
 $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Insurance in Pandi, Bulacan — '
        . 'clients, policies, claims, renewals and repair jobs in one place.';
 ?>
@@ -23,7 +34,7 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
 <meta property="og:image:height" content="512"/>
 <meta property="og:image:alt" content="TG Customworks logo"/>
 <meta name="twitter:card" content="summary"/>
-<link rel="icon" type="image/png" href="assets/img/tg_logo.png"/>
+<link rel="icon" type="image/png" href="<?= brand_logo('tg') ?>"/>
 <link rel="apple-touch-icon" href="assets/img/pwa/apple-touch-icon.png"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <meta name="theme-color" content="#1A1814"/>
@@ -37,9 +48,9 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
 <nav class="topnav">
   <a href="index.php" class="nav-brand">
     <div class="nav-logos">
-      <img src="assets/img/tg_logo.png" alt="TG Customworks" class="nav-logo-img"/>
+      <img src="<?= brand_logo('tg') ?>" alt="TG Customworks" class="nav-logo-img"/>
       <div class="nav-logo-sep"></div>
-      <img src="assets/img/LogoBasicCar.png" alt="Basic Car Insurance" class="nav-logo-img no-ring"/>
+      <img src="<?= brand_logo('basic') ?>" alt="Basic Car Insurance" class="nav-logo-img no-ring"/>
     </div>
     <div>
       <div class="nav-brand-name">TG<span>-BASICS</span></div>
@@ -87,9 +98,9 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
     <div class="hero-right">
       <div class="hero-card-main">
         <div class="hero-card-topbar">
-          <img src="assets/img/tg_logo.png" alt="TG Customworks" class="hc-logo-img"/>
+          <img src="<?= brand_logo('tg') ?>" alt="TG Customworks" class="hc-logo-img"/>
           <div class="hc-logo-sep"></div>
-          <img src="assets/img/LogoBasicCar.png" alt="Basic Car Insurance" class="hc-logo-img no-ring"/>
+          <img src="<?= brand_logo('basic') ?>" alt="Basic Car Insurance" class="hc-logo-img no-ring"/>
           <span class="hc-brand">TG<span>-BASICS</span></span>
           <div class="hc-dot"></div>
         </div>
@@ -162,7 +173,7 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
   <div class="trust-inner js-reveal">
     <div class="section-label" style="justify-content:center;">Trusted</div>
     <h3 class="trust-heading">&ldquo;Your Journey, Our Care.&rdquo;</h3>
-    <p class="trust-sub">PhilBritish &amp; Alpha Insurance-Accredited Broker &middot; Est. 2016</p>
+    <p class="trust-sub"><?= $ins_tag ?>-Accredited Broker &middot; Est. 2016</p>
 
     <div class="trust-rule">
       <span class="trust-rule-line"></span>
@@ -213,17 +224,17 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
       <!-- INSURANCE PILLAR -->
       <div class="service-pillar service-pillar--insurance">
         <div class="service-pillar-head">
-          <img src="assets/img/LogoBasicCar.png" alt="Basic Car Insurance" class="service-pillar-logo"/>
+          <img src="<?= brand_logo('basic') ?>" alt="Basic Car Insurance" class="service-pillar-logo"/>
           <div>
             <div class="service-pillar-name">Basic Car Insurance</div>
-            <div class="service-pillar-tag">PhilBritish &amp; Alpha Insurance-Accredited Broker</div>
+            <div class="service-pillar-tag"><?= $ins_tag ?>-Accredited Broker</div>
           </div>
         </div>
         <div class="service-item">
           <div class="service-item-icon"><?= icon('shield-check', 18) ?></div>
           <div>
             <div class="service-item-name">New Policy &amp; Eligibility Check</div>
-            <div class="service-item-desc">Vehicle eligibility checked against the shared 10-year coverage window for both PhilBritish and Alpha Insurance before any application moves forward.</div>
+            <div class="service-item-desc">Vehicle eligibility checked against the shared 10-year coverage window for <?= $ins_and ?> before any application moves forward.</div>
           </div>
         </div>
         <div class="service-item">
@@ -252,7 +263,7 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
       <!-- REPAIR PILLAR -->
       <div class="service-pillar service-pillar--repair">
         <div class="service-pillar-head">
-          <img src="assets/img/tg_logo.png" alt="TG Customworks" class="service-pillar-logo"/>
+          <img src="<?= brand_logo('tg') ?>" alt="TG Customworks" class="service-pillar-logo"/>
           <div>
             <div class="service-pillar-name">TG Customworks</div>
             <div class="service-pillar-tag">Auto Repair &amp; Paint Shop</div>
@@ -378,7 +389,7 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
                     <div class="bm-card-icon"><?= icon('document', 12) ?></div>
                     <div>
                       <div class="bm-card-title">Policy Details</div>
-                      <div class="bm-card-sub">PhilBritish Insurance Corporation</div>
+                      <div class="bm-card-sub"><?= $ins_first ?></div>
                     </div>
                   </div>
                   <div class="bm-card-body">
@@ -494,7 +505,7 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
                         </div>
                       </div>
                       <div class="bm-card-body">
-                        <div class="bm-field bm-field-solo"><div class="bm-label">Billed To <span class="bm-req">*</span></div><div class="bm-input bm-input-filled">PhilBritish Insurance Corp.</div></div>
+                        <div class="bm-field bm-field-solo"><div class="bm-label">Billed To <span class="bm-req">*</span></div><div class="bm-input bm-input-filled"><?= $ins_first ?></div></div>
                         <div class="bm-form-grid">
                           <div class="bm-field"><div class="bm-label">Incident Date</div><div class="bm-input bm-input-filled">Jul 10, 2026</div></div>
                           <div class="bm-field"><div class="bm-label">Repair Date</div><div class="bm-input bm-input-filled">Jul 14, 2026</div></div>
@@ -589,7 +600,7 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
         <div class="feat-text">
           <div class="feat-num-row"><span class="feat-num">02</span><span class="feat-tag">Insurance</span></div>
           <h3 class="feat-heading">Insurance Eligibility and Policy Processing</h3>
-          <p class="feat-desc">Automatic 10-year eligibility check for PhilBritish and Alpha Insurance coverage, based on year model. Encode full policy details including premium, commission, and coverage type.</p>
+          <p class="feat-desc">Automatic 10-year eligibility check for <?= $ins_and ?> coverage, based on year model. Encode full policy details including premium, commission, and coverage type.</p>
         </div>
         <div class="feat-node"><span class="feat-node-dot"></span></div>
         <div class="feat-visual">
@@ -839,7 +850,8 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
     </div>
   </div>
 </section>
-<!-- CLIENT TESTIMONIALS -->
+<!-- CLIENT TESTIMONIALS (from the testimonials table; hidden when there are none) -->
+<?php if ($testimonials): ?>
 <section id="testimonials" class="page-section page-section--open">
   <div class="section-open-inner js-reveal-container">
     <div class="section-head js-reveal">
@@ -848,31 +860,11 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
       <p class="section-desc">Feedback shared by TG Customworks and Basic Car Insurance clients, lightly rephrased for clarity.</p>
     </div>
 
-    <?php
-    // 'year' is the review's actual posting year — the "X years ago" label is computed
-    // below so it stays correct without manual edits as time passes.
-    $testimonials = [
-      ['name' => 'Jjpot G.',         'source' => 'Facebook Review', 'year' => 2020, 'rating' => 5, 'quote' => 'Sobrang linis at maayos ang trabaho — makikita mo talaga ang kalidad sa sasakyan ko.'],
-      ['name' => 'John Jack D.',     'source' => 'Facebook Review', 'year' => 2020, 'rating' => 5, 'quote' => 'Napakagaling ng kalidad ng trabaho, mabilis pa at pulido ang resulta. Mabait din po ang may-ari, si Mr. Carpio, sa mga kliyente.'],
-      ['name' => 'Joseph Albert O.', 'source' => 'Google Review',   'year' => 2021, 'rating' => 5, 'quote' => 'The service was perfect, and the owner, Mr. Carpio, was very accommodating to his clients.'],
-      ['name' => 'John Michael A.',  'source' => 'Google Review',   'year' => 2021, 'rating' => 5, 'quote' => 'Their work is solid.'],
-      ['name' => 'Ana Katrina V.',   'source' => 'Google Review',   'year' => 2024, 'rating' => 5, 'quote' => 'Maayos ang serbisyo nila.'],
-    ];
-    $current_year = (int)date('Y');
-    foreach ($testimonials as &$t) {
-        $diff = max(0, $current_year - $t['year']);
-        $t['meta'] = $t['source'] . ' · ' . ($diff === 0 ? 'This year' : ($diff === 1 ? '1 year ago' : $diff . ' years ago'));
-    }
-    unset($t);
-    ?>
 
     <div class="testimonial-carousel-wrap">
       <div class="testimonial-carousel" id="testimonial-carousel">
         <?php foreach ($testimonials as $t): ?>
-        <div class="testimonial-card<?= !empty($t['placeholder']) ? ' testimonial-card--placeholder' : '' ?>">
-          <?php if (!empty($t['placeholder'])): ?>
-          <div class="testimonial-placeholder-badge">Placeholder</div>
-          <?php endif; ?>
+        <div class="testimonial-card">
           <div class="testimonial-stars">
             <?php for ($i = 1; $i <= 5; $i++): ?>
               <svg class="rating-star<?= $i <= $t['rating'] ? ' is-filled' : '' ?>" width="15" height="15" viewBox="0 0 20 20"><path d="M10 1.5l2.472 5.007 5.528.803-4 3.899.944 5.507L10 14.14l-4.944 2.576.944-5.507-4-3.899 5.528-.803z"/></svg>
@@ -880,7 +872,7 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
           </div>
           <p class="testimonial-quote">&ldquo;<?= htmlspecialchars($t['quote']) ?>&rdquo;</p>
           <div class="testimonial-author">
-            <div class="testimonial-avatar"><?= strtoupper(substr(trim($t['name'], '[]'), 0, 1)) ?></div>
+            <div class="testimonial-avatar"><?= htmlspecialchars(mb_strtoupper(mb_substr(trim($t['name']), 0, 1))) ?></div>
             <div>
               <div class="testimonial-name"><?= htmlspecialchars($t['name']) ?></div>
               <div class="testimonial-meta"><?= htmlspecialchars($t['meta']) ?></div>
@@ -896,6 +888,7 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
     </div>
   </div>
 </section>
+<?php endif; ?>
 
 <!-- CTA -->
 <section id="contact" class="cta-section js-reveal">
@@ -921,9 +914,9 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
     <!-- Brand col -->
     <div class="footer-brand-col">
       <div class="footer-brand-name">
-        <img src="assets/img/tg_logo.png" alt="TG Customworks" class="footer-logo-img"/>
+        <img src="<?= brand_logo('tg') ?>" alt="TG Customworks" class="footer-logo-img"/>
         <div class="footer-logo-sep"></div>
-        <img src="assets/img/LogoBasicCar.png" alt="Basic Car Insurance" class="footer-logo-img no-ring"/>
+        <img src="<?= brand_logo('basic') ?>" alt="Basic Car Insurance" class="footer-logo-img no-ring"/>
         TG<span>-BASICS</span>
       </div>
       <p class="footer-brand-desc">Brokerage and Auto Shop Integrated Central System. Built exclusively for TG Customworks and Basic Car Insurance.</p>
@@ -1046,7 +1039,7 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
           ['Data Retention', 'Personal data is retained for a minimum of <strong style="color:#E8E2D8;">five (5) years</strong> after the last transaction, in compliance with insurance regulations and RA 10173.'],
           ['Security', 'Access is strictly role-based (Super Admin, Admin, Mechanic). Passwords are hashed. All data operations are logged through a full system audit trail.'],
           ['Your Rights', '<ul style="margin-top:0.4rem;margin-left:1.25rem;display:flex;flex-direction:column;gap:0.25rem;"><li><strong style="color:#E8E2D8;">Be Informed</strong> — know what data is collected and how it is used</li><li><strong style="color:#E8E2D8;">Access</strong> — request a copy of your personal data</li><li><strong style="color:#E8E2D8;">Rectification</strong> — request correction of inaccurate information</li><li><strong style="color:#E8E2D8;">Erasure</strong> — request deletion subject to legal retention requirements</li></ul>'],
-          ['Data Sharing', 'Personal data is <strong style="color:#E8E2D8;">not shared, sold, or disclosed</strong> to third parties except as required by law or when necessary for policy and claims processing with the insuring company you are enrolled under — either PhilBritish Insurance Corporation or Alpha Insurance &amp; Surety Company Inc.'],
+          ['Data Sharing', 'Personal data is <strong style="color:#E8E2D8;">not shared, sold, or disclosed</strong> to third parties except as required by law or when necessary for policy and claims processing with the insuring company you are enrolled under — ' . $ins_legal_or . '.'],
         ];
         foreach ($privacy_sections as $i => $sec): ?>
         <div style="margin-bottom:1.1rem;">
@@ -1089,7 +1082,7 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
           ['System Accuracy', 'The information displayed within TG-BASICS — including policy records, premium computations, claim statuses, and renewal dates — is dependent on the accuracy of data entered by authorized users. <strong style="color:#E8E2D8;">The system operators are not liable for errors arising from incorrect data entry, system misconfiguration, or user misuse.</strong>'],
           ['Business Decisions', 'TG-BASICS is a management tool intended to assist — not replace — professional judgment. <strong style="color:#E8E2D8;">No business decision should be made solely based on system output</strong> without proper verification. TG Customworks &amp; Basic Car Insurance assumes no liability for losses or damages arising from decisions made based on system-generated information.'],
           ['System Availability', 'Uptime, data persistence, and system availability are not guaranteed. <strong style="color:#E8E2D8;">The operators are not responsible for data loss, system downtime, or service interruptions</strong> caused by hosting provider outages, hardware failure, software errors, power outages, or other unforeseen circumstances.'],
-          ['Insurance Liability', 'TG-BASICS facilitates the encoding and tracking of insurance policies under PhilBritish Insurance Corporation and Alpha Insurance &amp; Surety Company Inc. <strong style="color:#E8E2D8;">The system does not constitute an official insurance contract.</strong> All insurance coverage and claims are governed by the actual policy documents issued by the insuring company. Discrepancies between system records and official policy documents shall defer to the official policy documents.'],
+          ['Insurance Liability', 'TG-BASICS facilitates the encoding and tracking of insurance policies under ' . $ins_legal . '. <strong style="color:#E8E2D8;">The system does not constitute an official insurance contract.</strong> All insurance coverage and claims are governed by the actual policy documents issued by the insuring company. Discrepancies between system records and official policy documents shall defer to the official policy documents.'],
           ['Limitation of Liability', 'To the maximum extent permitted by applicable law, TG Customworks &amp; Basic Car Insurance, its staff, and the system developers <strong style="color:#E8E2D8;">shall not be held liable</strong> for any direct, indirect, incidental, or consequential damages arising from the use of or inability to use TG-BASICS, even if advised of the possibility of such damages.'],
           ['Academic Context', 'This system was developed in partial fulfillment of the requirements for the Bachelor of Science in Information Technology at <strong style="color:#E8E2D8;">STI College Sta. Maria</strong>. The academic institution bears no responsibility for the deployment, operation, or outcomes of the system in a business environment.'],
         ];

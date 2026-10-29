@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/branding.php';
 require_once __DIR__ . "/../config/session.php";
 require_once '../config/db.php';
 require_once '../includes/icons.php';
@@ -38,8 +39,8 @@ $back      = is_mechanic() ? '../modules/repair/dashboard_mechanic.php' : '../mo
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <meta name="format-detection" content="telephone=no, date=no, email=no, address=no"/>
 <title>Logging Out | TG-BASICS</title>
-<link rel="icon" type="image/png" href="../assets/img/tg_logo.png"/>
-<link rel="apple-touch-icon" href="../assets/img/tg_logo.png"/>
+<link rel="icon" type="image/png" href="<?= brand_logo('tg', '../') ?>"/>
+<link rel="apple-touch-icon" href="<?= brand_logo('tg', '../') ?>"/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="../assets/css/auth/auth-background.css?v=<?= filemtime(__DIR__.'/../assets/css/auth/auth-background.css') ?>"/>
 <link rel="stylesheet" href="../assets/css/auth/logout.css?v=<?= filemtime(__DIR__.'/../assets/css/auth/logout.css') ?>"/>
@@ -60,9 +61,9 @@ $back      = is_mechanic() ? '../modules/repair/dashboard_mechanic.php' : '../mo
       <div class="auth-right-brand">
         <a href="../" class="auth-brand-link">
           <div class="auth-brand-logos">
-            <div class="auth-right-logo" style="background-image:url('../assets/img/tg_logo.png')"></div>
+            <div class="auth-right-logo" style="background-image:url('<?= brand_logo('tg', '../') ?>')"></div>
             <div class="auth-brand-sep"></div>
-            <div class="auth-right-logo-basic" style="background-image:url('../assets/img/LogoBasicCar.png')"></div>
+            <div class="auth-right-logo-basic" style="background-image:url('<?= brand_logo('basic', '../') ?>')"></div>
           </div>
         </a>
         <div class="auth-right-name">TG<span>-BASICS</span></div>

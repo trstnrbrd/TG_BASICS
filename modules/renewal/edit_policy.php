@@ -3,6 +3,8 @@ require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
+require_once '../../includes/insurance_companies.php';
+require_once '../../includes/mortgagees.php';
 
 require_role(['admin', 'super_admin']);
 
@@ -35,7 +37,9 @@ if (!policy_editable($policy['agent_id'] !== null ? (int)$policy['agent_id'] : n
     exit;
 }
 
-$companies     = ['PhilBritish', 'Alpha Insurance & Surety Company Inc.'];
+// the active companies (Settings), plus the policy's own company if it has since been deactivated
+$companies     = array_column(insurance_companies_active($conn), 'name');
+if (!in_array($policy['insurance_company'], $companies, true)) $companies[] = $policy['insurance_company'];
 $term_options  = ['1 time', '3 months', '4 months', '6 months'];
 $terms_map     = ['1 time' => 1, '2 months' => 2, '3 months' => 3, '4 months' => 4, '6 months' => 6, '12 months' => 12];
 if (!in_array($policy['payment_terms'], $term_options, true) && isset($terms_map[$policy['payment_terms']])) {
@@ -362,7 +366,7 @@ require_once '../../includes/topbar.php';
           <!-- PAYMENT TERMS + MORTGAGEE -->
           <div class="field-section">Payment</div>
           <?php
-          $ph_banks = ['Toyota Financial Services Philippines','BDO Unibank','BPI (Bank of the Philippine Islands)','Metrobank','PNB (Philippine National Bank)','Land Bank of the Philippines','DBP (Development Bank of the Philippines)','China Bank','Security Bank','UnionBank','RCBC','EastWest Bank','PSBank','AUB (Asia United Bank)','CTBC Bank Philippines','PBCOM','Maybank Philippines','Bank of Commerce','UCPB','Sterling Bank of Asia','Philippine Savings Bank (PSBank)','GCash (GSave)','Maya Bank','Tonik Bank','GoTyme Bank','UNObank','Other'];
+          $ph_banks = array_merge(mortgagees_active($conn), ['Other']);   // from the mortgagees table (phpMyAdmin); "Other" = type a name
           $mort          = $v('mortgagee', 'mortgagee');
           $mort_is_other = $mort !== '' && !in_array($mort, $ph_banks, true);
           $terms_val     = $is_locked ? $policy['payment_terms'] : $v('payment_terms', 'payment_terms');

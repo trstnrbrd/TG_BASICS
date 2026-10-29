@@ -47,6 +47,23 @@ function repair_status_change_allowed(string $from, string $to, bool $forward_on
     return $i !== false && $j !== false && $j > $i;
 }
 
+/** Is the repair job still open (pending, in progress, for pickup)? Photos show on the client's QR page only then. */
+function repair_job_is_open(string $status): bool
+{
+    return !in_array($status, ['completed', 'cancelled'], true);
+}
+
+/**
+ * May the signed-in user show / hide / delete this repair photo? Only while the job is open (a finished job's
+ * photos stay as its record); a mechanic only their own uploads, the owner and admins any photo.
+ */
+function repair_photo_editable(int $uploaded_by, string $job_status): bool
+{
+    if (!repair_job_is_open($job_status)) return false;
+    if (is_staff()) return true;
+    return is_mechanic() && $uploaded_by === (int)($_SESSION['user_id'] ?? 0);
+}
+
 /** Is the policy already expired? */
 function policy_is_expired(string $policy_end): bool
 {

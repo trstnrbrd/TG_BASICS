@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../config/session.php';
 require_once '../../config/db.php';
 require_once '../../config/settings.php';
 require_once '../../config/access.php';
+require_once '../../includes/insurance_companies.php';
 require_once '../../includes/db_backup.php';
 require_once '../../config/dev_access.php';
 
@@ -292,15 +293,16 @@ require_once '../../includes/topbar.php';
           $actions = [
             ['../clients/add_client.php',          'user-plus',        'Add New Client',       'Client and vehicle registration',  '#2E7D52', 'rgba(46,125,82,0.12)'],
             ['../insurance/eligibility_check.php', 'shield-check',     'New Insurance Policy', 'Check eligibility and encode',     '#1A6B9A', 'rgba(26,107,154,0.12)'],
-            ['../renewal/renewal_list.php?company=PhilBritish', 'shield-check', 'PhilBritish', 'Renewal tracking & policy expiry', '#B8860B', 'rgba(184,134,11,0.12)'],
-            ['../renewal/renewal_list.php?company=' . urlencode('Alpha Insurance & Surety Company Inc.'), 'shield-check', 'Alpha Insurance', 'Renewal tracking & policy expiry', '#B8860B', 'rgba(184,134,11,0.12)'],
           ];
+          foreach (insurance_companies_tracked($conn) as $dash_co) {
+            $actions[] = ['../renewal/renewal_list.php?company=' . urlencode($dash_co['name']), 'shield-check', $dash_co['short_name'], 'Renewal tracking & policy expiry', '#B8860B', 'rgba(184,134,11,0.12)'];
+          }
           foreach ($actions as $a): ?>
-          <a href="<?= $a[0] ?>" class="quick-action">
+          <a href="<?= htmlspecialchars($a[0]) ?>" class="quick-action">
             <div class="quick-action-icon" style="background:<?= $a[5] ?>;color:<?= $a[4] ?>;"><?= icon($a[1], 16) ?></div>
             <div>
-              <div class="quick-action-label"><?= $a[2] ?></div>
-              <div class="quick-action-hint"><?= $a[3] ?></div>
+              <div class="quick-action-label"><?= htmlspecialchars($a[2]) ?></div>
+              <div class="quick-action-hint"><?= htmlspecialchars($a[3]) ?></div>
             </div>
           </a>
           <?php endforeach; ?>

@@ -1,6 +1,8 @@
 <?php
 use PHPMailer\PHPMailer\PHPMailer;
 
+require_once __DIR__ . '/branding.php';
+
 /**
  * includes/email_template.php — every outgoing email's content: the shared template, the logo, and the
  * twelve send*Email() functions. This file is tracked by git (unlike config/mailer.php, which holds the
@@ -30,11 +32,14 @@ function _getCompanyAddress(): string {
  * block by default until the person clicks "show images". buildEmailTemplate()'s header references them as
  * cid:tg_logo / cid:basic_logo. The *_email.png files are small (resized copies of the real assets/img logos,
  * which are multi-megabyte originals meant for the web app, not for attaching to every email) — made once
- * with Resize-Logo in PowerShell (System.Drawing), not regenerated on the fly.
+ * with Resize-Logo in PowerShell (System.Drawing), not regenerated on the fly. Their paths are the
+ * logo_tg_email_path / logo_basic_email_path settings (includes/branding.php); one not set up is skipped.
  */
 function embedEmailLogos(PHPMailer $mail): void {
-    $mail->addEmbeddedImage(__DIR__ . '/../assets/img/tg_logo_email.png', 'tg_logo', 'tg_logo.png');
-    $mail->addEmbeddedImage(__DIR__ . '/../assets/img/LogoBasicCar_email.png', 'basic_logo', 'basic_logo.png');
+    foreach (['tg' => 'tg_logo', 'basic' => 'basic_logo'] as $which => $cid) {
+        $file = brand_logo_file($which, true);
+        if ($file !== '') $mail->addEmbeddedImage(__DIR__ . '/../' . $file, $cid, basename($file));
+    }
 }
 
 /**
@@ -265,7 +270,7 @@ function sendVaultPasswordChangeEmail(string $toEmail, string $toName, string $n
             </div>',
             '',
             '',
-            'Keep this password confidential. Share it only with Admins you personally authorize to access PhilBritish and Alpha Insurance renewal records.'
+            'Keep this password confidential. Share it only with Admins you personally authorize to access insurance renewal records.'
         );
 
         $mail->send();
@@ -290,7 +295,7 @@ function sendVaultRelockedNotice(string $toEmail, string $toName): bool {
         $mail->Body = buildEmailTemplate(
             'Security Notice',
             'Renewal Tracking has been re-locked',
-            'Dear <strong>' . htmlspecialchars($toName) . '</strong>,<br><br>The Renewal Tracking vault password was just changed. Your access has been automatically locked and you will need to enter the new password the next time you open PhilBritish or Alpha Insurance renewal records.<br><br>Please contact the Super Admin to obtain the new password.',
+            'Dear <strong>' . htmlspecialchars($toName) . '</strong>,<br><br>The Renewal Tracking vault password was just changed. Your access has been automatically locked and you will need to enter the new password the next time you open insurance renewal records.<br><br>Please contact the Super Admin to obtain the new password.',
             '',
             '',
             'This is a routine security measure — no action is needed unless you need renewed access to Renewal Tracking.'
@@ -411,7 +416,7 @@ function sendReceiptEmail(
             <td style="font-family:' . $font . ';font-size:13px;font-weight:700;color:#1A1814;">' . htmlspecialchars($receiptNumber) . '</td>
           </tr>
           <tr>
-            <td style="font-family:' . $font . ';font-size:12px;color:#9C9286;padding-top:4px;">Job #</td>
+            <td style="font-family:' . $font . ';font-size:12px;color:#9C9286;padding-top:4px;">Repair ID</td>
             <td style="font-family:' . $font . ';font-size:13px;color:#3C3830;padding-top:4px;">' . htmlspecialchars($jobNumber) . '</td>
           </tr>
           <tr>
@@ -523,7 +528,7 @@ function sendRepairCompletedEmail(
         $body = 'Dear <strong>' . htmlspecialchars($toName) . '</strong>,<br><br>'
               . 'Great news! Your vehicle is now ready for pickup at '
               . '<strong>' . htmlspecialchars(_getCompanyName()) . '</strong>.<br><br>'
-              . '<strong>Job #:</strong> ' . htmlspecialchars($jobNumber) . '<br>'
+              . '<strong>Repair ID:</strong> ' . htmlspecialchars($jobNumber) . '<br>'
               . '<strong>Vehicle:</strong> ' . htmlspecialchars($vehicle) . ' (' . htmlspecialchars($plateNumber) . ')<br>'
               . '<strong>Service:</strong> ' . htmlspecialchars($serviceType) . '<br>'
               . $release_line

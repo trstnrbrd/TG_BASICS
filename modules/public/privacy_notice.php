@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/../../includes/insurance_companies.php';
+require_once __DIR__ . '/../../includes/branding.php';
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../config/settings.php';
 
@@ -15,7 +17,7 @@ $company_email   = getSetting($conn, 'company_email',   'tgcustomworksbulacan@gm
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Privacy Notice — <?= htmlspecialchars($company_name) ?></title>
-<link rel="icon" type="image/png" href="../../assets/img/tg_logo.png">
+<link rel="icon" type="image/png" href="<?= brand_logo('tg', '../../') ?>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../../assets/css/public/client.css?v=<?= filemtime(__DIR__ . '/../../assets/css/public/client.css') ?>"/>
@@ -37,8 +39,8 @@ $company_email   = getSetting($conn, 'company_email',   'tgcustomworksbulacan@gm
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
   </a>
   <div class="pub-nav-logos">
-    <img src="../../assets/img/tg_logo.png" alt="TG Customworks" class="pub-nav-img">
-    <img src="../../assets/img/LogoBasicCar.png" alt="Basic Car Insurance" class="pub-nav-img">
+    <img src="<?= brand_logo('tg', '../../') ?>" alt="TG Customworks" class="pub-nav-img">
+    <img src="<?= brand_logo('basic', '../../') ?>" alt="Basic Car Insurance" class="pub-nav-img">
   </div>
   <div class="pub-nav-brand">
     <div class="pub-nav-brand-name">TG<span>-BASICS</span></div>
@@ -110,7 +112,7 @@ $company_email   = getSetting($conn, 'company_email',   'tgcustomworksbulacan@gm
 
         <div class="priv-section">
           <div class="priv-eyebrow">7. Data Sharing</div>
-          <p class="priv-body">Your personal data is <strong>not shared, sold, or disclosed</strong> to third parties except when required by law, or when necessary for the processing of your insurance policy or claim with the insuring company you are enrolled under — either PhilBritish Insurance Corporation or Alpha Insurance &amp; Surety Company Inc.</p>
+          <p class="priv-body">Your personal data is <strong>not shared, sold, or disclosed</strong> to third parties except when required by law, or when necessary for the processing of your insurance policy or claim with the insuring company you are enrolled under — <?= htmlspecialchars(insurance_companies_phrase($conn, 'billing_name', 'or')) ?>.</p>
         </div>
 
         <div class="priv-section">

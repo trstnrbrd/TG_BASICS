@@ -16,6 +16,7 @@ const MAX_PAYMENT_REF = 50;               // installment control / OR number
 const MAX_NOTE        = 125;              // every notes / description / remarks box (panel: short notes only)
 const MAX_QTY         = 999;              // quotation line quantity (column DECIMAL(6,2))
 const MAX_ITEM_DESC   = 255;              // quotation line description
+const REPAIR_PHOTO_MAX_BYTES = 8 * 1024 * 1024;   // one repair photo (phone pictures are 2–6 MB)
 const MAX_PLATE       = 8;
 const MAX_MAKE_MODEL  = 60;
 const MAX_COLOR       = 50;
@@ -268,7 +269,16 @@ function csrf_verify_json(): void {
     }
 }
 
-// ── SEQUENTIAL NUMBER GENERATION (RJ-/BILL-/Q- style) ──────────────────────
+// ── SEQUENTIAL NUMBER GENERATION (RJ-/QT-/BL-/BS- style) ──────────────────────
+
+/**
+ * The start of a record number for this month: record_number_prefix('RJ') -> "RJ-202610-".
+ * Numbers run RJ-202610-0001, -0002 … and start again at 0001 each month (the month is part of the prefix).
+ * RJ = repair job, QT = quotation, BL = billing, BS = billing statement (a converted quotation).
+ */
+function record_number_prefix(string $code): string {
+    return $code . '-' . date('Ym') . '-';
+}
 
 /**
  * Makes the next number for a job/billing/quotation (highest number + 1).

@@ -6,6 +6,7 @@ require_once '../../config/settings.php';
 require_once '../../config/access.php';
 require_once '../../includes/agent_filter.php';
 require_once '../../includes/pagination.php';
+require_once '../../includes/insurance_companies.php';
 
 $urg_days = (int)getSetting($conn, 'renewal_urgent_days', '7');
 $exp_days = (int)getSetting($conn, 'renewal_expiring_days', '30');
@@ -24,7 +25,9 @@ $scope_sql = '1=1' . agent_filter_sql($af, 'c.agent_id');
 $agent_qs  = '&agent=' . urlencode($af['value']);
 
 // ── FILTERS ──
-$company      = san_enum($_GET['company'] ?? 'PhilBritish', ['PhilBritish', 'Alpha Insurance & Surety Company Inc.']);
+$tracked_cos  = insurance_companies_tracked($conn);
+$company      = san_enum($_GET['company'] ?? '', array_column($tracked_cos, 'name'));
+if ($company === '') $company = $tracked_cos[0]['name'] ?? '';
 $filter       = san_enum($_GET['filter'] ?? 'all', ['all', 'urgent', 'expiring', 'stable', 'expired', 'renewed']);
 $search       = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
 
@@ -120,7 +123,7 @@ require_once '../../includes/navbar.php';
 <link rel="stylesheet" href="../../assets/css/shared/clients.css?v=<?= filemtime(__DIR__ . '/../../assets/css/shared/clients.css') ?>"/>
 <link rel="stylesheet" href="../../assets/css/shared/agent_filter.css?v=<?= filemtime(__DIR__ . '/../../assets/css/shared/agent_filter.css') ?>"/>
 <style>
-/* Company quick switch — a two-way toggle, so PhilBritish <-> Alpha no longer needs the sidebar menu */
+/* Company quick switch — one option per company (Settings > Insurance Companies), so no sidebar trip is needed */
 .rnl-company-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
 .rnl-company-switch {
   display: inline-flex; padding: 3px; gap: 3px; border-radius: 100px;
@@ -134,10 +137,10 @@ require_once '../../includes/navbar.php';
 .rnl-company-opt:hover { color: var(--gold); background: var(--gold-pale); }
 .rnl-company-opt.is-active { color: var(--gold); background: var(--gold-pale); border-color: var(--gold-bright); font-weight: 700; }
 
-/* Phones: the switch spans the width (two equal halves); the agent filter takes its own full row in the
+/* Phones: the switch spans the width (equal parts, scrolling sideways if there are many); the agent filter takes its own full row in the
    toolbar grid (mobile_tables.css) */
 @media (max-width: 768px) {
-  .rnl-company-switch { display: flex; width: 100%; }
+  .rnl-company-switch { display: flex; width: 100%; overflow-x: auto; }
   .rnl-company-opt { flex: 1; justify-content: center; }
   .rnl-filter-inner > .cl-agent-wrap { grid-column: 1 / -1; }
 }
@@ -172,11 +175,11 @@ require_once '../../includes/topbar.php';
 
   <div class="content">
 
-    <!-- Company quick switch (PhilBritish <-> Alpha) — keeps the chosen agent, status card and search -->
+    <!-- Company quick switch — keeps the chosen agent, status card and search -->
     <div class="rnl-company-row">
       <nav class="rnl-company-switch" aria-label="Insurance company">
-        <?php foreach (['PhilBritish' => 'PhilBritish', 'Alpha Insurance & Surety Company Inc.' => 'Alpha Insurance'] as $co => $co_label):
-          $co_on = $company === $co; ?>
+        <?php foreach ($tracked_cos as $tco):
+          $co = $tco['name']; $co_label = $tco['short_name'] . ($tco['is_active'] ? '' : ' (inactive)'); $co_on = $company === $co; ?>
         <a href="?<?= htmlspecialchars(http_build_query(['company' => $co, 'filter' => $filter, 'search' => $search, 'agent' => $af['value']])) ?>"
            class="rnl-company-opt<?= $co_on ? ' is-active' : '' ?>" title="<?= htmlspecialchars($co) ?>"<?= $co_on ? ' aria-current="page"' : '' ?>>
           <?= icon('shield-check', 13) ?> <?= htmlspecialchars($co_label) ?>

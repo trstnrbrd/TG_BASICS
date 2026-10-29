@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../../includes/branding.php';
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
@@ -200,9 +201,9 @@ require_once '../../includes/topbar.php';
 
           <!-- Print-only logo header -->
           <div class="vb-print-logo">
-            <img src="../../assets/img/tg_logo.png" alt="TG Customworks"/>
+            <img src="<?= brand_logo('tg', '../../') ?>" alt="TG Customworks"/>
             <div class="vb-print-logo-divider"></div>
-            <img src="../../assets/img/LogoBasicCar.png" alt="Basic Car Insurance"/>
+            <img src="<?= brand_logo('basic', '../../') ?>" alt="Basic Car Insurance"/>
             <div class="vb-print-logo-divider"></div>
             <div class="vb-print-logo-text">TG Customworks &amp; Basic Car Insurance<br>Official Billing Statement</div>
           </div>

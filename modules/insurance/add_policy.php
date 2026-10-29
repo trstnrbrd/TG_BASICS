@@ -5,6 +5,8 @@ require_once '../../config/validators.php';
 require_once '../../config/settings.php';
 require_once '../../config/access.php';
 require_once '../../includes/transaction.php';
+require_once '../../includes/insurance_companies.php';
+require_once '../../includes/mortgagees.php';
 
 require_role(['admin', 'super_admin']);
 
@@ -47,8 +49,9 @@ if ($renew_policy) {
 }
 
 // insurance company, from the form or carried over on renewal
-$allowed_companies = ['PhilBritish', 'Alpha Insurance & Surety Company Inc.'];
-$insurance_company  = san_str($_GET['company'] ?? $_POST['insurance_company'] ?? '', 60);
+// a new policy (renewals included) only goes under a company that is still active (Settings)
+$allowed_companies = array_column(insurance_companies_active($conn), 'name');
+$insurance_company  = san_str($_GET['company'] ?? $_POST['insurance_company'] ?? '', 100);
 if (!in_array($insurance_company, $allowed_companies, true)) {
     $insurance_company = $renew_policy['insurance_company'] ?? '';
 }
@@ -516,7 +519,7 @@ require_once '../../includes/topbar.php';
               <label class="field-label">Policy Number <span class="req">*</span></label>
               <input type="text" name="policy_number" class="field-input" maxlength="<?= MAX_POLICY_NUM ?>" data-allow="policyno"
                 value="<?= old('policy_number') ?>"/>
-              <?php if ($renew_policy): ?><span class="field-hint">Enter the new policy number from the PhilBritish renewal notice.</span><?php endif; ?>
+              <?php if ($renew_policy): ?><span class="field-hint">Enter the new policy number from the <?= htmlspecialchars(insurance_company_label($conn, $insurance_company)) ?> renewal notice.</span><?php endif; ?>
             </div>
             <div class="field">
               <label class="field-label">Coverage Type <span class="req">*</span></label>
@@ -564,13 +567,13 @@ require_once '../../includes/topbar.php';
               <label class="field-label">Sum Insured (PHP) <span class="req">*</span></label>
               <input type="text" inputmode="decimal" autocomplete="off" name="sum_insured" class="field-input money-input" placeholder="0.00"
                 value="<?= old('sum_insured', $renew_policy['sum_insured'] ?? '') ?>"/>
-              <span class="field-hint">Coverage amount from the PhilBritish policy.</span>
+              <span class="field-hint">Coverage amount from the <?= htmlspecialchars(insurance_company_label($conn, $insurance_company)) ?> policy.</span>
             </div>
             <div class="field">
               <label class="field-label">Total Premium (PHP) <span class="req">*</span></label>
               <input type="text" inputmode="decimal" autocomplete="off" name="total_premium" id="total_premium" class="field-input money-input" placeholder="0.00"
                 value="<?= old('total_premium', $renew_policy['total_premium'] ?? '') ?>"/>
-              <span class="field-hint">Premium amount from PhilBritish.</span>
+              <span class="field-hint">Premium amount from <?= htmlspecialchars(insurance_company_label($conn, $insurance_company)) ?>.</span>
             </div>
             <div class="field">
               <label class="field-label">Commission (PHP)</label>
@@ -597,7 +600,7 @@ require_once '../../includes/topbar.php';
           <!-- PAYMENT SCHEDULE -->
           <div class="field-section">Payment Schedule</div>
           <?php
-          $ph_banks = ['Toyota Financial Services Philippines','BDO Unibank','BPI (Bank of the Philippine Islands)','Metrobank','PNB (Philippine National Bank)','Land Bank of the Philippines','DBP (Development Bank of the Philippines)','China Bank','Security Bank','UnionBank','RCBC','EastWest Bank','PSBank','AUB (Asia United Bank)','CTBC Bank Philippines','PBCOM','Maybank Philippines','Bank of Commerce','UCPB','Sterling Bank of Asia','Philippine Savings Bank (PSBank)','GCash (GSave)','Maya Bank','Tonik Bank','GoTyme Bank','UNObank','Other'];
+          $ph_banks = array_merge(mortgagees_active($conn), ['Other']);   // from the mortgagees table (phpMyAdmin); "Other" = type a name
           $prefill_mort = $_POST['mortgagee'] ?? ($renew_policy['mortgagee'] ?? '');
           $mort_is_other = $prefill_mort !== '' && !in_array($prefill_mort, $ph_banks);
           $mort_select_val = $mort_is_other ? 'Other' : $prefill_mort;

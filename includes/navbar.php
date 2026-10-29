@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/branding.php';
+require_once __DIR__ . '/insurance_companies.php';
 $active_page = $active_page ?? '';
 $base_path   = $base_path   ?? '../';
 
@@ -21,9 +23,9 @@ $dash_url = is_mechanic()
 
   <a href="<?= $dash_url ?>" class="sidebar-logo" title="Go to Dashboard">
     <div class="sidebar-logo-imgs">
-      <img src="<?= $base_path ?>assets/img/tg_logo.png" alt="TG" class="sidebar-logo-img"/>
+      <img src="<?= brand_logo('tg', $base_path) ?>" alt="TG" class="sidebar-logo-img"/>
       <div class="sidebar-logo-sep"></div>
-      <img src="<?= $base_path ?>assets/img/LogoBasicCar.png" alt="BASICS" class="sidebar-logo-img no-ring"/>
+      <img src="<?= brand_logo('basic', $base_path) ?>" alt="BASICS" class="sidebar-logo-img no-ring"/>
     </div>
     <div class="sidebar-logo-name">TG<span>-BASICS</span></div>
   </a>
@@ -64,14 +66,12 @@ $dash_url = is_mechanic()
             <?= $chevron ?>
           </a>
           <div class="nav-flyout">
-            <a href="<?= $base_path ?>modules/renewal/renewal_list.php?company=PhilBritish"
+            <?php foreach (insurance_companies_tracked($conn) as $nav_co): ?>
+            <a href="<?= $base_path ?>modules/renewal/renewal_list.php?company=<?= urlencode($nav_co['name']) ?>"
                class="nav-flyout-item">
-              <?= icon('shield-check', 12) ?> PhilBritish
+              <?= icon('shield-check', 12) ?> <?= htmlspecialchars($nav_co['short_name']) ?>
             </a>
-            <a href="<?= $base_path ?>modules/renewal/renewal_list.php?company=<?= urlencode('Alpha Insurance & Surety Company Inc.') ?>"
-               class="nav-flyout-item">
-              <?= icon('shield-check', 12) ?> Alpha Insurance
-            </a>
+            <?php endforeach; ?>
           </div>
         </div>
       </div>

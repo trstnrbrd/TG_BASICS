@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/branding.php';
 require_once __DIR__ . "/../config/session.php";
 require_once '../config/db.php';
 require_once '../config/totp.php';
@@ -102,7 +103,7 @@ render:
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Authenticator Verification | TG-BASICS</title>
-<link rel="icon" type="image/png" href="../assets/img/tg_logo.png"/>
+<link rel="icon" type="image/png" href="<?= brand_logo('tg', '../') ?>"/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="../assets/css/auth/auth-background.css?v=<?= filemtime(__DIR__.'/../assets/css/auth/auth-background.css') ?>"/>
 <link rel="stylesheet" href="../assets/css/auth/activate.css?v=<?= filemtime(__DIR__.'/../assets/css/auth/activate.css') ?>"/>
@@ -139,11 +140,11 @@ render:
   <div class="brand">
     <div class="brand-logos">
       <div class="brand-logo-ring">
-        <img src="../assets/img/tg_logo.png" alt="TG Customworks"/>
+        <img src="<?= brand_logo('tg', '../') ?>" alt="TG Customworks"/>
       </div>
       <div class="brand-logo-sep"></div>
       <div class="brand-logo-ring no-ring">
-        <img src="../assets/img/LogoBasicCar.png" alt="Basic Car Insurance"/>
+        <img src="<?= brand_logo('basic', '../') ?>" alt="Basic Car Insurance"/>
       </div>
     </div>
     <div class="brand-name">TG<span>-BASICS</span></div>

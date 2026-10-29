@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../../includes/branding.php';
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
@@ -51,7 +52,7 @@ $pay_status_labels = ['unpaid' => 'Unpaid', 'partial' => 'Partial', 'paid' => 'P
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Billing Statement <?= htmlspecialchars($d['receipt_number']) ?> | TG-BASICS</title>
-<link rel="icon" type="image/png" href="../../assets/img/tg_logo.png"/>
+<link rel="icon" type="image/png" href="<?= brand_logo('tg', '../../') ?>"/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -225,9 +226,9 @@ $pay_status_labels = ['unpaid' => 'Unpaid', 'partial' => 'Partial', 'paid' => 'P
   <div class="receipt-head">
     <div class="receipt-brand">
       <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;">
-        <img src="../../assets/img/tg_logo.png" alt="TG Customworks" style="width:38px;height:38px;border-radius:8px;object-fit:cover;border:1.5px solid rgba(212,160,23,0.4);"/>
+        <img src="<?= brand_logo('tg', '../../') ?>" alt="TG Customworks" style="width:38px;height:38px;border-radius:8px;object-fit:cover;border:1.5px solid rgba(212,160,23,0.4);"/>
         <div style="width:1px;height:28px;background:rgba(212,160,23,0.25);"></div>
-        <img src="../../assets/img/LogoBasicCar.png" alt="Basic Car Insurance" style="height:34px;width:auto;object-fit:contain;"/>
+        <img src="<?= brand_logo('basic', '../../') ?>" alt="Basic Car Insurance" style="height:34px;width:auto;object-fit:contain;"/>
       </div>
       <div>
         <div class="receipt-brand-name">TG<span>-BASICS</span></div>

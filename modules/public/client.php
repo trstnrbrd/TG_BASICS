@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../../includes/branding.php';
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../config/settings.php';
 require_once __DIR__ . '/../../includes/icons.php';
@@ -21,7 +22,7 @@ function pub_not_found(): never {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Profile Not Found — TG-BASICS</title>
-<link rel="icon" type="image/png" href="../../assets/img/tg_logo.png">
+<link rel="icon" type="image/png" href="<?= brand_logo('tg', '../../') ?>">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -40,8 +41,8 @@ body{font-family:"Plus Jakarta Sans","Segoe UI",sans-serif;background:linear-gra
 <body>
 <div class="err-wrap">
   <div class="err-logos">
-    <img src="../../assets/img/tg_logo.png" alt="TG Customworks">
-    <img src="../../assets/img/LogoBasicCar.png" alt="Basic Car Insurance">
+    <img src="<?= brand_logo('tg', '../../') ?>" alt="TG Customworks">
+    <img src="<?= brand_logo('basic', '../../') ?>" alt="Basic Car Insurance">
   </div>
   <div class="err-code">404 — Not Found</div>
   <div class="err-icon">
@@ -135,6 +136,37 @@ $rjstmt->bind_param('i', $client_id);
 $rjstmt->execute();
 $repair_jobs = $rjstmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
+// Progress photos the shop chose to show ("Show to client"), and only while their job is still open. The files are
+// sent by photo.php, which checks all of that again; uploads/repair_jobs itself stays closed to direct links.
+require_once __DIR__ . '/../../config/access.php';
+$photos_by_job = [];
+$phstmt = $conn->prepare("
+    SELECT i.image_id, i.job_id, i.caption, i.uploaded_at, j.status
+    FROM repair_job_images i
+    INNER JOIN repair_jobs j ON j.job_id = i.job_id
+    WHERE j.client_id = ? AND i.show_client = 1
+    ORDER BY i.uploaded_at ASC, i.image_id ASC
+");
+$phstmt->bind_param('i', $client_id);
+$phstmt->execute();
+foreach ($phstmt->get_result()->fetch_all(MYSQLI_ASSOC) as $ph) {
+    if (repair_job_is_open($ph['status'])) $photos_by_job[(int)$ph['job_id']][] = $ph;
+}
+
+// Live updates: a fingerprint of everything this page shows. When the shop saves something (a Pusher signal, or
+// the 30-second poll when Pusher is unreachable), the page asks ?state=1 and reloads only if ITS fingerprint
+// changed, so one client's page never reloads because of another client's repair. Signals carry no client data.
+$live_state = md5(json_encode([$client['full_name'], $client['contact_number'], $client['email'], $client['address'],
+    $vehicles, $policies, $repair_jobs, $photos_by_job]));
+if (isset($_GET['state'])) {
+    header('Content-Type: application/json');
+    header('Cache-Control: no-store');
+    echo json_encode(['state' => $live_state]);
+    exit;
+}
+require_once __DIR__ . '/../../includes/realtime.php';
+$live_cfg = realtime_client_config();   // public values only (key, cluster); empty = polling only
+
 $status_progress = [
     'pending'     => 10,
     'in_progress' => 50,
@@ -183,7 +215,7 @@ $initials = strtoupper(substr(implode('', array_map(fn($w) => $w[0], $words)), 0
 <meta name="robots" content="noindex, nofollow, noarchive">
 <meta name="referrer" content="no-referrer">
 <title><?= htmlspecialchars($client['full_name']) ?> — <?= htmlspecialchars($company_name) ?></title>
-<link rel="icon" type="image/png" href="../../assets/img/tg_logo.png">
+<link rel="icon" type="image/png" href="<?= brand_logo('tg', '../../') ?>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Big+Shoulders+Text:wght@800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../../assets/css/public/client.css?v=<?= filemtime(__DIR__ . '/../../assets/css/public/client.css') ?>"/>
@@ -197,7 +229,7 @@ $initials = strtoupper(substr(implode('', array_map(fn($w) => $w[0], $words)), 0
 <!-- PAGE LOADER -->
 <div id="pub-loader" style="position:fixed;inset:0;z-index:9999;background:linear-gradient(160deg,#1c1a17 0%,#252118 50%,#1a1710 100%);display:flex;align-items:center;justify-content:center;">
   <div style="display:flex;flex-direction:column;align-items:center;gap:1.25rem;">
-    <img src="../../assets/img/tg_logo.png" alt="TG" style="width:64px;height:64px;object-fit:contain;animation:loaderPulse 1.2s ease-in-out infinite;">
+    <img src="<?= brand_logo('tg', '../../') ?>" alt="TG" style="width:64px;height:64px;object-fit:contain;animation:loaderPulse 1.2s ease-in-out infinite;">
     <div style="width:28px;height:28px;border:2.5px solid rgba(212,160,23,0.2);border-top-color:#d4a017;border-radius:50%;animation:loaderSpin 0.75s linear infinite;"></div>
   </div>
 </div>
@@ -205,8 +237,8 @@ $initials = strtoupper(substr(implode('', array_map(fn($w) => $w[0], $words)), 0
 <!-- TOP NAV -->
 <nav class="pub-nav">
   <div class="pub-nav-logos">
-    <img src="../../assets/img/tg_logo.png" alt="TG Customworks" class="pub-nav-img">
-    <img src="../../assets/img/LogoBasicCar.png" alt="Basic Car Insurance" class="pub-nav-img">
+    <img src="<?= brand_logo('tg', '../../') ?>" alt="TG Customworks" class="pub-nav-img">
+    <img src="<?= brand_logo('basic', '../../') ?>" alt="Basic Car Insurance" class="pub-nav-img">
   </div>
   <div class="pub-nav-brand">
     <div class="pub-nav-brand-name">TG<span>-BASICS</span></div>
@@ -385,6 +417,21 @@ $initials = strtoupper(substr(implode('', array_map(fn($w) => $w[0], $words)), 0
                 <span class="prog-label" style="color:<?= $scolor ?>;"><?= htmlspecialchars($slabel) ?></span>
                 <span class="prog-pct"><?= $pct ?>%</span>
               </div>
+              <?php if (!empty($photos_by_job[(int)$rj['job_id']])): ?>
+              <div class="job-photos">
+                <div class="job-photos-label">Progress photos from the shop</div>
+                <div class="job-photos-grid">
+                  <?php foreach ($photos_by_job[(int)$rj['job_id']] as $ph):
+                    $ph_url = 'photo.php?token=' . urlencode($token) . '&id=' . (int)$ph['image_id'];
+                    $ph_cap = (string)($ph['caption'] ?? ''); ?>
+                  <a class="job-photo" href="<?= htmlspecialchars($ph_url) ?>" target="_blank" rel="noopener">
+                    <img src="<?= htmlspecialchars($ph_url) ?>" alt="<?= htmlspecialchars($ph_cap !== '' ? $ph_cap : 'Repair progress photo') ?>" loading="lazy"/>
+                    <span class="job-photo-meta"><?php if ($ph_cap !== ''): ?><strong><?= htmlspecialchars($ph_cap) ?></strong><?php endif; ?><?= date('M d, Y', strtotime($ph['uploaded_at'])) ?></span>
+                  </a>
+                  <?php endforeach; ?>
+                </div>
+              </div>
+              <?php endif; ?>
             </div>
             <?php endforeach; ?>
           </div>
@@ -450,6 +497,16 @@ gsap.registerPlugin(ScrollTrigger);
 window.addEventListener('DOMContentLoaded', function () {
   var loader = document.getElementById('pub-loader');
 
+  // A reload made by a live update: no intro animation, back to where the client was
+  var liveY = null;
+  try { liveY = sessionStorage.getItem('pub_live_reload'); sessionStorage.removeItem('pub_live_reload'); } catch (e) {}
+  if (liveY !== null) {
+    loader.style.display = 'none';
+    gsap.set('.pub-nav, .pub-gold-bar, .pub-card, .pub-footer', { autoAlpha: 1, y: 0 });
+    window.scrollTo(0, parseInt(liveY, 10) || 0);
+    return;
+  }
+
   // Hide page content — target specific elements, NOT their parents
   gsap.set('.pub-nav, .pub-gold-bar, .pub-card, .pub-footer', { autoAlpha: 0 });
 
@@ -479,6 +536,46 @@ window.addEventListener('DOMContentLoaded', function () {
     }
   });
 });
+</script>
+<?php if ($live_cfg): ?>
+<script src="https://js.pusher.com/8.4.0/pusher.min.js"></script>
+<?php endif; ?>
+<script>
+// Live updates on the client's page: when the shop saves something, check whether THIS page changed and reload if so
+(function () {
+  var cfg = <?= json_encode($live_cfg + ['pollMs' => 30000]) ?>;
+  var mine = <?= json_encode($live_state) ?>;
+  var url = <?= json_encode('client.php?token=' . $token . '&state=1') ?>;
+  var busy = false, again = false, pollTimer = null;
+  function check() {
+    if (document.hidden) return;
+    if (busy) { again = true; return; }
+    busy = true;
+    fetch(url, { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        if (j && j.state && j.state !== mine) {
+          try { sessionStorage.setItem('pub_live_reload', String(window.scrollY)); } catch (e) {}
+          location.reload();
+        }
+      })
+      .catch(function () {})
+      .then(function () { busy = false; if (again) { again = false; check(); } });
+  }
+  function polling(on) {
+    if (on && !pollTimer) pollTimer = setInterval(check, cfg.pollMs);
+    if (!on && pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  }
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) check(); });
+  window.TG_PUB_check = check;   // for tests
+  if (!cfg.key || !window.Pusher) return polling(true);
+  var pusher = new Pusher(cfg.key, { cluster: cfg.cluster });
+  pusher.subscribe('tg-live').bind('changed', function (d) {
+    if (!d || !d.topic || ['clients', 'repairs', 'policies', 'quotations'].indexOf(d.topic) !== -1) check();
+  });
+  pusher.connection.bind('state_change', function (s) { polling(s.current !== 'connected'); });
+  window.TG_PUB_connected = function () { return pusher.connection.state === 'connected'; };
+})();
 </script>
 </body>
 </html>

@@ -6,6 +6,7 @@ require_once '../../config/mailer.php';
 require_once '../../includes/transaction.php';
 require_once '../../config/uploads.php';
 require_once '../../config/access.php';
+require_once '../../config/transaction_pin.php';
 
 require_role(['admin', 'super_admin', 'mechanic']);
 
@@ -37,59 +38,115 @@ $checklist = [];
 foreach ($cl_rows as $row) $checklist[$row['area_key']] = $row;
 
 // ── FETCH IMAGES ──
-$img_stmt = $conn->prepare("SELECT image_id, file_name, uploaded_at FROM repair_job_images WHERE job_id = ? ORDER BY uploaded_at ASC");
+$img_stmt = $conn->prepare("SELECT image_id, file_name, uploaded_by, show_client, caption, uploaded_at FROM repair_job_images WHERE job_id = ? ORDER BY uploaded_at ASC, image_id ASC");
 $img_stmt->bind_param('i', $job_id);
 $img_stmt->execute();
 $images = $img_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
-// ── HANDLE IMAGE DELETE ──
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_image') {
+// One photo of this job, for the show / hide / delete actions below (null if it is not this job's)
+$find_photo = function (int $img_id) use ($conn, $job_id): ?array {
+    $fi = $conn->prepare("SELECT image_id, file_name, uploaded_by, show_client FROM repair_job_images WHERE image_id = ? AND job_id = ?");
+    $fi->bind_param('ii', $img_id, $job_id);
+    $fi->execute();
+    return $fi->get_result()->fetch_assoc() ?: null;
+};
+$photo_log = function (string $action, string $what) use ($conn, $job) {
+    $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, ?, ?)");
+    $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' ' . $what . ' on repair job ' . $job['job_number'] . '.';
+    $log->bind_param('iss', $_SESSION['user_id'], $action, $desc);
+    $log->execute();
+};
+
+// ── HANDLE PHOTO DELETE ── only while the job is open; a mechanic only their own upload (repair_photo_editable())
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete_image') {
     csrf_verify();
-    if (is_staff()) {
-        $img_id = san_int($_POST['image_id'] ?? 0, 1);
-        if ($img_id) {
-            $fi = $conn->prepare("SELECT file_name FROM repair_job_images WHERE image_id = ? AND job_id = ?");
-            $fi->bind_param('ii', $img_id, $job_id);
-            $fi->execute();
-            $fi_row = $fi->get_result()->fetch_assoc();
-            if ($fi_row) {
-                $path = __DIR__ . '/../../uploads/repair_jobs/' . $job_id . '/' . $fi_row['file_name'];
-                if (file_exists($path)) unlink($path);
-                $del = $conn->prepare("DELETE FROM repair_job_images WHERE image_id = ?");
-                $del->bind_param('i', $img_id);
-                $del->execute();
-            }
-        }
+    // the page asks for the Transaction PIN first (requirePin()); the server makes sure it was given
+    if (!pin_consume($conn)) {
+        header("Location: view_repair.php?id=$job_id&error=" . urlencode(PIN_REQUIRED_MSG));
+        exit;
     }
-    header("Location: view_repair.php?id=$job_id&success=Image removed.");
+    $photo = $find_photo(san_int($_POST['image_id'] ?? 0, 1));
+    if (!$photo || !repair_photo_editable((int)$photo['uploaded_by'], $job['status'])) {
+        header("Location: view_repair.php?id=$job_id&error=" . urlencode('This photo can no longer be removed.'));
+        exit;
+    }
+    db_transaction($conn, function () use ($conn, $photo, $photo_log) {
+        $del = $conn->prepare("DELETE FROM repair_job_images WHERE image_id = ?");
+        $del->bind_param('i', $photo['image_id']);
+        $del->execute();
+        $photo_log('REPAIR_PHOTO_DELETED', 'removed a ' . ($photo['show_client'] ? 'client-visible' : 'private') . ' photo');
+    });
+    $path = __DIR__ . '/../../uploads/repair_jobs/' . $job_id . '/' . basename($photo['file_name']);
+    if (is_file($path)) unlink($path);   // only after the row is gone (CLAUDE.md: files after the commit)
+    header("Location: view_repair.php?id=$job_id&success=Photo removed.");
     exit;
 }
 
-// ── HANDLE IMAGE UPLOAD ──
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'upload_image') {
+// ── HANDLE SHOW / HIDE ON THE CLIENT'S QR PAGE ──
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'toggle_photo') {
     csrf_verify();
-    if (!empty($_FILES['job_images']['name'][0])) {
-        $upload_dir = __DIR__ . '/../../uploads/repair_jobs/' . $job_id . '/';
-        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-        $allowed = ['image/jpeg','image/png','image/webp','image/gif'];
-        $uploaded = 0;
-        foreach ($_FILES['job_images']['tmp_name'] as $i => $tmp) {
-            if ($_FILES['job_images']['error'][$i] !== UPLOAD_ERR_OK) continue;
-            $mime = mime_content_type($tmp);
-            if (!in_array($mime, $allowed)) continue;
-            $ext  = ['image/jpeg'=>'jpg','image/png'=>'png','image/webp'=>'webp','image/gif'=>'gif'][$mime];
-            $fname = uniqid('img_', true) . '.' . $ext;
-            if (move_uploaded_file($tmp, $upload_dir . $fname)) {
-                $ins = $conn->prepare("INSERT INTO repair_job_images (job_id, file_name, uploaded_by) VALUES (?,?,?)");
-                $ins->bind_param('isi', $job_id, $fname, $_SESSION['user_id']);
-                $ins->execute();
-                $uploaded++;
-            }
-        }
-        header("Location: view_repair.php?id=$job_id&success=" . urlencode($uploaded . ' image(s) uploaded.'));
+    $photo = $find_photo(san_int($_POST['image_id'] ?? 0, 1));
+    if (!$photo || !repair_photo_editable((int)$photo['uploaded_by'], $job['status'])) {
+        header("Location: view_repair.php?id=$job_id&error=" . urlencode('This photo can no longer be changed.'));
         exit;
     }
-    header("Location: view_repair.php?id=$job_id");
+    $show = ($_POST['show'] ?? '') === '1' ? 1 : 0;
+    db_transaction($conn, function () use ($conn, $photo, $show, $photo_log) {
+        $upd = $conn->prepare("UPDATE repair_job_images SET show_client = ? WHERE image_id = ?");
+        $upd->bind_param('ii', $show, $photo['image_id']);
+        $upd->execute();
+        $photo_log('REPAIR_PHOTO_VISIBILITY', $show ? 'showed a photo to the client' : 'hid a photo from the client');
+    });
+    header("Location: view_repair.php?id=$job_id&success=" . urlencode($show ? 'Photo is now shown to the client.' : 'Photo is now hidden from the client.'));
+    exit;
+}
+
+// ── HANDLE PHOTO UPLOAD ── metadata (GPS, phone model, date) is stripped before the file is kept
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'upload_image') {
+    csrf_verify();
+    require_once '../../includes/image_meta.php';
+    $files = $_FILES['job_images'] ?? null;
+    if (!$files || !is_array($files['tmp_name'] ?? null) || ($files['name'][0] ?? '') === '') {
+        header("Location: view_repair.php?id=$job_id&error=" . urlencode('Choose at least one photo to upload.'));
+        exit;
+    }
+    if (text_too_long($_POST['caption'] ?? '', MAX_NOTE)) {
+        header("Location: view_repair.php?id=$job_id&error=" . urlencode('The caption is too long (max ' . MAX_NOTE . ' characters).'));
+        exit;
+    }
+    $caption = san_str($_POST['caption'] ?? '', MAX_NOTE);
+    $caption = $caption === '' ? null : $caption;
+    // a finished job's photos never reach the QR page, so they are never marked for it
+    $show    = (($_POST['show_client'] ?? '') === '1' && repair_job_is_open($job['status'])) ? 1 : 0;
+    $upload_dir = __DIR__ . '/../../uploads/repair_jobs/' . $job_id . '/';
+    if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+    $types   = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
+    $saved   = [];
+    $skipped = 0;
+    foreach ($files['tmp_name'] as $i => $tmp) {
+        if (($files['error'][$i] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || ($files['size'][$i] ?? 0) > REPAIR_PHOTO_MAX_BYTES) { $skipped++; continue; }
+        $mime = mime_content_type($tmp);
+        if (!isset($types[$mime]) || !strip_image_metadata($tmp, $mime)) { $skipped++; continue; }
+        $fname = bin2hex(random_bytes(12)) . '.' . $types[$mime];
+        if (move_uploaded_file($tmp, $upload_dir . $fname)) $saved[] = $fname; else $skipped++;
+    }
+    if ($saved) {
+        try {
+            db_transaction($conn, function () use ($conn, $saved, $job_id, $show, $caption, $photo_log) {
+                $ins = $conn->prepare("INSERT INTO repair_job_images (job_id, file_name, uploaded_by, show_client, caption) VALUES (?, ?, ?, ?, ?)");
+                foreach ($saved as $fname) {
+                    $ins->bind_param('isiis', $job_id, $fname, $_SESSION['user_id'], $show, $caption);
+                    $ins->execute();
+                }
+                $photo_log('REPAIR_PHOTO_UPLOADED', 'uploaded ' . count($saved) . ' photo(s)' . ($show ? ' shown to the client' : ''));
+            });
+        } catch (Throwable $e) {
+            foreach ($saved as $fname) @unlink($upload_dir . $fname);
+            throw $e;
+        }
+    }
+    $msg = count($saved) . ' photo(s) uploaded.' . ($skipped ? ' ' . $skipped . ' skipped (not a JPG/PNG/WEBP/GIF image, unreadable, or over ' . (REPAIR_PHOTO_MAX_BYTES >> 20) . ' MB).' : '');
+    header("Location: view_repair.php?id=$job_id&" . ($saved ? 'success=' : 'error=') . urlencode($msg));
     exit;
 }
 
@@ -540,9 +597,17 @@ document.addEventListener('DOMContentLoaded', function() {
       <form method="POST" enctype="multipart/form-data" style="display:flex;flex-direction:column;gap:0.75rem;">
         <?= csrf_field() ?>
         <input type="hidden" name="action" value="upload_image"/>
-        <label style="font-size:0.78rem;font-weight:600;color:var(--text-muted);">Select images (JPG, PNG, WEBP — multiple allowed)</label>
+        <label style="font-size:0.78rem;font-weight:600;color:var(--text-muted);">Select images (JPG, PNG, WEBP — multiple allowed, up to <?= REPAIR_PHOTO_MAX_BYTES >> 20 ?> MB each)</label>
         <input type="file" name="job_images[]" multiple accept="image/jpeg,image/png,image/webp,image/gif"
           style="font-size:0.8rem;padding:0.5rem;border:1px dashed var(--gold-muted);border-radius:8px;background:var(--bg-3);color:var(--text-primary);width:100%;"/>
+        <?php if (repair_job_is_open($job['status'])): ?>
+        <label style="display:flex;align-items:flex-start;gap:0.55rem;font-size:0.8rem;color:var(--text-primary);cursor:pointer;">
+          <input type="checkbox" name="show_client" value="1" id="photo-show-client" style="margin-top:0.15rem;accent-color:var(--gold);"/>
+          <span><strong>Show these photos to the client</strong> on their QR page while the job is open.
+            <span style="display:block;font-size:0.72rem;color:var(--text-muted);margin-top:0.15rem;">Photograph the vehicle only: no faces, no other cars' plates, no documents left inside. Location and phone details are removed from the photos automatically.</span></span>
+        </label>
+        <input type="text" name="caption" class="field-input" maxlength="<?= MAX_NOTE ?>" placeholder="Caption for the client (optional), e.g. Primer applied, Ready for pickup"/>
+        <?php endif; ?>
         <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
           <button type="button" onclick="document.getElementById('upload-panel').style.display='none'" class="btn-ghost" style="font-size:0.8rem;">Cancel</button>
           <button type="submit" class="btn-primary" style="font-size:0.8rem;"><?= icon('arrow-up-tray', 13) ?> Upload</button>
@@ -559,25 +624,43 @@ document.addEventListener('DOMContentLoaded', function() {
       <?php else: ?>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:0.75rem;">
         <?php foreach ($images as $img):
-          $img_url = htmlspecialchars(upload_url('repair_jobs', $img['file_name'], $job_id));
+          $img_url  = htmlspecialchars(upload_url('repair_jobs', $img['file_name'], $job_id));
+          $can_edit = repair_photo_editable((int)$img['uploaded_by'], $job['status']);
+          $shown    = (int)$img['show_client'] === 1;
         ?>
-        <div style="position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--border);aspect-ratio:4/3;background:var(--bg-2);">
+        <div class="rp-photo" data-image-id="<?= (int)$img['image_id'] ?>" style="position:relative;border-radius:10px;overflow:hidden;border:1px solid <?= $shown ? 'var(--gold-muted)' : 'var(--border)' ?>;aspect-ratio:4/3;background:var(--bg-2);">
           <img src="<?= $img_url ?>" alt="Vehicle photo" loading="lazy"
             style="width:100%;height:100%;object-fit:cover;cursor:pointer;transition:opacity 0.15s;"
             onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'"
             onclick="openLightbox('<?= $img_url ?>')"/>
-          <?php if (is_staff()): ?>
-          <form method="POST" style="position:absolute;top:0.35rem;right:0.35rem;">
-            <?= csrf_field() ?>
-            <input type="hidden" name="action" value="delete_image"/>
-            <input type="hidden" name="image_id" value="<?= $img['image_id'] ?>"/>
-            <button type="button" onclick="confirmDeleteImg(this)" aria-label="Delete photo"
-              style="background:rgba(192,57,43,0.85);border:none;border-radius:6px;padding:0.25rem 0.4rem;cursor:pointer;color:#fff;display:flex;align-items:center;">
-              <?= icon('trash', 12) ?>
-            </button>
-          </form>
+          <span class="rp-badge" style="position:absolute;top:0.35rem;left:0.35rem;display:inline-flex;align-items:center;gap:0.25rem;padding:0.15rem 0.45rem;border-radius:6px;font-size:0.62rem;font-weight:700;<?= $shown ? 'background:rgba(212,160,23,0.92);color:#1C1A17;' : 'background:rgba(0,0,0,0.55);color:#fff;' ?>">
+            <?= icon($shown ? 'eye' : 'lock-closed', 10) ?> <?= $shown ? 'Shown to client' : 'Private' ?>
+          </span>
+          <?php if ($can_edit): ?>
+          <div style="position:absolute;top:0.35rem;right:0.35rem;display:flex;gap:0.3rem;">
+            <form method="POST">
+              <?= csrf_field() ?>
+              <input type="hidden" name="action" value="toggle_photo"/>
+              <input type="hidden" name="image_id" value="<?= (int)$img['image_id'] ?>"/>
+              <input type="hidden" name="show" value="<?= $shown ? '0' : '1' ?>"/>
+              <button type="submit" class="rp-toggle" title="<?= $shown ? 'Hide from the client' : 'Show to the client' ?>" aria-label="<?= $shown ? 'Hide from the client' : 'Show to the client' ?>"
+                style="background:rgba(0,0,0,0.6);border:none;border-radius:6px;padding:0.25rem 0.4rem;cursor:pointer;color:#fff;display:flex;align-items:center;">
+                <?= icon($shown ? 'lock-closed' : 'eye', 12) ?>
+              </button>
+            </form>
+            <form method="POST">
+              <?= csrf_field() ?>
+              <input type="hidden" name="action" value="delete_image"/>
+              <input type="hidden" name="image_id" value="<?= (int)$img['image_id'] ?>"/>
+              <button type="button" onclick="confirmDeleteImg(this)" aria-label="Delete photo"
+                style="background:rgba(192,57,43,0.85);border:none;border-radius:6px;padding:0.25rem 0.4rem;cursor:pointer;color:#fff;display:flex;align-items:center;">
+                <?= icon('trash', 12) ?>
+              </button>
+            </form>
+          </div>
           <?php endif; ?>
-          <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.45);padding:0.25rem 0.5rem;font-size:0.65rem;color:rgba(255,255,255,0.8);">
+          <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.55);padding:0.25rem 0.5rem;font-size:0.65rem;color:rgba(255,255,255,0.9);">
+            <?php if ($img['caption'] !== null && $img['caption'] !== ''): ?><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><?= htmlspecialchars($img['caption']) ?></div><?php endif; ?>
             <?= date('M d, Y', strtotime($img['uploaded_at'])) ?>
           </div>
         </div>

@@ -135,6 +135,23 @@ $rjstmt->bind_param('i', $client_id);
 $rjstmt->execute();
 $repair_jobs = $rjstmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
+// Progress photos the shop chose to show ("Show to client"), and only while their job is still open. The files are
+// sent by photo.php, which checks all of that again; uploads/repair_jobs itself stays closed to direct links.
+require_once __DIR__ . '/../../config/access.php';
+$photos_by_job = [];
+$phstmt = $conn->prepare("
+    SELECT i.image_id, i.job_id, i.caption, i.uploaded_at, j.status
+    FROM repair_job_images i
+    INNER JOIN repair_jobs j ON j.job_id = i.job_id
+    WHERE j.client_id = ? AND i.show_client = 1
+    ORDER BY i.uploaded_at ASC, i.image_id ASC
+");
+$phstmt->bind_param('i', $client_id);
+$phstmt->execute();
+foreach ($phstmt->get_result()->fetch_all(MYSQLI_ASSOC) as $ph) {
+    if (repair_job_is_open($ph['status'])) $photos_by_job[(int)$ph['job_id']][] = $ph;
+}
+
 $status_progress = [
     'pending'     => 10,
     'in_progress' => 50,
@@ -385,6 +402,21 @@ $initials = strtoupper(substr(implode('', array_map(fn($w) => $w[0], $words)), 0
                 <span class="prog-label" style="color:<?= $scolor ?>;"><?= htmlspecialchars($slabel) ?></span>
                 <span class="prog-pct"><?= $pct ?>%</span>
               </div>
+              <?php if (!empty($photos_by_job[(int)$rj['job_id']])): ?>
+              <div class="job-photos">
+                <div class="job-photos-label">Progress photos from the shop</div>
+                <div class="job-photos-grid">
+                  <?php foreach ($photos_by_job[(int)$rj['job_id']] as $ph):
+                    $ph_url = 'photo.php?token=' . urlencode($token) . '&id=' . (int)$ph['image_id'];
+                    $ph_cap = (string)($ph['caption'] ?? ''); ?>
+                  <a class="job-photo" href="<?= htmlspecialchars($ph_url) ?>" target="_blank" rel="noopener">
+                    <img src="<?= htmlspecialchars($ph_url) ?>" alt="<?= htmlspecialchars($ph_cap !== '' ? $ph_cap : 'Repair progress photo') ?>" loading="lazy"/>
+                    <span class="job-photo-meta"><?php if ($ph_cap !== ''): ?><strong><?= htmlspecialchars($ph_cap) ?></strong><?php endif; ?><?= date('M d, Y', strtotime($ph['uploaded_at'])) ?></span>
+                  </a>
+                  <?php endforeach; ?>
+                </div>
+              </div>
+              <?php endif; ?>
             </div>
             <?php endforeach; ?>
           </div>

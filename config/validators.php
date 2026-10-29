@@ -16,6 +16,7 @@ const MAX_PAYMENT_REF = 50;               // installment control / OR number
 const MAX_NOTE        = 125;              // every notes / description / remarks box (panel: short notes only)
 const MAX_QTY         = 999;              // quotation line quantity (column DECIMAL(6,2))
 const MAX_ITEM_DESC   = 255;              // quotation line description
+const REPAIR_PHOTO_MAX_BYTES = 8 * 1024 * 1024;   // one repair photo (phone pictures are 2–6 MB)
 const MAX_PLATE       = 8;
 const MAX_MAKE_MODEL  = 60;
 const MAX_COLOR       = 50;

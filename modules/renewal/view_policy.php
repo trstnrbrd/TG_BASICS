@@ -22,23 +22,7 @@ if ($policy_id === 0) {
     exit;
 }
 
-$stmt = $conn->prepare("
-    SELECT
-        p.*,
-        DATEDIFF(p.policy_end, CURDATE()) AS days_left,
-        c.full_name, c.contact_number, c.email, c.address, c.agent_id,
-        (SELECT CASE WHEN ag.is_hidden = 1 THEN 'Developer' ELSE ag.full_name END
-           FROM users ag WHERE ag.user_id = c.agent_id) AS agent_name,
-        v.plate_number, v.make, v.model, v.year_model, v.color,
-        v.motor_number, v.serial_number
-    FROM insurance_policies p
-    INNER JOIN clients c ON p.client_id = c.client_id
-    INNER JOIN vehicles v ON p.vehicle_id = v.vehicle_id
-    WHERE p.policy_id = ?
-");
-$stmt->bind_param('i', $policy_id);
-$stmt->execute();
-$policy = $stmt->get_result()->fetch_assoc();
+$policy = policy_find($conn, $policy_id);
 
 if (!$policy) {
     header("Location: renewal_list.php");
@@ -90,10 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_policy'])) {
 }
 
 // ── LOAD INSTALLMENTS ──
-$installments_res = $conn->prepare("SELECT * FROM policy_payments WHERE policy_id = ? ORDER BY installment_no ASC");
-$installments_res->bind_param('i', $policy_id);
-$installments_res->execute();
-$installments = $installments_res->get_result()->fetch_all(MYSQLI_ASSOC);
+$installments = policy_installments($conn, $policy_id);
 $has_installments = count($installments) > 0;
 
 // ── AUTO-SYNC OVERDUE STATUS ──
@@ -131,10 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_receipt'])) {
     if ($payment_id <= 0) api_error('Invalid payment.');
 
     // Verify it belongs to this policy
-    $chk = $conn->prepare("SELECT payment_id, receipt_file FROM policy_payments WHERE payment_id = ? AND policy_id = ?");
-    $chk->bind_param('ii', $payment_id, $policy_id);
-    $chk->execute();
-    $chk_row = $chk->get_result()->fetch_assoc();
+    $chk_row = policy_payment_find($conn, $payment_id, $policy_id);
     if (!$chk_row) api_error('Not found.', 404);
 
     if (empty($_FILES['receipt_file']['tmp_name'])) api_error('No file received.');
@@ -166,10 +144,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_receipt'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_receipt'])) {
     csrf_verify();
     $payment_id = isset($_POST['payment_id']) ? (int)$_POST['payment_id'] : 0;
-    $chk2 =$conn->prepare("SELECT receipt_file FROM policy_payments WHERE payment_id = ? AND policy_id = ?");
-    $chk2->bind_param('ii', $payment_id, $policy_id);
-    $chk2->execute();
-    $chk2_row = $chk2->get_result()->fetch_assoc();
+    $chk2_row = policy_payment_find($conn, $payment_id, $policy_id);
     if ($chk2_row && $chk2_row['receipt_file']) {
         $f2 = __DIR__ . '/../../uploads/receipts/' . $chk2_row['receipt_file'];
         if (file_exists($f2)) unlink($f2);
@@ -404,10 +379,7 @@ $days     = (int)$policy['days_left'];
 $expired  = policy_is_expired($policy['policy_end']);
 
 // Count linked claims
-$claims_count_res = $conn->prepare("SELECT COUNT(*) AS cnt FROM claims WHERE policy_id = ?");
-$claims_count_res->bind_param('i', $policy_id);
-$claims_count_res->execute();
-$claims_count = (int)$claims_count_res->get_result()->fetch_assoc()['cnt'];
+$claims_count = policy_claims_count($conn, $policy_id);
 
 // Status pill at the top: the renewal status (config/access.php), shown as "Renewed" for a few days after a
 // renewal unless the new policy already needs attention

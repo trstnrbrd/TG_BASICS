@@ -7,6 +7,189 @@
  * stay with the pages, so the rules are not hidden inside the data layer.
  * ========================================================================= */
 require_once __DIR__ . '/../../config/access.php';
+require_once __DIR__ . '/../pagination.php';
+require_once __DIR__ . '/../agent_filter.php';
+
+/* ---- Reading a policy ---- */
+
+/** A policy with days left, its client (and agent's name, developer's masked) and vehicle, for View Policy; or null. */
+function policy_find(mysqli $conn, int $policy_id): ?array
+{
+    return dal_one($conn, "
+        SELECT p.*, DATEDIFF(p.policy_end, CURDATE()) AS days_left,
+               c.full_name, c.contact_number, c.email, c.address, c.agent_id,
+               (SELECT CASE WHEN ag.is_hidden = 1 THEN 'Developer' ELSE ag.full_name END FROM users ag WHERE ag.user_id = c.agent_id) AS agent_name,
+               v.plate_number, v.make, v.model, v.year_model, v.color, v.motor_number, v.serial_number
+        FROM insurance_policies p
+        INNER JOIN clients c  ON p.client_id  = c.client_id
+        INNER JOIN vehicles v ON p.vehicle_id = v.vehicle_id
+        WHERE p.policy_id = ?", 'i', [$policy_id]);
+}
+
+/** A policy of an active client with the client's agent and name and the vehicle, for Edit Policy; or null. */
+function policy_find_for_edit(mysqli $conn, int $policy_id): ?array
+{
+    return dal_one($conn, "
+        SELECT p.*, c.agent_id, c.full_name, v.plate_number, v.make, v.model, v.year_model
+        FROM insurance_policies p
+        INNER JOIN clients c  ON c.client_id = p.client_id
+        INNER JOIN vehicles v ON v.vehicle_id = p.vehicle_id
+        WHERE p.policy_id = ? AND c.deleted_at IS NULL", 'i', [$policy_id]);
+}
+
+/** A policy of an active client with its client's agent (client_agent_id), to renew it; or null. */
+function policy_find_for_renewal(mysqli $conn, int $policy_id): ?array
+{
+    return dal_one($conn, "
+        SELECT p.*, c.agent_id AS client_agent_id
+        FROM insurance_policies p
+        INNER JOIN clients c ON p.client_id = c.client_id
+        WHERE p.policy_id = ? AND c.deleted_at IS NULL", 'i', [$policy_id]);
+}
+
+/** Locks the policy row until the transaction ends (Edit Policy re-reads it under this lock). */
+function policy_lock(mysqli $conn, int $policy_id): void
+{
+    dal_one($conn, "SELECT policy_id FROM insurance_policies WHERE policy_id = ? FOR UPDATE", 'i', [$policy_id]);
+}
+
+/** A policy's installment rows in order; with $lock they stay locked until the transaction ends. */
+function policy_installments(mysqli $conn, int $policy_id, bool $lock = false): array
+{
+    return dal_all($conn, "SELECT * FROM policy_payments WHERE policy_id = ? ORDER BY installment_no ASC" . ($lock ? " FOR UPDATE" : ""), 'i', [$policy_id]);
+}
+
+/** One installment of this policy (payment_id, receipt_file), or null if it is not this policy's. */
+function policy_payment_find(mysqli $conn, int $payment_id, int $policy_id): ?array
+{
+    return dal_one($conn, "SELECT payment_id, receipt_file FROM policy_payments WHERE payment_id = ? AND policy_id = ?", 'ii', [$payment_id, $policy_id]);
+}
+
+/** How many claims are filed on a policy. */
+function policy_claims_count(mysqli $conn, int $policy_id): int
+{
+    return (int)dal_value($conn, "SELECT COUNT(*) FROM claims WHERE policy_id = ?", 'i', [$policy_id]);
+}
+
+/** Whether another policy already uses this policy number ($except_policy_id: the policy being edited or renewed). */
+function policy_number_taken(mysqli $conn, string $policy_number, int $except_policy_id = 0): bool
+{
+    return dal_value($conn, "SELECT 1 FROM insurance_policies WHERE policy_number = ? AND policy_id <> ? LIMIT 1", 'si', [$policy_number, $except_policy_id]) !== null;
+}
+
+/* ---- Eligibility check / New Policy ---- */
+
+/** The search on Eligibility Check: client, contact, plate, make/model, engine or chassis no. */
+const POLICY_VEHICLE_SEARCH_SQL = "c.deleted_at IS NULL AND (c.full_name LIKE ? OR v.plate_number LIKE ? OR v.make LIKE ? OR v.model LIKE ?
+                                   OR c.contact_number LIKE ? OR v.motor_number LIKE ? OR v.serial_number LIKE ? OR CONCAT(v.make, ' ', v.model) LIKE ?)";
+
+/** Up to $limit vehicles (with client) matching $text, by client name — the live suggestions. */
+function policy_vehicle_suggest(mysqli $conn, string $text, int $limit = 8): array
+{
+    return dal_all($conn, "
+        SELECT c.client_id, c.full_name, c.contact_number, v.vehicle_id, v.plate_number, v.make, v.model, v.year_model
+        FROM clients c INNER JOIN vehicles v ON c.client_id = v.client_id
+        WHERE " . POLICY_VEHICLE_SEARCH_SQL . "
+        ORDER BY c.full_name ASC
+        LIMIT ?", str_repeat('s', 8) . 'i', array_merge(array_fill(0, 8, "%$text%"), [$limit]));
+}
+
+/** One page of vehicles (with client) matching $text, by client name. Returns [rows, pager]. */
+function policy_vehicle_search_page(mysqli $conn, string $text): array
+{
+    [$result, $pg] = paginate_query($conn, "
+        SELECT c.client_id, c.full_name, c.contact_number, v.vehicle_id, v.plate_number, v.make, v.model, v.year_model, v.color
+        FROM clients c INNER JOIN vehicles v ON c.client_id = v.client_id
+        WHERE " . POLICY_VEHICLE_SEARCH_SQL . "
+        ORDER BY c.full_name ASC", str_repeat('s', 8), array_fill(0, 8, "%$text%"));
+    return [$result->fetch_all(MYSQLI_ASSOC), $pg];
+}
+
+/** A vehicle of an active client with the client's details, to check eligibility or file a policy on it; or null. */
+function policy_vehicle_with_client(mysqli $conn, int $vehicle_id): ?array
+{
+    return dal_one($conn, "
+        SELECT c.client_id, c.full_name, c.contact_number, c.address,
+               v.vehicle_id, v.plate_number, v.make, v.model, v.year_model, v.color, v.motor_number, v.serial_number
+        FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id
+        WHERE v.vehicle_id = ? AND c.deleted_at IS NULL", 'i', [$vehicle_id]);
+}
+
+/** Whether the vehicle has a policy that has not expired yet. */
+function vehicle_has_active_policy(mysqli $conn, int $vehicle_id): bool
+{
+    return dal_value($conn, "SELECT 1 FROM insurance_policies WHERE vehicle_id = ? AND policy_end >= CURDATE() LIMIT 1", 'i', [$vehicle_id]) !== null;
+}
+
+/* ---- Renewal Tracking ---- */
+
+/**
+ * The WHERE condition of a renewal window (urgent / expiring / stable /
+ * expired / renewed, or '' for all) and its bound values.
+ */
+function policy_window_sql(string $window, int $urgent_days, int $expiring_days): array
+{
+    return match ($window) {
+        'urgent'   => ['p.policy_end >= CURDATE() AND DATEDIFF(p.policy_end, CURDATE()) <= ?', 'i', [$urgent_days]],
+        'expiring' => ['p.policy_end >= CURDATE() AND DATEDIFF(p.policy_end, CURDATE()) BETWEEN ? AND ?', 'ii', [$urgent_days + 1, $expiring_days]],
+        'stable'   => ['p.policy_end >= CURDATE() AND DATEDIFF(p.policy_end, CURDATE()) > ?', 'i', [$expiring_days]],
+        'expired'  => ['p.policy_end < CURDATE()', '', []],
+        'renewed'  => ['p.renewed_at IS NOT NULL', '', []],
+        default    => ['1=1', '', []],
+    };
+}
+
+/**
+ * One page of Renewal Tracking for one insurance company: current (not
+ * renewed) policies, soonest to expire first, in the $filter window, matching
+ * $search, for the insurance-agent filter $af. Returns [rows, pager].
+ */
+function policies_renewal_page(mysqli $conn, string $company, string $filter, string $search, array $af, int $urgent_days, int $expiring_days): array
+{
+    $where = ['p.is_renewed = 0', '1=1' . agent_filter_sql($af, 'c.agent_id'), 'p.insurance_company = ?'];
+    $types = 's'; $params = [$company];
+    if ($search !== '') {
+        $like    = "%$search%";
+        $where[] = '(c.full_name LIKE ? OR c.contact_number LIKE ? OR v.plate_number LIKE ? OR p.policy_number LIKE ?)';
+        array_push($params, $like, $like, $like, $like);
+        $types  .= 'ssss';
+    }
+    [$wsql, $wt, $wp] = policy_window_sql($filter, $urgent_days, $expiring_days);
+    $where[] = $wsql; $types .= $wt; $params = array_merge($params, $wp);
+    [$result, $pg] = paginate_query($conn, "
+        SELECT p.policy_id, p.policy_number, p.coverage_type, p.insurance_company,
+               p.policy_start, p.policy_end, p.is_renewed, p.renewed_at,
+               p.sum_insured, p.total_premium, p.amount_paid, p.balance, p.payment_status,
+               DATEDIFF(p.policy_end, CURDATE()) AS days_left,
+               c.client_id, c.full_name, c.contact_number, v.plate_number, v.make, v.model, v.year_model,
+               CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.full_name END AS added_by_name,
+               CASE WHEN ag.is_hidden = 1 THEN 'Developer' ELSE ag.full_name END AS agent_name,
+               CASE WHEN ag.is_hidden = 1 THEN NULL ELSE ag.profile_photo END AS agent_photo
+        FROM insurance_policies p
+        INNER JOIN clients c  ON p.client_id  = c.client_id
+        INNER JOIN vehicles v ON p.vehicle_id = v.vehicle_id
+        LEFT JOIN users u  ON p.created_by = u.user_id
+        LEFT JOIN users ag ON c.agent_id   = ag.user_id
+        WHERE " . implode(' AND ', $where) . "
+        ORDER BY p.policy_end ASC", $types, $params);
+    return [$result->fetch_all(MYSQLI_ASSOC), $pg];
+}
+
+/** The Renewal Tracking stat cards for one company and agent filter: total, urgent, expiring, stable, expired, renewed. */
+function policies_renewal_counts(mysqli $conn, string $company, array $af, int $urgent_days, int $expiring_days): array
+{
+    $cols = []; $types = ''; $params = [];
+    foreach (['urgent', 'expiring', 'stable', 'expired', 'renewed'] as $w) {
+        [$wsql, $wt, $wp] = policy_window_sql($w, $urgent_days, $expiring_days);
+        $cols[] = "SUM(CASE WHEN p.is_renewed = 0 AND $wsql THEN 1 ELSE 0 END) AS $w";
+        $types .= $wt; $params = array_merge($params, $wp);
+    }
+    return dal_one($conn, "
+        SELECT SUM(CASE WHEN p.is_renewed = 0 THEN 1 ELSE 0 END) AS total, " . implode(', ', $cols) . "
+        FROM insurance_policies p
+        INNER JOIN clients c ON c.client_id = p.client_id
+        WHERE p.insurance_company = ? AND 1=1" . agent_filter_sql($af, 'c.agent_id'), $types . 's', array_merge($params, [$company])) ?? [];
+}
 
 /**
  * How many current (not renewed) policies expire within $days days from

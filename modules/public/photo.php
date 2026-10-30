@@ -9,6 +9,7 @@
  * uploads/repair_jobs stays closed to direct links (root .htaccess); this is the only public way in.
  */
 require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once __DIR__ . '/../../config/access.php';
 
 header('X-Robots-Tag: noindex, nofollow, noarchive');
@@ -25,16 +26,7 @@ $token = is_string($_GET['token'] ?? null) ? $_GET['token'] : '';
 $id    = is_string($_GET['id'] ?? null) && ctype_digit($_GET['id']) ? (int)$_GET['id'] : 0;
 if (strlen($token) !== 64 || !ctype_xdigit($token) || $id <= 0) $not_found();
 
-$st = $conn->prepare("
-    SELECT i.file_name, i.job_id, j.status
-    FROM repair_job_images i
-    INNER JOIN repair_jobs j ON j.job_id = i.job_id
-    INNER JOIN clients c     ON c.client_id = j.client_id
-    WHERE i.image_id = ? AND i.show_client = 1 AND c.public_token = ? AND c.deleted_at IS NULL
-");
-$st->bind_param('is', $id, $token);
-$st->execute();
-$ph = $st->get_result()->fetch_assoc();
+$ph = public_photo($conn, $id, $token);   // token + ownership + "Show to client" checked in the query
 if (!$ph || !repair_job_is_open($ph['status'])) $not_found();
 
 $path = __DIR__ . '/../../uploads/repair_jobs/' . (int)$ph['job_id'] . '/' . basename($ph['file_name']);

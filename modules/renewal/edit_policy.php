@@ -16,18 +16,7 @@ require_role(['admin', 'super_admin']);
 // moves the due dates. Payment terms (the number of installments) can change only while nothing is paid.
 
 $policy_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-$load = function () use ($conn, $policy_id) {
-    $st = $conn->prepare("
-        SELECT p.*, c.agent_id, c.full_name, v.plate_number, v.make, v.model, v.year_model
-        FROM insurance_policies p
-        INNER JOIN clients c  ON c.client_id = p.client_id
-        INNER JOIN vehicles v ON v.vehicle_id = p.vehicle_id
-        WHERE p.policy_id = ? AND c.deleted_at IS NULL
-    ");
-    $st->bind_param('i', $policy_id);
-    $st->execute();
-    return $st->get_result()->fetch_assoc();
-};
+$load = fn() => policy_find_for_edit($conn, $policy_id);
 $policy = $policy_id > 0 ? $load() : null;
 if (!$policy || !client_in_scope($conn, (int)$policy['client_id'])) {
     header("Location: renewal_list.php");
@@ -47,12 +36,7 @@ if (!in_array($policy['payment_terms'], $term_options, true) && isset($terms_map
     $term_options[] = $policy['payment_terms'];   // an older policy on a term the form no longer offers
 }
 
-$load_installments = function (bool $lock = false) use ($conn, $policy_id) {
-    $st = $conn->prepare("SELECT * FROM policy_payments WHERE policy_id = ? ORDER BY installment_no" . ($lock ? " FOR UPDATE" : ""));
-    $st->bind_param('i', $policy_id);
-    $st->execute();
-    return $st->get_result()->fetch_all(MYSQLI_ASSOC);
-};
+$load_installments = fn(bool $lock = false) => policy_installments($conn, $policy_id, $lock);
 // Payment terms stay fixed once a payment or a receipt is on the schedule (re-building it would lose them)
 $terms_locked = function (array $inst): bool {
     if (!$inst) return true;   // older policy without an installment schedule
@@ -118,20 +102,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($pn_lock === null) $errors[] = 'Someone is saving a policy with this same number right now. Please try again in a moment.';
     }
     if (empty($errors) && $in['policy_number'] !== $policy['policy_number']) {
-        $dup = $conn->prepare("SELECT 1 FROM insurance_policies WHERE policy_number = ? AND policy_id <> ? LIMIT 1");
-        $dup->bind_param('si', $in['policy_number'], $policy_id);
-        $dup->execute();
-        if ($dup->get_result()->num_rows > 0) $errors[] = 'Another policy already uses policy number ' . $in['policy_number'] . '.';
+        if (policy_number_taken($conn, $in['policy_number'], $policy_id)) $errors[] = 'Another policy already uses policy number ' . $in['policy_number'] . '.';
     }
 
     if (empty($errors)) {
         $conn->begin_transaction();
         try {
             // Re-read under a lock: a payment recorded while this form was open still counts
-            $lk = $conn->prepare("SELECT policy_id FROM insurance_policies WHERE policy_id = ? FOR UPDATE");
-            $lk->bind_param('i', $policy_id);
-            $lk->execute();
-            $lk->get_result()->free();   // read the locked row so the connection is free for the next query
+            policy_lock($conn, $policy_id);
             $current = $load();
             if (!$current) throw new DomainException('This policy no longer exists.');
             $inst    = $load_installments(true);

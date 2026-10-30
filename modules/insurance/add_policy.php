@@ -19,15 +19,7 @@ $renew_from   = isset($_GET['renew_from']) ? (int)$_GET['renew_from'] : (isset($
 $renew_policy = null;
 
 if ($renew_from > 0) {
-    $rs = $conn->prepare("
-        SELECT p.*, c.agent_id AS client_agent_id
-        FROM insurance_policies p
-        INNER JOIN clients c ON p.client_id = c.client_id
-        WHERE p.policy_id = ? AND c.deleted_at IS NULL
-    ");
-    $rs->bind_param('i', $renew_from);
-    $rs->execute();
-    $renew_policy = $rs->get_result()->fetch_assoc();
+    $renew_policy = policy_find_for_renewal($conn, $renew_from);
 
     // only the client's agent or the Owner may renew a policy
     if (!$renew_policy || !policy_editable($renew_policy['client_agent_id'] !== null ? (int)$renew_policy['client_agent_id'] : null)) {
@@ -59,17 +51,7 @@ if (!in_array($insurance_company, $allowed_companies, true)) {
 
 $vehicle = null;
 if ($vehicle_id > 0) {
-    $stmt = $conn->prepare("
-        SELECT c.client_id, c.full_name, c.contact_number, c.address,
-               v.vehicle_id, v.plate_number, v.make, v.model,
-               v.year_model, v.color, v.motor_number, v.serial_number
-        FROM vehicles v
-        INNER JOIN clients c ON v.client_id = c.client_id
-        WHERE v.vehicle_id = ? AND c.deleted_at IS NULL
-    ");
-    $stmt->bind_param('i', $vehicle_id);
-    $stmt->execute();
-    $vehicle = $stmt->get_result()->fetch_assoc();
+    $vehicle = policy_vehicle_with_client($conn, $vehicle_id);
 }
 
 // If POST submitted without vehicle_id resolved, bounce back
@@ -165,15 +147,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Check for duplicate policy number (exclude the old policy being renewed)
     if ($policy_number !== '') {
-        if ($renew_from > 0) {
-            $dup = $conn->prepare("SELECT policy_id FROM insurance_policies WHERE policy_number = ? AND policy_id != ?");
-            $dup->bind_param('si', $policy_number, $renew_from);
-        } else {
-            $dup = $conn->prepare("SELECT policy_id FROM insurance_policies WHERE policy_number = ?");
-            $dup->bind_param('s', $policy_number);
-        }
-        $dup->execute();
-        if ($dup->get_result()->num_rows > 0) {
+        if (policy_number_taken($conn, $policy_number, $renew_from)) {   // $renew_from 0 = no policy is left out
             $errors[] = 'A policy with this policy number already exists.';
         }
     }

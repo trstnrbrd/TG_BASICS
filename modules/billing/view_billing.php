@@ -14,28 +14,7 @@ require_role(['admin', 'super_admin']);
 $billing_id = (int)($_GET['id'] ?? 0);
 if (!$billing_id) { header("Location: billing_list.php"); exit; }
 
-function loadBilling($conn, $billing_id) {
-    $stmt = $conn->prepare("
-        SELECT b.*,
-               cl.claim_id, cl.status AS claim_status,
-               c.full_name, c.contact_number, c.client_id,
-               v.plate_number, v.make, v.model, v.year_model,
-               ip.policy_number, ip.coverage_type, ip.participation_fee,
-               CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.full_name END AS created_by_name
-        FROM billing b
-        INNER JOIN claims cl          ON b.claim_id   = cl.claim_id
-        INNER JOIN clients c          ON cl.client_id = c.client_id
-        INNER JOIN insurance_policies ip ON cl.policy_id = ip.policy_id
-        LEFT  JOIN vehicles v         ON ip.vehicle_id = v.vehicle_id
-        LEFT  JOIN users u            ON b.created_by  = u.user_id
-        WHERE b.billing_id = ?
-    ");
-    $stmt->bind_param('i', $billing_id);
-    $stmt->execute();
-    return $stmt->get_result()->fetch_assoc();
-}
-
-$billing = loadBilling($conn, $billing_id);
+$billing = billing_find($conn, $billing_id);
 if (!$billing) { header("Location: billing_list.php"); exit; }
 
 // ── POST HANDLERS ──
@@ -119,7 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$billing = loadBilling($conn, $billing_id);
+$billing = billing_find($conn, $billing_id);
 
 $sb = billing_status_badge($conn, $billing['status']);   // statuses: the statuses table, module 'billing' (includes/billing_lists.php)
 

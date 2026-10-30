@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../config/session.php';
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 
@@ -18,66 +19,11 @@ $page          = max(1, (int)($_GET['page'] ?? 1));
 $per_page      = 50;
 $offset        = ($page - 1) * $per_page;
 
-// Build query
 // Display is always limited to the last 7 days; use Export CSV for older records
 // The developer account's entries are kept in the database but not listed (owner's approval 2026-10-07)
-$hidden_actor_sql = '(a.user_id IS NULL OR a.user_id NOT IN (SELECT user_id FROM users WHERE is_hidden = 1))';
-$where   = ["a.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)", $hidden_actor_sql];
-$params  = [];
-$types   = '';
-
-if ($filter_user > 0) {
-    $where[]  = 'a.user_id = ?';
-    $params[] = $filter_user;
-    $types   .= 'i';
-}
-if ($filter_action !== '') {
-    $where[]  = 'a.action = ?';
-    $params[] = $filter_action;
-    $types   .= 's';
-}
-if ($filter_search !== '') {
-    $where[]  = '(a.description LIKE ? OR a.action LIKE ?)';
-    $params[] = '%' . $filter_search . '%';
-    $params[] = '%' . $filter_search . '%';
-    $types   .= 'ss';
-}
-if ($filter_from !== '') {
-    $where[]  = 'a.created_at >= ?';
-    $params[] = $filter_from . ' 00:00:00';
-    $types   .= 's';
-}
-if ($filter_to !== '') {
-    $where[]  = 'a.created_at <= ?';
-    $params[] = $filter_to . ' 23:59:59';
-    $types   .= 's';
-}
-
-$where_clause = 'WHERE ' . implode(' AND ', $where);
-
-// Count total
-$count_sql  = "SELECT COUNT(*) AS total FROM audit_logs a $where_clause";
-$count_stmt = $conn->prepare($count_sql);
-if ($types) $count_stmt->bind_param($types, ...$params);
-$count_stmt->execute();
-$total       = $count_stmt->get_result()->fetch_assoc()['total'];
+$filters = ['user' => $filter_user, 'action' => $filter_action, 'search' => $filter_search, 'from' => $filter_from, 'to' => $filter_to];
+[$logs, $total] = audit_log_page($conn, $filters, $page, $per_page);
 $total_pages = max(1, ceil($total / $per_page));
-
-// Fetch logs
-$sql  = "SELECT a.log_id, a.user_id, a.action, a.description, a.created_at,
-                CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.full_name END AS full_name,
-                CASE WHEN u.is_hidden = 1 THEN NULL ELSE u.profile_photo END AS profile_photo
-         FROM audit_logs a
-         LEFT JOIN users u ON a.user_id = u.user_id
-         $where_clause
-         ORDER BY a.created_at DESC
-         LIMIT ? OFFSET ?";
-$stmt = $conn->prepare($sql);
-$bind_types  = $types . 'ii';
-$bind_params = array_merge($params, [$per_page, $offset]);
-$stmt->bind_param($bind_types, ...$bind_params);
-$stmt->execute();
-$logs = $stmt->get_result();
 
 // ── CSV EXPORT ──
 if (isset($_GET['export']) && $_GET['export'] === 'csv') {
@@ -85,41 +31,8 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     $exp_month_start = date('Y-m-01');
     $exp_today       = date('Y-m-d');
 
-    // Build export-specific where — keep user/action/search filters, override date range
-    $exp_where  = ['a.created_at >= ?', 'a.created_at <= ?', $hidden_actor_sql];
-    $exp_params = [$exp_month_start . ' 00:00:00', $exp_today . ' 23:59:59'];
-    $exp_types  = 'ss';
-
-    if ($filter_user > 0) {
-        $exp_where[]  = 'a.user_id = ?';
-        $exp_params[] = $filter_user;
-        $exp_types   .= 'i';
-    }
-    if ($filter_action !== '') {
-        $exp_where[]  = 'a.action = ?';
-        $exp_params[] = $filter_action;
-        $exp_types   .= 's';
-    }
-    if ($filter_search !== '') {
-        $exp_where[]  = '(a.description LIKE ? OR a.action LIKE ?)';
-        $exp_params[] = '%' . $filter_search . '%';
-        $exp_params[] = '%' . $filter_search . '%';
-        $exp_types   .= 'ss';
-    }
-
-    $exp_where_sql = 'WHERE ' . implode(' AND ', $exp_where);
-
-    $exp_sql  = "SELECT a.log_id,
-                        CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.full_name END AS full_name,
-                        a.action, a.description, a.created_at
-                 FROM audit_logs a
-                 LEFT JOIN users u ON a.user_id = u.user_id
-                 $exp_where_sql
-                 ORDER BY a.created_at ASC";
-    $exp_stmt = $conn->prepare($exp_sql);
-    $exp_stmt->bind_param($exp_types, ...$exp_params);
-    $exp_stmt->execute();
-    $exp_rows = $exp_stmt->get_result();
+    // Export keeps the user/action/search filters and overrides the date range
+    $exp_rows = audit_log_export($conn, ['from' => $exp_month_start, 'to' => $exp_today] + $filters);
 
     $filter_labels = [date('M j, Y', strtotime($exp_month_start)) . ' — ' . date('M j, Y', strtotime($exp_today))];
     if ($filter_user > 0)      $filter_labels[] = 'User: ' . $filter_user;
@@ -207,7 +120,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
         'RECEIPT_CREATED'        => '#e8f5e9',
     ];
     $n = 1; $stripe = false;
-    while ($r = $exp_rows->fetch_assoc()):
+    foreach ($exp_rows as $r):
         $ts  = strtotime($r['created_at']);
         $bg  = $action_colors[$r['action']] ?? ($stripe ? '#f9f9f9' : '#ffffff');
         $stripe = !$stripe;
@@ -220,7 +133,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     <td class="td-dt"><?= date('M d, Y', $ts) ?></td>
     <td class="td-dt"><?= date('h:i A', $ts) ?></td>
   </tr>
-    <?php endwhile; ?>
+    <?php endforeach; ?>
   <tr><td colspan="6" style="padding:8px;background:#fff;"></td></tr>
   <tr><td colspan="6" class="footer">&mdash; End of Report &mdash; &nbsp; TG-BASICS &copy; <?= date('Y') ?></td></tr>
 </table>
@@ -231,8 +144,8 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
 }
 
 // For filter dropdowns
-$all_users   = $conn->query("SELECT user_id, full_name FROM users WHERE is_hidden = 0 ORDER BY full_name ASC");
-$all_actions = $conn->query("SELECT DISTINCT action FROM audit_logs ORDER BY action ASC");
+$all_users   = users_listed($conn);
+$all_actions = audit_log_actions($conn);
 
 $page_title  = 'Activity Log';
 $active_page = 'activity_log';
@@ -279,11 +192,11 @@ require_once '../../includes/topbar.php';
           <label class="field-label">User</label>
           <select name="user" class="field-select">
             <option value="">All Users</option>
-            <?php while ($u = $all_users->fetch_assoc()): ?>
+            <?php foreach ($all_users as $u): ?>
             <option value="<?= $u['user_id'] ?>" <?= $filter_user == $u['user_id'] ? 'selected' : '' ?>>
               <?= htmlspecialchars($u['full_name']) ?>
             </option>
-            <?php endwhile; ?>
+            <?php endforeach; ?>
           </select>
         </div>
 
@@ -291,11 +204,11 @@ require_once '../../includes/topbar.php';
           <label class="field-label">Action</label>
           <select name="action" class="field-select">
             <option value="">All Actions</option>
-            <?php while ($a = $all_actions->fetch_assoc()): ?>
-            <option value="<?= htmlspecialchars($a['action']) ?>" <?= $filter_action === $a['action'] ? 'selected' : '' ?>>
-              <?= htmlspecialchars($a['action']) ?>
+            <?php foreach ($all_actions as $act): ?>
+            <option value="<?= htmlspecialchars($act) ?>" <?= $filter_action === $act ? 'selected' : '' ?>>
+              <?= htmlspecialchars($act) ?>
             </option>
-            <?php endwhile; ?>
+            <?php endforeach; ?>
           </select>
         </div>
 
@@ -356,7 +269,7 @@ require_once '../../includes/topbar.php';
 
     <!-- LOG TABLE -->
     <div class="card">
-      <?php if ($logs->num_rows > 0): ?>
+      <?php if ($logs): ?>
       <div class="tg-table-wrap mob-card-wrap">
         <table class="tg-table mob-card mob-activity-table">
           <thead>
@@ -371,7 +284,7 @@ require_once '../../includes/topbar.php';
           <tbody>
             <?php
             $row_num = $offset;
-            while ($log = $logs->fetch_assoc()):
+            foreach ($logs as $log):
               $row_num++;
               $action_badges = [
                 // Auth
@@ -469,7 +382,7 @@ require_once '../../includes/topbar.php';
                 <?= $date_label ?>
               </td>
             </tr>
-            <?php endwhile; ?>
+            <?php endforeach; ?>
           </tbody>
         </table>
       </div>

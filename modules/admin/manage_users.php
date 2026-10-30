@@ -25,21 +25,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_developer()) {
     $_POST = [];
 }
 
-// The account this POST is about — never the hidden oversight account
-function mu_load_target(mysqli $conn, int $user_id): ?array {
-    $st = $conn->prepare("SELECT user_id, full_name, role, is_active, activation_token FROM users WHERE user_id = ? AND is_hidden = 0");
-    $st->bind_param('i', $user_id);
-    $st->execute();
-    return $st->get_result()->fetch_assoc() ?: null;
-}
-
 // ── HANDLE DELETE ──
 // Only accounts that never did anything (e.g. created by mistake, never activated) can be deleted.
 // Everyone else is deactivated instead, so the audit trail and the "created by" links stay intact.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
     csrf_verify();
     $del_id = (int)($_POST['user_id'] ?? 0);
-    $target = mu_load_target($conn, $del_id);
+    $target = user_find_manageable($conn, $del_id);   // never the hidden developer account
 
     if (!pin_consume($conn)) {
         $errors[] = PIN_REQUIRED_MSG;
@@ -53,10 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $errors[] = 'This account has activity on record (sign-ins, clients, repair jobs, …), so deleting it would erase that history. Deactivate it instead — they are locked out right away and the records stay intact.';
     } else {
         try {
-            $del = $conn->prepare("DELETE FROM users WHERE user_id = ? AND role != 'super_admin'");
-            $del->bind_param('i', $del_id);
-            $del->execute();
-            if ($del->affected_rows > 0) {
+            if (user_delete($conn, $del_id)) {
                 $desc = $full_name . ' deleted account "' . $target['full_name'] . '" (' . $target['role'] . ').';
                 audit_log_add($conn, $admin_id, 'ACCOUNT_DELETED', $desc);
                 $success = 'Account deleted successfully.';
@@ -78,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && in_array
     csrf_verify();
     $act    = $_POST['action'];
     $tid    = (int)($_POST['user_id'] ?? 0);
-    $target = mu_load_target($conn, $tid);
+    $target = user_find_manageable($conn, $tid);
 
     // Deactivating asks for the PIN in the page (manage_users.js); reactivating does not
     if ($act === 'deactivate' && !pin_consume($conn)) {
@@ -94,10 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && in_array
     } elseif ($act === 'reactivate' && ((int)$target['is_active'] || $target['activation_token'] !== null)) {
         $errors[] = 'That account is not deactivated.';
     } else {
-        $new_state = $act === 'deactivate' ? 0 : 1;
-        $upd = $conn->prepare("UPDATE users SET is_active = ?, failed_attempts = 0, locked_until = NULL WHERE user_id = ? AND role != 'super_admin'");
-        $upd->bind_param('ii', $new_state, $tid);
-        $upd->execute();
+        user_set_active($conn, $tid, $act !== 'deactivate');
 
         $log_action = $act === 'deactivate' ? 'ACCOUNT_DEACTIVATED' : 'ACCOUNT_REACTIVATED';
         $desc       = $full_name . ($act === 'deactivate' ? ' deactivated' : ' reactivated') . ' the account of "' . $target['full_name'] . '" (' . $target['role'] . ').';
@@ -129,10 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
     // Check duplicate username or email
     if (empty($errors)) {
-        $dup = $conn->prepare("SELECT user_id FROM users WHERE username = ? OR email = ?");
-        $dup->bind_param('ss', $new_username, $new_email);
-        $dup->execute();
-        if ($dup->get_result()->num_rows > 0) {
+        if (user_username_or_email_taken($conn, $new_username, $new_email)) {
             $errors[] = 'Username or email already exists.';
         }
     }
@@ -143,14 +126,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         // Temporary random password - user sets their own via activation link
         $temp_pw  = password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT);
 
-        $ins = $conn->prepare("
-            INSERT INTO users (first_name, last_name, username, password, role, email, is_active, activation_token)
-            VALUES (?, ?, ?, ?, ?, ?, 0, ?)
-        ");
-        $ins->bind_param('sssssss', $new_first, $new_last, $new_username, $temp_pw, $new_role, $new_email, $token);
-
-        if ($ins->execute()) {
-            $new_user_id      = $conn->insert_id;
+        $new_user_id = user_invite($conn, $new_first, $new_last, $new_username, $temp_pw, $new_role, $new_email, $token);
+        if ($new_user_id > 0) {
             $activation_link  = app_url('auth/activate.php?token=' . $token);
 
             $sent = sendActivationEmail($new_email, $new_name, $activation_link);
@@ -167,15 +144,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 }
 
 // ── LOAD USERS ──
-$users = $conn->query("
-    SELECT user_id, full_name, username, role, email, is_active, created_at, last_active, profile_photo,
-           (last_active IS NOT NULL AND last_active >= NOW() - INTERVAL 5 MINUTE) AS is_online,
-           CASE WHEN is_active = 1 THEN 'active' WHEN activation_token IS NULL THEN 'deactivated' ELSE 'pending' END AS acct_status,
-           is_hidden
-    FROM users
-    WHERE is_hidden = 0   -- the developer account is not listed (owner's approval 2026-10-07)
-    ORDER BY FIELD(role, 'super_admin', 'admin', 'mechanic'), full_name ASC
-");
+$users = users_manage_list($conn);   // the developer account is not listed (owner's approval 2026-10-07)
 $users_with_history = users_with_history($conn);   // null = unknown → treated as "has history" below
 
 // Row action buttons: active → Deactivate, deactivated → Reactivate, and Delete only while the account has no history
@@ -314,7 +283,7 @@ require_once '../../includes/topbar.php';
         <?php
         // Store users for both desktop table and mobile cards
         $users_list = [];
-        while ($u = $users->fetch_assoc()) $users_list[] = mu_dev_row($u);
+        foreach ($users as $u) $users_list[] = mu_dev_row($u);
         $role_labels = [
           'super_admin' => ['Super Admin', 'badge-gold'],
           'admin'       => ['Admin',       'badge-green'],

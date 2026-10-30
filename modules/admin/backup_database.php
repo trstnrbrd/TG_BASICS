@@ -30,10 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         api_error('Too many attempts. Please wait a few minutes before trying again.', 429);
     }
     $password = is_string($_POST['password'] ?? null) ? $_POST['password'] : '';
-    $st = $conn->prepare('SELECT password FROM users WHERE user_id = ? AND is_active = 1');
-    $st->bind_param('i', $uid);
-    $st->execute();
-    $hash = $st->get_result()->fetch_row()[0] ?? '';
+    $hash = user_password_hash($conn, $uid);
     if ($password === '' || $hash === '' || !password_verify($password, $hash)) {
         rate_limit_record($conn, 'db_backup', $rl_key);
         api_error('Incorrect password.', 403);

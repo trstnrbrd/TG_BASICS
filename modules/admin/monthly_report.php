@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../includes/branding.php';
 require_once __DIR__ . '/../../config/session.php';
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 
@@ -9,8 +10,7 @@ require_role(['admin', 'super_admin']);
 // ── FILTER: year (default current year) ──
 // Build year range: from earliest data year (or current-2) up to current year
 $current_year = (int)date('Y');
-$earliest_row = $conn->query("SELECT MIN(YEAR(created_at)) as y FROM clients")->fetch_assoc();
-$earliest_year = (int)($earliest_row['y'] ?? $current_year);
+$earliest_year = report_first_year($conn) ?? $current_year;
 $range_start   = min($earliest_year, $current_year - 2);
 
 $available_years = [];
@@ -28,31 +28,10 @@ for ($m = 1; $m <= 12; $m++) {
     $label = date('F', mktime(0,0,0,$m,1));
     $short = date('M',  mktime(0,0,0,$m,1));
 
-    // Stats rule: include client if not deleted, OR deleted in a different month/year than added
-    $sc = "(c.deleted_at IS NULL OR (YEAR(c.deleted_at) != YEAR(c.created_at) OR MONTH(c.deleted_at) != MONTH(c.created_at)))";
-
-    $ins = (int)$conn->query("
-        SELECT COUNT(DISTINCT c.client_id) as c FROM clients c
-        INNER JOIN insurance_policies ip ON ip.client_id = c.client_id
-        WHERE YEAR(c.created_at)='$sel_year' AND MONTH(c.created_at)='$m' AND $sc
-    ")->fetch_assoc()['c'];
-
-    $wk = (int)$conn->query("
-        SELECT COUNT(*) as c FROM clients c
-        LEFT JOIN insurance_policies ip ON ip.client_id = c.client_id
-        WHERE ip.policy_id IS NULL
-        AND YEAR(c.created_at)='$sel_year' AND MONTH(c.created_at)='$m' AND $sc
-    ")->fetch_assoc()['c'];
-
-    $policies = (int)$conn->query("
-        SELECT COUNT(*) as c FROM insurance_policies
-        WHERE YEAR(created_at)='$sel_year' AND MONTH(created_at)='$m'
-    ")->fetch_assoc()['c'];
-
-    $repairs = (int)$conn->query("
-        SELECT COUNT(*) as c FROM repair_jobs
-        WHERE YEAR(created_at)='$sel_year' AND MONTH(created_at)='$m'
-    ")->fetch_assoc()['c'];
+    // Stats rule (inside the function): a deleted client still counts unless deleted in the month it was added
+    [$ins, $wk] = report_client_types_in_month($conn, $sel_year, $m);
+    $policies   = report_policies_in_month($conn, $sel_year, $m);
+    $repairs    = report_repairs_in_month($conn, $sel_year, $m);
 
     $months_data[] = [
         'month'     => $m,

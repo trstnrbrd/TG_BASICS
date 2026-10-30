@@ -66,6 +66,33 @@ function claim_is_billable(string $status): bool
     return in_array($status, CLAIM_BILLABLE_STATUSES, true);
 }
 
+// Every repair job status (repair list + filter, view repair, mechanic dashboard, view client, the client's QR
+// page): label, badge class, the colour of its choice in Update Status, and what the QR page shows the client
+// (its own wording, colour and progress bar %).
+const REPAIR_STATUSES = [
+    'pending'     => ['label' => 'Pending',     'class' => 'badge-yellow', 'color' => '#B8860B', 'public_label' => 'Pending',          'public_color' => '#B8860B', 'progress' => 10],
+    'in_progress' => ['label' => 'In Progress', 'class' => 'badge-blue',   'color' => '#1A6B9A', 'public_label' => 'In Progress',      'public_color' => '#2980B9', 'progress' => 50],
+    'for_pickup'  => ['label' => 'For Pickup',  'class' => 'badge-gold',   'color' => '#D4A017', 'public_label' => 'Ready for Pickup', 'public_color' => '#D4A017', 'progress' => 85],
+    'completed'   => ['label' => 'Completed',   'class' => 'badge-green',  'color' => '#2E7D52', 'public_label' => 'Completed',        'public_color' => '#27AE60', 'progress' => 100],
+    'cancelled'   => ['label' => 'Cancelled',   'class' => 'badge-gray',   'color' => '#6B7280', 'public_label' => 'Cancelled',        'public_color' => '#7F8C8D', 'progress' => 0],
+];
+
+// A job in one of these is finished: no more photos on the QR page, off the mechanic's open list
+const REPAIR_CLOSED_STATUSES = ['completed', 'cancelled'];
+
+/** Everything about a repair status; an unknown one shows as "Unknown". */
+function repair_status_badge(string $status): array
+{
+    return REPAIR_STATUSES[$status] ?? ['label' => 'Unknown', 'class' => 'badge-gray', 'color' => '#6B7280',
+                                        'public_label' => $status, 'public_color' => '#7F8C8D', 'progress' => 0];
+}
+
+/** The statuses of a job still being worked on (pending, in progress, for pickup). */
+function repair_open_statuses(): array
+{
+    return array_values(array_diff(array_keys(REPAIR_STATUSES), REPAIR_CLOSED_STATUSES));
+}
+
 // Repair job statuses in the order a job moves through them. 'cancelled' is a dead end, reachable from any open status.
 const REPAIR_STATUS_FLOW = ['pending', 'in_progress', 'for_pickup', 'completed'];
 
@@ -88,7 +115,7 @@ function repair_status_change_allowed(string $from, string $to, bool $forward_on
 /** Is the repair job still open (pending, in progress, for pickup)? Photos show on the client's QR page only then. */
 function repair_job_is_open(string $status): bool
 {
-    return !in_array($status, ['completed', 'cancelled'], true);
+    return !in_array($status, REPAIR_CLOSED_STATUSES, true);
 }
 
 /**

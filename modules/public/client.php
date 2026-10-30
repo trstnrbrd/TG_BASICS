@@ -167,27 +167,6 @@ if (isset($_GET['state'])) {
 require_once __DIR__ . '/../../includes/realtime.php';
 $live_cfg = realtime_client_config();   // public values only (key, cluster); empty = polling only
 
-$status_progress = [
-    'pending'     => 10,
-    'in_progress' => 50,
-    'for_pickup'  => 85,
-    'completed'   => 100,
-    'cancelled'   => 0,
-];
-$status_labels = [
-    'pending'     => 'Pending',
-    'in_progress' => 'In Progress',
-    'for_pickup'  => 'Ready for Pickup',
-    'completed'   => 'Completed',
-    'cancelled'   => 'Cancelled',
-];
-$status_colors = [
-    'pending'     => '#B8860B',
-    'in_progress' => '#2980B9',
-    'for_pickup'  => '#D4A017',
-    'completed'   => '#27AE60',
-    'cancelled'   => '#7F8C8D',
-];
 $svc_labels = [
     'repair_panel'   => 'Per Panel Repair',
     'repair_full'    => 'Full Body Repair',
@@ -388,9 +367,10 @@ $initials = strtoupper(substr(implode('', array_map(fn($w) => $w[0], $words)), 0
           <?php if ($repair_jobs): ?>
           <div class="job-list">
             <?php foreach ($repair_jobs as $rj):
-              $pct    = $status_progress[$rj['status']] ?? 0;
-              $slabel = $status_labels[$rj['status']]   ?? $rj['status'];
-              $scolor = $status_colors[$rj['status']]   ?? '#7F8C8D';
+              $rst    = repair_status_badge($rj['status']);   // config/access.php
+              $pct    = $rst['progress'];
+              $slabel = $rst['public_label'];
+              $scolor = $rst['public_color'];
               $svclbl = $svc_labels[$rj['service_type']] ?? $rj['service_type'];
             ?>
             <div class="job-item">

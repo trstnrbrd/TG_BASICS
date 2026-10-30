@@ -2,6 +2,7 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
+require_once '../../config/access.php';
 require_once '../../includes/pagination.php';
 require_once '../../includes/transaction.php';
 
@@ -35,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 // ── FILTERS ──
 $search        = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
-$filter_status = san_enum($_GET['status'] ?? 'all', ['all', 'pending', 'in_progress', 'for_pickup', 'completed', 'cancelled']);
+$filter_status = san_enum($_GET['status'] ?? 'all', array_merge(['all'], array_keys(REPAIR_STATUSES)));
 $sort_by       = san_enum($_GET['sort'] ?? 'newest', ['newest', 'oldest']);
 
 // ── BUILD QUERY ──
@@ -82,13 +83,6 @@ $service_labels = [
     'custom'         => 'Custom / Mixed',
 ];
 
-$status_badges = [
-    'pending'     => ['Pending',     'badge-yellow'],
-    'in_progress' => ['In Progress', 'badge-blue'],
-    'for_pickup'  => ['For Pickup',  'badge-gold'],
-    'completed'   => ['Completed',   'badge-green'],
-    'cancelled'   => ['Cancelled',   'badge-gray'],
-];
 
 $page_title  = 'Repair Jobs';
 $active_page = 'repair';
@@ -127,12 +121,10 @@ require_once '../../includes/topbar.php';
             value="<?= htmlspecialchars($search) ?>" style="padding-left:2.4rem;width:100%;"/>
         </div>
         <select name="status" class="filter-input rl-filter-status" style="width:160px;">
-          <option value="all"         <?= $filter_status === 'all'         ? 'selected' : '' ?>>All Statuses</option>
-          <option value="pending"     <?= $filter_status === 'pending'     ? 'selected' : '' ?>>Pending</option>
-          <option value="in_progress" <?= $filter_status === 'in_progress' ? 'selected' : '' ?>>In Progress</option>
-          <option value="for_pickup"  <?= $filter_status === 'for_pickup'  ? 'selected' : '' ?>>For Pickup</option>
-          <option value="completed"   <?= $filter_status === 'completed'   ? 'selected' : '' ?>>Completed</option>
-          <option value="cancelled"   <?= $filter_status === 'cancelled'   ? 'selected' : '' ?>>Cancelled</option>
+          <option value="all" <?= $filter_status === 'all' ? 'selected' : '' ?>>All Statuses</option>
+          <?php foreach (REPAIR_STATUSES as $key => $st): ?>
+          <option value="<?= $key ?>" <?= $filter_status === $key ? 'selected' : '' ?>><?= htmlspecialchars($st['label']) ?></option>
+          <?php endforeach; ?>
         </select>
         <select name="sort" class="filter-input rl-filter-sort" style="width:140px;">
           <option value="newest" <?= $sort_by === 'newest' ? 'selected' : '' ?>>Newest First</option>
@@ -174,7 +166,7 @@ require_once '../../includes/topbar.php';
         </thead>
         <tbody>
           <?php while ($j = $jobs->fetch_assoc()):
-              $sb  = $status_badges[$j['status']] ?? ['Unknown', 'badge-gray'];
+              $sb  = repair_status_badge($j['status']);
               $svc = $service_labels[$j['service_type']] ?? $j['service_type'];
           ?>
           <tr>
@@ -190,7 +182,7 @@ require_once '../../includes/topbar.php';
             <td><span class="cell-service"><?= htmlspecialchars($svc) ?></span></td>
             <td><span class="cell-date"><?= date('M d, Y', strtotime($j['repair_date'])) ?></span></td>
             <td><span class="cell-date-muted"><?= $j['release_date'] ? date('M d, Y', strtotime($j['release_date'])) : '—' ?></span></td>
-            <td><span class="badge <?= $sb[1] ?>"><?= $sb[0] ?></span></td>
+            <td><span class="badge <?= $sb['class'] ?>"><?= $sb['label'] ?></span></td>
             <td>
               <div style="display:flex;gap:0.35rem;justify-content:center;">
                 <a href="view_repair.php?id=<?= $j['job_id'] ?>" class="btn-sm-gold" title="View">

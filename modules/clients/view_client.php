@@ -727,14 +727,6 @@ require_once '../../includes/topbar.php';
 
     <!-- CLAIMS HISTORY -->
     <?php
-    $claim_status_map = [
-        'document_collection' => ['label' => 'Document Collection', 'class' => 'badge-yellow'],
-        'submitted'           => ['label' => 'Submitted to Head Office', 'class' => 'badge-info'],
-        'under_review'        => ['label' => 'Under Adjuster Review', 'class' => 'badge-orange'],
-        'approved'            => ['label' => 'Approved', 'class' => 'badge-green'],
-        'denied'              => ['label' => 'Denied', 'class' => 'badge-red'],
-        'resolved'            => ['label' => 'Resolved', 'class' => 'badge-gray'],
-    ];
     ?>
     <div class="card">
       <div class="card-header">
@@ -763,7 +755,7 @@ require_once '../../includes/topbar.php';
           </thead>
           <tbody>
             <?php while ($cl = $claims->fetch_assoc()):
-              $cs = $claim_status_map[$cl['status']] ?? ['label' => $cl['status'], 'class' => 'badge-gray'];
+              $cs = claim_status_badge($cl['status']);
             ?>
             <tr>
               <td>
@@ -805,13 +797,6 @@ require_once '../../includes/topbar.php';
 
     <!-- REPAIR JOBS -->
     <?php
-    $repair_status_badges = [
-        'pending'     => ['Pending',     'badge-yellow'],
-        'in_progress' => ['In Progress', 'badge-blue'],
-        'for_pickup'  => ['For Pickup',  'badge-gold'],
-        'completed'   => ['Completed',   'badge-green'],
-        'cancelled'   => ['Cancelled',   'badge-gray'],
-    ];
     $repair_service_labels = [
         'repair_panel'   => 'Per Panel Repair',
         'repair_full'    => 'Full Body Repair',
@@ -852,7 +837,7 @@ require_once '../../includes/topbar.php';
         </thead>
         <tbody>
           <?php while ($rj = $repair_jobs->fetch_assoc()):
-              $rsb = $repair_status_badges[$rj['status']] ?? ['Unknown', 'badge-gray'];
+              $rsb = repair_status_badge($rj['status']);
               $rsv = $repair_service_labels[$rj['service_type']] ?? $rj['service_type'];
           ?>
           <tr>

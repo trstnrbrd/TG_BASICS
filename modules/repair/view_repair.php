@@ -219,7 +219,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     csrf_verify();
 
     if ($_POST['action'] === 'update_status') {
-        $new_status = san_enum($_POST['status'] ?? '', ['pending','in_progress','for_pickup','completed','cancelled']);
+        $new_status = san_enum($_POST['status'] ?? '', array_keys(REPAIR_STATUSES));
         if ($new_status) {
             if (!repair_status_change_allowed($job['status'], $new_status, is_mechanic())) {
                 header("Location: view_repair.php?id=$job_id&error=" . urlencode('This job can no longer go back to that status.'));
@@ -312,13 +312,6 @@ $service_labels = [
     'custom'         => 'Custom / Mixed',
 ];
 
-$status_map = [
-    'pending'     => ['Pending',     'badge-yellow', '#B8860B'],
-    'in_progress' => ['In Progress', 'badge-blue',   '#1A6B9A'],
-    'for_pickup'  => ['For Pickup',  'badge-gold',   '#D4A017'],
-    'completed'   => ['Completed',   'badge-green',  '#2E7D52'],
-    'cancelled'   => ['Cancelled',   'badge-gray',   '#6B7280'],
-];
 
 $area_labels = [
     'front_bumper' => 'Front Bumper', 'rear_bumper'  => 'Rear Bumper',
@@ -336,7 +329,7 @@ $cond_map = [
     'major' => ['Major Damage', '#C0392B', 'rgba(192,57,43,0.12)'],
 ];
 
-$sb      = $status_map[$job['status']] ?? ['Unknown','badge-gray','#6B7280'];
+$sb      = repair_status_badge($job['status']);   // statuses live in config/access.php
 $svc_lbl = $service_labels[$job['service_type']] ?? $job['service_type'];
 
 $page_title  = 'Repair Job — ' . $job['job_number'];
@@ -375,10 +368,10 @@ document.addEventListener('DOMContentLoaded', function() {
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:0.75rem;">
     <a href="repair_list.php" class="back-link" onclick="goBack('repair_list.php'); return false;" style="margin-bottom:0;"><?= icon('arrow-left', 14) ?></a>
     <div style="display:flex;align-items:center;gap:0.5rem;">
-      <span class="badge <?= $sb[1] ?>"><?= $sb[0] ?></span>
+      <span class="badge <?= $sb['class'] ?>"><?= $sb['label'] ?></span>
       <?php
         // statuses this user may pick next; a mechanic on a completed / cancelled job has none, so no button
-        $next_statuses = array_filter(array_keys($status_map), fn($s) => repair_status_change_allowed($job['status'], $s, is_mechanic()));
+        $next_statuses = array_filter(array_keys(REPAIR_STATUSES), fn($s) => repair_status_change_allowed($job['status'], $s, is_mechanic()));
       ?>
       <?php if ($next_statuses): ?>
       <button onclick="document.getElementById('status-modal').style.display='flex'" class="btn-primary" style="padding:0.45rem 1rem;font-size:0.8rem;">
@@ -417,7 +410,7 @@ document.addEventListener('DOMContentLoaded', function() {
           ['Service Type',   $svc_lbl],
           ['Repair Date',    date('F d, Y', strtotime($job['repair_date']))],
           ['Est. Release',   $job['release_date'] ? date('F d, Y', strtotime($job['release_date'])) : '—'],
-          ['Status',         $sb[0]],
+          ['Status',         $sb['label']],
           ['Date Created',   date('F d, Y g:i A', strtotime($job['created_at']))],
         ];
         foreach ($details as [$lbl, $val]): ?>
@@ -716,7 +709,7 @@ document.addEventListener('DOMContentLoaded', function() {
       <?= csrf_field() ?>
       <input type="hidden" name="action" value="update_status"/>
       <div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:1.25rem;">
-        <?php foreach ($status_map as $val => [$lbl, $badge, $clr]):
+        <?php foreach (REPAIR_STATUSES as $val => ['label' => $lbl, 'class' => $badge, 'color' => $clr]):
             $is_current = $job['status'] === $val;
             $can_pick   = in_array($val, $next_statuses, true); ?>
         <label class="status-opt<?= $can_pick ? '' : ' is-locked' ?>" style="display:flex;align-items:center;gap:0.65rem;padding:0.65rem 0.85rem;border:1px solid var(--border);border-radius:10px;cursor:<?= $can_pick ? 'pointer' : 'not-allowed' ?>;transition:background 0.1s;<?= $can_pick ? '' : 'opacity:0.45;' ?>"

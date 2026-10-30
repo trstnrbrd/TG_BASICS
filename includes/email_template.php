@@ -554,7 +554,7 @@ function sendRepairCompletedEmail(
 }
 
 /**
- * Send claim requirements status email to the admin (Jean Paolo).
+ * Send claim requirements status email to the admin (the claim notify recipients in Settings).
  * Lists which docs are received and which are still pending.
  *
  * $docStatus = [['label' => 'Policy', 'received' => true], ...]

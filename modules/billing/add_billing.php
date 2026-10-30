@@ -5,6 +5,7 @@ require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../includes/transaction.php';
 require_once '../../includes/insurance_companies.php';
+require_once '../../includes/billing_lists.php';
 
 require_role(['admin', 'super_admin']);
 
@@ -58,6 +59,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($claim_id === 0) $errors[] = 'A linked claim is required.';
     if ($billed_to === '') $errors[] = 'Billed To (insurance company) is required.';
+    // who signs as cashier (billing_signatories); their name and title are copied onto the billing
+    // (none sent = the default one, first in the list; one sent that is not on the list is refused)
+    $signer = ($_POST['signatory_id'] ?? '') === '' ? (billing_signatories_active($conn)[0] ?? null)
+                                                    : billing_signatory_pick($conn, $_POST['signatory_id']);
+    if (!$signer && billing_signatories_active($conn)) $errors[] = 'Please choose the Authorized Representative / Cashier.';
+    $signer_name  = $signer['name']  ?? null;
+    $signer_title = $signer['title'] ?? null;
     if ($incident_date !== '' && !validate_date($incident_date)) $errors[] = 'Incident date is not a valid date.';
     if ($repair_date   !== '' && !validate_date($repair_date))   $errors[] = 'Repair date is not a valid date.';
 
@@ -90,7 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // lock the claim first, so two people can't both bill it at once
         $created = null;
         try {
-            $created = db_transaction($conn, function () use ($conn, $claim_id, $billed_to, $inc_date, $rep_date, $parts_cost, $labor_cost, $other_cost, $deductible) {
+            $created = db_transaction($conn, function () use ($conn, $claim_id, $billed_to, $inc_date, $rep_date, $parts_cost, $labor_cost, $other_cost, $deductible, $signer_name, $signer_title) {
                 $lock = $conn->prepare("SELECT claim_id FROM claims WHERE claim_id = ? FOR UPDATE");
                 $lock->bind_param('i', $claim_id);
                 $lock->execute();
@@ -102,16 +110,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($dup->get_result()->num_rows > 0) return ['duplicate' => true];
 
                 [$billing_id, $bill_num] = insert_with_sequential_number($conn, 'billing', 'billing_number', record_number_prefix('BL'),
-                    function (string $num) use ($conn, $claim_id, $billed_to, $inc_date, $rep_date, $parts_cost, $labor_cost, $other_cost, $deductible) {
+                    function (string $num) use ($conn, $claim_id, $billed_to, $inc_date, $rep_date, $parts_cost, $labor_cost, $other_cost, $deductible, $signer_name, $signer_title) {
                         $ins = $conn->prepare("
                             INSERT INTO billing
-                              (claim_id, billing_number, billed_to, incident_date, repair_date, parts_cost, labor_cost, other_cost, deductible, created_by)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                              (claim_id, billing_number, billed_to, incident_date, repair_date, parts_cost, labor_cost, other_cost, deductible, signed_by_name, signed_by_title, created_by)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ");
                         $ins->bind_param(
-                            'issssddddi',
+                            'issssddddssi',
                             $claim_id, $num, $billed_to, $inc_date, $rep_date,
                             $parts_cost, $labor_cost, $other_cost, $deductible,
+                            $signer_name, $signer_title,
                             $_SESSION['user_id']
                         );
                         $ins->execute();
@@ -242,6 +251,15 @@ require_once '../../includes/topbar.php';
                   value="<?= old('billed_to', $prefill_claim['insurer_name'] ?? (insurance_companies_active($conn)[0]['billing_name'] ?? '')) ?>"
                   placeholder="Insurance company name" required style="width:100%;"/>
               </div>
+              <div>
+                <label class="field-label">Authorized Representative / Cashier <span style="color:var(--danger)">*</span></label>
+                <select name="signatory_id" class="field-input" style="width:100%;">
+                  <?php foreach (billing_signatories_active($conn) as $i => $sg):
+                    $pick = isset($_POST['signatory_id']) ? (int)$_POST['signatory_id'] === (int)$sg['signatory_id'] : $i === 0;   // the default comes first ?>
+                  <option value="<?= (int)$sg['signatory_id'] ?>" <?= $pick ? 'selected' : '' ?>><?= htmlspecialchars($sg['name']) ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
                 <div>
                   <label class="field-label">Incident Date</label>
@@ -343,22 +361,16 @@ require_once '../../includes/topbar.php';
               <div class="card-icon" style="background:var(--gold-light);color:var(--gold);"><?= icon('paper-clip', 16) ?></div>
               <div>
                 <div class="card-title">Required Documents</div>
-                <div class="card-sub">Track these 3 documents on the billing record</div>
+                <div class="card-sub">Track these <?= count(billing_docs_for($conn, [])) ?> documents on the billing record</div>
               </div>
             </div>
             <div style="padding:1rem 1.25rem;display:flex;flex-direction:column;gap:0.5rem;">
-              <?php
-              $req_docs = [
-                  ['Release of Claim', 'Client signature + 2 witnesses'],
-                  ["Driver's License", '3 signatures required'],
-                  ['Billing Statement', 'Signed by Jean Paolo (Cashier)'],
-              ];
-              foreach ($req_docs as $i => [$name, $hint]): ?>
+              <?php foreach (billing_docs_for($conn, []) as $i => $doc):   // billing_document_types (phpMyAdmin) ?>
               <div style="display:flex;align-items:flex-start;gap:0.6rem;padding:0.55rem 0.7rem;background:var(--bg-2);border-radius:8px;">
                 <div style="width:20px;height:20px;border-radius:50%;background:var(--gold-light);color:var(--gold);font-size:0.65rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:0.05rem;"><?= $i + 1 ?></div>
                 <div>
-                  <div style="font-size:0.82rem;font-weight:600;color:var(--text-primary);"><?= $name ?></div>
-                  <div style="font-size:0.7rem;color:var(--text-muted);"><?= $hint ?></div>
+                  <div style="font-size:0.82rem;font-weight:600;color:var(--text-primary);"><?= htmlspecialchars($doc['name']) ?></div>
+                  <div style="font-size:0.7rem;color:var(--text-muted);"><?= htmlspecialchars((string)$doc['hint']) ?></div>
                 </div>
               </div>
               <?php endforeach; ?>

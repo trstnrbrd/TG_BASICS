@@ -6,6 +6,7 @@ require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../includes/transaction.php';
 require_once '../../config/transaction_pin.php';
+require_once '../../includes/billing_lists.php';
 
 require_role(['admin', 'super_admin']);
 
@@ -60,9 +61,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'update_status') {
-        $new_status = san_enum($_POST['status'] ?? '', array_keys(BILLING_STATUSES));
+        $new_status = san_enum($_POST['status'] ?? '', array_column(billing_statuses_active($conn), 'code'));
         if ($new_status) {
-            $sent_at = ($new_status === 'sent' && !$billing['sent_at']) ? date('Y-m-d H:i:s') : null;
+            $sent_at = ($new_status === BILLING_STATUS_SENT && !$billing['sent_at']) ? date('Y-m-d H:i:s') : null;
             db_transaction($conn, function () use ($conn, $billing_id, $billing, $new_status, $sent_at) {
                 $upd = $conn->prepare("UPDATE billing SET status=?, sent_at=COALESCE(?,sent_at) WHERE billing_id=?");
                 $upd->bind_param('ssi', $new_status, $sent_at, $billing_id);
@@ -77,13 +78,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'update_docs') {
-        $dr = isset($_POST['doc_release_of_claim'])  ? 1 : 0;
-        $dl = isset($_POST['doc_drivers_license'])   ? 1 : 0;
-        $ds = isset($_POST['doc_billing_statement']) ? 1 : 0;
-        db_transaction($conn, function () use ($conn, $billing_id, $billing, $dr, $dl, $ds) {
-            $upd = $conn->prepare("UPDATE billing SET doc_release_of_claim=?,doc_drivers_license=?,doc_billing_statement=? WHERE billing_id=?");
-            $upd->bind_param('iiii', $dr, $dl, $ds, $billing_id);
-            $upd->execute();
+        // The ticked documents (doc[] = doc_type_id). Only a type shown on this billing counts: an active one, or
+        // an inactive one it already has. A received one keeps its first received_at.
+        $shown   = array_column(billing_docs_for($conn, billing_docs_received($conn, [$billing_id])[$billing_id] ?? []), 'doc_type_id');
+        $shown   = array_map('intval', $shown);
+        $ticked  = array_values(array_intersect(array_map('intval', is_array($_POST['doc'] ?? null) ? $_POST['doc'] : []), $shown));
+        db_transaction($conn, function () use ($conn, $billing_id, $billing, $shown, $ticked) {
+            $keep = implode(',', $ticked ?: [0]);
+            $conn->query("DELETE FROM billing_documents WHERE billing_id = " . (int)$billing_id . " AND doc_type_id NOT IN ($keep)");
+            $ins = $conn->prepare("INSERT IGNORE INTO billing_documents (billing_id, doc_type_id) VALUES (?, ?)");
+            foreach ($ticked as $t) { $ins->bind_param('ii', $billing_id, $t); $ins->execute(); }
             $log = $conn->prepare("INSERT INTO audit_logs (user_id,action,description) VALUES (?,'BILLING_DOCS_UPDATED',?)");
             $desc = ($_SESSION['full_name'] ?? '') . ' updated docs for billing ' . $billing['billing_number'] . '.';
             $log->bind_param('is', $_SESSION['user_id'], $desc);
@@ -102,6 +106,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $notes  = san_str($_POST['notes']           ?? '', MAX_NOTE);
         $inc_d  = san_str($_POST['incident_date']   ?? '', 10) ?: null;
         $rep_d  = san_str($_POST['repair_date']     ?? '', 10) ?: null;
+        // the cashier who signs (billing_signatories); their name and title are copied onto the billing
+        $signer = billing_signatory_pick($conn, $_POST['signatory_id'] ?? 0);
 
         $bad = null;
         foreach ([$e1, $e2, $e3, $e4] as $e) if (!$bad && $e !== '') $bad = $e;
@@ -113,10 +119,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$bad && $rep_d !== null && !validate_date($rep_d)) $bad = 'Repair date is not a valid date.';
         if ($bad) { header("Location: view_billing.php?id=$billing_id&error=" . urlencode($bad)); exit; }
 
-        db_transaction($conn, function () use ($conn, $billing_id, $billing, $billed, $inc_d, $rep_d, $parts, $labor, $other, $deduct, $notes) {
+        db_transaction($conn, function () use ($conn, $billing_id, $billing, $billed, $inc_d, $rep_d, $parts, $labor, $other, $deduct, $notes, $signer) {
             $upd = $conn->prepare("UPDATE billing SET billed_to=?,incident_date=?,repair_date=?,parts_cost=?,labor_cost=?,other_cost=?,deductible=?,notes=? WHERE billing_id=?");
             $upd->bind_param('sssddddsi', $billed, $inc_d, $rep_d, $parts, $labor, $other, $deduct, $notes, $billing_id);
             $upd->execute();
+            if ($signer) {
+                $sg = $conn->prepare("UPDATE billing SET signed_by_name = ?, signed_by_title = ? WHERE billing_id = ?");
+                $sg->bind_param('ssi', $signer['name'], $signer['title'], $billing_id);
+                $sg->execute();
+            }
             $log = $conn->prepare("INSERT INTO audit_logs (user_id,action,description) VALUES (?,'BILLING_UPDATED',?)");
             $desc = ($_SESSION['full_name'] ?? '') . ' updated billing ' . $billing['billing_number'] . '.';
             $log->bind_param('is', $_SESSION['user_id'], $desc);
@@ -128,10 +139,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $billing = loadBilling($conn, $billing_id);
 
-$sb = billing_status_badge($billing['status']);   // statuses live in config/access.php
+$sb = billing_status_badge($conn, $billing['status']);   // statuses: billing_statuses table (includes/billing_lists.php)
 
 $total_repair = (float)$billing['parts_cost'] + (float)$billing['labor_cost'] + (float)$billing['other_cost'];
-$docs_done    = (int)$billing['doc_release_of_claim'] + (int)$billing['doc_drivers_license'] + (int)$billing['doc_billing_statement'];
+$docs         = billing_docs_for($conn, billing_docs_received($conn, [$billing_id])[$billing_id] ?? []);
+$docs_done    = count(array_filter($docs, fn($d) => $d['received']));
 
 $page_title  = $billing['billing_number'];
 $active_page = 'billing';
@@ -173,7 +185,7 @@ require_once '../../includes/topbar.php';
         <div>
           <div style="display:flex;align-items:center;gap:0.6rem;">
             <span style="font-size:1.1rem;font-weight:800;color:var(--text-primary);"><?= htmlspecialchars($billing['billing_number']) ?></span>
-            <span class="badge <?= $sb['class'] ?>"><?= $sb['label'] ?></span>
+            <span class="badge <?= $sb['class'] ?>"><?= htmlspecialchars($sb['label']) ?></span>
           </div>
           <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.15rem;">
             <?= htmlspecialchars($billing['full_name']) ?> &nbsp;·&nbsp;
@@ -284,8 +296,8 @@ require_once '../../includes/topbar.php';
               Prepared by: <strong style="color:var(--text-primary);"><?= htmlspecialchars($billing['created_by_name'] ?? '—') ?></strong>
             </div>
             <div class="vb-sig-block">
-              <div class="vb-sig-label">Authorized Representative / Cashier</div>
-              <div class="vb-sig-name">Jean Paolo De Guzman</div>
+              <div class="vb-sig-label"><?= htmlspecialchars($billing['signed_by_title'] ?: 'Authorized Representative / Cashier') ?></div>
+              <div class="vb-sig-name"><?= htmlspecialchars($billing['signed_by_name'] ?? '') ?></div>
             </div>
           </div>
         </div>
@@ -354,26 +366,21 @@ require_once '../../includes/topbar.php';
             <div class="card-icon" style="background:var(--gold-light);color:var(--gold);"><?= icon('paper-clip', 16) ?></div>
             <div>
               <div class="card-title">Required Documents</div>
-              <div class="card-sub"><?= $docs_done ?>/3 received</div>
+              <div class="card-sub"><?= $docs_done ?>/<?= count($docs) ?> received</div>
             </div>
           </div>
           <form method="POST" action="" style="padding:0.6rem 1rem;display:flex;flex-direction:column;gap:0.35rem;">
             <?= csrf_field() ?>
             <input type="hidden" name="action" value="update_docs"/>
-            <?php
-            $docs = [
-                ['doc_release_of_claim',  'Release of Claim',   'Client signature + 2 witnesses', $billing['doc_release_of_claim']],
-                ['doc_drivers_license',   "Driver's License",   '3 signatures required',           $billing['doc_drivers_license']],
-                ['doc_billing_statement', 'Billing Statement',  'Signed by Jean Paolo (Cashier)',  $billing['doc_billing_statement']],
-            ];
-            foreach ($docs as [$field, $label, $hint, $checked]): ?>
+            <?php foreach ($docs as $d):
+              $checked = $d['received']; ?>
             <label class="billing-doc-check <?= $checked ? 'checked' : '' ?>">
-              <input type="checkbox" name="<?= $field ?>" value="1" <?= $checked ? 'checked' : '' ?>
+              <input type="checkbox" name="doc[]" value="<?= (int)$d['doc_type_id'] ?>" <?= $checked ? 'checked' : '' ?>
                 onchange="this.closest('form').submit()" style="display:none;"/>
               <div class="billing-doc-tick <?= $checked ? 'done' : '' ?>"><?= $checked ? icon('check', 11) : '' ?></div>
               <div>
-                <div class="billing-doc-name"><?= $label ?></div>
-                <div class="billing-doc-hint"><?= $hint ?></div>
+                <div class="billing-doc-name"><?= htmlspecialchars($d['name']) ?></div>
+                <div class="billing-doc-hint"><?= htmlspecialchars((string)$d['hint']) ?></div>
               </div>
             </label>
             <?php endforeach; ?>
@@ -396,6 +403,22 @@ require_once '../../includes/topbar.php';
             <div>
               <label class="field-label">Billed To</label>
               <input type="text" name="billed_to" class="field-input" value="<?= htmlspecialchars($billing['billed_to']) ?>" style="width:100%;"/>
+            </div>
+
+            <div>
+              <label class="field-label">Authorized Representative / Cashier</label>
+              <?php
+              $signers   = billing_signatories_active($conn);
+              $on_list   = in_array($billing['signed_by_name'], array_column($signers, 'name'), true);
+              ?>
+              <select name="signatory_id" class="field-input" style="width:100%;">
+                <?php if (!$on_list): ?>
+                <option value=""><?= htmlspecialchars($billing['signed_by_name'] ?: '— None —') ?> (keep)</option>
+                <?php endif; ?>
+                <?php foreach ($signers as $sg): ?>
+                <option value="<?= (int)$sg['signatory_id'] ?>" <?= $on_list && $sg['name'] === $billing['signed_by_name'] ? 'selected' : '' ?>><?= htmlspecialchars($sg['name']) ?></option>
+                <?php endforeach; ?>
+              </select>
             </div>
 
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
@@ -478,16 +501,18 @@ require_once '../../includes/topbar.php';
       <?= csrf_field() ?>
       <input type="hidden" name="action" value="update_status"/>
       <div style="padding:1.25rem;display:flex;flex-direction:column;gap:0.65rem;">
-        <?php foreach (BILLING_STATUSES as $val => $st): ?>
+        <?php foreach (billing_statuses_active($conn) as $row_st):
+          $val = $row_st['code'];
+          $st  = billing_status_badge($conn, $val); ?>
         <label class="vb-status-opt <?= $billing['status'] === $val ? 'selected' : '' ?>">
-          <input type="radio" name="status" value="<?= $val ?>" <?= $billing['status'] === $val ? 'checked' : '' ?>
+          <input type="radio" name="status" value="<?= htmlspecialchars($val) ?>" <?= $billing['status'] === $val ? 'checked' : '' ?>
             onchange="document.querySelectorAll('.vb-status-opt').forEach(el=>el.classList.remove('selected'));this.closest('label').classList.add('selected')"
             style="display:none;"/>
           <div class="vb-status-opt-icon"><?= icon($st['icon'], 15) ?></div>
           <div>
-            <span class="badge <?= $st['class'] ?>"><?= $st['label'] ?></span>
+            <span class="badge <?= $st['class'] ?>"><?= htmlspecialchars($st['label']) ?></span>
             <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.1rem;">
-              <?= $st['desc'] ?>
+              <?= htmlspecialchars($st['desc']) ?>
             </div>
           </div>
         </label>

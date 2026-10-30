@@ -17,41 +17,17 @@ $job_id = san_int($_GET['id'] ?? 0, 1);
 if (!$job_id) { header("Location: repair_list.php"); exit; }
 
 // ── FETCH JOB ──
-$stmt = $conn->prepare("
-    SELECT j.*,
-           c.client_id, c.full_name, c.contact_number, c.email,
-           v.vehicle_id, v.plate_number, v.make, v.model, v.year_model, v.color
-    FROM repair_jobs j
-    INNER JOIN clients  c ON j.client_id  = c.client_id
-    INNER JOIN vehicles v ON j.vehicle_id = v.vehicle_id
-    WHERE j.job_id = ?
-");
-$stmt->bind_param('i', $job_id);
-$stmt->execute();
-$job = $stmt->get_result()->fetch_assoc();
+$job = repair_job_find($conn, $job_id);
 if (!$job) { header("Location: repair_list.php"); exit; }
 
-// ── FETCH CHECKLIST ──
-$cl_stmt = $conn->prepare("SELECT area_key, condition_value, notes FROM repair_checklist WHERE job_id = ?");
-$cl_stmt->bind_param('i', $job_id);
-$cl_stmt->execute();
-$cl_rows = $cl_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$checklist = [];
-foreach ($cl_rows as $row) $checklist[$row['area_key']] = $row;
+// ── FETCH CHECKLIST ── (area_key => row)
+$checklist = repair_checklist($conn, $job_id);
 
 // ── FETCH IMAGES ──
-$img_stmt = $conn->prepare("SELECT image_id, file_name, uploaded_by, show_client, caption, uploaded_at FROM repair_job_images WHERE job_id = ? ORDER BY uploaded_at ASC, image_id ASC");
-$img_stmt->bind_param('i', $job_id);
-$img_stmt->execute();
-$images = $img_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$images = repair_job_images($conn, $job_id);
 
 // One photo of this job, for the show / hide / delete actions below (null if it is not this job's)
-$find_photo = function (int $img_id) use ($conn, $job_id): ?array {
-    $fi = $conn->prepare("SELECT image_id, file_name, uploaded_by, show_client FROM repair_job_images WHERE image_id = ? AND job_id = ?");
-    $fi->bind_param('ii', $img_id, $job_id);
-    $fi->execute();
-    return $fi->get_result()->fetch_assoc() ?: null;
-};
+$find_photo = fn(int $img_id): ?array => repair_job_image($conn, $img_id, $job_id);
 $photo_log = function (string $action, string $what) use ($conn, $job) {
     $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' ' . $what . ' on repair job ' . $job['job_number'] . '.';
     audit_log_add($conn, $_SESSION['user_id'], $action, $desc);
@@ -71,9 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delet
         exit;
     }
     db_transaction($conn, function () use ($conn, $photo, $photo_log) {
-        $del = $conn->prepare("DELETE FROM repair_job_images WHERE image_id = ?");
-        $del->bind_param('i', $photo['image_id']);
-        $del->execute();
+        repair_job_image_delete($conn, (int)$photo['image_id']);
         $photo_log('REPAIR_PHOTO_DELETED', 'removed a ' . ($photo['show_client'] ? 'client-visible' : 'private') . ' photo');
     });
     $path = __DIR__ . '/../../uploads/repair_jobs/' . $job_id . '/' . basename($photo['file_name']);
@@ -92,9 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'toggl
     }
     $show = ($_POST['show'] ?? '') === '1' ? 1 : 0;
     db_transaction($conn, function () use ($conn, $photo, $show, $photo_log) {
-        $upd = $conn->prepare("UPDATE repair_job_images SET show_client = ? WHERE image_id = ?");
-        $upd->bind_param('ii', $show, $photo['image_id']);
-        $upd->execute();
+        repair_job_image_set_visible($conn, (int)$photo['image_id'], (bool)$show);
         $photo_log('REPAIR_PHOTO_VISIBILITY', $show ? 'showed a photo to the client' : 'hid a photo from the client');
     });
     header("Location: view_repair.php?id=$job_id&success=" . urlencode($show ? 'Photo is now shown to the client.' : 'Photo is now hidden from the client.'));
@@ -133,10 +105,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'uploa
     if ($saved) {
         try {
             db_transaction($conn, function () use ($conn, $saved, $job_id, $show, $caption, $photo_log) {
-                $ins = $conn->prepare("INSERT INTO repair_job_images (job_id, file_name, uploaded_by, show_client, caption) VALUES (?, ?, ?, ?, ?)");
                 foreach ($saved as $fname) {
-                    $ins->bind_param('isiis', $job_id, $fname, $_SESSION['user_id'], $show, $caption);
-                    $ins->execute();
+                    repair_job_image_add($conn, $job_id, $fname, (int)$_SESSION['user_id'], (bool)$show, $caption);
                 }
                 $photo_log('REPAIR_PHOTO_UPLOADED', 'uploaded ' . count($saved) . ' photo(s)' . ($show ? ' shown to the client' : ''));
             });
@@ -184,9 +154,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'sign_
 
     try {
         db_transaction($conn, function () use ($conn, $job_id, $job, $signer_role, $signer_name, $fname) {
-            $ins = $conn->prepare("INSERT INTO repair_job_signatures (job_id, signer_role, signer_name, file_name, captured_by) VALUES (?, ?, ?, ?, ?)");
-            $ins->bind_param('isssi', $job_id, $signer_role, $signer_name, $fname, $_SESSION['user_id']);
-            $ins->execute();
+            repair_job_signature_add($conn, $job_id, $signer_role, $signer_name, $fname, (int)$_SESSION['user_id']);
             $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' recorded the ' . ($signer_role === 'client' ? 'client' : 'shop')
                   . ' signature (' . $signer_name . ') on the inspection checklist of repair job ' . $job['job_number'] . '.';
             audit_log_add($conn, $_SESSION['user_id'], 'REPAIR_SIGNED', $desc);
@@ -206,11 +174,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'sign_
 }
 
 // ── FETCH SIGNATURES ──
-$sig_stmt = $conn->prepare("SELECT signer_role, signer_name, file_name, signed_at FROM repair_job_signatures WHERE job_id = ?");
-$sig_stmt->bind_param('i', $job_id);
-$sig_stmt->execute();
-$signatures = [];
-foreach ($sig_stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) $signatures[$row['signer_role']] = $row;
+$signatures = repair_job_signatures($conn, $job_id);   // signer_role => row
 
 // ── HANDLE STATUS UPDATE ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
@@ -226,10 +190,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             // The status change and its audit entry are saved together or not at all (includes/transaction.php).
             // "AND status = ?" makes it a no-op if someone else changed the status since this page was loaded.
             $changed = db_transaction($conn, function () use ($conn, $job_id, $job, $new_status) {
-                $upd = $conn->prepare("UPDATE repair_jobs SET status = ? WHERE job_id = ? AND status = ?");
-                $upd->bind_param('sis', $new_status, $job_id, $job['status']);
-                $upd->execute();
-                if ($upd->affected_rows !== 1) return false;
+                if (!repair_job_set_status($conn, $job_id, $job['status'], $new_status)) return false;
                 $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' updated repair job ' . $job['job_number'] . ' status to ' . $new_status . '.';
                 audit_log_add($conn, $_SESSION['user_id'], 'REPAIR_STATUS_UPDATED', $desc);
                 return true;
@@ -240,11 +201,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
 
             if ($new_status === 'completed' && !empty($job['email'])) {
-                $tok_row = $conn->prepare("SELECT public_token FROM clients WHERE client_id = ?");
-                $tok_row->bind_param('i', $job['client_id']);
-                $tok_row->execute();
-                $tok_data = $tok_row->get_result()->fetch_assoc();
-                $pub_token = $tok_data['public_token'] ?? '';
+                $pub_token = client_public_token($conn, (int)$job['client_id']);
                 $pub_url   = app_url('modules/public/client.php?token=' . urlencode($pub_token));
 
                 $svc_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
@@ -272,9 +229,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             exit;
         }
         $notes = san_str($_POST['additional_damages'] ?? '', MAX_NOTE);
-        $upd   = $conn->prepare("UPDATE repair_jobs SET additional_damages = ? WHERE job_id = ?");
-        $upd->bind_param('si', $notes, $job_id);
-        $upd->execute();
+        repair_job_set_notes($conn, $job_id, $notes);
         header("Location: view_repair.php?id=$job_id&success=Notes updated.");
         exit;
     }
@@ -282,10 +237,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] === 'update_release') {
         $rel = san_str($_POST['release_date'] ?? '', 10);
         if ($rel === '' || validate_date($rel)) {
-            $upd = $conn->prepare("UPDATE repair_jobs SET release_date = ? WHERE job_id = ?");
-            $rd  = $rel ?: null;
-            $upd->bind_param('si', $rd, $job_id);
-            $upd->execute();
+            repair_job_set_release_date($conn, $job_id, $rel ?: null);
             header("Location: view_repair.php?id=$job_id&success=Release date updated.");
             exit;
         }
@@ -350,10 +302,8 @@ document.addEventListener('DOMContentLoaded', function() {
       </button>
       <?php endif; ?>
       <?php
-        $qt_chk = $conn->prepare("SELECT quotation_id FROM quotations WHERE job_id = ? LIMIT 1");
-        $qt_chk->bind_param('i', $job_id);
-        $qt_chk->execute();
-        $existing_qt = $qt_chk->get_result()->fetch_assoc();
+        $existing_qt_id = quotation_id_for_job($conn, $job_id);
+        $existing_qt    = $existing_qt_id === null ? null : ['quotation_id' => $existing_qt_id];
       ?>
       <?php if ($existing_qt): ?>
         <a href="../quotations/view_quotation.php?id=<?= $existing_qt['quotation_id'] ?>" class="btn-primary" style="padding:0.45rem 1rem;font-size:0.8rem;"><?= icon('receipt', 13) ?> View Quotation</a>

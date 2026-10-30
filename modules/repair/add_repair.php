@@ -19,10 +19,7 @@ $prefill_data = null;
 $prefill_client_id  = (int)($_GET['prefill_client']  ?? 0);
 $prefill_vehicle_id = (int)($_GET['prefill_vehicle'] ?? 0);
 if ($prefill_client_id > 0 && client_in_scope($conn, $prefill_client_id)) {
-    $pc = $conn->prepare("SELECT client_id, full_name, contact_number FROM clients WHERE client_id = ? AND deleted_at IS NULL");
-    $pc->bind_param('i', $prefill_client_id);
-    $pc->execute();
-    $pc_row = $pc->get_result()->fetch_assoc();
+    $pc_row = client_find_contact($conn, $prefill_client_id);
     if ($pc_row) {
         $prefill_data = [
             'client_id' => $pc_row['client_id'],
@@ -31,10 +28,7 @@ if ($prefill_client_id > 0 && client_in_scope($conn, $prefill_client_id)) {
             'vehicle'   => null,
         ];
         if ($prefill_vehicle_id > 0) {
-            $pv = $conn->prepare("SELECT vehicle_id, plate_number, make, model, year_model, color FROM vehicles WHERE vehicle_id = ? AND client_id = ?");
-            $pv->bind_param('ii', $prefill_vehicle_id, $prefill_client_id);
-            $pv->execute();
-            $pv_row = $pv->get_result()->fetch_assoc();
+            $pv_row = client_vehicle($conn, $prefill_client_id, $prefill_vehicle_id);
             if ($pv_row) $prefill_data['vehicle'] = $pv_row;
         }
     }
@@ -65,10 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!client_in_scope($conn, $client_id)) {
             $errors[] = 'Selected client was not found.';
         } else {
-            $vchk = $conn->prepare("SELECT 1 FROM vehicles WHERE vehicle_id = ? AND client_id = ?");
-            $vchk->bind_param('ii', $vehicle_id, $client_id);
-            $vchk->execute();
-            if ($vchk->get_result()->num_rows === 0) $errors[] = 'Selected vehicle does not belong to that client.';
+            if (client_vehicle($conn, $client_id, $vehicle_id) === null) $errors[] = 'Selected vehicle does not belong to that client.';
         }
     }
 
@@ -85,23 +76,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $created = db_transaction($conn, function () use ($conn, $client_id, $vehicle_id, $repair_date, $rel, $service_type, $additional, $checklist_area_keys) {
                 [$job_id, $job_num] = insert_with_sequential_number($conn, 'repair_jobs', 'job_number', record_number_prefix('RJ'),
                     function (string $num) use ($conn, $client_id, $vehicle_id, $repair_date, $rel, $service_type, $additional) {
-                        $ins = $conn->prepare("
-                            INSERT INTO repair_jobs (client_id, vehicle_id, job_number, repair_date, release_date, service_type, additional_damages, created_by)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                        ");
-                        $ins->bind_param('iisssssi', $client_id, $vehicle_id, $num, $repair_date, $rel, $service_type, $additional, $_SESSION['user_id']);
-                        $ins->execute();
-                        return [$conn->insert_id, $num];
+                        $id = repair_job_create($conn, $num, [
+                            'client_id' => $client_id, 'vehicle_id' => $vehicle_id, 'repair_date' => $repair_date, 'release_date' => $rel,
+                            'service_type' => $service_type, 'additional_damages' => $additional,
+                        ], (int)$_SESSION['user_id']);
+                        return [$id, $num];
                     }
                 );
 
                 // Save checklist
-                $cins = $conn->prepare("INSERT INTO repair_checklist (job_id, area_key, condition_value, notes) VALUES (?, ?, ?, ?)");
                 foreach ($checklist_area_keys as $key) {
                     $cond  = san_enum($_POST['area_' . $key] ?? 'none', array_keys(REPAIR_DAMAGE_LEVELS));
                     $note  = san_str($_POST['note_' . $key] ?? '', 255);
-                    $cins->bind_param('isss', $job_id, $key, $cond, $note);
-                    $cins->execute();
+                    repair_checklist_add($conn, (int)$job_id, $key, $cond, $note);
                 }
 
                 // Audit log

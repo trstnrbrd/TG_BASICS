@@ -21,16 +21,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
     $del_id = san_int($_POST['job_id'] ?? 0, 1);
     if ($del_id) {
-        $job_row = $conn->prepare("SELECT job_number FROM repair_jobs WHERE job_id = ?");
-        $job_row->bind_param('i', $del_id);
-        $job_row->execute();
-        $job_row = $job_row->get_result()->fetch_assoc();
-        if ($job_row) {
-            db_transaction($conn, function () use ($conn, $del_id, $job_row) {
-                $del = $conn->prepare("DELETE FROM repair_jobs WHERE job_id = ?");
-                $del->bind_param('i', $del_id);
-                $del->execute();
-                $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' deleted repair job ' . $job_row['job_number'] . '.';
+        $job_number = repair_job_number($conn, $del_id);
+        if ($job_number !== null) {
+            db_transaction($conn, function () use ($conn, $del_id, $job_number) {
+                repair_job_delete($conn, $del_id);
+                $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' deleted repair job ' . $job_number . '.';
                 audit_log_add($conn, $_SESSION['user_id'], 'REPAIR_JOB_DELETED', $desc);
             });
         }
@@ -44,39 +39,8 @@ $search        = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
 $filter_status = san_enum($_GET['status'] ?? 'all', array_merge(['all'], array_keys(repair_statuses())));
 $sort_by       = san_enum($_GET['sort'] ?? 'newest', ['newest', 'oldest']);
 
-// ── BUILD QUERY ──
-$where  = ["1=1"];
-$params = [];
-$types  = '';
-
-if ($search !== '') {
-    $like    = "%$search%";
-    $where[] = "(c.full_name LIKE ? OR v.plate_number LIKE ? OR j.job_number LIKE ?)";
-    $params  = array_merge($params, [$like, $like, $like]);
-    $types  .= 'sss';
-}
-if ($filter_status !== 'all') {
-    $where[] = "j.status = ?";
-    $params[] = $filter_status;
-    $types   .= 's';
-}
-
-$where_sql = implode(' AND ', $where);
-$order     = $sort_by === 'oldest' ? 'j.created_at ASC' : 'j.created_at DESC';
-
-$sql = "
-    SELECT j.job_id, j.job_number, j.service_type, j.status,
-           j.repair_date, j.release_date,
-           c.client_id, c.full_name, c.contact_number,
-           v.vehicle_id, v.plate_number, v.make, v.model, v.year_model
-    FROM repair_jobs j
-    INNER JOIN clients  c ON j.client_id  = c.client_id
-    INNER JOIN vehicles v ON j.vehicle_id = v.vehicle_id
-    WHERE $where_sql
-    ORDER BY $order
-";
-// One page at a time (includes/pagination.php) — the total is counted from this same query
-[$jobs, $pg] = paginate_query($conn, $sql, $types, $params);
+// One page at a time (includes/pagination.php)
+[$jobs, $pg] = repair_jobs_list_page($conn, $search, $filter_status, $sort_by);
 
 $service_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
 
@@ -154,7 +118,7 @@ require_once '../../includes/topbar.php';
         </div>
       </div>
 
-      <?php if ($jobs->num_rows > 0): ?>
+      <?php if ($jobs): ?>
       <table class="tg-table repair-jobs-table">
         <thead>
           <tr>
@@ -169,7 +133,7 @@ require_once '../../includes/topbar.php';
           </tr>
         </thead>
         <tbody>
-          <?php while ($j = $jobs->fetch_assoc()):
+          <?php foreach ($jobs as $j):
               $sb  = repair_status_badge($j['status']);
               $svc = $service_labels[$j['service_type']] ?? $j['service_type'];
           ?>
@@ -200,7 +164,7 @@ require_once '../../includes/topbar.php';
               </div>
             </td>
           </tr>
-          <?php endwhile; ?>
+          <?php endforeach; ?>
         </tbody>
       </table>
       <?php render_pagination($pg); ?>

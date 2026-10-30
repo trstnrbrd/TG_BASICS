@@ -131,6 +131,32 @@ function vehicle_find(mysqli $conn, int $vehicle_id): ?array
         WHERE v.vehicle_id = ?", 'i', [$vehicle_id]);
 }
 
+/** A client's vehicles by plate (the repair form's vehicle list). */
+function client_vehicles_by_plate(mysqli $conn, int $client_id): array
+{
+    return dal_all($conn, "SELECT vehicle_id, plate_number, make, model, year_model, color FROM vehicles WHERE client_id = ? ORDER BY plate_number ASC",
+                   'i', [$client_id]);
+}
+
+/** One of the client's vehicles (basic details), or null when it is not theirs. */
+function client_vehicle(mysqli $conn, int $client_id, int $vehicle_id): ?array
+{
+    return dal_one($conn, "SELECT vehicle_id, plate_number, make, model, year_model, color FROM vehicles WHERE vehicle_id = ? AND client_id = ?",
+                   'ii', [$vehicle_id, $client_id]);
+}
+
+/** An active client's id, name and contact number, or null. */
+function client_find_contact(mysqli $conn, int $client_id): ?array
+{
+    return dal_one($conn, "SELECT client_id, full_name, contact_number FROM clients WHERE client_id = ? AND deleted_at IS NULL", 'i', [$client_id]);
+}
+
+/** The token of a client's public QR page ('' when none). */
+function client_public_token(mysqli $conn, int $client_id): string
+{
+    return (string)(dal_value($conn, "SELECT public_token FROM clients WHERE client_id = ?", 'i', [$client_id]) ?? '');
+}
+
 /** An active client's row (all columns), or null. */
 function client_row(mysqli $conn, int $client_id): ?array
 {

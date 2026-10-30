@@ -14,30 +14,11 @@ $qt_id = san_int($_GET['id'] ?? 0, 1);
 if (!$qt_id) { header("Location: quotation_list.php"); exit; }
 
 // ── FETCH QUOTATION ──
-$stmt = $conn->prepare("
-    SELECT q.*,
-           j.job_number, j.service_type, j.repair_date, j.status AS job_status,
-           c.client_id, c.full_name, c.contact_number, c.email, c.address,
-           v.plate_number, v.make, v.model, v.year_model, v.color,
-           r.receipt_id, r.receipt_number, r.amount_paid, r.balance AS receipt_balance,
-           r.payment_method, r.payment_status, r.issued_at
-    FROM quotations q
-    INNER JOIN repair_jobs j ON q.job_id = j.job_id
-    INNER JOIN clients     c ON j.client_id  = c.client_id
-    INNER JOIN vehicles    v ON j.vehicle_id = v.vehicle_id
-    LEFT  JOIN receipts    r ON r.quotation_id = q.quotation_id
-    WHERE q.quotation_id = ?
-");
-$stmt->bind_param('i', $qt_id);
-$stmt->execute();
-$qt = $stmt->get_result()->fetch_assoc();
+$qt = quotation_find($conn, $qt_id);
 if (!$qt) { header("Location: quotation_list.php"); exit; }
 
 // ── FETCH LINE ITEMS ──
-$items_stmt = $conn->prepare("SELECT * FROM quotation_items WHERE quotation_id = ? ORDER BY sort_order ASC");
-$items_stmt->bind_param('i', $qt_id);
-$items_stmt->execute();
-$items = $items_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$items = quotation_items($conn, $qt_id);
 
 $area_labels = REPAIR_CHECKLIST_AREAS;   // config/access.php
 
@@ -50,9 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_admin) {
 
     // Approve
     if ($action === 'approve' && $qt['status'] === 'pending_approval') {
-        $upd = $conn->prepare("UPDATE quotations SET status='approved', approved_at=NOW() WHERE quotation_id=?");
-        $upd->bind_param('i', $qt_id);
-        $upd->execute();
+        quotation_set_status($conn, $qt_id, 'approved');
         $d   = ($_SESSION['full_name'] ?? 'Unknown') . ' approved quotation ' . $qt['quotation_number'] . '.';
         audit_log_add($conn, $_SESSION['user_id'], 'QUOTATION_APPROVED', $d);
         header("Location: view_quotation.php?id=$qt_id&success=Quotation+approved.");
@@ -61,18 +40,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_admin) {
 
     // Send for approval (from draft)
     if ($action === 'send_approval' && $qt['status'] === 'draft') {
-        $upd = $conn->prepare("UPDATE quotations SET status='pending_approval' WHERE quotation_id=?");
-        $upd->bind_param('i', $qt_id);
-        $upd->execute();
+        quotation_set_status($conn, $qt_id, 'pending_approval');
         header("Location: view_quotation.php?id=$qt_id&success=Sent+for+client+approval.");
         exit;
     }
 
     // Cancel
     if ($action === 'cancel' && in_array($qt['status'], ['draft','pending_approval'])) {
-        $upd = $conn->prepare("UPDATE quotations SET status='cancelled' WHERE quotation_id=?");
-        $upd->bind_param('i', $qt_id);
-        $upd->execute();
+        quotation_set_status($conn, $qt_id, 'cancelled');
         header("Location: view_quotation.php?id=$qt_id&success=Quotation+cancelled.");
         exit;
     }
@@ -106,19 +81,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_admin) {
             // insert_with_sequential_number() — instead of failing the whole conversion for it.
             $rc_num = insert_with_sequential_number($conn, 'receipts', 'receipt_number', record_number_prefix('BS'),
                 function (string $num) use ($conn, $qt_id, $amount_paid, $balance, $pay_method, $pay_status, $receipt_notes) {
-                    $ins = $conn->prepare("
-                        INSERT INTO receipts (quotation_id, receipt_number, amount_paid, balance, payment_method, payment_status, notes, issued_by)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    ");
-                    $ins->bind_param('isddsssi', $qt_id, $num, $amount_paid, $balance, $pay_method, $pay_status, $receipt_notes, $_SESSION['user_id']);
-                    $ins->execute();
+                    receipt_create($conn, $num, $qt_id, (float)$amount_paid, (float)$balance, $pay_method, $pay_status, $receipt_notes, (int)$_SESSION['user_id']);
                     return $num;
                 }
             );
 
-            $upd = $conn->prepare("UPDATE quotations SET status='converted', converted_at=NOW() WHERE quotation_id=?");
-            $upd->bind_param('i', $qt_id);
-            $upd->execute();
+            quotation_set_status($conn, $qt_id, 'converted');
 
             $d   = ($_SESSION['full_name'] ?? 'Unknown') . ' converted quotation ' . $qt['quotation_number'] . ' to receipt ' . $rc_num . '.';
             audit_log_add($conn, $_SESSION['user_id'], 'RECEIPT_CREATED', $d);
@@ -159,9 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_admin) {
         $pay_method    = san_enum($_POST['payment_method'] ?? 'cash', ['cash','e_wallet','bank_transfer']);
         $balance       = max(0, $qt['total'] - $amount_paid);
         $pay_status    = $amount_paid <= 0 ? 'unpaid' : ($balance > 0 ? 'partial' : 'paid');
-        $upd = $conn->prepare("UPDATE receipts SET amount_paid=?, balance=?, payment_method=?, payment_status=? WHERE receipt_id=?");
-        $upd->bind_param('ddssi', $amount_paid, $balance, $pay_method, $pay_status, $qt['receipt_id']);
-        $upd->execute();
+        receipt_set_payment($conn, (int)$qt['receipt_id'], (float)$amount_paid, (float)$balance, $pay_method, $pay_status);
         header("Location: view_quotation.php?id=$qt_id&success=Payment+updated.");
         exit;
     }

@@ -61,19 +61,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // same-plate race — see with_named_lock() for the confirmed repro) instead of two unsynchronized queries.
     if (empty($errors) && $plate_number !== '') {
         $lock = with_named_lock($conn, 'plate_' . $plate_number, function () use ($conn, $vehicle_id, $plate_number, $make, $model, $year_model, $color, $motor_number, $serial_number) {
-            $check = $conn->prepare("SELECT v.vehicle_id FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id WHERE v.plate_number = ? AND v.vehicle_id != ? AND c.deleted_at IS NULL");
-            $check->bind_param('si', $plate_number, $vehicle_id);
-            $check->execute();
-            if ($check->get_result()->num_rows > 0) return false;   // duplicate — caller adds the error
+            if (vehicle_plate_taken($conn, $plate_number, $vehicle_id)) return false;   // duplicate — caller adds the error
 
-            $upd = $conn->prepare("
-                UPDATE vehicles
-                SET plate_number = ?, make = ?, model = ?, year_model = ?,
-                    color = ?, motor_number = ?, serial_number = ?
-                WHERE vehicle_id = ?
-            ");
-            $upd->bind_param('sssisssi', $plate_number, $make, $model, $year_model, $color, $motor_number, $serial_number, $vehicle_id);
-            return $upd->execute();
+            return vehicle_update($conn, $vehicle_id, [
+                'plate_number' => $plate_number, 'make' => $make, 'model' => $model, 'year_model' => $year_model,
+                'color' => $color, 'motor_number' => $motor_number, 'serial_number' => $serial_number,
+            ]);
         });
 
         if (!$lock['locked']) {

@@ -79,26 +79,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // for a given plate is ever "in the check" at a time — see with_named_lock() for the confirmed repro.
     if (empty($errors) && $plate_number !== '') {
         $lock = with_named_lock($conn, 'plate_' . $plate_number, function () use ($conn, $plate_number, $full_name, $contact_number, $email, $facebook_name, $address, $make, $model, $year_model, $color, $motor_number, $serial_number, $agent_id) {
-            $check = $conn->prepare("SELECT v.vehicle_id FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id WHERE v.plate_number = ? AND c.deleted_at IS NULL");
-            $check->bind_param('s', $plate_number);
-            $check->execute();
-            if ($check->get_result()->num_rows > 0) return null;   // duplicate — caller adds the field error
+            if (vehicle_plate_taken($conn, $plate_number)) return null;   // duplicate — caller adds the field error
 
-            $created_by = (int)$_SESSION['user_id'];
-            $ins_client = $conn->prepare("INSERT INTO clients (full_name, contact_number, email, facebook_name, address, created_by, agent_id, consent_signed_at, consent_recorded_by) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?)");
-            $ins_client->bind_param('sssssiii', $full_name, $contact_number, $email, $facebook_name, $address, $created_by, $agent_id, $created_by);
-            $ins_client->execute();
-            $client_id = $conn->insert_id;
-
-            $tok = $conn->prepare("UPDATE clients SET public_token = SHA2(CONCAT(?, UUID(), 'tgbasics'), 256) WHERE client_id = ?");
-            $tok->bind_param('ii', $client_id, $client_id);
-            $tok->execute();
-
-            $ins_vehicle = $conn->prepare("INSERT INTO vehicles (client_id, plate_number, make, model, year_model, color, motor_number, serial_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-            $ins_vehicle->bind_param('isssssss', $client_id, $plate_number, $make, $model, $year_model, $color, $motor_number, $serial_number);
-            $ins_vehicle->execute();
-
-            return ['client_id' => $client_id, 'vehicle_id' => $conn->insert_id];
+            // the client and its first vehicle are saved together or not at all
+            return db_transaction($conn, function () use ($conn, $full_name, $contact_number, $email, $facebook_name, $address, $agent_id, $plate_number, $make, $model, $year_model, $color, $motor_number, $serial_number) {
+                $client_id = client_create($conn, [
+                    'full_name' => $full_name, 'contact_number' => $contact_number, 'email' => $email,
+                    'facebook_name' => $facebook_name, 'address' => $address, 'agent_id' => $agent_id,
+                ], (int)$_SESSION['user_id']);
+                $vehicle_id = vehicle_create($conn, $client_id, [
+                    'plate_number' => $plate_number, 'make' => $make, 'model' => $model, 'year_model' => $year_model,
+                    'color' => $color, 'motor_number' => $motor_number, 'serial_number' => $serial_number,
+                ]);
+                return ['client_id' => $client_id, 'vehicle_id' => $vehicle_id];
+            });
         });
 
         if (!$lock['locked']) {

@@ -55,14 +55,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // with_named_lock() for the confirmed repro) instead of two separate, unsynchronized queries.
     if (empty($errors) && $plate_number !== '') {
         $lock = with_named_lock($conn, 'plate_' . $plate_number, function () use ($conn, $client_id, $plate_number, $make, $model, $year_model, $color, $motor_number, $serial_number) {
-            $check = $conn->prepare("SELECT v.vehicle_id FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id WHERE v.plate_number = ? AND c.deleted_at IS NULL");
-            $check->bind_param('s', $plate_number);
-            $check->execute();
-            if ($check->get_result()->num_rows > 0) return false;   // duplicate — caller adds the error
+            if (vehicle_plate_taken($conn, $plate_number)) return false;   // duplicate — caller adds the error
 
-            $ins = $conn->prepare("INSERT INTO vehicles (client_id, plate_number, make, model, year_model, color, motor_number, serial_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-            $ins->bind_param('isssssss', $client_id, $plate_number, $make, $model, $year_model, $color, $motor_number, $serial_number);
-            return $ins->execute();
+            return vehicle_create($conn, $client_id, [
+                'plate_number' => $plate_number, 'make' => $make, 'model' => $model, 'year_model' => $year_model,
+                'color' => $color, 'motor_number' => $motor_number, 'serial_number' => $serial_number,
+            ]) > 0;
         });
 
         if (!$lock['locked']) {

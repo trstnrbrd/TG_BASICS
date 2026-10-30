@@ -283,25 +283,16 @@ function imp_run(mysqli $conn, array $rows, array $ticked, array $agents): array
     $groups = [];
     foreach ($rows as $i => $r) if ($r['status'] !== 'error') $groups[$r['group']][] = $i;
 
-    $ins_client  = $conn->prepare("INSERT INTO clients (full_name, contact_number, email, facebook_name, address, created_by, agent_id, consent_signed_at, consent_recorded_by, public_token) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)");
-    $ins_vehicle = $conn->prepare("INSERT INTO vehicles (client_id, plate_number, make, model, year_model, color, motor_number, serial_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     // One client with its vehicles (inside the caller's transaction). Client details come from its first row,
     // with blanks filled in from its other rows.
-    $save = function (array $idxs) use ($conn, $rows, $uid, $ins_client, $ins_vehicle) {
+    $save = function (array $idxs) use ($conn, $rows, $uid) {
         $c = $rows[$idxs[0]]['d'];
         foreach (['contact_number', 'email', 'facebook_name'] as $f) {
             foreach ($idxs as $i) if ($c[$f] === '' && $rows[$i]['d'][$f] !== '') $c[$f] = $rows[$i]['d'][$f];
         }
-        $agent_id = $rows[$idxs[0]]['agent_id'];
-        $token    = bin2hex(random_bytes(32));
-        $ins_client->bind_param('sssssiiis', $c['full_name'], $c['contact_number'], $c['email'], $c['facebook_name'], $c['address'], $uid, $agent_id, $uid, $token);
-        $ins_client->execute();
-        $client_id = (int)$conn->insert_id;
-        foreach ($idxs as $i) {
-            $v = $rows[$i]['d'];
-            $ins_vehicle->bind_param('isssisss', $client_id, $v['plate_number'], $v['make'], $v['model'], $v['year_model'], $v['color'], $v['motor_number'], $v['serial_number']);
-            $ins_vehicle->execute();
-        }
+        $c['agent_id'] = $rows[$idxs[0]]['agent_id'];
+        $client_id = client_create($conn, $c, $uid);
+        foreach ($idxs as $i) vehicle_create($conn, $client_id, $rows[$i]['d']);
     };
     $saved = function (array $idxs) use (&$out, $rows) {
         $aid = $rows[$idxs[0]]['agent_id'];

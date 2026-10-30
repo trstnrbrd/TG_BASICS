@@ -68,10 +68,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($address === '')                            $errors[] = 'Address is required.';
 
     if (empty($errors)) {
-        $agent_param = $agent_id > 0 ? $agent_id : null;
-        $upd = $conn->prepare("UPDATE clients SET full_name = ?, contact_number = ?, email = ?, facebook_name = ?, address = ?, agent_id = ? WHERE client_id = ?");
-        $upd->bind_param('sssssii', $full_name, $contact_number, $email, $facebook_name, $address, $agent_param, $client_id);
-        if ($upd->execute()) {
+        $saved = client_update($conn, $client_id, [
+            'full_name' => $full_name, 'contact_number' => $contact_number, 'email' => $email,
+            'facebook_name' => $facebook_name, 'address' => $address, 'agent_id' => $agent_id,
+        ]);
+        if ($saved) {
             // Audit log
             $uid = $_SESSION['user_id'];
             $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' updated client "' . $full_name . '" (ID ' . $client_id . ').';

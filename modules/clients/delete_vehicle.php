@@ -57,15 +57,15 @@ if ($blockers !== '') {
     exit;
 }
 
-// Delete vehicle — CASCADE removes linked policies automatically
-$del = $conn->prepare("DELETE FROM vehicles WHERE vehicle_id = ?");
-$del->bind_param('i', $vehicle_id);
-
-if ($del->execute() && $del->affected_rows > 0) {
-    $uid  = $_SESSION['user_id'];
+// Delete vehicle — CASCADE removes linked policies automatically; the delete and its audit entry are saved together
+$deleted = db_transaction($conn, function () use ($conn, $vehicle_id, $vehicle) {
+    if (!vehicle_delete($conn, $vehicle_id)) return false;
     $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' unregistered vehicle ' . $vehicle['plate_number'] . ' (' . $vehicle['make'] . ' ' . $vehicle['model'] . ') from client "' . $vehicle['client_name'] . '".';
-    audit_log_add($conn, $uid, 'VEHICLE_UNREGISTERED', $desc);
+    audit_log_add($conn, $_SESSION['user_id'], 'VEHICLE_UNREGISTERED', $desc);
+    return true;
+});
 
+if ($deleted) {
     header("Location: view_client.php?id=" . $client_id . "&success=" . urlencode('Vehicle ' . $vehicle['plate_number'] . ' has been unregistered.'));
     exit;
 } else {

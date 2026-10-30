@@ -55,14 +55,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) 
             exit;
         }
 
-        // Remove vehicles first before soft-deleting the client
-        $conn->query("DELETE FROM vehicles WHERE client_id = " . $del_id);
-
-        $dstmt = $conn->prepare("UPDATE clients SET deleted_at = NOW() WHERE client_id = ?");
-        $dstmt->bind_param('i', $del_id);
-        $dstmt->execute();
-        $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' deleted client "' . $cdata['full_name'] . '" and all associated records.';
-        audit_log_add($conn, $_SESSION['user_id'], 'CLIENT_DELETED', $desc);
+        // vehicles removed, client marked deleted and the audit entry: all saved together or not at all
+        db_transaction($conn, function () use ($conn, $del_id, $cdata) {
+            client_soft_delete($conn, $del_id);
+            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' deleted client "' . $cdata['full_name'] . '" and all associated records.';
+            audit_log_add($conn, $_SESSION['user_id'], 'CLIENT_DELETED', $desc);
+        });
         header("Location: client_list.php?success=" . urlencode('"' . $cdata['full_name'] . '" has been deleted.'));
         exit;
     }
@@ -251,13 +249,7 @@ require_once '../../includes/topbar.php';
     <?php
     $public_token = $client['public_token'] ?? '';
     if (empty($public_token)) {
-        $gen = $conn->prepare("UPDATE clients SET public_token = SHA2(CONCAT(?, UUID(), 'tgbasics'), 256) WHERE client_id = ? AND public_token IS NULL");
-        $gen->bind_param('ii', $client_id, $client_id);
-        $gen->execute();
-        $rt = $conn->prepare("SELECT public_token FROM clients WHERE client_id = ?");
-        $rt->bind_param('i', $client_id);
-        $rt->execute();
-        $public_token = $rt->get_result()->fetch_assoc()['public_token'] ?? '';
+        $public_token = client_ensure_public_token($conn, $client_id);
     }
     $public_url = app_url('modules/public/client.php?token=' . urlencode($public_token));
     ?>

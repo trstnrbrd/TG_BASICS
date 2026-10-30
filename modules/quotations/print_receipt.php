@@ -5,6 +5,7 @@ require_once '../../config/db.php';
 require_once __DIR__ . '/../../includes/service_types.php';
 require_once '../../config/validators.php';
 require_once '../../config/settings.php';
+require_once __DIR__ . '/../../includes/statuses.php';
 
 require_role(['admin', 'super_admin']);
 
@@ -40,7 +41,6 @@ $company_address = getSetting($conn, 'company_address', '49 Villa Tierra St., Sa
 
 $service_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
 $pay_methods = ['cash' => 'Cash', 'e_wallet' => 'E-Wallet', 'bank_transfer' => 'Bank Transfer'];
-$pay_status_labels = ['unpaid' => 'Unpaid', 'partial' => 'Partial', 'paid' => 'Paid'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -338,12 +338,12 @@ $pay_status_labels = ['unpaid' => 'Unpaid', 'partial' => 'Partial', 'paid' => 'P
       Generated on <?= date('F d, Y \a\t h:i A') ?> via TG-BASICS.
     </div>
     <?php
-    $stamp_map   = ['paid' => 'PAID', 'partial' => 'PARTIAL', 'unpaid' => 'UNPAID'];
-    $stamp_color = ['paid' => '#2E7D52', 'partial' => '#B8860B', 'unpaid' => '#C0392B'];
-    $ps = $d['payment_status'];
+    // the stamp: the receipt status's label and colour from the statuses table (module 'receipt')
+    $ps    = (string)$d['payment_status'];
+    $stamp = $ps !== '' ? receipt_status_badge($ps) : ['label' => 'Issued', 'color' => '#D4A017'];
     ?>
-    <div class="stamp" style="border-color:<?= $stamp_color[$ps] ?? '#D4A017' ?>;color:<?= $stamp_color[$ps] ?? '#D4A017' ?>;">
-      <?= $stamp_map[$ps] ?? 'ISSUED' ?>
+    <div class="stamp" style="border-color:<?= $stamp['color'] ?>;color:<?= $stamp['color'] ?>;">
+      <?= htmlspecialchars(strtoupper($stamp['label'])) ?>
     </div>
   </div>
 

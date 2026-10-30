@@ -869,6 +869,48 @@
   }
 }
 
+/* Search / status / sort filter row on the Repair Jobs and Quotations lists (rl-filter-*): two columns on a phone */
+@media (max-width: 768px) {
+  .rl-filter-form {
+    margin-bottom: 0.75rem !important;
+  }
+  .rl-filter-inner {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.4rem !important;
+    align-items: center !important;
+    flex-wrap: unset !important;
+  }
+  .rl-filter-search {
+    grid-column: 1/-1 !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    flex: unset !important;
+  }
+  .rl-filter-search .filter-input,
+  .rl-filter-sort,
+  .rl-filter-status {
+    width: 100% !important;
+    min-width: 0 !important;
+    font-size: 0.78rem !important;
+    padding-top: 0.38rem !important;
+    padding-bottom: 0.38rem !important;
+  }
+  .rl-filter-btn {
+    grid-column: 1/-1 !important;
+    justify-content: center !important;
+    font-size: 0.78rem !important;
+    padding: 0.38rem 0.6rem !important;
+  }
+  .rl-filter-clear {
+    grid-column: 1 !important;
+    justify-content: center !important;
+    font-size: 0.78rem !important;
+    padding: 0.38rem 0.6rem !important;
+    text-align: center !important;
+  }
+}
+
 /* Filter rows on the list pages (Renewal, Repair Jobs, Activity Log): the blocks above compacted every control to
    28-30px, which is too small for a thumb. Same layout, just a 42px floor on the fields and the Search / Filter
    / Clear buttons. min-height is not set by any of the rules above, so no specificity fight. */

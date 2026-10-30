@@ -288,7 +288,8 @@ document.addEventListener('DOMContentLoaded', function() {
           <div style="font-size:0.73rem;color:var(--text-muted);"><?= htmlspecialchars($job['plate_number']) ?> &nbsp;·&nbsp; <?= htmlspecialchars($job['year_model'] . ' ' . $job['make'] . ' ' . $job['model']) ?> &nbsp;·&nbsp; <?= htmlspecialchars($service_labels[$job['service_type']] ?? $job['service_type']) ?></div>
         </div>
       </div>
-      <span class="badge badge-yellow"><?= icon('clock', 10) ?> <?= ucfirst(str_replace('_', ' ', $job['status'])) ?></span>
+      <?php $jsb = repair_status_badge($job['status']); ?>
+      <span class="badge <?= $jsb['class'] ?>"><?= icon('clock', 10) ?> <?= htmlspecialchars($jsb['label']) ?></span>
     </div>
   </div>
 

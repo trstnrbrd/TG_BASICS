@@ -6,6 +6,7 @@ require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../includes/pagination.php';
 require_once '../../includes/transaction.php';
+require_once '../../config/transaction_pin.php';
 
 require_role(['admin', 'super_admin', 'mechanic']);
 
@@ -13,6 +14,10 @@ require_role(['admin', 'super_admin', 'mechanic']);
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
     if (!is_staff()) { header("Location: repair_list.php"); exit; }
     csrf_verify();
+    if (!pin_consume($conn)) {   // behind the Transaction PIN prompt, so the server checks the PIN too
+        header("Location: repair_list.php?error=" . urlencode(PIN_REQUIRED_MSG));
+        exit;
+    }
     $del_id = san_int($_POST['job_id'] ?? 0, 1);
     if ($del_id) {
         $job_row = $conn->prepare("SELECT job_number FROM repair_jobs WHERE job_id = ?");
@@ -100,6 +105,13 @@ require_once '../../includes/topbar.php';
     <script>
     document.addEventListener('DOMContentLoaded', function() {
       Swal.fire({ toast:true, position:'top-end', icon:'success', titleText:<?= json_encode(san_str($_GET['success'], 200)) ?>, showConfirmButton:false, timer:3000, timerProgressBar:true });
+    });
+    </script>
+    <?php endif; ?>
+    <?php if (!empty($_GET['error'])): ?>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      Swal.fire({ icon:'error', title:'Not deleted', text:<?= json_encode(san_str($_GET['error'], 200)) ?>, confirmButtonColor:'#D4A017' });
     });
     </script>
     <?php endif; ?>

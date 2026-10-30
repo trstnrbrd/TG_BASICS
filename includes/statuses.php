@@ -1,8 +1,9 @@
 <?php
-// Every status list (billing, claim, repair) comes from one `statuses` table, keyed by `module` + `code`
-// (panel revision; phpMyAdmin only). A record stores the `code`, so a code never changes once used; label, colours,
-// icon, wording, order and is_active can. Columns only one module uses are left blank for the others:
+// Every status list (billing, claim, repair, quotation, receipt) comes from one `statuses` table, keyed by
+// `module` + `code` (panel revision; phpMyAdmin only). A record stores the `code`, so a code never changes once used;
+// label, colours, icon, wording, order and is_active can. Columns only one module uses are left blank for the others:
 //   billing - icon, description (the Update Status choices)
+//   receipt - color (the PAID / PARTIAL / UNPAID stamp on the printed receipt)
 //   repair  - color (its Update Status choice), public_label / public_color / progress (the client's QR page),
 //             is_closed (completed / cancelled: off the mechanic's list, photos hidden from the client),
 //             is_dead_end (cancelled: reachable from any open status, the flow ends there)
@@ -64,6 +65,14 @@ function status_badge(string $module, string $code): array {
 
 function claim_statuses(): array { return statuses_for('claim'); }
 function claim_status_badge(string $code): array { return status_badge('claim', $code); }
+
+// ── QUOTATIONS / RECEIPTS ── only labels and colours: the quotation steps (draft, pending approval, approved,
+// converted, cancelled) are fixed buttons in view_quotation.php, and a receipt's paid / partial / unpaid is worked
+// out from its amounts, so neither list can take a new code.
+
+function quotation_statuses(): array { return statuses_for('quotation'); }
+function quotation_status_badge(string $code): array { return status_badge('quotation', $code); }
+function receipt_status_badge(string $code): array { return status_badge('receipt', $code); }
 
 // ── REPAIR JOBS ── the rules take the status list as a parameter (default: the table) so they can be unit-tested
 

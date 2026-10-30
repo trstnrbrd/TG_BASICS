@@ -42,19 +42,6 @@ $area_labels = REPAIR_CHECKLIST_AREAS;   // config/access.php
 
 $service_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
 
-$status_cfg = [
-    'draft'            => ['Draft',            'badge-gray',    '#6B7280'],
-    'pending_approval' => ['Pending Approval', 'badge-yellow',  '#B8860B'],
-    'approved'         => ['Approved',         'badge-green',   '#2E7D52'],
-    'converted'        => ['Converted',        'badge-blue',    '#1A6B9A'],
-    'cancelled'        => ['Cancelled',        'badge-red',     '#C0392B'],
-];
-$pay_cfg = [
-    'unpaid'  => ['Unpaid',  'badge-red'],
-    'partial' => ['Partial', 'badge-yellow'],
-    'paid'    => ['Paid',    'badge-green'],
-];
-
 // ── HANDLE POST ACTIONS ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_admin) {
     csrf_verify();
@@ -183,7 +170,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_admin) {
     }
 }
 
-$sc   = $status_cfg[$qt['status']] ?? ['Unknown','badge-gray','#6B7280'];
+$sc   = quotation_status_badge($qt['status']);   // statuses table (includes/statuses.php)
 $svc  = $service_labels[$qt['service_type']] ?? $qt['service_type'];
 
 $page_title  = 'Quotation — ' . $qt['quotation_number'];
@@ -229,7 +216,7 @@ document.addEventListener('DOMContentLoaded',function(){
 <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
   <a href="quotation_list.php" class="back-link" onclick="goBack('quotation_list.php'); return false;"><?= icon('arrow-left', 14) ?> Back to Quotations</a>
   <div class="qt-action-bar">
-    <span class="badge <?= $sc[1] ?>"><?= $sc[0] ?></span>
+    <span class="badge <?= $sc['class'] ?>"><?= htmlspecialchars($sc['label']) ?></span>
     <?php if ($is_admin && $qt['status'] === 'draft'): ?>
       <a href="../quotations/add_quotation.php?quotation_id=<?= $qt_id ?>" class="btn-ghost" style="font-size:0.82rem;"><?= icon('pencil', 13) ?> Edit Draft</a>
       <form method="POST" style="display:inline;">
@@ -273,7 +260,7 @@ document.addEventListener('DOMContentLoaded',function(){
         ['Repair ID',    $qt['job_number']],
         ['Service Type', $svc],
         ['Repair Date',  date('F d, Y', strtotime($qt['repair_date']))],
-        ['Status',       $sc[0]],
+        ['Status',       $sc['label']],
         ['Created',      date('F d, Y', strtotime($qt['created_at']))],
       ];
       foreach ($qt_details as [$lbl, $val]): ?>
@@ -373,8 +360,8 @@ document.addEventListener('DOMContentLoaded',function(){
       <div class="card-title">Billing Statement Issued</div>
       <div class="card-sub"><?= htmlspecialchars($qt['receipt_number']) ?></div>
     </div>
-    <?php $pc = $pay_cfg[$qt['payment_status']] ?? ['Unknown','badge-gray']; ?>
-    <span class="badge <?= $pc[1] ?>" style="margin-left:auto;"><?= $pc[0] ?></span>
+    <?php $pc = receipt_status_badge((string)$qt['payment_status']); ?>
+    <span class="badge <?= $pc['class'] ?>" style="margin-left:auto;"><?= htmlspecialchars($pc['label']) ?></span>
   </div>
   <div style="padding:1rem 1.25rem;">
     <div class="receipt-info-grid">

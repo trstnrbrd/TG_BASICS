@@ -6,6 +6,7 @@
  */
 
 require_once __DIR__ . '/access.php';
+require_once __DIR__ . '/../includes/data_access.php';
 require_once __DIR__ . '/settings.php';
 require_once __DIR__ . '/app_url.php';
 
@@ -81,9 +82,7 @@ function renewal_reminders_run(mysqli $conn): array
             . ' — no email went out. Check the SMTP settings in System Settings.'
           : 'Renewal reminders sent: ' . $emails_sent . ' email' . ($emails_sent === 1 ? '' : 's')
             . ' covering ' . $n . ' urgent polic' . ($n === 1 ? 'y' : 'ies') . '.';
-    $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (NULL, 'RENEWAL_REMINDERS_SENT', ?)");
-    $log->bind_param('s', $desc);
-    $log->execute();
+    audit_log_add($conn, null, 'RENEWAL_REMINDERS_SENT', $desc);
 
     return ['emails_sent' => $emails_sent, 'policies' => $n];
 }

@@ -5,6 +5,7 @@
 // renewal switch, billing_name pre-fills "Billed To". A deactivated company is not offered for new policies but
 // its existing policies still show and can still be tracked.
 require_once __DIR__ . '/transaction.php';
+require_once __DIR__ . '/data_access.php';
 
 /** Every company, active or not, in display order. Cached for the request. */
 function insurance_companies_all(mysqli $conn): array {
@@ -148,9 +149,7 @@ function insurance_company_save(mysqli $conn, int $user_id, int $id, array $in):
                 }
                 $action = 'INSURANCE_COMPANY_UPDATED';
             }
-            $al = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, ?, ?)");
-            $al->bind_param('iss', $user_id, $action, $log);
-            $al->execute();
+            audit_log_add($conn, $user_id, $action, $log);
             return '';
         });
     } catch (mysqli_sql_exception $e) {
@@ -180,9 +179,7 @@ function insurance_company_set_active(mysqli $conn, int $user_id, int $id, bool 
             $up->execute();
             $action = $active ? 'INSURANCE_COMPANY_ACTIVATED' : 'INSURANCE_COMPANY_DEACTIVATED';
             $log = ($active ? 'Activated' : 'Deactivated') . ' insurance company: ' . $co['name'];
-            $al = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, ?, ?)");
-            $al->bind_param('iss', $user_id, $action, $log);
-            $al->execute();
+            audit_log_add($conn, $user_id, $action, $log);
             return '';
         });
     } catch (mysqli_sql_exception $e) {

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../includes/branding.php';
+require_once __DIR__ . '/../includes/data_access.php';
 require_once __DIR__ . "/../config/session.php";
 require_once '../config/db.php';
 require_once '../config/validators.php';
@@ -61,12 +62,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $record && !$record['used'] && strt
             $mark->execute();
 
             // Log it
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'PASSWORD_RESET', ?)");
             // mask the developer account's real name in the audit log
             $actor = !empty($record['is_hidden']) ? 'Developer' : $record['full_name'];
             $desc  = $actor . ' reset their password via email link.';
-            $log->bind_param('is', $record['user_id'], $desc);
-            $log->execute();
+            audit_log_add($conn, $record['user_id'], 'PASSWORD_RESET', $desc);
 
             $success = true;
         } else {

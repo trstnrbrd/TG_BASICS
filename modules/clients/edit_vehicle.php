@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
@@ -81,10 +82,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'Plate number ' . $plate_number . ' already exists in the system.';
         } else {
             $uid  = $_SESSION['user_id'];
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'VEHICLE_UPDATED', ?)");
             $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' updated vehicle ' . $plate_number . ' (' . $make . ' ' . $model . ') for client "' . $vehicle['client_name'] . '".';
-            $log->bind_param('is', $uid, $desc);
-            $log->execute();
+            audit_log_add($conn, $uid, 'VEHICLE_UPDATED', $desc);
 
             header("Location: view_client.php?id=" . $client_id . "&success=" . urlencode('Vehicle ' . $plate_number . ' updated successfully.'));
             exit;

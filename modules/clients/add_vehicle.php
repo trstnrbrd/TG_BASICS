@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
@@ -71,10 +72,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             // Audit log
             $uid = $_SESSION['user_id'];
-            $log = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'VEHICLE_ADDED', ?)");
             $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' added vehicle ' . ($plate_number ?: 'no plate') . ' (' . $make . ' ' . $model . ') to client ID ' . $client_id . '.';
-            $log->bind_param('is', $uid, $desc);
-            $log->execute();
+            audit_log_add($conn, $uid, 'VEHICLE_ADDED', $desc);
 
             header("Location: view_client.php?id=" . $client_id . "&success=Vehicle added successfully.");
             exit;

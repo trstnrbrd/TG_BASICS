@@ -9,6 +9,7 @@
  */
 
 require_once __DIR__ . '/db_backup.php';
+require_once __DIR__ . '/data_access.php';
 
 const FULL_BACKUP_KEEP = 4;   // keep the last 4 weeks
 
@@ -81,9 +82,7 @@ function full_backup_weekly_run(mysqli $conn): array
 
     $desc = 'Automatic weekly backup saved: ' . $info['tables'] . ' tables, ' . number_format($info['rows']) . ' rows, '
           . number_format($info['files']) . ' uploaded files (' . full_backup_size_label($info['size']) . ').';
-    $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (NULL, 'DATABASE_BACKUP', ?)");
-    $log->bind_param('s', $desc);
-    $log->execute();
+    audit_log_add($conn, null, 'DATABASE_BACKUP', $desc);
 
     // Tell the owner (not the hidden developer account)
     $info['emails_sent'] = 0;

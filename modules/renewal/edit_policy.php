@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
@@ -225,10 +226,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $upd->execute();
 
             $uid  = $_SESSION['user_id'];
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'POLICY_UPDATED', ?)");
             $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' edited policy ' . $current['policy_number'] . ' of ' . $current['full_name'] . ' — ' . implode('; ', $changes) . '.';
-            $log->bind_param('is', $uid, $desc);
-            $log->execute();
+            audit_log_add($conn, $uid, 'POLICY_UPDATED', $desc);
 
             $conn->commit();
             header("Location: view_policy.php?id=" . $policy_id . "&success=" . urlencode('Policy ' . $in['policy_number'] . ' updated.'));

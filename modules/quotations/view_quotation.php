@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once __DIR__ . '/../../includes/service_types.php';
 require_once '../../config/validators.php';
@@ -52,10 +53,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_admin) {
         $upd = $conn->prepare("UPDATE quotations SET status='approved', approved_at=NOW() WHERE quotation_id=?");
         $upd->bind_param('i', $qt_id);
         $upd->execute();
-        $log = $conn->prepare("INSERT INTO audit_logs (user_id,action,description) VALUES (?,'QUOTATION_APPROVED',?)");
         $d   = ($_SESSION['full_name'] ?? 'Unknown') . ' approved quotation ' . $qt['quotation_number'] . '.';
-        $log->bind_param('is', $_SESSION['user_id'], $d);
-        $log->execute();
+        audit_log_add($conn, $_SESSION['user_id'], 'QUOTATION_APPROVED', $d);
         header("Location: view_quotation.php?id=$qt_id&success=Quotation+approved.");
         exit;
     }
@@ -121,10 +120,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_admin) {
             $upd->bind_param('i', $qt_id);
             $upd->execute();
 
-            $log = $conn->prepare("INSERT INTO audit_logs (user_id,action,description) VALUES (?,'RECEIPT_CREATED',?)");
             $d   = ($_SESSION['full_name'] ?? 'Unknown') . ' converted quotation ' . $qt['quotation_number'] . ' to receipt ' . $rc_num . '.';
-            $log->bind_param('is', $_SESSION['user_id'], $d);
-            $log->execute();
+            audit_log_add($conn, $_SESSION['user_id'], 'RECEIPT_CREATED', $d);
 
             $conn->commit();
 

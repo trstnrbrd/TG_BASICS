@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../config/session.php';
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/mailer.php';
@@ -56,10 +57,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $del->bind_param('i', $del_id);
             $del->execute();
             if ($del->affected_rows > 0) {
-                $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'ACCOUNT_DELETED', ?)");
                 $desc = $full_name . ' deleted account "' . $target['full_name'] . '" (' . $target['role'] . ').';
-                $log->bind_param('is', $admin_id, $desc);
-                $log->execute();
+                audit_log_add($conn, $admin_id, 'ACCOUNT_DELETED', $desc);
                 $success = 'Account deleted successfully.';
             } else {
                 $errors[] = 'Could not delete account. Please try again.';
@@ -102,9 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && in_array
 
         $log_action = $act === 'deactivate' ? 'ACCOUNT_DEACTIVATED' : 'ACCOUNT_REACTIVATED';
         $desc       = $full_name . ($act === 'deactivate' ? ' deactivated' : ' reactivated') . ' the account of "' . $target['full_name'] . '" (' . $target['role'] . ').';
-        $log = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, ?, ?)");
-        $log->bind_param('iss', $admin_id, $log_action, $desc);
-        $log->execute();
+        audit_log_add($conn, $admin_id, $log_action, $desc);
 
         $success = $target['full_name'] . ($act === 'deactivate' ? ' was deactivated and can no longer sign in.' : ' was reactivated and can sign in again.');
     }
@@ -159,10 +156,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $sent = sendActivationEmail($new_email, $new_name, $activation_link);
 
             // Log it
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'ACCOUNT_CREATED', ?)");
             $desc = $full_name . ' created account for ' . $new_name . ' (' . $new_role . ').';
-            $log->bind_param('is', $admin_id, $desc);
-            $log->execute();
+            audit_log_add($conn, $admin_id, 'ACCOUNT_CREATED', $desc);
 
             $success = 'Account created for ' . $new_name . '. ' . ($sent ? 'Activation email sent.' : 'Account created but email failed to send. Share the activation link manually.');
         } else {

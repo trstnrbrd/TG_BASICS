@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../includes/branding.php';
+require_once __DIR__ . '/../includes/data_access.php';
 require_once __DIR__ . "/../config/session.php";
 require_once '../config/db.php';
 require_once '../config/validators.php';
@@ -38,17 +39,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'resend') {
 
     $sent = false;
     if ($em_row && $em_row['email']) {
-        // Invalidate old codes
-        $inv = $conn->prepare("UPDATE two_factor_codes SET used = 1 WHERE user_id = ? AND used = 0");
-        $inv->bind_param('i', $pending_uid);
-        $inv->execute();
-
-        // Generate new code (use MySQL NOW() to avoid timezone mismatch)
-        $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-        $ins = $conn->prepare("INSERT INTO two_factor_codes (user_id, code, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))");
-        $ins->bind_param('is', $pending_uid, $code);
-        $ins->execute();
-
+        $code = two_factor_code_issue($conn, $pending_uid);
         $sent = send2FACodeEmail($em_row['email'], $pending_name, $code);
     }
 
@@ -73,32 +64,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (strlen($code) !== 6 || !ctype_digit($code)) {
         $error = 'Please enter a valid 6-digit code.';
     } else {
-        $stmt = $conn->prepare("
-            SELECT id FROM two_factor_codes
-            WHERE user_id = ? AND code = ? AND used = 0 AND expires_at > NOW()
-            LIMIT 1
-        ");
-        $stmt->bind_param('is', $pending_uid, $code);
-        $stmt->execute();
-        $row = $stmt->get_result()->fetch_assoc();
-
-        if ($row) {
-            // Mark code as used
-            $mark = $conn->prepare("UPDATE two_factor_codes SET used = 1 WHERE id = ?");
-            $mark->bind_param('i', $row['id']);
-            $mark->execute();
-
+        if (two_factor_code_consume($conn, $pending_uid, $code)) {
             // Log the login
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'LOGIN', ?)");
             $desc = $pending_name . ' logged in (2FA verified).';
-            $log->bind_param('is', $pending_uid, $desc);
-            $log->execute();
+            audit_log_add($conn, $pending_uid, 'LOGIN', $desc);
 
             // Set full session
             rate_limit_clear($conn, 'verify_2fa');
             session_regenerate_id(true);
-            $la = $conn->prepare("UPDATE users SET last_active = NOW() WHERE user_id = ?");
-            $la->bind_param('i', $pending_uid); $la->execute();
+            user_mark_signed_in($conn, $pending_uid);
             $_SESSION['user_id']   = $pending_uid;
             $_SESSION['username']  = $pending_user;
             $_SESSION['role']      = $pending_role;

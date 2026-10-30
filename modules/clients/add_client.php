@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
@@ -110,11 +111,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // Audit log
             $uid = $_SESSION['user_id'];
-            $log = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'CLIENT_ADDED', ?)");
             $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' added client "' . $full_name . '" with vehicle ' . ($plate_number ?: 'no plate') . ' (' . $make . ' ' . $model . ')'
                   . ($agent_id !== (int)$uid ? ' for insurance agent ' . $agents[$agent_id]['full_name'] : '') . '.';
-            $log->bind_param('is', $uid, $desc);
-            $log->execute();
+            audit_log_add($conn, $uid, 'CLIENT_ADDED', $desc);
 
             if ($then_policy) {
                 header("Location: ../insurance/eligibility_check.php?vehicle_id=" . (int)$vehicle_id . "&added=1");

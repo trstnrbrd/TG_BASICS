@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../config/session.php';
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../includes/api.php';
 require_once '../../config/validators.php';
@@ -170,10 +171,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                 $upd->execute();
                 $_SESSION['full_name'] = $display_name;
 
-                $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'PROFILE_UPDATED', ?)");
                 $desc = $display_name . ' updated their profile. Email verification sent to ' . $email . '.';
-                $log->bind_param('is', $user_id, $desc);
-                $log->execute();
+                audit_log_add($conn, $user_id, 'PROFILE_UPDATED', $desc);
 
                 $msg = 'Profile updated. A verification email has been sent to ' . htmlspecialchars($email) . '.';
             } else {
@@ -183,10 +182,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                 $upd->execute();
                 $_SESSION['full_name'] = $display_name;
 
-                $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'PROFILE_UPDATED', ?)");
                 $desc = $display_name . ' updated their profile.';
-                $log->bind_param('is', $user_id, $desc);
-                $log->execute();
+                audit_log_add($conn, $user_id, 'PROFILE_UPDATED', $desc);
 
                 $msg = 'Profile updated successfully.';
             }
@@ -221,10 +218,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                 $pw_upd->bind_param('si', $hashed, $user_id);
                 $pw_upd->execute();
 
-                $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'PASSWORD_CHANGED', ?)");
                 $desc = $display_name . ' changed their password.';
-                $log->bind_param('is', $user_id, $desc);
-                $log->execute();
+                audit_log_add($conn, $user_id, 'PASSWORD_CHANGED', $desc);
 
                 // Send password change notification email
                 $notify_email = $email ?: $old_email;
@@ -298,10 +293,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
 
             $_SESSION['username'] = $new_username;
 
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'PROFILE_UPDATED', ?)");
             $desc = ($_SESSION['full_name'] ?? '') . ' changed their username to @' . $new_username . '.';
-            $log->bind_param('is', $user_id, $desc);
-            $log->execute();
+            audit_log_add($conn, $user_id, 'PROFILE_UPDATED', $desc);
 
             api_success(['new_username' => $new_username], 'Username updated to @' . $new_username . '.');
             exit;
@@ -326,10 +319,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             $upd->bind_param('ii', $enabled, $user_id);
             $upd->execute();
 
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'SECURITY_UPDATED', ?)");
             $desc = $_SESSION['full_name'] . ($enabled ? ' enabled' : ' disabled') . ' two-factor authentication.';
-            $log->bind_param('is', $user_id, $desc);
-            $log->execute();
+            audit_log_add($conn, $user_id, 'SECURITY_UPDATED', $desc);
 
             api_success([], '2FA ' . ($enabled ? 'enabled' : 'disabled') . ' successfully.');
             break;
@@ -362,9 +353,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             $u = $conn->prepare("UPDATE users SET totp_secret = ?, totp_enabled = 1, totp_recovery_codes = ?, two_factor_enabled = 0 WHERE user_id = ?");
             $u->bind_param('ssi', $secret, $encoded, $user_id); $u->execute();
             unset($_SESSION['totp_pending_secret']);
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'TOTP_ENABLED', ?)");
             $desc = ($_SESSION['full_name'] ?? '') . ' enabled authenticator app 2FA.';
-            $log->bind_param('is', $user_id, $desc); $log->execute();
+            audit_log_add($conn, $user_id, 'TOTP_ENABLED', $desc);
             api_success(['recovery_codes' => $plain_codes]);
             exit;
 
@@ -378,9 +368,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             if (is_developer()) { api_error('The developer account must keep the authenticator app on.', 403); exit; }
             $u = $conn->prepare("UPDATE users SET totp_secret = NULL, totp_enabled = 0, totp_recovery_codes = NULL WHERE user_id = ?");
             $u->bind_param('i', $user_id); $u->execute();
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'TOTP_DISABLED', ?)");
             $desc = ($_SESSION['full_name'] ?? '') . ' disabled authenticator app 2FA.';
-            $log->bind_param('is', $user_id, $desc); $log->execute();
+            audit_log_add($conn, $user_id, 'TOTP_DISABLED', $desc);
             api_success();
             exit;
 
@@ -492,10 +481,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                 setSetting($conn, $k, trim($_POST[$k] ?? ''));
             }
 
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'SETTINGS_UPDATED', ?)");
             $desc = $_SESSION['full_name'] . ' updated system settings.';
-            $log->bind_param('is', $user_id, $desc);
-            $log->execute();
+            audit_log_add($conn, $user_id, 'SETTINGS_UPDATED', $desc);
 
             api_success([], 'All settings saved successfully.');
             break;
@@ -533,10 +520,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             $upd = $conn->prepare("UPDATE users SET transaction_pin = ? WHERE user_id = ?");
             $upd->bind_param('si', $hashed_pin, $user_id);
             $upd->execute();
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'SECURITY_UPDATED', ?)");
             $desc = ($_SESSION['full_name'] ?? '') . ' set a transaction PIN.';
-            $log->bind_param('is', $user_id, $desc);
-            $log->execute();
+            audit_log_add($conn, $user_id, 'SECURITY_UPDATED', $desc);
             api_success([], 'Transaction PIN set successfully.');
             exit;
 

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../config/session.php';
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/settings.php';
@@ -73,9 +74,7 @@ if (($grant['mode'] ?? 'db') === 'full') {
     setSetting($conn, 'backup_last_at', date('Y-m-d H:i:s'));
     setSetting($conn, 'backup_last_by', (string)$uid);
     $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' downloaded the weekly full backup of ' . date('M j, Y', strtotime($latest['at'])) . ' (' . full_backup_size_label($latest['size']) . ').';
-    $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'DATABASE_BACKUP', ?)");
-    $log->bind_param('is', $uid, $desc);
-    $log->execute();
+    audit_log_add($conn, $uid, 'DATABASE_BACKUP', $desc);
     exit;
 }
 @ini_set('zlib.output_compression', '0');
@@ -105,6 +104,4 @@ flush();
 setSetting($conn, 'backup_last_at', date('Y-m-d H:i:s'));
 setSetting($conn, 'backup_last_by', (string)$uid);
 $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' downloaded a database backup (' . $stats['tables'] . ' tables, ' . number_format($stats['rows']) . ' rows).';
-$log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'DATABASE_BACKUP', ?)");
-$log->bind_param('is', $uid, $desc);
-$log->execute();
+audit_log_add($conn, $uid, 'DATABASE_BACKUP', $desc);

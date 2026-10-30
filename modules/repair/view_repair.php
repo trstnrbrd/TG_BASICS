@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once __DIR__ . '/../../includes/service_types.php';
 require_once '../../config/validators.php';
@@ -52,10 +53,8 @@ $find_photo = function (int $img_id) use ($conn, $job_id): ?array {
     return $fi->get_result()->fetch_assoc() ?: null;
 };
 $photo_log = function (string $action, string $what) use ($conn, $job) {
-    $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, ?, ?)");
     $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' ' . $what . ' on repair job ' . $job['job_number'] . '.';
-    $log->bind_param('iss', $_SESSION['user_id'], $action, $desc);
-    $log->execute();
+    audit_log_add($conn, $_SESSION['user_id'], $action, $desc);
 };
 
 // ── HANDLE PHOTO DELETE ── only while the job is open; a mechanic only their own upload (repair_photo_editable())
@@ -188,11 +187,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'sign_
             $ins = $conn->prepare("INSERT INTO repair_job_signatures (job_id, signer_role, signer_name, file_name, captured_by) VALUES (?, ?, ?, ?, ?)");
             $ins->bind_param('isssi', $job_id, $signer_role, $signer_name, $fname, $_SESSION['user_id']);
             $ins->execute();
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'REPAIR_SIGNED', ?)");
             $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' recorded the ' . ($signer_role === 'client' ? 'client' : 'shop')
                   . ' signature (' . $signer_name . ') on the inspection checklist of repair job ' . $job['job_number'] . '.';
-            $log->bind_param('is', $_SESSION['user_id'], $desc);
-            $log->execute();
+            audit_log_add($conn, $_SESSION['user_id'], 'REPAIR_SIGNED', $desc);
         });
     } catch (mysqli_sql_exception $e) {
         @unlink($dir . $fname);
@@ -233,10 +230,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $upd->bind_param('sis', $new_status, $job_id, $job['status']);
                 $upd->execute();
                 if ($upd->affected_rows !== 1) return false;
-                $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'REPAIR_STATUS_UPDATED', ?)");
                 $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' updated repair job ' . $job['job_number'] . ' status to ' . $new_status . '.';
-                $log->bind_param('is', $_SESSION['user_id'], $desc);
-                $log->execute();
+                audit_log_add($conn, $_SESSION['user_id'], 'REPAIR_STATUS_UPDATED', $desc);
                 return true;
             });
             if (!$changed) {

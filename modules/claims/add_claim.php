@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../includes/icons.php';
@@ -70,10 +71,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute();
             $id = $conn->insert_id;
 
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'CLAIM_FILED', ?)");
             $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' filed a new ' . $claim_type . ' claim.';
-            $log->bind_param('is', $_SESSION['user_id'], $desc);
-            $log->execute();
+            audit_log_add($conn, $_SESSION['user_id'], 'CLAIM_FILED', $desc);
 
             return $id;
         });

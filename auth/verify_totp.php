@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../includes/branding.php';
+require_once __DIR__ . '/../includes/data_access.php';
 require_once __DIR__ . "/../config/session.php";
 require_once '../config/db.php';
 require_once '../config/totp.php';
@@ -71,12 +72,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     rate_limit_clear($conn, 'verify_totp');
     session_regenerate_id(true);
 
-    $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'LOGIN', ?)");
     $desc = $pending_name . ' logged in (Authenticator 2FA verified).';
-    $log->bind_param('is', $pending_uid, $desc); $log->execute();
+    audit_log_add($conn, $pending_uid, 'LOGIN', $desc);
 
-    $la = $conn->prepare("UPDATE users SET last_active = NOW() WHERE user_id = ?");
-    $la->bind_param('i', $pending_uid); $la->execute();
+    user_mark_signed_in($conn, $pending_uid);
 
     $_SESSION['user_id']   = $pending_uid;
     $_SESSION['username']  = $pending_user;

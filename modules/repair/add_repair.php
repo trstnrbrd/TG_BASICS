@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once __DIR__ . '/../../includes/service_types.php';
 require_once '../../config/validators.php';
@@ -104,10 +105,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
 
                 // Audit log
-                $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'REPAIR_JOB_CREATED', ?)");
                 $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' created repair job ' . $job_num . '.';
-                $log->bind_param('is', $_SESSION['user_id'], $desc);
-                $log->execute();
+                audit_log_add($conn, $_SESSION['user_id'], 'REPAIR_JOB_CREATED', $desc);
 
                 return $job_num;
             });

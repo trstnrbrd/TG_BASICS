@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../includes/branding.php';
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once __DIR__ . '/../../includes/service_types.php';
@@ -60,10 +61,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) 
         $dstmt = $conn->prepare("UPDATE clients SET deleted_at = NOW() WHERE client_id = ?");
         $dstmt->bind_param('i', $del_id);
         $dstmt->execute();
-        $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'CLIENT_DELETED', ?)");
         $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' deleted client "' . $cdata['full_name'] . '" and all associated records.';
-        $log->bind_param('is', $_SESSION['user_id'], $desc);
-        $log->execute();
+        audit_log_add($conn, $_SESSION['user_id'], 'CLIENT_DELETED', $desc);
         header("Location: client_list.php?success=" . urlencode('"' . $cdata['full_name'] . '" has been deleted.'));
         exit;
     }

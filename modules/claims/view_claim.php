@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
@@ -361,10 +362,8 @@ function deleteClaim($conn, $claim_id, $display_num, $user_id, $actor_name) {
         $del->bind_param('i', $claim_id);
         $del->execute();
 
-        $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'CLAIM_DELETED', ?)");
         $desc = $actor_name . ' deleted claim #' . $claim_id . '.';
-        $log->bind_param('is', $user_id, $desc);
-        $log->execute();
+        audit_log_add($conn, $user_id, 'CLAIM_DELETED', $desc);
     });
 
     foreach ($files as $path) unlink($path);
@@ -427,10 +426,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
             $upd->bind_param('sssi', $new_status, $dr, $notes, $claim_id);
             $upd->execute();
 
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'CLAIM_UPDATED', ?)");
             $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' updated claim #' . $claim_id . ' status to ' . $new_status . '.';
-            $log->bind_param('is', $_SESSION['user_id'], $desc);
-            $log->execute();
+            audit_log_add($conn, $_SESSION['user_id'], 'CLAIM_UPDATED', $desc);
         });
 
         // Send email notification to client if they have an email on file

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
@@ -62,10 +63,8 @@ $del->bind_param('i', $vehicle_id);
 
 if ($del->execute() && $del->affected_rows > 0) {
     $uid  = $_SESSION['user_id'];
-    $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'VEHICLE_UNREGISTERED', ?)");
     $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' unregistered vehicle ' . $vehicle['plate_number'] . ' (' . $vehicle['make'] . ' ' . $vehicle['model'] . ') from client "' . $vehicle['client_name'] . '".';
-    $log->bind_param('is', $uid, $desc);
-    $log->execute();
+    audit_log_add($conn, $uid, 'VEHICLE_UNREGISTERED', $desc);
 
     header("Location: view_client.php?id=" . $client_id . "&success=" . urlencode('Vehicle ' . $vehicle['plate_number'] . ' has been unregistered.'));
     exit;

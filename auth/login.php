@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../includes/branding.php';
+require_once __DIR__ . '/../includes/data_access.php';
 require_once __DIR__ . "/../config/session.php";
 require_once '../config/db.php';
 require_once '../config/settings.php';
@@ -49,20 +50,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Invalid username format.';
         rate_limit_record($conn, 'login');
     } else {
-        $lock_check = $conn->prepare("SELECT failed_attempts, locked_until FROM users WHERE username = ?");
-        $lock_check->bind_param('s', $username);
-        $lock_check->execute();
-        $lock_result = $lock_check->get_result()->fetch_assoc();
+        $user = user_find_for_login($conn, $username);
 
-        if ($lock_result && $lock_result['locked_until'] && strtotime($lock_result['locked_until']) > time()) {
+        if ($user && $user['locked_until'] && strtotime($user['locked_until']) > time()) {
             $lockout = true;
             $error   = 'Account is locked due to too many failed attempts. Please try again later.';
         } else {
-            $stmt = $conn->prepare("SELECT user_id, username, password, role, full_name, is_active, activation_token, is_hidden, two_factor_enabled, totp_enabled, email FROM users WHERE username = ?");
-            $stmt->bind_param('s', $username);
-            $stmt->execute();
-            $user = $stmt->get_result()->fetch_assoc();
-
             if ($user && password_verify($password, $user['password'])) {
                 if (!$user['is_active']) {
                     // has a token = invited but never activated; no token = deactivated by an admin
@@ -70,9 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ? 'Your account has been deactivated. Please contact your administrator.'
                         : 'Your account is not yet activated. Please check your email for the activation link.';
                 } else {
-                    $reset = $conn->prepare("UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE username = ?");
-                    $reset->bind_param('s', $username);
-                    $reset->execute();
+                    user_clear_failed_logins($conn, $username);
 
                     // the developer account never shows its real name
                     $display_name = !empty($user['is_hidden']) ? 'Developer' : $user['full_name'];
@@ -90,18 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     // Check if email 2FA is enabled
                     if ($user['two_factor_enabled'] && !empty($user['email'])) {
-                        // Generate 6-digit code
-                        $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-
-                        // Invalidate old codes
-                        $inv = $conn->prepare("UPDATE two_factor_codes SET used = 1 WHERE user_id = ? AND used = 0");
-                        $inv->bind_param('i', $user['user_id']);
-                        $inv->execute();
-
-                        // Insert new code (use MySQL NOW() to avoid PHP/MySQL timezone mismatch)
-                        $ins = $conn->prepare("INSERT INTO two_factor_codes (user_id, code, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))");
-                        $ins->bind_param('is', $user['user_id'], $code);
-                        $ins->execute();
+                        $code = two_factor_code_issue($conn, $user['user_id']);
 
                         // if the email fails, don't send the user to a code screen with no code coming
                         if (!send2FACodeEmail($user['email'], $user['full_name'], $code)) {
@@ -125,14 +105,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // No 2FA — normal login
                     rate_limit_clear($conn, 'login');
                     session_regenerate_id(true);
-                    $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'LOGIN', ?)");
                     $desc = $display_name . ' logged in.';
-                    $log->bind_param('is', $user['user_id'], $desc);
-                    $log->execute();
+                    audit_log_add($conn, $user['user_id'], 'LOGIN', $desc);
 
-                    $la = $conn->prepare("UPDATE users SET last_active = NOW() WHERE user_id = ?");
-                    $la->bind_param('i', $user['user_id']);
-                    $la->execute();
+                    user_mark_signed_in($conn, $user['user_id']);
 
                     $_SESSION['user_id']   = $user['user_id'];
                     $_SESSION['username']  = $user['username'];
@@ -148,20 +124,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     exit;
                 }
             } else {
-                if ($lock_result) {
-                    $new_attempts = ($lock_result['failed_attempts'] ?? 0) + 1;
+                if ($user) {
+                    $new_attempts = ($user['failed_attempts'] ?? 0) + 1;
                     if ($new_attempts >= $_max_attempts) {
                         $locked_until = date('Y-m-d H:i:s', strtotime('+' . $_lockout_mins . ' minutes'));
-                        $upd = $conn->prepare("UPDATE users SET failed_attempts = ?, locked_until = ? WHERE username = ?");
-                        $upd->bind_param('iss', $new_attempts, $locked_until, $username);
-                        $upd->execute();
+                        user_record_failed_login($conn, $username, $new_attempts, $locked_until);
                         $lockout = true;
                         $error   = 'Account locked after ' . $_max_attempts . ' failed attempts. Try again in ' . $_lockout_mins . ' minutes.';
                     } else {
                         $remaining = $_max_attempts - $new_attempts;
-                        $upd = $conn->prepare("UPDATE users SET failed_attempts = ? WHERE username = ?");
-                        $upd->bind_param('is', $new_attempts, $username);
-                        $upd->execute();
+                        user_record_failed_login($conn, $username, $new_attempts);
                         $error = 'Invalid username or password. ' . $remaining . ' attempt' . ($remaining !== 1 ? 's' : '') . ' remaining.';
                     }
                 } else {

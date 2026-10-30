@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
@@ -479,9 +480,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $names = array_map(fn($aid) => $agents[$aid]['full_name'], array_keys($out['agents']));
             $desc  = ($_SESSION['full_name'] ?? 'Unknown') . ' imported ' . $out['clients'] . ' client(s) with ' . $out['vehicles'] . ' vehicle(s) from "' . $preview['file'] . '"'
                    . ' for insurance agent' . (count($names) > 1 ? 's ' : ' ') . implode(', ', $names) . '.';
-            $log = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'CLIENT_IMPORTED', ?)");
-            $log->bind_param('is', $uid, $desc);
-            $log->execute();
+            audit_log_add($conn, $uid, 'CLIENT_IMPORTED', $desc);
         }
         $_SESSION['client_import_result'] = $out + [
             'token'  => $preview['token'],

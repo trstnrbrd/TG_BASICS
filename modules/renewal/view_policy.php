@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/settings.php';
@@ -100,10 +101,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_policy'])) {
     $del->execute();
 
     $uid  = $_SESSION['user_id'];
-    $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'POLICY_DELETED', ?)");
     $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' deleted policy ' . $policy['policy_number'] . ($with_claims ? ' and all associated claims.' : '.');
-    $log->bind_param('is', $uid, $desc);
-    $log->execute();
+    audit_log_add($conn, $uid, 'POLICY_DELETED', $desc);
 
     header("Location: renewal_list.php?msg=" . urlencode("Policy " . $policy['policy_number'] . " deleted."));
     exit;
@@ -182,10 +181,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_receipt'])) {
     $upd_rc->execute();
 
     $uid  = $_SESSION['user_id'];
-    $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'RECEIPT_UPLOADED', ?)");
     $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' uploaded receipt for payment #' . $payment_id . ' on policy ' . $policy['policy_number'] . '.';
-    $log->bind_param('is', $uid, $desc);
-    $log->execute();
+    audit_log_add($conn, $uid, 'RECEIPT_UPLOADED', $desc);
 
     api_success(['filename' => $filename, 'url' => upload_url('receipts', $filename)]);
 }
@@ -257,11 +254,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['undo_payment'])) {
                     . ' (' . ($undo_row['payment_mode'] ?: 'no mode') . (!empty($undo_row['control_number']) ? ', control no. ' . $undo_row['control_number'] : '') . ')'
                     . (!empty($undo_row['paid_at']) ? ' recorded ' . date('M d, Y', strtotime($undo_row['paid_at'])) : '');
         $uid  = $_SESSION['user_id'];
-        $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'PAYMENT_UNDONE', ?)");
         $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' undid the ' . $undo_label . ' of policy ' . $policy['policy_number'] . ': ' . $undo_what
               . '. Total paid now PHP ' . number_format($total_paid, 2) . '. Status: ' . $new_status . '.';
-        $log->bind_param('is', $uid, $desc);
-        $log->execute();
+        audit_log_add($conn, $uid, 'PAYMENT_UNDONE', $desc);
 
         $conn->commit();
     } catch (Throwable $e) {
@@ -393,10 +388,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
                     $upd->bind_param('ddsi', $total_paid, $new_balance, $new_status, $policy_id);
                     $upd->execute();
 
-                    $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'PAYMENT_RECORDED', ?)");
                     $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' updated installment payments for policy ' . $policy['policy_number'] . '. Total paid: PHP ' . number_format($total_paid, 2) . '. Status: ' . $new_status . '.';
-                    $log->bind_param('is', $_SESSION['user_id'], $desc);
-                    $log->execute();
+                    audit_log_add($conn, $_SESSION['user_id'], 'PAYMENT_RECORDED', $desc);
                 });
 
                 header("Location: view_policy.php?id=" . $policy_id . "&success=" . urlencode("Payment schedule updated successfully."));
@@ -439,10 +432,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
                     $upd->bind_param('ddssi', $new_amount_paid, $new_balance, $new_status, $new_notes, $policy_id);
                     $upd->execute();
 
-                    $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'PAYMENT_RECORDED', ?)");
                     $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' recorded payment of PHP ' . number_format($payment_amount, 2) . ' for policy ' . $policy['policy_number'] . '. New balance: PHP ' . number_format($new_balance, 2) . '. Status: ' . $new_status . '.';
-                    $log->bind_param('is', $_SESSION['user_id'], $desc);
-                    $log->execute();
+                    audit_log_add($conn, $_SESSION['user_id'], 'PAYMENT_RECORDED', $desc);
                 });
 
                 header("Location: view_policy.php?id=" . $policy_id . "&success=" . urlencode("Payment of PHP " . number_format((float)$payment_amount, 2) . " recorded successfully."));

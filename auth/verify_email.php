@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../includes/branding.php';
+require_once __DIR__ . '/../includes/data_access.php';
 require_once __DIR__ . "/../config/session.php";
 require_once '../config/db.php';
 require_once '../config/validators.php';
@@ -43,12 +44,10 @@ if ($token !== '') {
             $mark->execute();
 
             // Audit log
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'EMAIL_VERIFIED', ?)");
             // No session on this token-link page, so mask the hidden account's name here.
             $actor = !empty($row['is_hidden']) ? 'Developer' : $row['full_name'];
             $desc  = $actor . ' verified new email address: ' . $row['new_email'];
-            $log->bind_param('is', $row['user_id'], $desc);
-            $log->execute();
+            audit_log_add($conn, $row['user_id'], 'EMAIL_VERIFIED', $desc);
 
             $status  = 'success';
             $message = 'Your email address has been updated to <strong>' . htmlspecialchars($row['new_email']) . '</strong>.';

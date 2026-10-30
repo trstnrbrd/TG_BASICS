@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/settings.php';
@@ -315,10 +316,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 // Audit log
                 $action = $renew_from > 0 ? 'POLICY_RENEWED' : 'POLICY_CREATED';
-                $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, ?, ?)");
                 $desc = ($_SESSION['full_name'] ?? 'Unknown') . ($renew_from > 0 ? ' renewed policy as ' : ' created policy ') . $policy_number . ' (' . $coverage_type . ') for vehicle ' . ($vehicle['plate_number'] ?? '') . ' — Payable: ₱' . number_format($payable_amount, 2) . ' (Premium: ₱' . number_format((float)$total_premium, 2) . ' − Commission: ₱' . number_format((float)$basic_premium, 2) . ').';
-                $log->bind_param('iss', $created_by, $action, $desc);
-                $log->execute();
+                audit_log_add($conn, $created_by, $action, $desc);
             });
             $saved = true;
         } catch (Throwable $e) {

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once __DIR__ . '/../../includes/service_types.php';
 require_once '../../config/validators.php';
@@ -144,10 +145,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_mechanic) {
                     $item_ins->execute();
                 }
 
-                $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'QUOTATION_UPDATED', ?)");
                 $d    = ($_SESSION['full_name'] ?? 'Unknown') . ' edited quotation ' . $edit_qt['quotation_number'] . '.';
-                $log->bind_param('is', $_SESSION['user_id'], $d);
-                $log->execute();
+                audit_log_add($conn, $_SESSION['user_id'], 'QUOTATION_UPDATED', $d);
 
                 $conn->commit();
                 header("Location: view_quotation.php?id=$edit_qt_id&success=" . urlencode('Quotation updated.'));
@@ -177,10 +176,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_mechanic) {
                     $item_ins->execute();
                 }
 
-                $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'QUOTATION_CREATED', ?)");
                 $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' created quotation ' . $qt_num . ' for job ' . $job['job_number'] . '.';
-                $log->bind_param('is', $_SESSION['user_id'], $desc);
-                $log->execute();
+                audit_log_add($conn, $_SESSION['user_id'], 'QUOTATION_CREATED', $desc);
 
                 $conn->commit();
                 header("Location: view_quotation.php?id=$qt_id&success=" . urlencode('Quotation ' . $qt_num . ' created.'));

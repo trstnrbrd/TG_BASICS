@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
@@ -13,15 +14,7 @@ if ($vehicle_id === 0) {
 }
 
 // Load vehicle + client name
-$stmt = $conn->prepare("
-    SELECT v.*, c.full_name AS client_name
-    FROM vehicles v
-    INNER JOIN clients c ON v.client_id = c.client_id
-    WHERE v.vehicle_id = ?
-");
-$stmt->bind_param('i', $vehicle_id);
-$stmt->execute();
-$vehicle = $stmt->get_result()->fetch_assoc();
+$vehicle = vehicle_find($conn, $vehicle_id);
 
 if (!$vehicle) {
     header("Location: client_list.php?error=Vehicle not found.");
@@ -60,19 +53,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // same-plate race — see with_named_lock() for the confirmed repro) instead of two unsynchronized queries.
     if (empty($errors) && $plate_number !== '') {
         $lock = with_named_lock($conn, 'plate_' . $plate_number, function () use ($conn, $vehicle_id, $plate_number, $make, $model, $year_model, $color, $motor_number, $serial_number) {
-            $check = $conn->prepare("SELECT v.vehicle_id FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id WHERE v.plate_number = ? AND v.vehicle_id != ? AND c.deleted_at IS NULL");
-            $check->bind_param('si', $plate_number, $vehicle_id);
-            $check->execute();
-            if ($check->get_result()->num_rows > 0) return false;   // duplicate — caller adds the error
+            if (vehicle_plate_taken($conn, $plate_number, $vehicle_id)) return false;   // duplicate — caller adds the error
 
-            $upd = $conn->prepare("
-                UPDATE vehicles
-                SET plate_number = ?, make = ?, model = ?, year_model = ?,
-                    color = ?, motor_number = ?, serial_number = ?
-                WHERE vehicle_id = ?
-            ");
-            $upd->bind_param('sssisssi', $plate_number, $make, $model, $year_model, $color, $motor_number, $serial_number, $vehicle_id);
-            return $upd->execute();
+            return vehicle_update($conn, $vehicle_id, [
+                'plate_number' => $plate_number, 'make' => $make, 'model' => $model, 'year_model' => $year_model,
+                'color' => $color, 'motor_number' => $motor_number, 'serial_number' => $serial_number,
+            ]);
         });
 
         if (!$lock['locked']) {
@@ -81,10 +67,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'Plate number ' . $plate_number . ' already exists in the system.';
         } else {
             $uid  = $_SESSION['user_id'];
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'VEHICLE_UPDATED', ?)");
             $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' updated vehicle ' . $plate_number . ' (' . $make . ' ' . $model . ') for client "' . $vehicle['client_name'] . '".';
-            $log->bind_param('is', $uid, $desc);
-            $log->execute();
+            audit_log_add($conn, $uid, 'VEHICLE_UPDATED', $desc);
 
             header("Location: view_client.php?id=" . $client_id . "&success=" . urlencode('Vehicle ' . $plate_number . ' updated successfully.'));
             exit;

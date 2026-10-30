@@ -18,10 +18,8 @@ require_once __DIR__ . '/themes.php';
 // Load user theme preference (only a theme listed in includes/themes.php, else the default)
 $_user_theme = theme_valid($_SESSION['theme'] ?? null);
 if ($_user_theme === THEME_DEFAULT && isset($_SESSION['user_id'], $conn)) {
-    $__t = $conn->prepare("SELECT theme FROM users WHERE user_id = ?");
-    $__t->bind_param('i', $_SESSION['user_id']);
-    $__t->execute();
-    $__tr = $__t->get_result()->fetch_assoc();
+    require_once __DIR__ . '/data_access.php';
+    $__tr = account_get($conn, (int)$_SESSION['user_id']);
     if ($__tr) {
         $_user_theme = theme_valid($__tr['theme'] ?? null);
         $_SESSION['theme'] = $_user_theme;

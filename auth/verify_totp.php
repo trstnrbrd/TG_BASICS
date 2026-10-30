@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../includes/branding.php';
+require_once __DIR__ . '/../includes/data_access.php';
 require_once __DIR__ . "/../config/session.php";
 require_once '../config/db.php';
 require_once '../config/totp.php';
@@ -32,10 +33,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($is_recovery) {
         // Check against recovery codes
-        $s = $conn->prepare("SELECT totp_recovery_codes FROM users WHERE user_id = ?");
-        $s->bind_param('i', $pending_uid); $s->execute();
-        $row = $s->get_result()->fetch_assoc();
-        $codes = json_decode($row['totp_recovery_codes'] ?? '[]', true);
+        $row   = account_totp($conn, (int)$pending_uid);
+        $codes = json_decode($row['totp_recovery_codes'] ?? '[]', true) ?: [];
         $matched_idx = null;
         foreach ($codes as $i => $hashed) {
             if (password_verify($raw, $hashed)) { $matched_idx = $i; break; }
@@ -46,18 +45,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             // Remove used code
             array_splice($codes, $matched_idx, 1);
-            $encoded = json_encode($codes);
-            $u = $conn->prepare("UPDATE users SET totp_recovery_codes = ? WHERE user_id = ?");
-            $u->bind_param('si', $encoded, $pending_uid); $u->execute();
+            account_set_recovery_codes($conn, (int)$pending_uid, json_encode($codes));
             goto login_success;
         }
     } else {
         // TOTP code
-        $s = $conn->prepare("SELECT totp_secret FROM users WHERE user_id = ?");
-        $s->bind_param('i', $pending_uid); $s->execute();
-        $row = $s->get_result()->fetch_assoc();
+        $row = account_totp($conn, (int)$pending_uid);
 
-        if (!$row || !totp_verify($row['totp_secret'], $raw)) {
+        if (!$row || !totp_verify((string)$row['totp_secret'], $raw)) {
             $error = 'Invalid code. Make sure your authenticator app is in sync.';
             rate_limit_record($conn, 'verify_totp');
         } else {
@@ -71,12 +66,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     rate_limit_clear($conn, 'verify_totp');
     session_regenerate_id(true);
 
-    $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'LOGIN', ?)");
     $desc = $pending_name . ' logged in (Authenticator 2FA verified).';
-    $log->bind_param('is', $pending_uid, $desc); $log->execute();
+    audit_log_add($conn, $pending_uid, 'LOGIN', $desc);
 
-    $la = $conn->prepare("UPDATE users SET last_active = NOW() WHERE user_id = ?");
-    $la->bind_param('i', $pending_uid); $la->execute();
+    user_mark_signed_in($conn, $pending_uid);
 
     $_SESSION['user_id']   = $pending_uid;
     $_SESSION['username']  = $pending_user;

@@ -9,6 +9,8 @@
  *   rate_limit_clear($conn, 'login');    // call after success
  */
 
+require_once __DIR__ . '/../includes/data_access.php';
+
 define('RL_MAX_ATTEMPTS', 5);
 define('RL_WINDOW_SECS',  5 * 60);    // 5 minutes
 
@@ -20,28 +22,12 @@ function rl_get_ip(): string {
 
 /** How many attempts in the last 5 minutes. */
 function rl_count(mysqli $conn, string $endpoint, ?string $key = null): int {
-    $id      = $key ?? rl_get_ip();
-    $cutoff  = date('Y-m-d H:i:s', time() - RL_WINDOW_SECS);
-    $stmt    = $conn->prepare(
-        "SELECT COUNT(*) FROM rate_limit_attempts
-         WHERE ip = ? AND endpoint = ? AND attempted_at >= ?"
-    );
-    $stmt->bind_param('sss', $id, $endpoint, $cutoff);
-    $stmt->execute();
-    $stmt->bind_result($count);
-    $stmt->fetch();
-    $stmt->close();
-    return (int)$count;
+    return rate_limit_attempts($conn, $key ?? rl_get_ip(), $endpoint, date('Y-m-d H:i:s', time() - RL_WINDOW_SECS));
 }
 
 /** Has this IP/user used up its attempts? */
 function rate_limit_blocked(mysqli $conn, string $endpoint, ?string $key = null): bool {
-    $cutoff = date('Y-m-d H:i:s', time() - RL_WINDOW_SECS);
-    $prune = $conn->prepare("DELETE FROM rate_limit_attempts WHERE attempted_at < ?");
-    $prune->bind_param('s', $cutoff);
-    $prune->execute();
-    $prune->close();
-
+    rate_limit_prune($conn, date('Y-m-d H:i:s', time() - RL_WINDOW_SECS));
     return rl_count($conn, $endpoint, $key) >= RL_MAX_ATTEMPTS;
 }
 
@@ -71,23 +57,10 @@ function rate_limit_check(mysqli $conn, string $endpoint): void {
 
 /** Save a failed attempt. */
 function rate_limit_record(mysqli $conn, string $endpoint, ?string $key = null): void {
-    $id   = $key ?? rl_get_ip();
-    $now  = date('Y-m-d H:i:s');
-    $stmt = $conn->prepare(
-        "INSERT INTO rate_limit_attempts (ip, endpoint, attempted_at) VALUES (?, ?, ?)"
-    );
-    $stmt->bind_param('sss', $id, $endpoint, $now);
-    $stmt->execute();
-    $stmt->close();
+    rate_limit_attempt_add($conn, $key ?? rl_get_ip(), $endpoint, date('Y-m-d H:i:s'));
 }
 
 /** Clear attempts after a successful login/action. */
 function rate_limit_clear(mysqli $conn, string $endpoint, ?string $key = null): void {
-    $id   = $key ?? rl_get_ip();
-    $stmt = $conn->prepare(
-        "DELETE FROM rate_limit_attempts WHERE ip = ? AND endpoint = ?"
-    );
-    $stmt->bind_param('ss', $id, $endpoint);
-    $stmt->execute();
-    $stmt->close();
+    rate_limit_attempts_clear($conn, $key ?? rl_get_ip(), $endpoint);
 }

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
@@ -124,10 +125,7 @@ function imp_agent_lookup(mysqli $conn, array $agents): array {
         if ($key !== '') $lookup[$key] = isset($lookup[$key]) && $lookup[$key] !== $id ? -1 : $id;
     };
     foreach ($agents as $id => $a) $add($a['full_name'], (int)$id);
-    if ($agents) {
-        $res = $conn->query("SELECT user_id, username FROM users WHERE user_id IN (" . implode(',', array_map('intval', array_keys($agents))) . ")");
-        while ($u = $res->fetch_assoc()) $add($u['username'], (int)$u['user_id']);
-    }
+    foreach (users_usernames($conn, array_keys($agents)) as $id => $username) $add($username, (int)$id);
     return $lookup;
 }
 
@@ -182,18 +180,7 @@ function imp_check_row(array $c, array $agent_lookup, int $default_agent): array
 
 /** UPPER name => ['ABC 1234, XYZ 789', …] for active clients already in the system with one of these names. */
 function imp_existing_names(mysqli $conn, array $names): array {
-    $found = [];
-    foreach (array_chunk($names, 200) as $chunk) {
-        $st = $conn->prepare("
-            SELECT c.full_name, GROUP_CONCAT(v.plate_number ORDER BY v.vehicle_id SEPARATOR ', ') AS plates
-            FROM clients c LEFT JOIN vehicles v ON v.client_id = c.client_id
-            WHERE c.deleted_at IS NULL AND c.full_name IN (" . implode(',', array_fill(0, count($chunk), '?')) . ")
-            GROUP BY c.client_id");
-        $st->bind_param(str_repeat('s', count($chunk)), ...$chunk);
-        $st->execute();
-        foreach ($st->get_result() as $row) $found[mb_strtoupper($row['full_name'])][] = $row['plates'] ?: 'no vehicle';
-    }
-    return $found;
+    return clients_with_names($conn, $names);
 }
 
 /** Parsed rows -> preview rows: each with errors (not imported), warnings (imported unless unticked) and notes. */
@@ -206,8 +193,7 @@ function imp_build_preview(mysqli $conn, array $parsed, array $agent_lookup, int
 
     // Plates already in the system (spaces and hyphens ignored, so "ABC1234" is caught against "ABC 1234"), or twice in the file
     $on_file = [];
-    $res = $conn->query("SELECT v.plate_number, c.full_name FROM vehicles v JOIN clients c ON c.client_id = v.client_id WHERE c.deleted_at IS NULL");
-    while ($v = $res->fetch_assoc()) $on_file[imp_plate_key($v['plate_number'])] ??= $v;
+    foreach (vehicles_active_plates($conn) as $v) $on_file[imp_plate_key($v['plate_number'])] ??= $v;
     $seen = [];
     foreach ($rows as $i => &$r) {
         $plate = $r['d']['plate_number'];
@@ -282,25 +268,16 @@ function imp_run(mysqli $conn, array $rows, array $ticked, array $agents): array
     $groups = [];
     foreach ($rows as $i => $r) if ($r['status'] !== 'error') $groups[$r['group']][] = $i;
 
-    $ins_client  = $conn->prepare("INSERT INTO clients (full_name, contact_number, email, facebook_name, address, created_by, agent_id, consent_signed_at, consent_recorded_by, public_token) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)");
-    $ins_vehicle = $conn->prepare("INSERT INTO vehicles (client_id, plate_number, make, model, year_model, color, motor_number, serial_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     // One client with its vehicles (inside the caller's transaction). Client details come from its first row,
     // with blanks filled in from its other rows.
-    $save = function (array $idxs) use ($conn, $rows, $uid, $ins_client, $ins_vehicle) {
+    $save = function (array $idxs) use ($conn, $rows, $uid) {
         $c = $rows[$idxs[0]]['d'];
         foreach (['contact_number', 'email', 'facebook_name'] as $f) {
             foreach ($idxs as $i) if ($c[$f] === '' && $rows[$i]['d'][$f] !== '') $c[$f] = $rows[$i]['d'][$f];
         }
-        $agent_id = $rows[$idxs[0]]['agent_id'];
-        $token    = bin2hex(random_bytes(32));
-        $ins_client->bind_param('sssssiiis', $c['full_name'], $c['contact_number'], $c['email'], $c['facebook_name'], $c['address'], $uid, $agent_id, $uid, $token);
-        $ins_client->execute();
-        $client_id = (int)$conn->insert_id;
-        foreach ($idxs as $i) {
-            $v = $rows[$i]['d'];
-            $ins_vehicle->bind_param('isssisss', $client_id, $v['plate_number'], $v['make'], $v['model'], $v['year_model'], $v['color'], $v['motor_number'], $v['serial_number']);
-            $ins_vehicle->execute();
-        }
+        $c['agent_id'] = $rows[$idxs[0]]['agent_id'];
+        $client_id = client_create($conn, $c, $uid);
+        foreach ($idxs as $i) vehicle_create($conn, $client_id, $rows[$i]['d']);
     };
     $saved = function (array $idxs) use (&$out, $rows) {
         $aid = $rows[$idxs[0]]['agent_id'];
@@ -323,12 +300,8 @@ function imp_run(mysqli $conn, array $rows, array $ticked, array $agents): array
 
         $lock_of = [];
         foreach ($todo as $idxs) foreach ($idxs as $i) $lock_of[$i] = named_lock_name('plate_' . $rows[$i]['d']['plate_number']);
-        $st = $conn->prepare('SELECT ' . implode(', ', array_fill(0, count($lock_of), 'GET_LOCK(?, 5)')));
-        $st->bind_param(str_repeat('s', count($lock_of)), ...array_values($lock_of));
-        $st->execute();
-        $got  = $st->get_result()->fetch_row();
         $held = [];
-        foreach (array_keys($lock_of) as $n => $i) if ((int)$got[$n] === 1) $held[$i] = $lock_of[$i];
+        foreach (db_locks_get($conn, $lock_of, 5) as $i => $ok) if ($ok) $held[$i] = $lock_of[$i];
 
         try {
             $plates = [];
@@ -343,12 +316,8 @@ function imp_run(mysqli $conn, array $rows, array $ticked, array $agents): array
             if (!$todo) continue;
 
             // Plates someone saved by hand since the preview
-            $st = $conn->prepare("SELECT v.plate_number FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id
-                                  WHERE c.deleted_at IS NULL AND v.plate_number IN (" . implode(',', array_fill(0, count($plates), '?')) . ")");
-            $st->bind_param(str_repeat('s', count($plates)), ...$plates);
-            $st->execute();
             $taken = [];
-            foreach ($st->get_result() as $v) $taken[strtoupper($v['plate_number'])] = true;
+            foreach (vehicles_plates_taken($conn, $plates) as $tp) $taken[strtoupper($tp)] = true;
             foreach ($todo as $leader => $idxs) {
                 $keep = [];
                 foreach ($idxs as $i) {
@@ -383,12 +352,7 @@ function imp_run(mysqli $conn, array $rows, array $ticked, array $agents): array
                 }
             }
         } finally {
-            if ($held) {
-                $st = $conn->prepare('SELECT ' . implode(', ', array_fill(0, count($held), 'RELEASE_LOCK(?)')));
-                $st->bind_param(str_repeat('s', count($held)), ...array_values($held));
-                $st->execute();
-                $st->get_result();
-            }
+            db_locks_release($conn, $held);
         }
     }
     usort($out['skipped'], fn($a, $b) => $a['line'] <=> $b['line']);
@@ -479,9 +443,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $names = array_map(fn($aid) => $agents[$aid]['full_name'], array_keys($out['agents']));
             $desc  = ($_SESSION['full_name'] ?? 'Unknown') . ' imported ' . $out['clients'] . ' client(s) with ' . $out['vehicles'] . ' vehicle(s) from "' . $preview['file'] . '"'
                    . ' for insurance agent' . (count($names) > 1 ? 's ' : ' ') . implode(', ', $names) . '.';
-            $log = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'CLIENT_IMPORTED', ?)");
-            $log->bind_param('is', $uid, $desc);
-            $log->execute();
+            audit_log_add($conn, $uid, 'CLIENT_IMPORTED', $desc);
         }
         $_SESSION['client_import_result'] = $out + [
             'token'  => $preview['token'],

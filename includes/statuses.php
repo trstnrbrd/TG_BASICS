@@ -18,13 +18,8 @@ function statuses_for(string $module): array {
     global $conn;
     $cache[$module] = [];
     if (!isset($conn) || !($conn instanceof mysqli)) return $cache[$module];
-    try {
-        $st = $conn->prepare("SELECT * FROM statuses WHERE module = ? ORDER BY sort_order, label");
-        $st->bind_param('s', $module);
-        $st->execute();
-        foreach ($st->get_result()->fetch_all(MYSQLI_ASSOC) as $row) $cache[$module][$row['code']] = status_row_clean($row);
-    } catch (mysqli_sql_exception $e) {
-    }
+    require_once __DIR__ . '/data_access.php';
+    foreach (statuses_rows($conn, $module) as $row) $cache[$module][$row['code']] = status_row_clean($row);   // [] before the SQL is run
     return $cache[$module];
 }
 

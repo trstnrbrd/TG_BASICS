@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
@@ -19,10 +20,7 @@ if (!client_editable($conn, $client_id)) {
 }
 
 // Load client (exclude soft-deleted)
-$stmt = $conn->prepare("SELECT * FROM clients WHERE client_id = ? AND deleted_at IS NULL");
-$stmt->bind_param('i', $client_id);
-$stmt->execute();
-$client = $stmt->get_result()->fetch_assoc();
+$client = client_row($conn, $client_id);
 
 if (!$client) {
     header("Location: client_list.php?error=Client not found.");
@@ -54,14 +52,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // with_named_lock() for the confirmed repro) instead of two separate, unsynchronized queries.
     if (empty($errors) && $plate_number !== '') {
         $lock = with_named_lock($conn, 'plate_' . $plate_number, function () use ($conn, $client_id, $plate_number, $make, $model, $year_model, $color, $motor_number, $serial_number) {
-            $check = $conn->prepare("SELECT v.vehicle_id FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id WHERE v.plate_number = ? AND c.deleted_at IS NULL");
-            $check->bind_param('s', $plate_number);
-            $check->execute();
-            if ($check->get_result()->num_rows > 0) return false;   // duplicate — caller adds the error
+            if (vehicle_plate_taken($conn, $plate_number)) return false;   // duplicate — caller adds the error
 
-            $ins = $conn->prepare("INSERT INTO vehicles (client_id, plate_number, make, model, year_model, color, motor_number, serial_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-            $ins->bind_param('isssssss', $client_id, $plate_number, $make, $model, $year_model, $color, $motor_number, $serial_number);
-            return $ins->execute();
+            return vehicle_create($conn, $client_id, [
+                'plate_number' => $plate_number, 'make' => $make, 'model' => $model, 'year_model' => $year_model,
+                'color' => $color, 'motor_number' => $motor_number, 'serial_number' => $serial_number,
+            ]) > 0;
         });
 
         if (!$lock['locked']) {
@@ -71,10 +67,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             // Audit log
             $uid = $_SESSION['user_id'];
-            $log = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'VEHICLE_ADDED', ?)");
             $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' added vehicle ' . ($plate_number ?: 'no plate') . ' (' . $make . ' ' . $model . ') to client ID ' . $client_id . '.';
-            $log->bind_param('is', $uid, $desc);
-            $log->execute();
+            audit_log_add($conn, $uid, 'VEHICLE_ADDED', $desc);
 
             header("Location: view_client.php?id=" . $client_id . "&success=Vehicle added successfully.");
             exit;

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/settings.php';
@@ -20,7 +21,6 @@ $is_super = is_super_admin();
 // Client Records — other agents' policies open view-only (view_policy.php). The dashboard alerts and the
 // sidebar badge still count only the user's own policies (renewal_scope_sql).
 $af        = agent_filter_state($conn);
-$scope_sql = '1=1' . agent_filter_sql($af, 'c.agent_id');
 // Keeps the chosen agent on the stat-card and Clear links
 $agent_qs  = '&agent=' . urlencode($af['value']);
 
@@ -31,87 +31,12 @@ if ($company === '') $company = $tracked_cos[0]['name'] ?? '';
 $filter       = san_enum($_GET['filter'] ?? 'all', ['all', 'urgent', 'expiring', 'stable', 'expired', 'renewed']);
 $search       = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
 
-// ── BUILD QUERY ──
-$where_clauses = [];
-$params        = [];
-$types         = '';
-
-// Old archived policies (is_renewed=1) never appear — only the new replacement policy does
-$where_clauses[] = "p.is_renewed = 0";
-$where_clauses[] = $scope_sql;
-$where_clauses[] = "p.insurance_company = ?";
-$params[] = $company;
-$types   .= 's';
-
-if ($search !== '') {
-    $like = "%$search%";
-    $where_clauses[] = "(c.full_name LIKE ? OR c.contact_number LIKE ? OR v.plate_number LIKE ? OR p.policy_number LIKE ?)";
-    $params[] = $like; $params[] = $like; $params[] = $like; $params[] = $like;
-    $types   .= 'ssss';
-}
-
-switch ($filter) {
-    case 'urgent':
-        $where_clauses[] = "p.policy_end >= CURDATE() AND DATEDIFF(p.policy_end, CURDATE()) <= $urg_days";
-        break;
-    case 'expiring':
-        $exp_start = $urg_days + 1;
-        $where_clauses[] = "p.policy_end >= CURDATE() AND DATEDIFF(p.policy_end, CURDATE()) BETWEEN $exp_start AND $exp_days";
-        break;
-    case 'stable':
-        $where_clauses[] = "p.policy_end >= CURDATE() AND DATEDIFF(p.policy_end, CURDATE()) > $exp_days";
-        break;
-    case 'expired':
-        $where_clauses[] = "p.policy_end < CURDATE()";
-        break;
-    case 'renewed':
-        $where_clauses[] = "p.renewed_at IS NOT NULL";
-        break;
-}
-
-$where_sql = count($where_clauses) ? 'WHERE ' . implode(' AND ', $where_clauses) : '';
-
-$sql = "
-    SELECT
-        p.policy_id, p.policy_number, p.coverage_type, p.insurance_company,
-        p.policy_start, p.policy_end, p.is_renewed, p.renewed_at,
-        p.sum_insured, p.total_premium, p.amount_paid, p.balance,
-        p.payment_status,
-        DATEDIFF(p.policy_end, CURDATE()) AS days_left,
-        c.client_id, c.full_name, c.contact_number,
-        v.plate_number, v.make, v.model, v.year_model,
-        CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.full_name END AS added_by_name,
-        CASE WHEN ag.is_hidden = 1 THEN 'Developer' ELSE ag.full_name END AS agent_name,
-        CASE WHEN ag.is_hidden = 1 THEN NULL ELSE ag.profile_photo END AS agent_photo
-    FROM insurance_policies p
-    INNER JOIN clients c ON p.client_id = c.client_id
-    INNER JOIN vehicles v ON p.vehicle_id = v.vehicle_id
-    LEFT JOIN users u ON p.created_by = u.user_id
-    LEFT JOIN users ag ON c.agent_id = ag.user_id
-    $where_sql
-    ORDER BY p.policy_end ASC
-";
-
-// One page at a time (includes/pagination.php) — the total is counted from this same query
-[$policies, $pg] = paginate_query($conn, $sql, $types, $params);
+// Old archived policies (is_renewed=1) never appear — only the new replacement policy does.
+// One page at a time (includes/pagination.php).
+[$policies, $pg] = policies_renewal_page($conn, $company, $filter, $search, $af, $urg_days, $exp_days);
 
 // ── SUMMARY COUNTS ──
-$exp_start_count = $urg_days + 1;
-$counts_stmt = $conn->prepare("
-    SELECT
-        SUM(CASE WHEN p.is_renewed = 0 THEN 1 ELSE 0 END) AS total,
-        SUM(CASE WHEN p.is_renewed = 0 AND p.policy_end >= CURDATE() AND DATEDIFF(p.policy_end, CURDATE()) <= $urg_days THEN 1 ELSE 0 END) AS urgent,
-        SUM(CASE WHEN p.is_renewed = 0 AND p.policy_end >= CURDATE() AND DATEDIFF(p.policy_end, CURDATE()) BETWEEN $exp_start_count AND $exp_days THEN 1 ELSE 0 END) AS expiring,
-        SUM(CASE WHEN p.is_renewed = 0 AND p.policy_end >= CURDATE() AND DATEDIFF(p.policy_end, CURDATE()) > $exp_days THEN 1 ELSE 0 END) AS stable,
-        SUM(CASE WHEN p.is_renewed = 0 AND p.policy_end < CURDATE() THEN 1 ELSE 0 END) AS expired,
-        SUM(CASE WHEN p.is_renewed = 0 AND p.renewed_at IS NOT NULL THEN 1 ELSE 0 END) AS renewed
-    FROM insurance_policies p
-    INNER JOIN clients c ON c.client_id = p.client_id
-    WHERE p.insurance_company = ? AND $scope_sql
-");
-$counts_stmt->bind_param('s', $company);
-$counts_stmt->execute();
-$counts = $counts_stmt->get_result()->fetch_assoc();
+$counts = policies_renewal_counts($conn, $company, $af, $urg_days, $exp_days);
 
 $page_title  = 'Renewal Tracking';
 $active_page = 'renewal';
@@ -269,7 +194,7 @@ require_once '../../includes/topbar.php';
         </div>
       </div>
 
-      <?php if ($policies->num_rows > 0): ?>
+      <?php if ($policies): ?>
       <div class="tg-table-wrap mob-card-wrap">
         <table class="tg-table mob-card mob-renewal-table renewal-list-table">
           <thead>
@@ -284,7 +209,7 @@ require_once '../../includes/topbar.php';
             </tr>
           </thead>
           <tbody>
-            <?php while ($row = $policies->fetch_assoc()):
+            <?php foreach ($policies as $row):
               $rid  = 'rnl-expand-' . $row['policy_id'];
               $days = (int)$row['days_left'];
 
@@ -389,7 +314,7 @@ require_once '../../includes/topbar.php';
                 </div>
               </td>
             </tr>
-            <?php endwhile; ?>
+            <?php endforeach; ?>
           </tbody>
         </table>
       </div>

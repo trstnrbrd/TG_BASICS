@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../config/session.php';
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/settings.php';
 require_once '../../config/access.php';
@@ -16,78 +17,23 @@ require_once '../../config/validators.php';   // csrf_token() for the reminder c
 $full_name = $_SESSION['full_name'];
 $first_name = explode(' ', $full_name)[0];
 
-// ── STATS QUERIES ──
-$total_clients  = $conn->query("SELECT COUNT(*) as c FROM clients WHERE deleted_at IS NULL")->fetch_assoc()['c'];
-$total_vehicles = $conn->query("SELECT COUNT(*) as c FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id WHERE c.deleted_at IS NULL")->fetch_assoc()['c'];
-$recent_clients  = $conn->query("SELECT COUNT(*) as c FROM clients WHERE deleted_at IS NULL AND YEAR(created_at)=YEAR(NOW()) AND MONTH(created_at)=MONTH(NOW())")->fetch_assoc()['c'];
-$recent_vehicles = $conn->query("SELECT COUNT(*) as c FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id WHERE c.deleted_at IS NULL AND YEAR(v.created_at)=YEAR(NOW()) AND MONTH(v.created_at)=MONTH(NOW())")->fetch_assoc()['c'];
-
-$total_policies   = $conn->query("SELECT COUNT(*) as c FROM insurance_policies WHERE is_renewed = 0")->fetch_assoc()['c'];
-$active_policies  = $conn->query("SELECT COUNT(*) as c FROM insurance_policies WHERE is_renewed = 0 AND policy_end >= CURDATE()")->fetch_assoc()['c'];
+// ── STATS ──
+['total_clients' => $total_clients, 'total_vehicles' => $total_vehicles, 'recent_clients' => $recent_clients,
+ 'recent_vehicles' => $recent_vehicles, 'total_policies' => $total_policies, 'active_policies' => $active_policies] = dashboard_counts($conn);
 // Renewal figures follow the same scope as Renewal Tracking: the Owner sees all, an admin only the
 // policies of clients they are the insurance agent of (config/access.php).
-$renewal_scope = renewal_scope_sql('c');
-$es_stmt = $conn->prepare("SELECT COUNT(*) as c FROM insurance_policies p INNER JOIN clients c ON c.client_id = p.client_id WHERE p.is_renewed = 0 AND DATEDIFF(p.policy_end, CURDATE()) BETWEEN 0 AND ? AND $renewal_scope");
-$es_stmt->bind_param('i', $exp_days);
-$es_stmt->execute();
-$expiring_soon = $es_stmt->get_result()->fetch_assoc()['c'];
+$expiring_soon   = policies_due_count($conn, $exp_days);
+$urgent_policies = policies_due_count($conn, $urg_days);
 
-$up_stmt = $conn->prepare("SELECT COUNT(*) as c FROM insurance_policies p INNER JOIN clients c ON c.client_id = p.client_id WHERE p.is_renewed = 0 AND DATEDIFF(p.policy_end, CURDATE()) BETWEEN 0 AND ? AND $renewal_scope");
-$up_stmt->bind_param('i', $urg_days);
-$up_stmt->execute();
-$urgent_policies = $up_stmt->get_result()->fetch_assoc()['c'];
-
-// ── RENEWAL ALERTS (policies expiring within 30 days) ──
-$rn_stmt = $conn->prepare("
-    SELECT p.policy_id, p.policy_number, p.policy_end, p.coverage_type,
-           DATEDIFF(p.policy_end, CURDATE()) as days_left,
-           c.full_name, v.plate_number, v.make, v.model
-    FROM insurance_policies p
-    INNER JOIN vehicles v ON p.vehicle_id = v.vehicle_id
-    INNER JOIN clients c ON p.client_id = c.client_id
-    WHERE p.is_renewed = 0 AND DATEDIFF(p.policy_end, CURDATE()) BETWEEN 0 AND ? AND $renewal_scope
-    ORDER BY p.policy_end ASC
-    LIMIT 6
-");
-$rn_stmt->bind_param('i', $exp_days);
-$rn_stmt->execute();
-$renewals = $rn_stmt->get_result();
-
-// ── RECENT CLIENTS ──
-$recent_list = $conn->query("
-    SELECT c.client_id, c.full_name, c.contact_number, c.created_at,
-           COUNT(v.vehicle_id) as vehicle_count
-    FROM clients c
-    LEFT JOIN vehicles v ON c.client_id = v.client_id
-    WHERE c.deleted_at IS NULL
-    GROUP BY c.client_id
-    ORDER BY c.created_at DESC
-    LIMIT 5
-");
+// ── RENEWAL ALERTS (policies expiring within the "expiring" window) ──
+$renewals = policies_due_list($conn, $exp_days, 6);
 
 // ── TEAM MEMBERS ──
-$team = $conn->query("
-    SELECT user_id, full_name, username, role, profile_photo,
-           (last_active IS NOT NULL AND last_active >= NOW() - INTERVAL 5 MINUTE) AS is_online,
-           last_active
-    FROM users
-    WHERE is_active = 1 AND is_hidden = 0
-    ORDER BY FIELD(role,'super_admin','admin','mechanic'), full_name ASC
-");
+$team = users_team($conn);
 
 // ── RECENT ACTIVITY (from audit_logs) ──
-$activity = $conn->query("
-    SELECT a.action, a.description, a.created_at,
-           CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.full_name END AS actor
-    FROM audit_logs a
-    LEFT JOIN users u ON a.user_id = u.user_id
-    WHERE (a.user_id IS NULL OR a.user_id NOT IN (SELECT user_id FROM users WHERE is_hidden = 1))
-    ORDER BY a.created_at DESC
-    LIMIT 8
-");
-
 $activity_items = [];
-while ($row = $activity->fetch_assoc()) {
+foreach (audit_log_recent($conn, 8) as $row) {
     $ts = strtotime($row['created_at']);
     $diff = time() - $ts;
     if ($diff < 60)        $time_ago = 'Just now';
@@ -108,12 +54,7 @@ while ($row = $activity->fetch_assoc()) {
 // Client type breakdown — last 6 months (for JS navigator)
 $ct_months = [];
 for ($m = 5; $m >= 0; $m--) {
-    $y  = date('Y', strtotime("-$m months"));
-    $mo = date('m', strtotime("-$m months"));
-    // Stats rule: include client if not deleted, OR deleted in a different month/year than added
-    $stats_cond = "(c.deleted_at IS NULL OR (YEAR(c.deleted_at) != YEAR(c.created_at) OR MONTH(c.deleted_at) != MONTH(c.created_at)))";
-    $ins = (int)$conn->query("SELECT COUNT(DISTINCT c.client_id) as c FROM clients c INNER JOIN insurance_policies ip ON ip.client_id = c.client_id WHERE YEAR(c.created_at)='$y' AND MONTH(c.created_at)='$mo' AND $stats_cond")->fetch_assoc()['c'];
-    $wk  = (int)$conn->query("SELECT COUNT(*) as c FROM clients c LEFT JOIN insurance_policies ip ON ip.client_id = c.client_id WHERE ip.policy_id IS NULL AND YEAR(c.created_at)='$y' AND MONTH(c.created_at)='$mo' AND $stats_cond")->fetch_assoc()['c'];
+    [$ins, $wk] = report_client_types_in_month($conn, (int)date('Y', strtotime("-$m months")), (int)date('m', strtotime("-$m months")));
     $ct_months[] = [
         'label'     => date('F Y', strtotime("-$m months")),
         'short'     => date('M',   strtotime("-$m months")),
@@ -132,32 +73,18 @@ $month_clients_total = $cur_ct['total'];
 // Policies added per month (last 6 months)
 $monthly_policies = [];
 for ($m = 5; $m >= 0; $m--) {
-    $label    = date('M Y', strtotime("-$m months"));
-    $y        = date('Y', strtotime("-$m months"));
-    $mo       = date('m', strtotime("-$m months"));
-    $res      = $conn->query("SELECT COUNT(*) as c FROM insurance_policies WHERE YEAR(created_at)='$y' AND MONTH(created_at)='$mo'");
-    $monthly_policies[] = ['label' => $label, 'count' => (int)$res->fetch_assoc()['c']];
+    $monthly_policies[] = ['label' => date('M Y', strtotime("-$m months")),
+                           'count' => report_policies_in_month($conn, (int)date('Y', strtotime("-$m months")), (int)date('m', strtotime("-$m months")))];
 }
 
 // Payment status breakdown
-$pay_status_res = $conn->query("
-    SELECT payment_status, COUNT(*) as c
-    FROM insurance_policies
-    GROUP BY payment_status
-");
-$pay_status = ['Paid' => 0, 'Partial' => 0, 'Unpaid' => 0, 'Overdue' => 0];
-while ($ps = $pay_status_res->fetch_assoc()) {
-    $pay_status[$ps['payment_status']] = (int)$ps['c'];
-}
+$pay_status = array_replace(['Paid' => 0, 'Partial' => 0, 'Unpaid' => 0, 'Overdue' => 0], report_payment_status_counts($conn));
 
 // Repair jobs per month (last 6 months)
 $monthly_repairs = [];
 for ($m = 5; $m >= 0; $m--) {
-    $label = date('M Y', strtotime("-$m months"));
-    $y     = date('Y', strtotime("-$m months"));
-    $mo    = date('m', strtotime("-$m months"));
-    $res   = $conn->query("SELECT COUNT(*) as c FROM repair_jobs WHERE YEAR(created_at)='$y' AND MONTH(created_at)='$mo'");
-    $monthly_repairs[] = ['label' => $label, 'count' => (int)$res->fetch_assoc()['c']];
+    $monthly_repairs[] = ['label' => date('M Y', strtotime("-$m months")),
+                          'count' => report_repairs_in_month($conn, (int)date('Y', strtotime("-$m months")), (int)date('m', strtotime("-$m months")))];
 }
 
 // Greeting & date are now handled in real-time by JavaScript (see bottom of file)
@@ -249,8 +176,8 @@ require_once '../../includes/topbar.php';
             <?php endif; ?>
           </div>
           <div style="overflow-y:auto;flex:1;">
-          <?php if ($renewals->num_rows > 0): ?>
-            <?php while ($r = $renewals->fetch_assoc()):
+          <?php if ($renewals): ?>
+            <?php foreach ($renewals as $r):
               $is_urgent = $r['days_left'] <= $urg_days;
             ?>
             <a href="../renewal/view_policy.php?id=<?= $r['policy_id'] ?>" class="renewal-row">
@@ -268,7 +195,7 @@ require_once '../../includes/topbar.php';
                 <?php else: ?><?= $r['days_left'] ?> days left<?php endif; ?>
               </div>
             </a>
-            <?php endwhile; ?>
+            <?php endforeach; ?>
           <?php else: ?>
             <div class="empty-state" style="padding:2rem;">
               <div style="opacity:0.3;margin-bottom:0.4rem;"><?= icon('check-circle', 28) ?></div>
@@ -450,7 +377,7 @@ require_once '../../includes/topbar.php';
         <?php
         $role_labels_map = ['super_admin'=>'Owner','admin'=>'Admin','mechanic'=>'Mechanic'];
         $role_badge_map  = ['super_admin'=>'badge-gold','admin'=>'badge-green','mechanic'=>'badge-blue'];
-        while ($tm = $team->fetch_assoc()):
+        foreach ($team as $tm):
           $tm_initials = substr(implode('', array_map(fn($w) => strtoupper($w[0] ?? ''), array_filter(explode(' ', $tm['full_name'])))), 0, 2);
           $tm_photo    = !empty($tm['profile_photo']) ? '../../uploads/avatars/' . htmlspecialchars($tm['profile_photo']) : '';
           $tm_online   = !empty($tm['is_online']);
@@ -483,7 +410,7 @@ require_once '../../includes/topbar.php';
             </div>
           </div>
         </div>
-        <?php endwhile; ?>
+        <?php endforeach; ?>
       </div>
     </div>
 

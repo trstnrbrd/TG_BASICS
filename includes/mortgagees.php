@@ -6,10 +6,6 @@
 
 /** The active mortgagee names, in display order. */
 function mortgagees_active(mysqli $conn): array {
-    try {
-        $res = $conn->query("SELECT name FROM mortgagees WHERE is_active = 1 ORDER BY sort_order, name");
-        if ($res) return array_column($res->fetch_all(), 0);
-    } catch (mysqli_sql_exception $e) {
-    }
-    return [];   // table not set up yet: only "None / Cash" and "Other" until the SQL is run
+    require_once __DIR__ . '/data_access.php';
+    return mortgagees_rows($conn);   // table not set up yet: [] (only "None / Cash" and "Other" until the SQL is run)
 }

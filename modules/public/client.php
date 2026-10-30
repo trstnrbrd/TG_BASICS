@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../includes/branding.php';
 require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once __DIR__ . '/../../includes/service_types.php';
 require_once __DIR__ . '/../../config/settings.php';
 require_once __DIR__ . '/../../includes/icons.php';
@@ -92,10 +93,7 @@ if ($token === '' || strlen($token) !== 64 || !ctype_xdigit($token)) {
     pub_not_found();
 }
 
-$stmt = $conn->prepare("SELECT * FROM clients WHERE public_token = ? AND deleted_at IS NULL");
-$stmt->bind_param('s', $token);
-$stmt->execute();
-$client = $stmt->get_result()->fetch_assoc();
+$client = public_client_by_token($conn, $token);
 
 if (!$client) {
     pub_not_found();
@@ -104,53 +102,19 @@ if (!$client) {
 $client_id = (int)$client['client_id'];
 
 // Vehicles
-$vstmt = $conn->prepare("SELECT * FROM vehicles WHERE client_id = ? ORDER BY vehicle_id DESC");
-$vstmt->bind_param('i', $client_id);
-$vstmt->execute();
-$vehicles = $vstmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$vehicles = client_vehicles($conn, $client_id);
 
 // Active policies
-$pstmt = $conn->prepare("
-    SELECT p.policy_number, p.coverage_type, p.policy_start, p.policy_end, p.payment_status,
-           DATEDIFF(p.policy_end, CURDATE()) AS days_left,
-           v.plate_number, v.make, v.model
-    FROM insurance_policies p
-    INNER JOIN vehicles v ON p.vehicle_id = v.vehicle_id
-    WHERE p.client_id = ? AND p.is_renewed = 0
-    ORDER BY p.policy_end ASC
-");
-$pstmt->bind_param('i', $client_id);
-$pstmt->execute();
-$policies = $pstmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$policies = public_client_policies($conn, $client_id);
 
 // Repair jobs
-$rjstmt = $conn->prepare("
-    SELECT j.job_id, j.job_number, j.service_type, j.status, j.repair_date, j.release_date,
-           v.plate_number, v.make, v.model
-    FROM repair_jobs j
-    INNER JOIN vehicles v ON j.vehicle_id = v.vehicle_id
-    WHERE j.client_id = ?
-    ORDER BY j.created_at DESC
-    LIMIT 10
-");
-$rjstmt->bind_param('i', $client_id);
-$rjstmt->execute();
-$repair_jobs = $rjstmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$repair_jobs = public_client_repair_jobs($conn, $client_id, 10);
 
 // Progress photos the shop chose to show ("Show to client"), and only while their job is still open. The files are
 // sent by photo.php, which checks all of that again; uploads/repair_jobs itself stays closed to direct links.
 require_once __DIR__ . '/../../config/access.php';
 $photos_by_job = [];
-$phstmt = $conn->prepare("
-    SELECT i.image_id, i.job_id, i.caption, i.uploaded_at, j.status
-    FROM repair_job_images i
-    INNER JOIN repair_jobs j ON j.job_id = i.job_id
-    WHERE j.client_id = ? AND i.show_client = 1
-    ORDER BY i.uploaded_at ASC, i.image_id ASC
-");
-$phstmt->bind_param('i', $client_id);
-$phstmt->execute();
-foreach ($phstmt->get_result()->fetch_all(MYSQLI_ASSOC) as $ph) {
+foreach (public_client_shown_photos($conn, $client_id) as $ph) {
     if (repair_job_is_open($ph['status'])) $photos_by_job[(int)$ph['job_id']][] = $ph;
 }
 

@@ -12,15 +12,7 @@ require_once __DIR__ . '/statuses.php';
 
 const BILLING_STATUS_SENT = 'sent';
 
-/** Runs a read-only query and returns all rows, or [] when the table is not there yet. */
-function billing_list_query(mysqli $conn, string $sql): array {
-    try {
-        $res = $conn->query($sql);
-        return $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
-    } catch (mysqli_sql_exception $e) {
-        return [];
-    }
-}
+require_once __DIR__ . '/data_access.php';   // the queries: includes/data/lists.php ([] before the SQL is run)
 
 // ── STATUSES ── (the shared `statuses` table, module 'billing'; includes/statuses.php)
 
@@ -44,15 +36,13 @@ function billing_status_badge(mysqli $conn, string $code): array {
 /** Every document type, active or not, in display order. Cached for the request. */
 function billing_doc_types_all(mysqli $conn): array {
     static $cache = null;
-    return $cache ??= billing_list_query($conn, "SELECT doc_type_id, name, hint, is_active
-                                                 FROM billing_document_types ORDER BY sort_order, name");
+    return $cache ??= billing_document_types_rows($conn);
 }
 
 /** The doc_type_ids a set of billings have received: [billing_id => [doc_type_id => true]]. */
 function billing_docs_received(mysqli $conn, array $billing_ids): array {
-    $ids = implode(',', array_map('intval', $billing_ids)) ?: '0';
     $out = [];
-    foreach (billing_list_query($conn, "SELECT billing_id, doc_type_id FROM billing_documents WHERE billing_id IN ($ids)") as $r) {
+    foreach (billing_documents_rows($conn, $billing_ids) as $r) {
         $out[(int)$r['billing_id']][(int)$r['doc_type_id']] = true;
     }
     return $out;
@@ -77,8 +67,7 @@ function billing_docs_for(mysqli $conn, array $received): array {
 /** The people who can sign as cashier, default first. */
 function billing_signatories_active(mysqli $conn): array {
     static $cache = null;
-    return $cache ??= billing_list_query($conn, "SELECT signatory_id, name, title, is_default FROM billing_signatories
-                                                 WHERE is_active = 1 ORDER BY is_default DESC, sort_order, name");
+    return $cache ??= billing_signatories_rows($conn);
 }
 
 /** The signatory picked in a form (by id), or null if the id is not an active one. */

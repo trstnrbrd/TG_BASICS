@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/settings.php';
@@ -18,15 +19,7 @@ $renew_from   = isset($_GET['renew_from']) ? (int)$_GET['renew_from'] : (isset($
 $renew_policy = null;
 
 if ($renew_from > 0) {
-    $rs = $conn->prepare("
-        SELECT p.*, c.agent_id AS client_agent_id
-        FROM insurance_policies p
-        INNER JOIN clients c ON p.client_id = c.client_id
-        WHERE p.policy_id = ? AND c.deleted_at IS NULL
-    ");
-    $rs->bind_param('i', $renew_from);
-    $rs->execute();
-    $renew_policy = $rs->get_result()->fetch_assoc();
+    $renew_policy = policy_find_for_renewal($conn, $renew_from);
 
     // only the client's agent or the Owner may renew a policy
     if (!$renew_policy || !policy_editable($renew_policy['client_agent_id'] !== null ? (int)$renew_policy['client_agent_id'] : null)) {
@@ -58,17 +51,7 @@ if (!in_array($insurance_company, $allowed_companies, true)) {
 
 $vehicle = null;
 if ($vehicle_id > 0) {
-    $stmt = $conn->prepare("
-        SELECT c.client_id, c.full_name, c.contact_number, c.address,
-               v.vehicle_id, v.plate_number, v.make, v.model,
-               v.year_model, v.color, v.motor_number, v.serial_number
-        FROM vehicles v
-        INNER JOIN clients c ON v.client_id = c.client_id
-        WHERE v.vehicle_id = ? AND c.deleted_at IS NULL
-    ");
-    $stmt->bind_param('i', $vehicle_id);
-    $stmt->execute();
-    $vehicle = $stmt->get_result()->fetch_assoc();
+    $vehicle = policy_vehicle_with_client($conn, $vehicle_id);
 }
 
 // If POST submitted without vehicle_id resolved, bounce back
@@ -164,15 +147,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Check for duplicate policy number (exclude the old policy being renewed)
     if ($policy_number !== '') {
-        if ($renew_from > 0) {
-            $dup = $conn->prepare("SELECT policy_id FROM insurance_policies WHERE policy_number = ? AND policy_id != ?");
-            $dup->bind_param('si', $policy_number, $renew_from);
-        } else {
-            $dup = $conn->prepare("SELECT policy_id FROM insurance_policies WHERE policy_number = ?");
-            $dup->bind_param('s', $policy_number);
-        }
-        $dup->execute();
-        if ($dup->get_result()->num_rows > 0) {
+        if (policy_number_taken($conn, $policy_number, $renew_from)) {   // $renew_from 0 = no policy is left out
             $errors[] = 'A policy with this policy number already exists.';
         }
     }
@@ -231,37 +206,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $payable_amount, $num_months, $installment_amounts, $installment_modes, $installment_ctrls,
                 $receipt_file_name, $renew_from, &$moved_receipts
             ) {
-                $ins = $conn->prepare("
-                    INSERT INTO insurance_policies (
-                        client_id, vehicle_id, policy_number, insurance_company, coverage_type,
-                        sum_insured, markup, total_premium, participation_fee,
-                        policy_start, policy_end, payment_terms, mortgagee, payment_status,
-                        amount_paid, balance, notes, created_by
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ");
-                $ins->bind_param(
-                    'iisssddddsssssddsi',
-                    $vehicle['client_id'],
-                    $vehicle_id,
-                    $policy_number,
-                    $insurance_company,
-                    $coverage_type,
-                    $sum_insured,
-                    $basic_premium,
-                    $total_premium,
-                    $participation_fee,
-                    $policy_start,
-                    $policy_end,
-                    $payment_terms,
-                    $mortgagee,
-                    $payment_status,
-                    $amount_paid,
-                    $balance,
-                    $notes,
-                    $created_by
-                );
-                $ins->execute();
-                $new_policy_id = $conn->insert_id;
+                $new_policy_id = policy_create($conn, [
+                    'client_id'         => $vehicle['client_id'],
+                    'vehicle_id'        => $vehicle_id,
+                    'policy_number'     => $policy_number,
+                    'insurance_company' => $insurance_company,
+                    'coverage_type'     => $coverage_type,
+                    'sum_insured'       => $sum_insured,
+                    'markup'            => $basic_premium,
+                    'total_premium'     => $total_premium,
+                    'participation_fee' => $participation_fee,
+                    'policy_start'      => $policy_start,
+                    'policy_end'        => $policy_end,
+                    'payment_terms'     => $payment_terms,
+                    'mortgagee'         => $mortgagee,
+                    'payment_status'    => $payment_status,
+                    'amount_paid'       => $amount_paid,
+                    'balance'           => $balance,
+                    'notes'             => $notes,
+                ], $created_by);
 
                 // Insert installment schedule into policy_payments
                 // Each installment = (total_premium - commission) / num_months
@@ -279,14 +242,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $inst_mode  = !empty($installment_modes[$i])  ? trim($installment_modes[$i])  : null;
                     $inst_ctrl  = !empty($installment_ctrls[$i])  ? trim($installment_ctrls[$i])  : null;
 
-                    $pp = $conn->prepare("INSERT INTO policy_payments (policy_id, installment_no, due_date, amount_due, amount_paid, paid_at, payment_mode, control_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-                    $inst_no = $i + 1;
-                    $pp->bind_param('iisddsss', $new_policy_id, $inst_no, $due_date, $amt_due, $amt_paid_i, $paid_at, $inst_mode, $inst_ctrl);
-                    $pp->execute();
+                    $new_pp_id = policy_payment_add($conn, $new_policy_id, $i + 1, $due_date, $amt_due, $amt_paid_i, $paid_at, $inst_mode, $inst_ctrl);
 
                     // Save receipt for 1st installment if uploaded
                     if ($i === 0 && $receipt_file_name === '__pending__') {
-                        $new_pp_id = $conn->insert_id;
                         $rf        = $_FILES['first_receipt'];
                         $mime      = mime_content_type($rf['tmp_name']);
                         $ext_map   = ['image/jpeg'=>'jpg','image/png'=>'png','image/webp'=>'webp','image/gif'=>'gif'];
@@ -295,30 +254,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $dest      = __DIR__ . '/../../uploads/receipts/' . $fname;
                         if ($ext !== null && move_uploaded_file($rf['tmp_name'], $dest)) {
                             $moved_receipts[] = $dest;
-                            $upd_rc = $conn->prepare("UPDATE policy_payments SET receipt_file = ? WHERE payment_id = ?");
-                            $upd_rc->bind_param('si', $fname, $new_pp_id);
-                            $upd_rc->execute();
+                            policy_payment_set_receipt($conn, $new_pp_id, $fname);
                         }
                     }
                 }
 
                 // Mark old policy as renewed and stamp the new policy with renewed_at
-                if ($renew_from > 0) {
-                    $mark_renewed = $conn->prepare("UPDATE insurance_policies SET is_renewed = 1 WHERE policy_id = ?");
-                    $mark_renewed->bind_param('i', $renew_from);
-                    $mark_renewed->execute();
-
-                    $stamp = $conn->prepare("UPDATE insurance_policies SET renewed_at = NOW() WHERE policy_id = ?");
-                    $stamp->bind_param('i', $new_policy_id);
-                    $stamp->execute();
-                }
+                if ($renew_from > 0) policy_mark_renewed($conn, $renew_from, $new_policy_id);
 
                 // Audit log
                 $action = $renew_from > 0 ? 'POLICY_RENEWED' : 'POLICY_CREATED';
-                $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, ?, ?)");
                 $desc = ($_SESSION['full_name'] ?? 'Unknown') . ($renew_from > 0 ? ' renewed policy as ' : ' created policy ') . $policy_number . ' (' . $coverage_type . ') for vehicle ' . ($vehicle['plate_number'] ?? '') . ' — Payable: ₱' . number_format($payable_amount, 2) . ' (Premium: ₱' . number_format((float)$total_premium, 2) . ' − Commission: ₱' . number_format((float)$basic_premium, 2) . ').';
-                $log->bind_param('iss', $created_by, $action, $desc);
-                $log->execute();
+                audit_log_add($conn, $created_by, $action, $desc);
             });
             $saved = true;
         } catch (Throwable $e) {

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
@@ -21,15 +22,7 @@ if ($vehicle_id === 0) {
 }
 
 // Load vehicle + client name before deleting
-$stmt = $conn->prepare("
-    SELECT v.*, c.full_name AS client_name
-    FROM vehicles v
-    INNER JOIN clients c ON v.client_id = c.client_id
-    WHERE v.vehicle_id = ?
-");
-$stmt->bind_param('i', $vehicle_id);
-$stmt->execute();
-$vehicle = $stmt->get_result()->fetch_assoc();
+$vehicle = vehicle_find($conn, $vehicle_id);
 
 if (!$vehicle) {
     header("Location: client_list.php?error=Vehicle not found.");
@@ -56,17 +49,15 @@ if ($blockers !== '') {
     exit;
 }
 
-// Delete vehicle — CASCADE removes linked policies automatically
-$del = $conn->prepare("DELETE FROM vehicles WHERE vehicle_id = ?");
-$del->bind_param('i', $vehicle_id);
-
-if ($del->execute() && $del->affected_rows > 0) {
-    $uid  = $_SESSION['user_id'];
-    $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'VEHICLE_UNREGISTERED', ?)");
+// Delete vehicle — CASCADE removes linked policies automatically; the delete and its audit entry are saved together
+$deleted = db_transaction($conn, function () use ($conn, $vehicle_id, $vehicle) {
+    if (!vehicle_delete($conn, $vehicle_id)) return false;
     $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' unregistered vehicle ' . $vehicle['plate_number'] . ' (' . $vehicle['make'] . ' ' . $vehicle['model'] . ') from client "' . $vehicle['client_name'] . '".';
-    $log->bind_param('is', $uid, $desc);
-    $log->execute();
+    audit_log_add($conn, $_SESSION['user_id'], 'VEHICLE_UNREGISTERED', $desc);
+    return true;
+});
 
+if ($deleted) {
     header("Location: view_client.php?id=" . $client_id . "&success=" . urlencode('Vehicle ' . $vehicle['plate_number'] . ' has been unregistered.'));
     exit;
 } else {

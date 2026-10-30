@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../includes/icons.php';
@@ -14,30 +15,14 @@ $success = false;
 // AJAX: search clients by name
 if (isset($_GET['ajax_clients']) && isset($_GET['q'])) {
     header('Content-Type: application/json');
-    $q    = '%' . san_str($_GET['q'], 100) . '%';
-    $stmt = $conn->prepare("SELECT client_id, full_name FROM clients WHERE deleted_at IS NULL AND full_name LIKE ? ORDER BY full_name ASC LIMIT 20");
-    $stmt->bind_param('s', $q);
-    $stmt->execute();
-    echo json_encode($stmt->get_result()->fetch_all(MYSQLI_ASSOC));
+    echo json_encode(clients_search_by_name($conn, san_str($_GET['q'], 100), 20));
     exit;
 }
 
 // AJAX: load policies for a selected client
 if (isset($_GET['ajax_policies']) && isset($_GET['client_id'])) {
     header('Content-Type: application/json');
-    $cid  = (int)$_GET['client_id'];
-    $stmt = $conn->prepare("
-        SELECT ip.policy_id, ip.policy_number, ip.coverage_type, ip.policy_end,
-               v.plate_number, v.make, v.model
-        FROM insurance_policies ip
-        LEFT JOIN vehicles v ON ip.vehicle_id = v.vehicle_id
-        WHERE ip.client_id = ? AND ip.policy_end >= CURDATE()
-        ORDER BY ip.policy_end ASC
-    ");
-    $stmt->bind_param('i', $cid);
-    $stmt->execute();
-    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    echo json_encode($rows);
+    echo json_encode(claim_client_open_policies($conn, (int)$_GET['client_id']));
     exit;
 }
 
@@ -62,18 +47,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($errors)) {
         // The claim and its audit entry are saved together or not at all (includes/transaction.php)
         $new_id = db_transaction($conn, function () use ($conn, $policy_id, $client_id, $claim_type, $incident_date, $description) {
-            $stmt = $conn->prepare("
-                INSERT INTO claims (policy_id, client_id, claim_type, incident_date, description, status, created_by)
-                VALUES (?, ?, ?, ?, ?, 'compiling', ?)
-            ");
-            $stmt->bind_param('iisssi', $policy_id, $client_id, $claim_type, $incident_date, $description, $_SESSION['user_id']);
-            $stmt->execute();
-            $id = $conn->insert_id;
+            $id = claim_create($conn, $policy_id, $client_id, $claim_type, $incident_date, $description, (int)$_SESSION['user_id']);
 
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'CLAIM_FILED', ?)");
             $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' filed a new ' . $claim_type . ' claim.';
-            $log->bind_param('is', $_SESSION['user_id'], $desc);
-            $log->execute();
+            audit_log_add($conn, $_SESSION['user_id'], 'CLAIM_FILED', $desc);
 
             return $id;
         });
@@ -89,10 +66,7 @@ $prefill_client_name = '';
 if (isset($_GET['client_id']) && !$_POST) {
     $prefill_client_id = (int)$_GET['client_id'];
     if ($prefill_client_id > 0) {
-        $pfc = $conn->prepare("SELECT client_id, full_name FROM clients WHERE client_id = ? AND deleted_at IS NULL");
-        $pfc->bind_param('i', $prefill_client_id);
-        $pfc->execute();
-        $pfc_row = $pfc->get_result()->fetch_assoc();
+        $pfc_row = client_find_name($conn, $prefill_client_id);
         if ($pfc_row) {
             $prefill_client_id   = (int)$pfc_row['client_id'];
             $prefill_client_name = $pfc_row['full_name'];

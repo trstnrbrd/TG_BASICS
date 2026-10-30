@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../config/session.php';
+require_once __DIR__ . '/../includes/data_access.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/rate_limit.php';
 require_once __DIR__ . '/../config/transaction_pin.php';
@@ -21,16 +22,13 @@ if ($pin !== '' && rate_limit_blocked($conn, 'verify_pin', $rl_key)) {
     api_error('Too many attempts. Please wait a few minutes before trying again.', 429);
 }
 
-$stmt = $conn->prepare("SELECT transaction_pin FROM users WHERE user_id = ?");
-$stmt->bind_param('i', $user_id);
-$stmt->execute();
-$row = $stmt->get_result()->fetch_assoc();
+$pin_hash = account_pin_hash($conn, (int)$user_id);
 
-if (empty($row['transaction_pin'])) api_success(['no_pin' => true]);
+if ($pin_hash === null) api_success(['no_pin' => true]);
 
 if ($pin === '') api_success(['has_pin' => true]);
 
-if (password_verify($pin, $row['transaction_pin'])) {
+if (password_verify($pin, $pin_hash)) {
     rate_limit_clear($conn, 'verify_pin', $rl_key);
     pin_grant();
     api_success();

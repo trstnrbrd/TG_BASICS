@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
@@ -13,54 +14,10 @@ require_role(['admin', 'super_admin']);
 $search        = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
 $filter_status = san_enum($_GET['status'] ?? 'all', array_merge(['all'], array_keys(claim_statuses())));
 $filter_type   = san_enum($_GET['type'] ?? 'all', array_merge(['all'], array_column(claim_types_all($conn), 'code')));
-$sort_by       = $_GET['sort'] ?? 'newest';
+$sort_by       = san_enum($_GET['sort'] ?? 'newest', ['newest', 'oldest']);
 
-$where   = ["1=1"];
-$params  = [];
-$types   = '';
-
-if ($search !== '') {
-    $like    = "%$search%";
-    $where[] = "(c.full_name LIKE ? OR v.plate_number LIKE ? OR ip.policy_number LIKE ? OR v.make LIKE ? OR v.model LIKE ?)";
-    $params  = array_merge($params, [$like, $like, $like, $like, $like]);
-    $types  .= 'sssss';
-}
-if ($filter_status !== 'all') {
-    $where[] = "cl.status = ?";
-    $params[] = $filter_status;
-    $types   .= 's';
-}
-if ($filter_type !== 'all') {
-    $where[] = "cl.claim_type = ?";
-    $params[] = $filter_type;
-    $types   .= 's';
-}
-
-$where_sql = implode(' AND ', $where);
-$order = match($sort_by) {
-    'oldest' => 'cl.created_at ASC',
-    default  => 'cl.created_at DESC',
-};
-
-$sql = "
-    SELECT cl.claim_id, cl.claim_type, cl.status, cl.incident_date, cl.created_at,
-           cl.doc_insurance_policy, cl.doc_or, cl.doc_cr, cl.doc_drivers_license, cl.doc_affidavit, cl.doc_estimate, cl.doc_damage_photos,
-           c.full_name, c.client_id,
-           v.plate_number, v.make, v.model,
-           ip.policy_number, ip.coverage_type,
-           CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.full_name END AS added_by_name,
-           CASE WHEN u.is_hidden = 1 THEN NULL ELSE u.profile_photo END AS added_by_photo
-    FROM claims cl
-    INNER JOIN clients c  ON cl.client_id = c.client_id
-    INNER JOIN insurance_policies ip ON cl.policy_id = ip.policy_id
-    LEFT  JOIN vehicles v ON ip.vehicle_id = v.vehicle_id
-    LEFT  JOIN users u    ON cl.created_by = u.user_id
-    WHERE $where_sql
-    ORDER BY $order
-";
-
-// One page at a time (includes/pagination.php) — the total is counted from this same query
-[$result, $pg] = paginate_query($conn, $sql, $types, $params);
+// One page at a time (includes/pagination.php)
+[$claim_rows, $pg] = claims_list_page($conn, $search, $filter_status, $filter_type, $sort_by);
 
 
 $page_title  = 'Claims';
@@ -153,7 +110,7 @@ require_once '../../includes/topbar.php';
         </div>
       </div>
 
-      <?php if ($result->num_rows > 0): ?>
+      <?php if ($claim_rows): ?>
       <div class="tg-table-wrap mob-card-wrap">
         <table class="tg-table mob-card mob-claims-table claims-list-table">
           <thead>
@@ -165,7 +122,7 @@ require_once '../../includes/topbar.php';
             </tr>
           </thead>
           <tbody>
-            <?php while ($row = $result->fetch_assoc()):
+            <?php foreach ($claim_rows as $row):
               $req_docs  = 7;
               $docs_done = (int)$row['doc_insurance_policy'] + (int)$row['doc_or'] + (int)$row['doc_cr']
                          + (int)$row['doc_drivers_license'] + (int)$row['doc_affidavit']
@@ -260,7 +217,7 @@ require_once '../../includes/topbar.php';
                 </div>
               </td>
             </tr>
-            <?php endwhile; ?>
+            <?php endforeach; ?>
           </tbody>
         </table>
       </div>

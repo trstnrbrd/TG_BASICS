@@ -53,7 +53,8 @@ function realtime_watch_request(mysqli $conn): void
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') return;
     $topic = realtime_topic_for_script($_SERVER['SCRIPT_NAME'] ?? '');
     if ($topic === null) return;
-    $last_log = fn() => (int)$conn->query("SELECT COALESCE(MAX(log_id), 0) FROM audit_logs")->fetch_row()[0];
+    require_once __DIR__ . '/data_access.php';
+    $last_log = fn() => audit_log_latest_id($conn);
     $before   = $last_log();
     register_shutdown_function(function () use ($topic, $last_log, $before) {
         if (http_response_code() >= 400) return;

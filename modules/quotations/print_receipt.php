@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../includes/branding.php';
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once __DIR__ . '/../../includes/service_types.php';
 require_once '../../config/validators.php';
@@ -12,29 +13,10 @@ require_role(['admin', 'super_admin']);
 $qt_id = san_int($_GET['id'] ?? 0, 1);
 if (!$qt_id) { header("Location: quotation_list.php"); exit; }
 
-$stmt = $conn->prepare("
-    SELECT q.quotation_number, q.total, q.discount, q.subtotal, q.notes AS qt_notes,
-           j.job_number, j.service_type, j.repair_date,
-           c.full_name, c.contact_number, c.email, c.address,
-           v.plate_number, v.make, v.model, v.year_model, v.color,
-           r.receipt_number, r.amount_paid, r.balance, r.payment_method,
-           r.payment_status, r.issued_at, r.notes AS receipt_notes
-    FROM quotations q
-    INNER JOIN repair_jobs j ON q.job_id = j.job_id
-    INNER JOIN clients     c ON j.client_id  = c.client_id
-    INNER JOIN vehicles    v ON j.vehicle_id = v.vehicle_id
-    INNER JOIN receipts    r ON r.quotation_id = q.quotation_id
-    WHERE q.quotation_id = ?
-");
-$stmt->bind_param('i', $qt_id);
-$stmt->execute();
-$d = $stmt->get_result()->fetch_assoc();
+$d = receipt_print_data($conn, $qt_id);
 if (!$d) { header("Location: quotation_list.php"); exit; }
 
-$items_stmt = $conn->prepare("SELECT * FROM quotation_items WHERE quotation_id = ? ORDER BY sort_order ASC");
-$items_stmt->bind_param('i', $qt_id);
-$items_stmt->execute();
-$items = $items_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$items = quotation_items($conn, $qt_id);
 
 $company_name    = getSetting($conn, 'company_name',    'TG Customworks & Basic Car Insurance');
 $company_address = getSetting($conn, 'company_address', '49 Villa Tierra St., San Roque, Pandi, Bulacan');

@@ -10,13 +10,8 @@
 function service_types_all(mysqli $conn): array {
     static $cache = null;
     if ($cache !== null) return $cache;
-    try {
-        $res = $conn->query("SELECT code, label, group_label, default_price, is_active FROM service_types ORDER BY sort_order, label");
-        $cache = $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
-    } catch (mysqli_sql_exception $e) {
-        $cache = [];
-    }
-    return $cache;
+    require_once __DIR__ . '/data_access.php';
+    return $cache = service_types_rows($conn);   // [] before the SQL is run
 }
 
 /** The types a new job can be booked as. */

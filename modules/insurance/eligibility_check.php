@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/settings.php';
@@ -14,27 +15,12 @@ require_role(['admin', 'super_admin']);
 if (isset($_GET['ajax']) && $_GET['ajax'] === '1') {
     $q = san_str($_GET['search'] ?? '', 100);
     if ($q === '') { echo ''; exit; }
-    $like = "%$q%";
-    $stmt = $conn->prepare("
-        SELECT c.client_id, c.full_name, c.contact_number,
-               v.vehicle_id, v.plate_number, v.make, v.model, v.year_model
-        FROM clients c
-        INNER JOIN vehicles v ON c.client_id = v.client_id
-        WHERE c.deleted_at IS NULL
-          AND (c.full_name LIKE ? OR v.plate_number LIKE ? OR v.make LIKE ?
-           OR v.model LIKE ? OR c.contact_number LIKE ? OR v.motor_number LIKE ?
-           OR v.serial_number LIKE ? OR CONCAT(v.make,' ',v.model) LIKE ?)
-        ORDER BY c.full_name ASC
-        LIMIT 8
-    ");
-    $stmt->bind_param('ssssssss', $like, $like, $like, $like, $like, $like, $like, $like);
-    $stmt->execute();
-    $rows = $stmt->get_result();
-    if ($rows->num_rows === 0) {
+    $rows = policy_vehicle_suggest($conn, $q, 8);
+    if (!$rows) {
         echo '<div style="padding:1rem;text-align:center;font-size:0.8rem;color:var(--text-muted);">No results found</div>';
         exit;
     }
-    while ($r = $rows->fetch_assoc()) {
+    foreach ($rows as $r) {
         echo '
         <a class="live-result-item" href="?vehicle_id=' . $r['vehicle_id'] . '" style="padding:0.75rem 1rem;cursor:pointer;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);transition:background 0.1s;text-decoration:none;" onmouseover="this.style.background=\'var(--gold-pale)\'" onmouseout="this.style.background=\'\'">
           <div>
@@ -60,34 +46,12 @@ $eligibility    = null;
 
 // Search clients and vehicles — one page of results at a time (includes/pagination.php)
 if ($search !== '') {
-    $like = "%$search%";
-    [$found, $search_pg] = paginate_query($conn, "
-        SELECT c.client_id, c.full_name, c.contact_number,
-               v.vehicle_id, v.plate_number, v.make, v.model, v.year_model, v.color
-        FROM clients c
-        INNER JOIN vehicles v ON c.client_id = v.client_id
-        WHERE c.deleted_at IS NULL
-          AND (c.full_name LIKE ? OR v.plate_number LIKE ? OR v.make LIKE ?
-           OR v.model LIKE ? OR c.contact_number LIKE ? OR v.motor_number LIKE ?
-           OR v.serial_number LIKE ? OR CONCAT(v.make,' ',v.model) LIKE ?)
-        ORDER BY c.full_name ASC
-    ", 'ssssssss', array_fill(0, 8, $like));
-    $search_results = $found->fetch_all(MYSQLI_ASSOC);
+    [$search_results, $search_pg] = policy_vehicle_search_page($conn, $search);
 }
 
 // Load selected vehicle and compute eligibility
 if ($selected_vid > 0) {
-    $stmt = $conn->prepare("
-        SELECT c.client_id, c.full_name, c.contact_number, c.address,
-               v.vehicle_id, v.plate_number, v.make, v.model,
-               v.year_model, v.color, v.motor_number, v.serial_number
-        FROM vehicles v
-        INNER JOIN clients c ON v.client_id = c.client_id
-        WHERE v.vehicle_id = ? AND c.deleted_at IS NULL
-    ");
-    $stmt->bind_param('i', $selected_vid);
-    $stmt->execute();
-    $row = $stmt->get_result()->fetch_assoc();
+    $row = policy_vehicle_with_client($conn, $selected_vid);
 
     if ($row) {
         $vehicle = $row;
@@ -100,14 +64,7 @@ if ($selected_vid > 0) {
 
         $eligible = $age <= $max_vehicle_age;
 
-        $policy_check = $conn->prepare("
-            SELECT policy_id FROM insurance_policies
-            WHERE vehicle_id = ? AND policy_end >= CURDATE()
-            LIMIT 1
-        ");
-        $policy_check->bind_param('i', $selected_vid);
-        $policy_check->execute();
-        $has_active_policy = $policy_check->get_result()->num_rows > 0;
+        $has_active_policy = vehicle_has_active_policy($conn, $selected_vid);
 
         $eligibility = [
             'age'               => $age,

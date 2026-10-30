@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../config/session.php';
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../includes/api.php';
 require_once '../../config/validators.php';
@@ -68,10 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             }
 
             // Delete old photo if exists
-            $old_stmt = $conn->prepare("SELECT profile_photo FROM users WHERE user_id = ?");
-            $old_stmt->bind_param('i', $user_id);
-            $old_stmt->execute();
-            $old_photo = $old_stmt->get_result()->fetch_assoc()['profile_photo'] ?? '';
+            $old_photo = account_photo($conn, $user_id);
             if ($old_photo && file_exists($upload_dir . $old_photo)) {
                 unlink($upload_dir . $old_photo);
             }
@@ -80,9 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             $filename = 'avatar_' . $user_id . '_' . time() . '.' . $ext;
             move_uploaded_file($file['tmp_name'], $upload_dir . $filename);
 
-            $upd = $conn->prepare("UPDATE users SET profile_photo = ? WHERE user_id = ?");
-            $upd->bind_param('si', $filename, $user_id);
-            $upd->execute();
+            account_set_photo($conn, $user_id, $filename);
 
             api_success(['photo' => $filename], 'Profile photo updated.');
             break;
@@ -90,17 +86,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
         // ── REMOVE AVATAR ──
         case 'avatar_remove':
             $upload_dir = __DIR__ . '/../../uploads/avatars/';
-            $old_stmt = $conn->prepare("SELECT profile_photo FROM users WHERE user_id = ?");
-            $old_stmt->bind_param('i', $user_id);
-            $old_stmt->execute();
-            $old_photo = $old_stmt->get_result()->fetch_assoc()['profile_photo'] ?? '';
+            $old_photo = account_photo($conn, $user_id);
             if ($old_photo && file_exists($upload_dir . $old_photo)) {
                 unlink($upload_dir . $old_photo);
             }
 
-            $upd = $conn->prepare("UPDATE users SET profile_photo = NULL WHERE user_id = ?");
-            $upd->bind_param('i', $user_id);
-            $upd->execute();
+            account_set_photo($conn, $user_id, null);
 
             api_success([], 'Profile photo removed.');
             break;
@@ -131,62 +122,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             }
 
             // Get current user data
-            $cur_stmt = $conn->prepare("SELECT email, full_name FROM users WHERE user_id = ?");
-            $cur_stmt->bind_param('i', $user_id);
-            $cur_stmt->execute();
-            $cur_data = $cur_stmt->get_result()->fetch_assoc();
-            $old_email = $cur_data['email'] ?? '';
+            $old_email = account_email($conn, $user_id);
 
             // Email uniqueness check (against both users and pending verifications)
             if ($email !== '' && $email !== $old_email) {
-                $dup = $conn->prepare("SELECT user_id FROM users WHERE email = ? AND user_id != ?");
-                $dup->bind_param('si', $email, $user_id);
-                $dup->execute();
-                if ($dup->get_result()->num_rows > 0) {
+                if (account_email_taken($conn, $email, $user_id)) {
                     api_error('Email is already used by another account.');
                     exit;
                 }
 
-                // Send verification email instead of updating directly
+                // Send verification email instead of updating directly (any earlier pending change is cancelled)
                 $token = bin2hex(random_bytes(32));
-
-                // Invalidate previous pending verifications
-                $inv = $conn->prepare("UPDATE email_verifications SET used = 1 WHERE user_id = ? AND used = 0");
-                $inv->bind_param('i', $user_id);
-                $inv->execute();
-
-                // Use MySQL NOW() to avoid PHP/MySQL timezone mismatch
-                $ins = $conn->prepare("INSERT INTO email_verifications (user_id, new_email, token, expires_at) VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 24 HOUR))");
-                $ins->bind_param('iss', $user_id, $email, $token);
-                $ins->execute();
+                account_email_change_request($conn, $user_id, $email, $token);
 
                 $verifyLink = app_url('auth/verify_email.php?token=' . $token);
 
                 sendEmailVerificationEmail($email, $name, $verifyLink);
 
                 // Don't update email directly — update name only
-                $upd = $conn->prepare("UPDATE users SET first_name = ?, last_name = ? WHERE user_id = ?");
-                $upd->bind_param('ssi', $first, $last, $user_id);
-                $upd->execute();
+                account_set_name($conn, $user_id, $first, $last);
                 $_SESSION['full_name'] = $display_name;
 
-                $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'PROFILE_UPDATED', ?)");
                 $desc = $display_name . ' updated their profile. Email verification sent to ' . $email . '.';
-                $log->bind_param('is', $user_id, $desc);
-                $log->execute();
+                audit_log_add($conn, $user_id, 'PROFILE_UPDATED', $desc);
 
                 $msg = 'Profile updated. A verification email has been sent to ' . htmlspecialchars($email) . '.';
             } else {
                 // No email change — update profile normally
-                $upd = $conn->prepare("UPDATE users SET first_name = ?, last_name = ?, email = ? WHERE user_id = ?");
-                $upd->bind_param('sssi', $first, $last, $email, $user_id);
-                $upd->execute();
+                account_set_name($conn, $user_id, $first, $last, $email);
                 $_SESSION['full_name'] = $display_name;
 
-                $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'PROFILE_UPDATED', ?)");
                 $desc = $display_name . ' updated their profile.';
-                $log->bind_param('is', $user_id, $desc);
-                $log->execute();
+                audit_log_add($conn, $user_id, 'PROFILE_UPDATED', $desc);
 
                 $msg = 'Profile updated successfully.';
             }
@@ -206,25 +173,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                     exit;
                 }
 
-                $pw_stmt = $conn->prepare("SELECT password FROM users WHERE user_id = ?");
-                $pw_stmt->bind_param('i', $user_id);
-                $pw_stmt->execute();
-                $pw_row = $pw_stmt->get_result()->fetch_assoc();
-
-                if (!password_verify($cur_pw, $pw_row['password'])) {
+                if (!password_verify($cur_pw, account_password_hash($conn, $user_id))) {
                     api_error('Current password is incorrect.', 403);
                     exit;
                 }
 
-                $hashed = password_hash($new_pw, PASSWORD_DEFAULT);
-                $pw_upd = $conn->prepare("UPDATE users SET password = ? WHERE user_id = ?");
-                $pw_upd->bind_param('si', $hashed, $user_id);
-                $pw_upd->execute();
+                account_set_password($conn, $user_id, password_hash($new_pw, PASSWORD_DEFAULT));
 
-                $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'PASSWORD_CHANGED', ?)");
                 $desc = $display_name . ' changed their password.';
-                $log->bind_param('is', $user_id, $desc);
-                $log->execute();
+                audit_log_add($conn, $user_id, 'PASSWORD_CHANGED', $desc);
 
                 // Send password change notification email
                 $notify_email = $email ?: $old_email;
@@ -259,10 +216,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             }
 
             // Verify password + check cooldown
-            $pw_stmt = $conn->prepare("SELECT password, username, username_changed_at FROM users WHERE user_id = ?");
-            $pw_stmt->bind_param('i', $user_id);
-            $pw_stmt->execute();
-            $pw_row = $pw_stmt->get_result()->fetch_assoc();
+            $pw_row = account_username_state($conn, $user_id);
 
             if ($pw_row['username_changed_at']) {
                 $days_since = (int)floor((time() - strtotime($pw_row['username_changed_at'])) / 86400);
@@ -283,25 +237,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             }
 
             // Check uniqueness
-            $dup = $conn->prepare("SELECT user_id FROM users WHERE username = ? AND user_id != ?");
-            $dup->bind_param('si', $new_username, $user_id);
-            $dup->execute();
-            if ($dup->get_result()->num_rows > 0) {
+            if (account_username_taken($conn, $new_username, $user_id)) {
                 api_error('That username is already taken.');
                 exit;
             }
 
-            $now = date('Y-m-d H:i:s');
-            $upd = $conn->prepare("UPDATE users SET username = ?, username_changed_at = ? WHERE user_id = ?");
-            $upd->bind_param('ssi', $new_username, $now, $user_id);
-            $upd->execute();
+            account_set_username($conn, $user_id, $new_username, date('Y-m-d H:i:s'));
 
             $_SESSION['username'] = $new_username;
 
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'PROFILE_UPDATED', ?)");
             $desc = ($_SESSION['full_name'] ?? '') . ' changed their username to @' . $new_username . '.';
-            $log->bind_param('is', $user_id, $desc);
-            $log->execute();
+            audit_log_add($conn, $user_id, 'PROFILE_UPDATED', $desc);
 
             api_success(['new_username' => $new_username], 'Username updated to @' . $new_username . '.');
             exit;
@@ -312,24 +258,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
 
             // If enabling 2FA, user must have an email
             if ($enabled) {
-                $em_chk = $conn->prepare("SELECT email FROM users WHERE user_id = ?");
-                $em_chk->bind_param('i', $user_id);
-                $em_chk->execute();
-                $em_row = $em_chk->get_result()->fetch_assoc();
-                if (empty($em_row['email'])) {
+                if (account_email($conn, $user_id) === '') {
                     api_error('You must have an email address set before enabling Two-Factor Authentication.');
                     exit;
                 }
             }
 
-            $upd = $conn->prepare("UPDATE users SET two_factor_enabled = ? WHERE user_id = ?");
-            $upd->bind_param('ii', $enabled, $user_id);
-            $upd->execute();
+            account_set_email_2fa($conn, $user_id, (bool)$enabled);
 
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'SECURITY_UPDATED', ?)");
             $desc = $_SESSION['full_name'] . ($enabled ? ' enabled' : ' disabled') . ' two-factor authentication.';
-            $log->bind_param('is', $user_id, $desc);
-            $log->execute();
+            audit_log_add($conn, $user_id, 'SECURITY_UPDATED', $desc);
 
             api_success([], '2FA ' . ($enabled ? 'enabled' : 'disabled') . ' successfully.');
             break;
@@ -352,35 +290,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
             if (!$secret) { api_error('No pending setup. Please start again.'); exit; }
             if (!totp_verify($secret, $code)) { api_error('Incorrect code. Make sure your authenticator app time is in sync.', 403); exit; }
             // Verify password
-            $pw_row = $conn->prepare("SELECT password FROM users WHERE user_id = ?");
-            $pw_row->bind_param('i', $user_id); $pw_row->execute();
-            $pw_hash = $pw_row->get_result()->fetch_assoc()['password'] ?? '';
-            if (!password_verify($password, $pw_hash)) { api_error('Incorrect password.', 403); exit; }
+            if (!password_verify($password, account_password_hash($conn, $user_id))) { api_error('Incorrect password.', 403); exit; }
             $plain_codes  = totp_generate_recovery_codes(8);
             $hashed_codes = array_map(fn($c) => password_hash($c, PASSWORD_DEFAULT), $plain_codes);
-            $encoded = json_encode($hashed_codes);
-            $u = $conn->prepare("UPDATE users SET totp_secret = ?, totp_enabled = 1, totp_recovery_codes = ?, two_factor_enabled = 0 WHERE user_id = ?");
-            $u->bind_param('ssi', $secret, $encoded, $user_id); $u->execute();
+            account_enable_totp($conn, $user_id, $secret, json_encode($hashed_codes));
             unset($_SESSION['totp_pending_secret']);
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'TOTP_ENABLED', ?)");
             $desc = ($_SESSION['full_name'] ?? '') . ' enabled authenticator app 2FA.';
-            $log->bind_param('is', $user_id, $desc); $log->execute();
+            audit_log_add($conn, $user_id, 'TOTP_ENABLED', $desc);
             api_success(['recovery_codes' => $plain_codes]);
             exit;
 
         // ── TOTP DISABLE ──
         case 'totp_disable':
             $password = $_POST['password'] ?? '';
-            $s = $conn->prepare("SELECT password FROM users WHERE user_id = ?");
-            $s->bind_param('i', $user_id); $s->execute();
-            $row = $s->get_result()->fetch_assoc();
-            if (!$row || !password_verify($password, $row['password'])) { api_error('Incorrect password.', 403); exit; }
+            if (!password_verify($password, account_password_hash($conn, $user_id))) { api_error('Incorrect password.', 403); exit; }
             if (is_developer()) { api_error('The developer account must keep the authenticator app on.', 403); exit; }
-            $u = $conn->prepare("UPDATE users SET totp_secret = NULL, totp_enabled = 0, totp_recovery_codes = NULL WHERE user_id = ?");
-            $u->bind_param('i', $user_id); $u->execute();
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'TOTP_DISABLED', ?)");
+            account_disable_totp($conn, $user_id);
             $desc = ($_SESSION['full_name'] ?? '') . ' disabled authenticator app 2FA.';
-            $log->bind_param('is', $user_id, $desc); $log->execute();
+            audit_log_add($conn, $user_id, 'TOTP_DISABLED', $desc);
             api_success();
             exit;
 
@@ -388,15 +315,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
         case 'totp_regen_recovery':
             require_once '../../config/totp.php';
             $password = $_POST['password'] ?? '';
-            $s = $conn->prepare("SELECT password FROM users WHERE user_id = ?");
-            $s->bind_param('i', $user_id); $s->execute();
-            $row = $s->get_result()->fetch_assoc();
-            if (!$row || !password_verify($password, $row['password'])) { api_error('Incorrect password.', 403); exit; }
+            if (!password_verify($password, account_password_hash($conn, $user_id))) { api_error('Incorrect password.', 403); exit; }
             $plain_codes  = totp_generate_recovery_codes(8);
             $hashed_codes = array_map(fn($c) => password_hash($c, PASSWORD_DEFAULT), $plain_codes);
-            $encoded = json_encode($hashed_codes);
-            $u = $conn->prepare("UPDATE users SET totp_recovery_codes = ? WHERE user_id = ?");
-            $u->bind_param('si', $encoded, $user_id); $u->execute();
+            account_set_recovery_codes($conn, $user_id, json_encode($hashed_codes));
             api_success(['recovery_codes' => $plain_codes]);
             exit;
 
@@ -404,9 +326,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
         case 'design_prefs':
             $theme = theme_valid($_POST['theme'] ?? '');   // includes/themes.php
 
-            $upd = $conn->prepare("UPDATE users SET theme = ? WHERE user_id = ?");
-            $upd->bind_param('si', $theme, $user_id);
-            $upd->execute();
+            account_set_theme($conn, $user_id, $theme);
 
             $_SESSION['theme'] = $theme;
 
@@ -455,9 +375,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
 
             // A linked recipient must be someone the picker could have offered: a visible
             // (non-hidden) account with an email on file — never an arbitrary submitted id.
-            $cnr_valid_ids = [];
-            $vr = $conn->query("SELECT user_id FROM users WHERE is_hidden = 0 AND email IS NOT NULL AND email != ''");
-            while ($vrow = $vr->fetch_assoc()) $cnr_valid_ids[] = (int)$vrow['user_id'];
+            $cnr_valid_ids = array_map('intval', array_column(claim_notify_pickable_users($conn), 'user_id'));
 
             $new_recipients = []; // [ ['user_id' => int|null, 'email' => string|null], ... ]
             for ($i = 0; $i < $row_count; $i++) {
@@ -471,14 +389,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                 if (count($new_recipients) >= 5) break;
             }
 
-            $conn->query("DELETE FROM claim_notify_recipients");
-            if (!empty($new_recipients)) {
-                $ins_cnr = $conn->prepare("INSERT INTO claim_notify_recipients (user_id, email) VALUES (?, ?)");
-                foreach ($new_recipients as $r) {
-                    $ins_cnr->bind_param('is', $r['user_id'], $r['email']);
-                    $ins_cnr->execute();
-                }
-            }
+            // old list removed and new one saved together, so a failure never leaves no one to notify
+            db_transaction($conn, fn() => claim_notify_recipients_replace($conn, $new_recipients));
             // Insurance
             foreach (['eligibility_max_age', 'renewal_urgent_days', 'renewal_expiring_days'] as $k) {
                 setSetting($conn, $k, (string)max(1, (int)($_POST[$k] ?? 0)));
@@ -492,10 +404,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                 setSetting($conn, $k, trim($_POST[$k] ?? ''));
             }
 
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'SETTINGS_UPDATED', ?)");
             $desc = $_SESSION['full_name'] . ' updated system settings.';
-            $log->bind_param('is', $user_id, $desc);
-            $log->execute();
+            audit_log_add($conn, $user_id, 'SETTINGS_UPDATED', $desc);
 
             api_success([], 'All settings saved successfully.');
             break;
@@ -521,22 +431,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                 api_error('Current password is required.');
                 exit;
             }
-            $pw_stmt = $conn->prepare("SELECT password FROM users WHERE user_id = ?");
-            $pw_stmt->bind_param('i', $user_id);
-            $pw_stmt->execute();
-            $pw_row = $pw_stmt->get_result()->fetch_assoc();
-            if (!password_verify($cur_pw, $pw_row['password'])) {
+            if (!password_verify($cur_pw, account_password_hash($conn, $user_id))) {
                 api_error('Current password is incorrect.', 403);
                 exit;
             }
-            $hashed_pin = password_hash($new_pin, PASSWORD_DEFAULT);
-            $upd = $conn->prepare("UPDATE users SET transaction_pin = ? WHERE user_id = ?");
-            $upd->bind_param('si', $hashed_pin, $user_id);
-            $upd->execute();
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'SECURITY_UPDATED', ?)");
+            account_set_pin($conn, $user_id, password_hash($new_pin, PASSWORD_DEFAULT));
             $desc = ($_SESSION['full_name'] ?? '') . ' set a transaction PIN.';
-            $log->bind_param('is', $user_id, $desc);
-            $log->execute();
+            audit_log_add($conn, $user_id, 'SECURITY_UPDATED', $desc);
             api_success([], 'Transaction PIN set successfully.');
             exit;
 
@@ -546,27 +447,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                 api_error('Current password is required.');
                 exit;
             }
-            $pw_stmt = $conn->prepare("SELECT password FROM users WHERE user_id = ?");
-            $pw_stmt->bind_param('i', $user_id);
-            $pw_stmt->execute();
-            $pw_row = $pw_stmt->get_result()->fetch_assoc();
-            if (!password_verify($cur_pw, $pw_row['password'])) {
+            if (!password_verify($cur_pw, account_password_hash($conn, $user_id))) {
                 api_error('Current password is incorrect.', 403);
                 exit;
             }
-            $upd = $conn->prepare("UPDATE users SET transaction_pin = NULL WHERE user_id = ?");
-            $upd->bind_param('i', $user_id);
-            $upd->execute();
+            account_set_pin($conn, $user_id, null);
             api_success([], 'Transaction PIN removed.');
             exit;
 
         case 'pin_verify':
             $pin = $_POST['pin'] ?? '';
-            $pin_stmt = $conn->prepare("SELECT transaction_pin FROM users WHERE user_id = ?");
-            $pin_stmt->bind_param('i', $user_id);
-            $pin_stmt->execute();
-            $pin_row = $pin_stmt->get_result()->fetch_assoc();
-            if (!$pin_row['transaction_pin']) {
+            $pin_hash = account_pin_hash($conn, $user_id);
+            if ($pin_hash === null) {
                 api_success(['no_pin' => true]);
                 exit;
             }
@@ -577,7 +469,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                 api_error('Too many attempts. Please wait a few minutes before trying again.', 429);
                 exit;
             }
-            if (password_verify($pin, $pin_row['transaction_pin'])) {
+            if (password_verify($pin, $pin_hash)) {
                 rate_limit_clear($conn, 'verify_pin', $rl_key);
                 pin_grant();
                 api_success();
@@ -600,16 +492,11 @@ $full_name = $_SESSION['full_name'];
 $initials  = substr(implode('', array_map(fn($w) => strtoupper($w[0] ?? ''), array_filter(explode(' ', $full_name), 'strlen'))), 0, 2);
 
 // Current user record (include 2FA status, photo, theme)
-$u_stmt = $conn->prepare("SELECT first_name, last_name, full_name, username, username_changed_at, email, two_factor_enabled, totp_enabled, profile_photo, theme, transaction_pin FROM users WHERE user_id = ?");
-$u_stmt->bind_param('i', $user_id);
-$u_stmt->execute();
-$current_user = $u_stmt->get_result()->fetch_assoc();
+$current_user = account_get($conn, $user_id);
 
 // Check for pending email verification
-$pend_stmt = $conn->prepare("SELECT new_email FROM email_verifications WHERE user_id = ? AND used = 0 AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1");
-$pend_stmt->bind_param('i', $user_id);
-$pend_stmt->execute();
-$pending_email = $pend_stmt->get_result()->fetch_assoc();
+$pending_new_email = account_email_change_pending($conn, $user_id);
+$pending_email     = $pending_new_email === null ? null : ['new_email' => $pending_new_email];
 
 // All system settings. The defaults fill in any key that has no row yet (a fresh or local database),
 // so the form never prints an undefined-key warning; saved values always win over these.
@@ -635,26 +522,10 @@ $settings = array_merge([
 
 // Claim notify recipients (up to 5) — each is either a linked user (email follows their account)
 // or a raw typed email address.
-$claim_notify_rows = [];
-$cnr_res = $conn->query("
-    SELECT r.user_id, r.email AS raw_email,
-           CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.username  END AS username,
-           CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.full_name END AS full_name,
-           u.email AS user_email
-    FROM claim_notify_recipients r
-    LEFT JOIN users u ON r.user_id = u.user_id
-    ORDER BY r.id ASC
-");
-while ($cnr_row = $cnr_res->fetch_assoc()) {
-    $claim_notify_rows[] = $cnr_row;
-}
+$claim_notify_rows = claim_notify_recipients($conn);
 
 // Users eligible to be picked as a linked recipient (must have an email on file)
-$claim_notify_pickable = [];
-$pick_res = $conn->query("SELECT user_id, username, full_name FROM users WHERE is_hidden = 0 AND email IS NOT NULL AND email != '' ORDER BY full_name ASC");
-while ($pick_row = $pick_res->fetch_assoc()) {
-    $claim_notify_pickable[] = $pick_row;
-}
+$claim_notify_pickable = claim_notify_pickable_users($conn);
 
 $page_title  = 'Settings';
 $active_page = 'settings';

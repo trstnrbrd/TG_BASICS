@@ -16,10 +16,8 @@ $_profile_photo_url = '';
 $_first_name_display = '';
 $_last_name_display  = '';
 if (isset($_SESSION['user_id'], $conn)) {
-    $_pq = $conn->prepare("SELECT profile_photo, first_name, last_name, email FROM users WHERE user_id = ?");
-    $_pq->bind_param('i', $_SESSION['user_id']);
-    $_pq->execute();
-    $_pr = $_pq->get_result()->fetch_assoc();
+    require_once __DIR__ . '/data_access.php';
+    $_pr = account_topbar($conn, (int)$_SESSION['user_id']);
     if (!empty($_pr['profile_photo'])) {
         $_profile_photo_url = $base_path . 'uploads/avatars/' . $_pr['profile_photo'];
     }

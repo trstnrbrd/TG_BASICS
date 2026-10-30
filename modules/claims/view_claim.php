@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
@@ -17,24 +18,7 @@ $claim_id = (int)($_GET['id'] ?? 0);
 if (!$claim_id) { header("Location: claims_list.php"); exit; }
 
 // Load claim
-$stmt = $conn->prepare("
-    SELECT cl.*,
-           c.full_name, c.contact_number, c.email, c.address, c.client_id,
-           ip.policy_number, ip.coverage_type, ip.policy_start, ip.policy_end,
-           ip.total_premium, ip.participation_fee, ip.payment_status,
-           v.plate_number, v.make, v.model, v.year_model, v.color,
-           v.motor_number, v.serial_number,
-           CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.full_name END as filed_by
-    FROM claims cl
-    INNER JOIN clients c         ON cl.client_id  = c.client_id
-    INNER JOIN insurance_policies ip ON cl.policy_id  = ip.policy_id
-    LEFT  JOIN vehicles v        ON ip.vehicle_id = v.vehicle_id
-    LEFT  JOIN users u           ON cl.created_by = u.user_id
-    WHERE cl.claim_id = ?
-");
-$stmt->bind_param('i', $claim_id);
-$stmt->execute();
-$claim = $stmt->get_result()->fetch_assoc();
+$claim = claim_find($conn, $claim_id);
 if (!$claim) { header("Location: claims_list.php"); exit; }
 
 // Policy expiry + document progress. Computed here, before any POST handler runs, because the
@@ -48,23 +32,14 @@ $docs_done      = (int)$claim['doc_insurance_policy'] + (int)$claim['doc_or'] + 
 $all_docs_complete = $docs_done === $required_docs;
 
 // Display number — sequential position, not raw ID
-$dn_stmt = $conn->prepare("SELECT COUNT(*) as pos FROM claims WHERE claim_id <= ?");
-$dn_stmt->bind_param('i', $claim_id);
-$dn_stmt->execute();
-$display_num = $dn_stmt->get_result()->fetch_assoc()['pos'];
+$display_num = claim_display_number($conn, $claim_id);
 
 // Load damage photos
-$dp_stmt = $conn->prepare("SELECT photo_id, filename FROM claim_damage_photos WHERE claim_id = ? ORDER BY uploaded_at ASC");
-$dp_stmt->bind_param('i', $claim_id);
-$dp_stmt->execute();
-$damage_photos = $dp_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$damage_photos = claim_damage_photos($conn, $claim_id);
 
 // Helper: re-fetch doc counts
 function fetchDocCounts($conn, $claim_id) {
-    $s = $conn->prepare("SELECT claim_type, doc_insurance_policy, doc_or, doc_cr, doc_drivers_license, doc_affidavit, doc_estimate, doc_damage_photos FROM claims WHERE claim_id = ?");
-    $s->bind_param('i', $claim_id);
-    $s->execute();
-    $chk = $s->get_result()->fetch_assoc();
+    $chk = claim_doc_flags($conn, $claim_id);
     $req  = 7; // policy, OR, CR, license, affidavit, estimate, photos
     $done = (int)$chk['doc_insurance_policy'] + (int)$chk['doc_or'] + (int)$chk['doc_cr']
           + (int)$chk['doc_drivers_license'] + (int)$chk['doc_affidavit']
@@ -106,22 +81,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_upload'])) {
     $filename = 'claim_' . $claim_id . '_' . $doc_field . '_' . time() . '.' . $ext;
     $dest     = __DIR__ . '/../../uploads/claims/' . $filename;
 
-    // Delete old file if exists — $doc_field is already whitelist-validated above
-    $file_col_old = $doc_field . '_file';
-    $old_stmt = $conn->prepare("SELECT `{$file_col_old}` FROM claims WHERE claim_id = ?");
-    $old_stmt->bind_param('i', $claim_id);
-    $old_stmt->execute();
-    $old = $old_stmt->get_result()->fetch_assoc()[$file_col_old] ?? '';
+    // Delete old file if exists — $doc_field is whitelist-validated above (and again inside the DAL)
+    $old = claim_doc_file($conn, $claim_id, $doc_field);
     if ($old && file_exists(__DIR__ . '/../../uploads/claims/' . $old)) {
         unlink(__DIR__ . '/../../uploads/claims/' . $old);
     }
 
     if (!move_uploaded_file($file['tmp_name'], $dest)) api_error('Could not save file.', 500);
 
-    $file_col = $doc_field . '_file';
-    $upd = $conn->prepare("UPDATE claims SET $doc_field = 1, $file_col = ? WHERE claim_id = ?");
-    $upd->bind_param('si', $filename, $claim_id);
-    $upd->execute();
+    claim_doc_set($conn, $claim_id, $doc_field, $filename);
 
     $counts = fetchDocCounts($conn, $claim_id);
     $url    = upload_url('claims', $filename);
@@ -137,18 +105,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_remove_doc'])) {
         api_error('Not allowed.', 403);
     }
 
-    $file_col = $doc_field . '_file';
-    $rm_stmt = $conn->prepare("SELECT `{$file_col}` FROM claims WHERE claim_id = ?");
-    $rm_stmt->bind_param('i', $claim_id);
-    $rm_stmt->execute();
-    $old = $rm_stmt->get_result()->fetch_assoc()[$file_col] ?? '';
+    $old = claim_doc_file($conn, $claim_id, $doc_field);
     if ($old && file_exists(__DIR__ . '/../../uploads/claims/' . $old)) {
         unlink(__DIR__ . '/../../uploads/claims/' . $old);
     }
 
-    $upd = $conn->prepare("UPDATE claims SET $doc_field = 0, $file_col = NULL WHERE claim_id = ?");
-    $upd->bind_param('i', $claim_id);
-    $upd->execute();
+    claim_doc_set($conn, $claim_id, $doc_field, null);
 
     $counts = fetchDocCounts($conn, $claim_id);
     api_success($counts);
@@ -177,19 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_damage_upload'])
 
     // The photo row and the "photos present" flag change together; if either fails, the saved file is removed
     try {
-        $photo_id = db_transaction($conn, function () use ($conn, $claim_id, $filename) {
-            $ins = $conn->prepare("INSERT INTO claim_damage_photos (claim_id, filename) VALUES (?, ?)");
-            $ins->bind_param('is', $claim_id, $filename);
-            $ins->execute();
-            $id = $conn->insert_id;
-
-            // Mark doc_damage_photos = 1 if not already
-            $dmg_upd = $conn->prepare("UPDATE claims SET doc_damage_photos = 1 WHERE claim_id = ? AND doc_damage_photos = 0");
-            $dmg_upd->bind_param('i', $claim_id);
-            $dmg_upd->execute();
-
-            return $id;
-        });
+        $photo_id = db_transaction($conn, fn() => claim_damage_photo_add($conn, $claim_id, $filename));
     } catch (Throwable $e) {
         unlink($dest);
         throw $e;
@@ -207,31 +157,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_damage_remove'])
 
     $photo_id = (int)($_POST['photo_id'] ?? 0);
     // The photo row, the remaining count and the "photos present" flag change together
-    [$removed_file, $remaining] = db_transaction($conn, function () use ($conn, $photo_id, $claim_id) {
-        $removed_file = null;
-        $ph_sel = $conn->prepare("SELECT filename FROM claim_damage_photos WHERE photo_id = ? AND claim_id = ?");
-        $ph_sel->bind_param('ii', $photo_id, $claim_id);
-        $ph_sel->execute();
-        $row = $ph_sel->get_result()->fetch_assoc();
-        if ($row) {
-            $removed_file = $row['filename'];
-            $ph_del = $conn->prepare("DELETE FROM claim_damage_photos WHERE photo_id = ?");
-            $ph_del->bind_param('i', $photo_id);
-            $ph_del->execute();
-        }
-
-        // If no photos remain, uncheck doc_damage_photos
-        $rem_stmt = $conn->prepare("SELECT COUNT(*) as c FROM claim_damage_photos WHERE claim_id = ?");
-        $rem_stmt->bind_param('i', $claim_id);
-        $rem_stmt->execute();
-        $remaining = $rem_stmt->get_result()->fetch_assoc()['c'];
-        if ($remaining === 0) {
-            $uncheck = $conn->prepare("UPDATE claims SET doc_damage_photos = 0 WHERE claim_id = ?");
-            $uncheck->bind_param('i', $claim_id);
-            $uncheck->execute();
-        }
-        return [$removed_file, $remaining];
-    });
+    // (none left unticks "photos present")
+    [$removed_file, $remaining] = db_transaction($conn, fn() => claim_damage_photo_remove($conn, $claim_id, $photo_id));
     // The file goes only after the database change is committed
     if ($removed_file !== null) {
         $path = __DIR__ . '/../../uploads/claims/' . $removed_file;
@@ -245,25 +172,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_damage_remove'])
 // Handle AJAX: Send requirements email to admin
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_send_admin_email'])) {
     // Linked recipients use the user's CURRENT email (follows their account); raw entries use the stored email.
-    $notify_emails = [];
-    $cnr_res = $conn->query("
-        SELECT COALESCE(u.email, r.email) AS resolved_email
-        FROM claim_notify_recipients r
-        LEFT JOIN users u ON r.user_id = u.user_id
-        ORDER BY r.id ASC
-    ");
-    while ($cnr_row = $cnr_res->fetch_assoc()) {
-        if (!empty($cnr_row['resolved_email'])) {
-            $notify_emails[] = $cnr_row['resolved_email'];
-        }
-    }
+    $notify_emails = claim_notify_emails($conn);
     if (empty($notify_emails)) api_error('No admin email configured. Please set it in Settings.');
 
     // Reload fresh claim data
-    $fr_stmt = $conn->prepare("SELECT * FROM claims WHERE claim_id = ?");
-    $fr_stmt->bind_param('i', $claim_id);
-    $fr_stmt->execute();
-    $fresh = $fr_stmt->get_result()->fetch_assoc();
+    $fresh = claim_row($conn, $claim_id);
 
     $upload_dir = __DIR__ . '/../../uploads/claims/';
 
@@ -295,12 +208,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_send_admin_email
     }
 
     // Also attach damage photos (stored in separate table)
-    $ph_stmt = $conn->prepare("SELECT filename FROM claim_damage_photos WHERE claim_id = ? ORDER BY uploaded_at ASC");
-    $ph_stmt->bind_param('i', $claim_id);
-    $ph_stmt->execute();
-    $photos = $ph_stmt->get_result();
     $photo_idx = 1;
-    while ($ph = $photos->fetch_assoc()) {
+    foreach (claim_damage_photos($conn, $claim_id) as $ph) {
         $ph_path = $upload_dir . $ph['filename'];
         if (file_exists($ph_path)) {
             $attachments[] = ['path' => $ph_path, 'name' => 'Photo_' . $photo_idx . '.' . pathinfo($ph['filename'], PATHINFO_EXTENSION)];
@@ -328,43 +237,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_send_admin_email
 function deleteClaim($conn, $claim_id, $display_num, $user_id, $actor_name) {
     $upload_dir = __DIR__ . '/../../uploads/claims/';
 
-    // Delete all individual doc files (all file columns)
-    $doc_cols = [
-        'doc_insurance_policy_file', 'doc_or_file', 'doc_cr_file',
-        'doc_drivers_license_file', 'doc_affidavit_file', 'doc_estimate_file',
-        'doc_damage_photos_file', 'doc_or_cr_file', 'doc_police_report_file',
-    ];
-    $dc_stmt = $conn->prepare("SELECT " . implode(',', $doc_cols) . " FROM claims WHERE claim_id = ?");
-    $dc_stmt->bind_param('i', $claim_id);
-    $dc_stmt->execute();
-    // Files are removed only after the database delete is committed (below), so a failed delete keeps them
+    // Every file of the claim (document files, older file columns, damage photos). They are removed only after
+    // the database delete is committed (below), so a failed delete keeps them
     $files = [];
-    $row = $dc_stmt->get_result()->fetch_assoc();
-    if ($row) {
-        foreach ($doc_cols as $col) {
-            if (!empty($row[$col]) && file_exists($upload_dir . $row[$col])) $files[] = $upload_dir . $row[$col];
-        }
-    }
-
-    // Damage photos listed in claim_damage_photos (the rows go with the claim)
-    $dp2 = $conn->prepare("SELECT filename FROM claim_damage_photos WHERE claim_id = ?");
-    $dp2->bind_param('i', $claim_id);
-    $dp2->execute();
-    $photos = $dp2->get_result();
-    while ($p = $photos->fetch_assoc()) {
-        if (file_exists($upload_dir . $p['filename'])) $files[] = $upload_dir . $p['filename'];
+    foreach (claim_files($conn, $claim_id) as $f) {
+        if (file_exists($upload_dir . $f)) $files[] = $upload_dir . $f;
     }
 
     // Delete DB row (claim_damage_photos deleted via CASCADE) and its audit entry, together
     db_transaction($conn, function () use ($conn, $claim_id, $user_id, $actor_name) {
-        $del = $conn->prepare("DELETE FROM claims WHERE claim_id = ?");
-        $del->bind_param('i', $claim_id);
-        $del->execute();
+        claim_delete($conn, $claim_id);
 
-        $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'CLAIM_DELETED', ?)");
         $desc = $actor_name . ' deleted claim #' . $claim_id . '.';
-        $log->bind_param('is', $user_id, $desc);
-        $log->execute();
+        audit_log_add($conn, $user_id, 'CLAIM_DELETED', $desc);
     });
 
     foreach ($files as $path) unlink($path);
@@ -423,14 +308,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
         $dr  = $new_status === 'denied' ? $denial_reason : null;
         // The status change and its audit entry are saved together or not at all (includes/transaction.php)
         db_transaction($conn, function () use ($conn, $claim_id, $new_status, $dr, $notes) {
-            $upd = $conn->prepare("UPDATE claims SET status = ?, denial_reason = ?, notes = ? WHERE claim_id = ?");
-            $upd->bind_param('sssi', $new_status, $dr, $notes, $claim_id);
-            $upd->execute();
+            claim_set_status($conn, $claim_id, $new_status, $dr, $notes);
 
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'CLAIM_UPDATED', ?)");
             $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' updated claim #' . $claim_id . ' status to ' . $new_status . '.';
-            $log->bind_param('is', $_SESSION['user_id'], $desc);
-            $log->execute();
+            audit_log_add($conn, $_SESSION['user_id'], 'CLAIM_UPDATED', $desc);
         });
 
         // Send email notification to client if they have an email on file
@@ -504,10 +385,8 @@ require_once '../../includes/topbar.php';
       </div>
       <?php
       // Check if billing already exists for this claim
-      $has_billing_stmt = $conn->prepare("SELECT billing_id FROM billing WHERE claim_id = ?");
-      $has_billing_stmt->bind_param('i', $claim_id);
-      $has_billing_stmt->execute();
-      $has_billing = $has_billing_stmt->get_result()->fetch_assoc();
+      $billing_id_of_claim = billing_id_for_claim($conn, $claim_id);
+      $has_billing = $billing_id_of_claim === null ? null : ['billing_id' => $billing_id_of_claim];
       ?>
       <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
         <?php if (claim_is_billable($claim['status'])): ?>

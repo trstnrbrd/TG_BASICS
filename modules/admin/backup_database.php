@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../config/session.php';
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/settings.php';
@@ -29,10 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         api_error('Too many attempts. Please wait a few minutes before trying again.', 429);
     }
     $password = is_string($_POST['password'] ?? null) ? $_POST['password'] : '';
-    $st = $conn->prepare('SELECT password FROM users WHERE user_id = ? AND is_active = 1');
-    $st->bind_param('i', $uid);
-    $st->execute();
-    $hash = $st->get_result()->fetch_row()[0] ?? '';
+    $hash = user_password_hash($conn, $uid);
     if ($password === '' || $hash === '' || !password_verify($password, $hash)) {
         rate_limit_record($conn, 'db_backup', $rl_key);
         api_error('Incorrect password.', 403);
@@ -73,9 +71,7 @@ if (($grant['mode'] ?? 'db') === 'full') {
     setSetting($conn, 'backup_last_at', date('Y-m-d H:i:s'));
     setSetting($conn, 'backup_last_by', (string)$uid);
     $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' downloaded the weekly full backup of ' . date('M j, Y', strtotime($latest['at'])) . ' (' . full_backup_size_label($latest['size']) . ').';
-    $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'DATABASE_BACKUP', ?)");
-    $log->bind_param('is', $uid, $desc);
-    $log->execute();
+    audit_log_add($conn, $uid, 'DATABASE_BACKUP', $desc);
     exit;
 }
 @ini_set('zlib.output_compression', '0');
@@ -105,6 +101,4 @@ flush();
 setSetting($conn, 'backup_last_at', date('Y-m-d H:i:s'));
 setSetting($conn, 'backup_last_by', (string)$uid);
 $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' downloaded a database backup (' . $stats['tables'] . ' tables, ' . number_format($stats['rows']) . ' rows).';
-$log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'DATABASE_BACKUP', ?)");
-$log->bind_param('is', $uid, $desc);
-$log->execute();
+audit_log_add($conn, $uid, 'DATABASE_BACKUP', $desc);

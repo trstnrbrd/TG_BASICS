@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
@@ -9,57 +10,15 @@ require_once '../../includes/billing_lists.php';
 require_role(['admin', 'super_admin']);
 
 // ── CHECK ELIGIBLE CLAIMS (claims without billing) ──
-$eligible_claims = $conn->query("
-    SELECT COUNT(*) AS cnt
-    FROM claims cl
-    LEFT JOIN billing b ON b.claim_id = cl.claim_id
-    WHERE cl.status IN ('" . implode("','", CLAIM_BILLABLE_STATUSES) . "')
-      AND b.billing_id IS NULL
-")->fetch_assoc()['cnt'] ?? 0;
+$eligible_claims = billing_unbilled_claims_count($conn);
 
 // ── FILTERS ──
 $search        = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
 $filter_status = san_enum($_GET['status'] ?? 'all', array_merge(['all'], array_column(billing_statuses_all($conn), 'code')));
 $sort_by       = san_enum($_GET['sort']   ?? 'newest', ['newest', 'oldest']);
 
-$where  = ["1=1"];
-$params = [];
-$types  = '';
-
-if ($search !== '') {
-    $like    = "%$search%";
-    $where[] = "(b.billing_number LIKE ? OR c.full_name LIKE ? OR v.plate_number LIKE ? OR b.billed_to LIKE ?)";
-    $params  = array_merge($params, [$like, $like, $like, $like]);
-    $types  .= 'ssss';
-}
-if ($filter_status !== 'all') {
-    $where[] = "b.status = ?";
-    $params[] = $filter_status;
-    $types   .= 's';
-}
-
-$where_sql = implode(' AND ', $where);
-$order     = $sort_by === 'oldest' ? 'b.created_at ASC' : 'b.created_at DESC';
-
-$sql = "
-    SELECT b.billing_id, b.billing_number, b.billed_to, b.status,
-           b.parts_cost, b.labor_cost, b.other_cost, b.deductible, b.total_amount_due,
-           b.created_at, b.sent_at,
-           b.claim_id,
-           c.full_name, c.client_id,
-           v.plate_number, v.make, v.model,
-           ip.policy_number
-    FROM billing b
-    INNER JOIN claims cl          ON b.claim_id    = cl.claim_id
-    INNER JOIN clients c          ON cl.client_id  = c.client_id
-    INNER JOIN insurance_policies ip ON cl.policy_id  = ip.policy_id
-    LEFT  JOIN vehicles v         ON ip.vehicle_id = v.vehicle_id
-    WHERE $where_sql
-    ORDER BY $order
-";
-// One page at a time (includes/pagination.php) — the total is counted from this same query
-[$result, $pg] = paginate_query($conn, $sql, $types, $params);
-$rows     = $result->fetch_all(MYSQLI_ASSOC);
+// One page at a time (includes/pagination.php)
+[$rows, $pg] = billing_list_page($conn, $search, $filter_status, $sort_by);
 // Required Documents: the types (billing_document_types) and which ones each billing on this page has received
 $docs_got = billing_docs_received($conn, array_column($rows, 'billing_id'));
 

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
@@ -20,16 +21,7 @@ if (!client_editable($conn, $client_id)) {
 }
 
 // Load client (exclude soft-deleted) with its current insurance agent
-$stmt = $conn->prepare("
-    SELECT c.*,
-           CASE WHEN ag.is_hidden = 1 THEN 'Developer' ELSE ag.full_name END AS agent_name
-    FROM clients c
-    LEFT JOIN users ag ON ag.user_id = c.agent_id
-    WHERE c.client_id = ? AND c.deleted_at IS NULL
-");
-$stmt->bind_param('i', $client_id);
-$stmt->execute();
-$client = $stmt->get_result()->fetch_assoc();
+$client = client_find($conn, $client_id);   // with the agent's name (developer's masked)
 
 if (!$client) {
     header("Location: client_list.php?error=Client not found.");
@@ -67,19 +59,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($address === '')                            $errors[] = 'Address is required.';
 
     if (empty($errors)) {
-        $agent_param = $agent_id > 0 ? $agent_id : null;
-        $upd = $conn->prepare("UPDATE clients SET full_name = ?, contact_number = ?, email = ?, facebook_name = ?, address = ?, agent_id = ? WHERE client_id = ?");
-        $upd->bind_param('sssssii', $full_name, $contact_number, $email, $facebook_name, $address, $agent_param, $client_id);
-        if ($upd->execute()) {
+        $saved = client_update($conn, $client_id, [
+            'full_name' => $full_name, 'contact_number' => $contact_number, 'email' => $email,
+            'facebook_name' => $facebook_name, 'address' => $address, 'agent_id' => $agent_id,
+        ]);
+        if ($saved) {
             // Audit log
             $uid = $_SESSION['user_id'];
-            $log = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'CLIENT_UPDATED', ?)");
             $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' updated client "' . $full_name . '" (ID ' . $client_id . ').';
             if ($agent_id !== $cur_agent_id) {
                 $desc .= ' Insurance agent changed from ' . ($client['agent_name'] ?? 'Unassigned') . ' to ' . $agents[$agent_id]['full_name'] . '.';
             }
-            $log->bind_param('is', $uid, $desc);
-            $log->execute();
+            audit_log_add($conn, $uid, 'CLIENT_UPDATED', $desc);
 
             header("Location: view_client.php?id=" . $client_id . "&success=Client updated successfully.");
             exit;

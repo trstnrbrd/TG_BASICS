@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../includes/branding.php';
 require_once __DIR__ . "/../config/session.php";
+require_once __DIR__ . '/../includes/data_access.php';
 require_once '../config/db.php';
 require_once '../config/validators.php';
 require_once '../config/settings.php';
@@ -23,25 +24,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Please enter a valid email address.';
     } else {
-        $stmt = $conn->prepare("SELECT user_id, full_name, email FROM users WHERE email = ? AND is_active = 1");
-        $stmt->bind_param('s', $email);
-        $stmt->execute();
-        $user = $stmt->get_result()->fetch_assoc();
+        $user = user_find_active_by_email($conn, $email);
 
         if ($user) {
-            // Invalidate any existing unused tokens for this user
-            $inv = $conn->prepare("UPDATE password_resets SET used = 1 WHERE user_id = ? AND used = 0");
-            $inv->bind_param('i', $user['user_id']);
-            $inv->execute();
-
-            // Generate a new token
+            // A new link; any earlier unused one for this user stops working
             $reset_expiry_hours = (int)getSetting($conn, 'reset_link_expiry', '1');
             $token      = bin2hex(random_bytes(32));
             $expires_at = date('Y-m-d H:i:s', strtotime('+' . $reset_expiry_hours . ' hours'));
-
-            $ins = $conn->prepare("INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, ?)");
-            $ins->bind_param('iss', $user['user_id'], $token, $expires_at);
-            $ins->execute();
+            password_reset_issue($conn, (int)$user['user_id'], $token, $expires_at);
 
             $reset_link = app_url('auth/reset_password.php?token=' . $token);
             sendPasswordResetEmail($user['email'], $user['full_name'], $reset_link);

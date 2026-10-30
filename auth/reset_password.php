@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../includes/branding.php';
+require_once __DIR__ . '/../includes/data_access.php';
 require_once __DIR__ . "/../config/session.php";
 require_once '../config/db.php';
 require_once '../config/validators.php';
@@ -22,15 +23,7 @@ if ($token === '') {
 }
 
 // Look up the token
-$stmt = $conn->prepare("
-    SELECT pr.id, pr.user_id, pr.expires_at, pr.used, u.full_name, u.is_hidden
-    FROM password_resets pr
-    JOIN users u ON u.user_id = pr.user_id
-    WHERE pr.token = ?
-");
-$stmt->bind_param('s', $token);
-$stmt->execute();
-$record = $stmt->get_result()->fetch_assoc();
+$record = password_reset_find($conn, $token);
 
 if (!$record) {
     $error = 'This reset link is invalid or has already been used.';
@@ -51,26 +44,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $record && !$record['used'] && strt
     } else {
         $hashed = password_hash($new_password, PASSWORD_DEFAULT);
 
-        $upd = $conn->prepare("UPDATE users SET password = ?, failed_attempts = 0, locked_until = NULL WHERE user_id = ?");
-        $upd->bind_param('si', $hashed, $record['user_id']);
-
-        if ($upd->execute()) {
-            // Mark token as used
-            $mark = $conn->prepare("UPDATE password_resets SET used = 1 WHERE id = ?");
-            $mark->bind_param('i', $record['id']);
-            $mark->execute();
-
-            // Log it
-            $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'PASSWORD_RESET', ?)");
+        // New password, link used up and the audit entry: saved together. False = the link was used meanwhile.
+        $done = db_transaction($conn, function () use ($conn, $record, $hashed) {
+            if (!password_reset_complete($conn, (int)$record['id'], (int)$record['user_id'], $hashed)) return false;
             // mask the developer account's real name in the audit log
             $actor = !empty($record['is_hidden']) ? 'Developer' : $record['full_name'];
-            $desc  = $actor . ' reset their password via email link.';
-            $log->bind_param('is', $record['user_id'], $desc);
-            $log->execute();
+            audit_log_add($conn, $record['user_id'], 'PASSWORD_RESET', $actor . ' reset their password via email link.');
+            return true;
+        });
 
+        if ($done) {
             $success = true;
         } else {
-            $error = 'Something went wrong. Please try again.';
+            $error = 'This reset link has already been used. Please request a new one.';
         }
     }
 }

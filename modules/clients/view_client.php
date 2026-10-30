@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../includes/branding.php';
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once __DIR__ . '/../../includes/service_types.php';
@@ -41,10 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) 
         exit('Not allowed.');
     }
     $del_id = $client_id;
-    $cstmt  = $conn->prepare("SELECT full_name FROM clients WHERE client_id = ? AND deleted_at IS NULL");
-    $cstmt->bind_param('i', $del_id);
-    $cstmt->execute();
-    $cdata = $cstmt->get_result()->fetch_assoc();
+    $cdata  = client_find_name($conn, $del_id);
     if ($cdata) {
         // Same rule as the client list: policies, repair jobs and claims block the delete. Removing the
         // vehicles below cascades straight through them (policies, payments, repair jobs, quotations, receipts).
@@ -54,16 +52,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) 
             exit;
         }
 
-        // Remove vehicles first before soft-deleting the client
-        $conn->query("DELETE FROM vehicles WHERE client_id = " . $del_id);
-
-        $dstmt = $conn->prepare("UPDATE clients SET deleted_at = NOW() WHERE client_id = ?");
-        $dstmt->bind_param('i', $del_id);
-        $dstmt->execute();
-        $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'CLIENT_DELETED', ?)");
-        $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' deleted client "' . $cdata['full_name'] . '" and all associated records.';
-        $log->bind_param('is', $_SESSION['user_id'], $desc);
-        $log->execute();
+        // vehicles removed, client marked deleted and the audit entry: all saved together or not at all
+        db_transaction($conn, function () use ($conn, $del_id, $cdata) {
+            client_soft_delete($conn, $del_id);
+            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' deleted client "' . $cdata['full_name'] . '" and all associated records.';
+            audit_log_add($conn, $_SESSION['user_id'], 'CLIENT_DELETED', $desc);
+        });
         header("Location: client_list.php?success=" . urlencode('"' . $cdata['full_name'] . '" has been deleted.'));
         exit;
     }
@@ -86,9 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
             $fname = uniqid('doc_', true) . '.pdf';
             if (move_uploaded_file($tmp, $upload_dir . $fname)) {
-                $ins = $conn->prepare("INSERT INTO client_documents (client_id, file_name, original_name, uploaded_by) VALUES (?,?,?,?)");
-                $ins->bind_param('issi', $client_id, $fname, $orig, $_SESSION['user_id']);
-                $ins->execute();
+                client_document_add($conn, $client_id, $fname, $orig, (int)$_SESSION['user_id']);
             }
         }
     }
@@ -106,16 +98,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     if ($can_edit) {
         $doc_id = (int)($_POST['doc_id'] ?? 0);
         if ($doc_id) {
-            $fd = $conn->prepare("SELECT file_name FROM client_documents WHERE doc_id = ? AND client_id = ?");
-            $fd->bind_param('ii', $doc_id, $client_id);
-            $fd->execute();
-            $fd_row = $fd->get_result()->fetch_assoc();
-            if ($fd_row) {
-                $path = __DIR__ . '/../../uploads/client_docs/' . $client_id . '/' . $fd_row['file_name'];
+            $doc_file = client_document_file($conn, $doc_id, $client_id);   // null = not this client's
+            if ($doc_file !== null) {
+                $path = __DIR__ . '/../../uploads/client_docs/' . $client_id . '/' . $doc_file;
                 if (file_exists($path)) unlink($path);
-                $del = $conn->prepare("DELETE FROM client_documents WHERE doc_id = ?");
-                $del->bind_param('i', $doc_id);
-                $del->execute();
+                client_document_delete($conn, $doc_id);
             }
         }
     }
@@ -124,18 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 }
 
 // Load client (exclude soft-deleted), with its insurance agent and who added it — masked if either is the hidden account
-$stmt = $conn->prepare("
-    SELECT c.*,
-           CASE WHEN ag.is_hidden = 1 THEN 'Developer' ELSE ag.full_name END AS agent_name,
-           CASE WHEN cb.is_hidden = 1 THEN 'Developer' ELSE cb.full_name END AS added_by_name
-    FROM clients c
-    LEFT JOIN users ag ON ag.user_id = c.agent_id
-    LEFT JOIN users cb ON cb.user_id = c.created_by
-    WHERE c.client_id = ? AND c.deleted_at IS NULL
-");
-$stmt->bind_param('i', $client_id);
-$stmt->execute();
-$client = $stmt->get_result()->fetch_assoc();
+$client = client_find($conn, $client_id);
 
 if (!$client) {
     header("Location: client_list.php?error=Client not found.");
@@ -143,70 +119,20 @@ if (!$client) {
 }
 
 // Load vehicles
-$vstmt = $conn->prepare("SELECT * FROM vehicles WHERE client_id = ? ORDER BY vehicle_id DESC");
-$vstmt->bind_param('i', $client_id);
-$vstmt->execute();
-$vehicles = $vstmt->get_result();
+$vehicles = client_vehicles($conn, $client_id);
 
 // Collect vehicle IDs for eligibility button
-$_client_vehicle_ids = [];
-$_vtmp = $conn->prepare("SELECT vehicle_id FROM vehicles WHERE client_id = ? ORDER BY vehicle_id DESC");
-$_vtmp->bind_param('i', $client_id);
-$_vtmp->execute();
-$_vr = $_vtmp->get_result();
-while ($_vrow = $_vr->fetch_assoc()) $_client_vehicle_ids[] = (int)$_vrow['vehicle_id'];
-unset($_vtmp, $_vr, $_vrow);
+$_client_vehicle_ids = array_map('intval', array_column($vehicles, 'vehicle_id'));
 
-// Load claims
-$clstmt = $conn->prepare("
-    SELECT cl.claim_id, cl.claim_type, cl.status, cl.incident_date, cl.created_at, cl.denial_reason,
-           ip.policy_number, v.plate_number, v.make, v.model
-    FROM claims cl
-    INNER JOIN insurance_policies ip ON cl.policy_id = ip.policy_id
-    LEFT  JOIN vehicles v ON ip.vehicle_id = v.vehicle_id
-    WHERE cl.client_id = ?
-    ORDER BY cl.created_at DESC
-");
-$clstmt->bind_param('i', $client_id);
-$clstmt->execute();
-$claims = $clstmt->get_result();
-
-// Load repair jobs
-$rjstmt = $conn->prepare("
-    SELECT j.job_id, j.job_number, j.service_type, j.status, j.repair_date, j.release_date,
-           v.plate_number, v.make, v.model
-    FROM repair_jobs j
-    INNER JOIN vehicles v ON j.vehicle_id = v.vehicle_id
-    WHERE j.client_id = ?
-    ORDER BY j.created_at DESC
-");
-$rjstmt->bind_param('i', $client_id);
-$rjstmt->execute();
-$repair_jobs = $rjstmt->get_result();
-
-// Load policies
-$pstmt = $conn->prepare("
-    SELECT p.*, v.plate_number, v.make, v.model, v.year_model
-    FROM insurance_policies p
-    INNER JOIN vehicles v ON p.vehicle_id = v.vehicle_id
-    WHERE p.client_id = ?
-    ORDER BY p.created_at DESC
-");
-$pstmt->bind_param('i', $client_id);
-$pstmt->execute();
-$policies = $pstmt->get_result();
+$claims      = client_claims($conn, $client_id);
+$repair_jobs = client_repair_jobs($conn, $client_id);
+$policies    = client_policies($conn, $client_id);
 
 // ── FETCH DOCUMENTS ──
-$doc_stmt = $conn->prepare("SELECT doc_id, file_name, original_name, uploaded_at FROM client_documents WHERE client_id = ? ORDER BY uploaded_at DESC");
-$doc_stmt->bind_param('i', $client_id);
-$doc_stmt->execute();
-$documents = $doc_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$documents = client_documents($conn, $client_id);
 
 // ── CHECK IF CLIENT HAS POLICIES ──
-$has_policies = $conn->prepare("SELECT 1 FROM insurance_policies WHERE client_id = ? LIMIT 1");
-$has_policies->bind_param('i', $client_id);
-$has_policies->execute();
-$has_policies = (bool)$has_policies->get_result()->num_rows;
+$has_policies = client_has_policy($conn, $client_id);
 
 $page_title  = 'View Client';
 $active_page = 'clients';
@@ -252,13 +178,7 @@ require_once '../../includes/topbar.php';
     <?php
     $public_token = $client['public_token'] ?? '';
     if (empty($public_token)) {
-        $gen = $conn->prepare("UPDATE clients SET public_token = SHA2(CONCAT(?, UUID(), 'tgbasics'), 256) WHERE client_id = ? AND public_token IS NULL");
-        $gen->bind_param('ii', $client_id, $client_id);
-        $gen->execute();
-        $rt = $conn->prepare("SELECT public_token FROM clients WHERE client_id = ?");
-        $rt->bind_param('i', $client_id);
-        $rt->execute();
-        $public_token = $rt->get_result()->fetch_assoc()['public_token'] ?? '';
+        $public_token = client_ensure_public_token($conn, $client_id);
     }
     $public_url = app_url('modules/public/client.php?token=' . urlencode($public_token));
     ?>
@@ -297,25 +217,7 @@ require_once '../../includes/topbar.php';
     </div>
 
     <?php
-    $vehicle_count = $conn->prepare("SELECT COUNT(*) as c FROM vehicles WHERE client_id = ?");
-    $vehicle_count->bind_param('i', $client_id);
-    $vehicle_count->execute();
-    $vc = $vehicle_count->get_result()->fetch_assoc()['c'];
-
-    $policy_count = $conn->prepare("SELECT COUNT(*) as c FROM insurance_policies WHERE client_id = ?");
-    $policy_count->bind_param('i', $client_id);
-    $policy_count->execute();
-    $pc = $policy_count->get_result()->fetch_assoc()['c'];
-
-    $active_policy = $conn->prepare("SELECT COUNT(*) as c FROM insurance_policies WHERE client_id = ? AND policy_end >= CURDATE()");
-    $active_policy->bind_param('i', $client_id);
-    $active_policy->execute();
-    $apc = $active_policy->get_result()->fetch_assoc()['c'];
-
-    $claim_count = $conn->prepare("SELECT COUNT(*) as c FROM claims WHERE client_id = ?");
-    $claim_count->bind_param('i', $client_id);
-    $claim_count->execute();
-    $clc = $claim_count->get_result()->fetch_assoc()['c'];
+    ['vehicles' => $vc, 'policies' => $pc, 'active_policies' => $apc, 'claims' => $clc] = client_counts($conn, $client_id);
     ?>
 
     <!-- CLIENT INFO CARD (with QR embedded on the right) -->
@@ -411,9 +313,9 @@ require_once '../../includes/topbar.php';
         <?php endif; ?>
       </div>
 
-      <?php if ($vehicles->num_rows > 0): ?>
+      <?php if ($vehicles): ?>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem;padding:1.25rem;">
-        <?php while ($v = $vehicles->fetch_assoc()):
+        <?php foreach ($vehicles as $v):
           // Build Imagin Studio URL from vehicle data
           $img_make   = strtolower(trim($v['make']));
           $img_model  = strtolower(str_replace(' ', '-', trim($v['model'])));
@@ -533,7 +435,7 @@ require_once '../../includes/topbar.php';
           </div>
 
         </div>
-        <?php endwhile; ?>
+        <?php endforeach; ?>
       </div>
       <?php else: ?>
       <div class="empty-state">
@@ -646,7 +548,7 @@ require_once '../../includes/topbar.php';
         <a href="<?= $_elig_url ?>" class="btn-primary" style="margin-left:auto;padding:0.5rem 1rem;font-size:0.78rem;"><?= icon('shield-check', 14) ?> Check Eligibility</a>
         <?php endif; ?>
       </div>
-      <?php if ($policies->num_rows > 0): ?>
+      <?php if ($policies): ?>
       <div class="tg-table-wrap mob-card-wrap">
         <table class="tg-table mob-card mob-policy-table">
           <thead>
@@ -662,7 +564,7 @@ require_once '../../includes/topbar.php';
             </tr>
           </thead>
           <tbody>
-            <?php while ($p = $policies->fetch_assoc()):
+            <?php foreach ($policies as $p):
               $today     = new DateTime();
               $end_date  = new DateTime($p['policy_end']);
               $days_left = (int)$today->diff($end_date)->format('%r%a');
@@ -713,7 +615,7 @@ require_once '../../includes/topbar.php';
               </td>
               <td style="text-align:center;"><?= $status_badge ?> <?= $pay_badge ?></td>
             </tr>
-            <?php endwhile; ?>
+            <?php endforeach; ?>
           </tbody>
         </table>
       </div>
@@ -734,7 +636,7 @@ require_once '../../includes/topbar.php';
         <div class="card-icon"><?= icon('clipboard-list', 16) ?></div>
         <div>
           <div class="card-title">Claims History</div>
-          <div class="card-sub"><?= $claims->num_rows ?> claim<?= $claims->num_rows !== 1 ? 's' : '' ?> on record</div>
+          <div class="card-sub"><?= count($claims) ?> claim<?= count($claims) !== 1 ? 's' : '' ?> on record</div>
         </div>
         <?php if (!$is_mechanic): ?>
         <a href="../claims/add_claim.php?client_id=<?= $client_id ?>" class="btn-primary" style="margin-left:auto;padding:0.5rem 1rem;font-size:0.78rem;">
@@ -742,7 +644,7 @@ require_once '../../includes/topbar.php';
         </a>
         <?php endif; ?>
       </div>
-      <?php if ($claims->num_rows > 0): ?>
+      <?php if ($claims): ?>
       <div class="tg-table-wrap mob-card-wrap">
         <table class="tg-table mob-card mob-client-claims-table">
           <thead>
@@ -755,7 +657,7 @@ require_once '../../includes/topbar.php';
             </tr>
           </thead>
           <tbody>
-            <?php while ($cl = $claims->fetch_assoc()):
+            <?php foreach ($claims as $cl):
               $cs = claim_status_badge($cl['status']);
             ?>
             <tr>
@@ -783,7 +685,7 @@ require_once '../../includes/topbar.php';
               </td>
               <?php endif; ?>
             </tr>
-            <?php endwhile; ?>
+            <?php endforeach; ?>
           </tbody>
         </table>
       </div>
@@ -815,7 +717,7 @@ require_once '../../includes/topbar.php';
         ?>
         <a href="<?= htmlspecialchars($_repair_prefill) ?>" class="btn-primary" style="margin-left:auto;padding:0.5rem 1rem;font-size:0.78rem;"><?= icon('plus', 14) ?> Add Repair Job</a>
       </div>
-      <?php if ($repair_jobs->num_rows > 0): ?>
+      <?php if ($repair_jobs): ?>
       <table class="tg-table mob-card mob-client-repairs-table">
         <thead>
           <tr>
@@ -829,7 +731,7 @@ require_once '../../includes/topbar.php';
           </tr>
         </thead>
         <tbody>
-          <?php while ($rj = $repair_jobs->fetch_assoc()):
+          <?php foreach ($repair_jobs as $rj):
               $rsb = repair_status_badge($rj['status']);
               $rsv = $repair_service_labels[$rj['service_type']] ?? $rj['service_type'];
           ?>
@@ -851,7 +753,7 @@ require_once '../../includes/topbar.php';
               </a>
             </td>
           </tr>
-          <?php endwhile; ?>
+          <?php endforeach; ?>
         </tbody>
       </table>
       <?php else: ?>
@@ -922,6 +824,6 @@ require_once '../../includes/topbar.php';
     };
   };
 })();
-</script>
+</script> 
 
 <?php require_once '../../includes/footer.php'; ?>

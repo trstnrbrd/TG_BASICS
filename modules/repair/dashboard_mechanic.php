@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once __DIR__ . '/../../includes/service_types.php';
 require_once '../../config/access.php';
@@ -9,30 +10,13 @@ require_role(['mechanic']);
 $full_name = $_SESSION['full_name'] ?? 'Mechanic';
 
 // ── STATS ──
-$active_jobs   = (int)$conn->query("SELECT COUNT(*) as c FROM repair_jobs WHERE status = 'in_progress'")->fetch_assoc()['c'];
-$completed_today = (int)$conn->query("SELECT COUNT(*) as c FROM repair_jobs WHERE status = 'completed' AND DATE(updated_at) = CURDATE()")->fetch_assoc()['c'];
-$pending_jobs  = (int)$conn->query("SELECT COUNT(*) as c FROM repair_jobs WHERE status = 'pending'")->fetch_assoc()['c'];
+['active' => $active_jobs, 'completed_today' => $completed_today, 'pending' => $pending_jobs] = repair_dashboard_counts($conn);
 
-// ── RECENT REPAIR JOBS (latest 5 active/pending) ──
-$jobs = $conn->query("
-    SELECT j.job_id, j.job_number, j.service_type, j.status, j.repair_date, j.release_date,
-           c.full_name, v.plate_number, v.make, v.model
-    FROM repair_jobs j
-    INNER JOIN clients  c ON j.client_id  = c.client_id
-    INNER JOIN vehicles v ON j.vehicle_id = v.vehicle_id
-    WHERE j.status IN ('" . implode("','", repair_open_statuses()) . "')
-    ORDER BY j.created_at DESC
-    LIMIT 5
-");
+// ── RECENT REPAIR JOBS (latest 5 open ones) ──
+$jobs = repair_jobs_open_recent($conn, 5);
 
 // ── TEAM MEMBERS ──
-$team = $conn->query("
-    SELECT user_id, full_name, username, role, profile_photo,
-           (last_active IS NOT NULL AND last_active >= NOW() - INTERVAL 5 MINUTE) AS is_online
-    FROM users
-    WHERE is_active = 1 AND is_hidden = 0
-    ORDER BY FIELD(role,'super_admin','admin','mechanic'), full_name ASC
-");
+$team = users_team($conn);
 
 $service_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
 
@@ -105,7 +89,7 @@ require_once '../../includes/topbar.php';
           <a href="repair_list.php" class="btn-sm-gold"><?= icon('arrow-right', 13) ?> View All</a>
         </div>
 
-        <?php if ($jobs->num_rows > 0): ?>
+        <?php if ($jobs): ?>
         <table class="tg-table repair-jobs-table dash-jobs-table">
           <thead>
             <tr>
@@ -118,7 +102,7 @@ require_once '../../includes/topbar.php';
             </tr>
           </thead>
           <tbody>
-            <?php while ($j = $jobs->fetch_assoc()):
+            <?php foreach ($jobs as $j):
               $sb  = repair_status_badge($j['status']);
               $svc = $service_labels[$j['service_type']] ?? $j['service_type'];
             ?>
@@ -137,7 +121,7 @@ require_once '../../includes/topbar.php';
                 </a>
               </td>
             </tr>
-            <?php endwhile; ?>
+            <?php endforeach; ?>
           </tbody>
         </table>
         <?php else: ?>
@@ -196,7 +180,7 @@ require_once '../../includes/topbar.php';
         <?php
         $role_labels_map = ['super_admin'=>'Owner','admin'=>'Admin','mechanic'=>'Mechanic'];
         $role_badge_map  = ['super_admin'=>'badge-gold','admin'=>'badge-green','mechanic'=>'badge-blue'];
-        while ($tm = $team->fetch_assoc()):
+        foreach ($team as $tm):
           $tm_initials = substr(implode('', array_map(fn($w) => strtoupper($w[0] ?? ''), array_filter(explode(' ', $tm['full_name'])))), 0, 2);
           $tm_photo    = !empty($tm['profile_photo']) ? '../../uploads/avatars/' . htmlspecialchars($tm['profile_photo']) : '';
           $tm_online   = !empty($tm['is_online']);
@@ -227,7 +211,7 @@ require_once '../../includes/topbar.php';
             </div>
           </div>
         </div>
-        <?php endwhile; ?>
+        <?php endforeach; ?>
       </div>
     </div>
 

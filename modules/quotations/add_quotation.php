@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once __DIR__ . '/../../includes/service_types.php';
 require_once '../../config/validators.php';
@@ -14,55 +15,32 @@ $edit_qt    = null;
 $edit_items = [];
 
 if ($edit_mode) {
-    $eq = $conn->prepare("SELECT * FROM quotations WHERE quotation_id = ? AND status = 'draft'");
-    $eq->bind_param('i', $edit_qt_id);
-    $eq->execute();
-    $edit_qt = $eq->get_result()->fetch_assoc();
+    $edit_qt = quotation_find_draft($conn, $edit_qt_id);
     if (!$edit_qt) {
         header("Location: quotation_list.php?error=" . urlencode('Quotation not found or is no longer a draft.'));
         exit;
     }
-    $ei = $conn->prepare("SELECT * FROM quotation_items WHERE quotation_id = ? ORDER BY sort_order ASC");
-    $ei->bind_param('i', $edit_qt_id);
-    $ei->execute();
-    $edit_items = $ei->get_result()->fetch_all(MYSQLI_ASSOC);
+    $edit_items = quotation_items($conn, $edit_qt_id);
 }
 
 $job_id = $edit_mode ? $edit_qt['job_id'] : san_int($_GET['job_id'] ?? 0, 1);
 if (!$job_id) { header("Location: quotation_list.php"); exit; }
 
 // ── FETCH JOB ──
-$stmt = $conn->prepare("
-    SELECT j.*,
-           c.client_id, c.full_name, c.contact_number, c.email, c.address,
-           v.vehicle_id, v.plate_number, v.make, v.model, v.year_model, v.color
-    FROM repair_jobs j
-    INNER JOIN clients  c ON j.client_id  = c.client_id
-    INNER JOIN vehicles v ON j.vehicle_id = v.vehicle_id
-    WHERE j.job_id = ?
-");
-$stmt->bind_param('i', $job_id);
-$stmt->execute();
-$job = $stmt->get_result()->fetch_assoc();
+$job = repair_job_find($conn, (int)$job_id);
 if (!$job) { header("Location: quotation_list.php"); exit; }
 
 // Block duplicate — only in create mode
 if (!$edit_mode) {
-    $chk = $conn->prepare("SELECT quotation_id, quotation_number FROM quotations WHERE job_id = ? LIMIT 1");
-    $chk->bind_param('i', $job_id);
-    $chk->execute();
-    $existing = $chk->get_result()->fetch_assoc();
-    if ($existing) {
-        header("Location: view_quotation.php?id={$existing['quotation_id']}&msg=" . urlencode('Quotation already exists for this job.'));
+    $existing_id = quotation_id_for_job($conn, (int)$job_id);
+    if ($existing_id !== null) {
+        header("Location: view_quotation.php?id={$existing_id}&msg=" . urlencode('Quotation already exists for this job.'));
         exit;
     }
 }
 
 // ── FETCH CHECKLIST (pre-fill line items from damage) ──
-$cl_stmt = $conn->prepare("SELECT area_key, condition_value, notes FROM repair_checklist WHERE job_id = ? AND condition_value != 'none'");
-$cl_stmt->bind_param('i', $job_id);
-$cl_stmt->execute();
-$damaged_areas = $cl_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$damaged_areas = repair_checklist_damaged($conn, (int)$job_id);
 
 $area_labels = REPAIR_CHECKLIST_AREAS;   // config/access.php
 
@@ -127,27 +105,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_mechanic) {
         try {
             if ($edit_mode) {
                 // ── UPDATE existing draft ──
-                $upd = $conn->prepare("UPDATE quotations SET status=?, subtotal=?, discount=?, total=?, notes=? WHERE quotation_id=?");
-                $upd->bind_param('sdddsi', $status, $subtotal, $discount, $total, $notes, $edit_qt_id);
-                $upd->execute();
+                quotation_update($conn, $edit_qt_id, $status, $subtotal, (float)$discount, $total, $notes);
+                quotation_items_replace($conn, $edit_qt_id, $items);
 
-                $del = $conn->prepare("DELETE FROM quotation_items WHERE quotation_id=?");
-                $del->bind_param('i', $edit_qt_id);
-                $del->execute();
-
-                $item_ins = $conn->prepare("
-                    INSERT INTO quotation_items (quotation_id, description, area, qty, unit_price, subtotal, sort_order)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                ");
-                foreach ($items as $it) {
-                    $item_ins->bind_param('issdddi', $edit_qt_id, $it['desc'], $it['area'], $it['qty'], $it['unit_price'], $it['subtotal'], $it['sort_order']);
-                    $item_ins->execute();
-                }
-
-                $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'QUOTATION_UPDATED', ?)");
                 $d    = ($_SESSION['full_name'] ?? 'Unknown') . ' edited quotation ' . $edit_qt['quotation_number'] . '.';
-                $log->bind_param('is', $_SESSION['user_id'], $d);
-                $log->execute();
+                audit_log_add($conn, $_SESSION['user_id'], 'QUOTATION_UPDATED', $d);
 
                 $conn->commit();
                 header("Location: view_quotation.php?id=$edit_qt_id&success=" . urlencode('Quotation updated.'));
@@ -158,29 +120,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_mechanic) {
                 // other failure, this just avoids that for the common concurrent case)
                 [$qt_id, $qt_num] = insert_with_sequential_number($conn, 'quotations', 'quotation_number', record_number_prefix('QT'),
                     function (string $num) use ($conn, $job_id, $status, $subtotal, $discount, $total, $notes) {
-                        $ins = $conn->prepare("
-                            INSERT INTO quotations (job_id, quotation_number, status, subtotal, discount, total, notes, created_by)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                        ");
-                        $ins->bind_param('issdddsi', $job_id, $num, $status, $subtotal, $discount, $total, $notes, $_SESSION['user_id']);
-                        $ins->execute();
-                        return [$conn->insert_id, $num];
+                        $id = quotation_create($conn, $num, (int)$job_id, $status, $subtotal, (float)$discount, $total, $notes, (int)$_SESSION['user_id']);
+                        return [$id, $num];
                     }
                 );
 
-                $item_ins = $conn->prepare("
-                    INSERT INTO quotation_items (quotation_id, description, area, qty, unit_price, subtotal, sort_order)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                ");
-                foreach ($items as $it) {
-                    $item_ins->bind_param('issdddi', $qt_id, $it['desc'], $it['area'], $it['qty'], $it['unit_price'], $it['subtotal'], $it['sort_order']);
-                    $item_ins->execute();
-                }
+                quotation_items_replace($conn, $qt_id, $items);   // a new quotation has none yet, so this only adds
 
-                $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'QUOTATION_CREATED', ?)");
                 $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' created quotation ' . $qt_num . ' for job ' . $job['job_number'] . '.';
-                $log->bind_param('is', $_SESSION['user_id'], $desc);
-                $log->execute();
+                audit_log_add($conn, $_SESSION['user_id'], 'QUOTATION_CREATED', $desc);
 
                 $conn->commit();
                 header("Location: view_quotation.php?id=$qt_id&success=" . urlencode('Quotation ' . $qt_num . ' created.'));

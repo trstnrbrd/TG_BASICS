@@ -281,13 +281,11 @@ function record_number_prefix(string $code): string {
  * instead of crashing.
  */
 function insert_with_sequential_number(mysqli $conn, string $table, string $column, string $prefix, callable $attempt, int $max_tries = 5): mixed {
-    $like = $prefix . '%';
+    require_once __DIR__ . '/../includes/data_access.php';
+    if ((RECORD_NUMBER_COLUMNS[$table] ?? null) !== $column) throw new InvalidArgumentException("Not a record number column: $table.$column");
     for ($try = 1; $try <= $max_tries; $try++) {
-        $stmt = $conn->prepare("SELECT `$column` FROM `$table` WHERE `$column` LIKE ? ORDER BY `$column` DESC LIMIT 1");
-        $stmt->bind_param('s', $like);
-        $stmt->execute();
-        $last   = $stmt->get_result()->fetch_row();
-        $seq    = $last ? (int)substr($last[0], -4) + 1 : 1;
+        $last   = record_number_last($conn, $table, $prefix);
+        $seq    = $last !== null ? (int)substr($last, -4) + 1 : 1;
         $number = $prefix . str_pad((string)$seq, 4, '0', STR_PAD_LEFT);
         try {
             return $attempt($number);
@@ -320,11 +318,9 @@ function with_named_lock(mysqli $conn, string $name, callable $work, int $wait_s
 
 /** Takes a lock by name. Returns the lock name (pass it to named_lock_release()), or null if it timed out. */
 function named_lock_acquire(mysqli $conn, string $name, int $wait_seconds = 5): ?string {
+    require_once __DIR__ . '/../includes/data_access.php';
     $lock_name = named_lock_name($name);
-    $stmt = $conn->prepare('SELECT GET_LOCK(?, ?)');
-    $stmt->bind_param('si', $lock_name, $wait_seconds);
-    $stmt->execute();
-    return (int)$stmt->get_result()->fetch_row()[0] === 1 ? $lock_name : null;
+    return db_lock_get($conn, $lock_name, $wait_seconds) ? $lock_name : null;
 }
 
 /** Turns $name into a valid MySQL lock name. */
@@ -334,10 +330,8 @@ function named_lock_name(string $name): string {
 
 /** Releases a lock taken by named_lock_acquire(). */
 function named_lock_release(mysqli $conn, string $lock_name): void {
-    $rel = $conn->prepare('SELECT RELEASE_LOCK(?)');
-    $rel->bind_param('s', $lock_name);
-    $rel->execute();
-    $rel->get_result();
+    require_once __DIR__ . '/../includes/data_access.php';
+    db_lock_release($conn, $lock_name);
 }
 
 /** Hidden CSRF input for a <form>. Usage: <?= csrf_field() ?> */

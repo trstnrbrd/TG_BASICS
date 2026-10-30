@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once __DIR__ . '/../../includes/service_types.php';
 require_once '../../config/validators.php';
@@ -21,19 +22,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
     $del_id = san_int($_POST['quotation_id'] ?? 0, 1);
     if ($del_id) {
-        $qt_row = $conn->prepare("SELECT quotation_number FROM quotations WHERE quotation_id = ?");
-        $qt_row->bind_param('i', $del_id);
-        $qt_row->execute();
-        $qt_row = $qt_row->get_result()->fetch_assoc();
-        if ($qt_row) {
-            db_transaction($conn, function () use ($conn, $del_id, $qt_row) {
-                $del = $conn->prepare("DELETE FROM quotations WHERE quotation_id = ?");
-                $del->bind_param('i', $del_id);
-                $del->execute();
-                $log = $conn->prepare("INSERT INTO audit_logs (user_id,action,description) VALUES (?,'QUOTATION_DELETED',?)");
-                $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' deleted quotation ' . $qt_row['quotation_number'] . '.';
-                $log->bind_param('is', $_SESSION['user_id'], $desc);
-                $log->execute();
+        $qt_number = quotation_number($conn, $del_id);
+        if ($qt_number !== null) {
+            db_transaction($conn, function () use ($conn, $del_id, $qt_number) {
+                quotation_delete($conn, $del_id);
+                $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' deleted quotation ' . $qt_number . '.';
+                audit_log_add($conn, $_SESSION['user_id'], 'QUOTATION_DELETED', $desc);
             });
         }
     }
@@ -46,42 +40,8 @@ $filter  = san_enum($_GET['status'] ?? 'all', array_merge(['all'], array_keys(qu
 $search  = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
 $sort_by = san_enum($_GET['sort'] ?? 'newest', ['newest', 'oldest']);
 
-// ── BUILD QUERY ──
-$where = [];
-$params = [];
-$types  = '';
-
-if ($filter !== 'all') {
-    $where[]  = "q.status = ?";
-    $params[] = $filter;
-    $types   .= 's';
-}
-if ($search !== '') {
-    $like     = "%$search%";
-    $where[]  = "(c.full_name LIKE ? OR v.plate_number LIKE ? OR q.quotation_number LIKE ? OR j.job_number LIKE ?)";
-    $params[] = $like; $params[] = $like; $params[] = $like; $params[] = $like;
-    $types   .= 'ssss';
-}
-
-$where_sql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
-
-$sql = "
-    SELECT q.quotation_id, q.quotation_number, q.status, q.total, q.discount, q.created_at,
-           j.job_id, j.job_number, j.service_type,
-           c.full_name, c.contact_number,
-           v.plate_number, v.make, v.model, v.year_model,
-           r.receipt_number, r.payment_status
-    FROM quotations q
-    INNER JOIN repair_jobs j ON q.job_id = j.job_id
-    INNER JOIN clients     c ON j.client_id  = c.client_id
-    INNER JOIN vehicles    v ON j.vehicle_id = v.vehicle_id
-    LEFT  JOIN receipts    r ON r.quotation_id = q.quotation_id
-    $where_sql
-    ORDER BY q.created_at " . ($sort_by === 'oldest' ? 'ASC' : 'DESC') . "
-";
-
-// One page at a time (includes/pagination.php) — the total is counted from this same query
-[$rows, $pg] = paginate_query($conn, $sql, $types, $params);
+// One page at a time (includes/pagination.php)
+[$rows, $pg] = quotations_list_page($conn, $filter, $search, $sort_by);
 
 $service_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
 
@@ -156,7 +116,7 @@ document.addEventListener('DOMContentLoaded',function(){
     <a href="../repair/repair_list.php" class="btn-sm-gold"><?= icon('wrench', 12) ?> Repair Jobs</a>
   </div>
 
-  <?php if ($rows->num_rows > 0): ?>
+  <?php if ($rows): ?>
     <style>
     @media (min-width: 769px) {
       .mob-quotation-table thead th { padding: 0.45rem 0.75rem; }
@@ -180,7 +140,7 @@ document.addEventListener('DOMContentLoaded',function(){
         </tr>
       </thead>
       <tbody>
-        <?php while ($row = $rows->fetch_assoc()):
+        <?php foreach ($rows as $row):
           $sc = quotation_status_badge($row['status']);   // statuses table (includes/statuses.php)
         ?>
         <tr>
@@ -214,7 +174,7 @@ document.addEventListener('DOMContentLoaded',function(){
             </div>
           </td>
         </tr>
-        <?php endwhile; ?>
+        <?php endforeach; ?>
       </tbody>
     </table>
   </div>

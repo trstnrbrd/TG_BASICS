@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
@@ -16,22 +17,7 @@ $success = '';
 $prefill_claim_id = (int)($_GET['claim_id'] ?? 0);
 $prefill_claim    = null;
 if ($prefill_claim_id) {
-    $pf = $conn->prepare("
-        SELECT cl.claim_id, cl.incident_date,
-               c.full_name, c.client_id,
-               ip.policy_number,
-               ip.participation_fee,
-               ip.insurance_company,
-               v.make, v.model, v.plate_number
-        FROM claims cl
-        INNER JOIN clients c         ON cl.client_id  = c.client_id
-        INNER JOIN insurance_policies ip ON cl.policy_id  = ip.policy_id
-        LEFT  JOIN vehicles v        ON ip.vehicle_id = v.vehicle_id
-        WHERE cl.claim_id = ?
-    ");
-    $pf->bind_param('i', $prefill_claim_id);
-    $pf->execute();
-    $prefill_claim = $pf->get_result()->fetch_assoc();
+    $prefill_claim = billing_claim_prefill($conn, $prefill_claim_id);
     // "Billed To" starts as the billing name of the company the claim's policy is under (Settings)
     if ($prefill_claim) $prefill_claim['insurer_name'] = insurance_company_billing_name($conn, $prefill_claim['insurance_company']);
 }
@@ -71,23 +57,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // only approved claims can be billed
     if (empty($errors)) {
-        $cs = $conn->prepare("SELECT status FROM claims WHERE claim_id = ?");
-        $cs->bind_param('i', $claim_id);
-        $cs->execute();
-        $crow = $cs->get_result()->fetch_assoc();
-        if (!$crow) {
+        $claim_st = claim_status($conn, $claim_id);
+        if ($claim_st === null) {
             $errors[] = 'The selected claim was not found.';
-        } elseif (!claim_is_billable($crow['status'])) {
+        } elseif (!claim_is_billable($claim_st)) {
             $errors[] = 'Billing can only be created for approved claims.';
         }
     }
 
     // Check no duplicate billing for same claim
     if (empty($errors)) {
-        $dup = $conn->prepare("SELECT billing_id FROM billing WHERE claim_id = ?");
-        $dup->bind_param('i', $claim_id);
-        $dup->execute();
-        if ($dup->get_result()->num_rows > 0) {
+        if (billing_exists_for_claim($conn, $claim_id)) {
             $errors[] = 'A billing record already exists for this claim.';
         }
     }
@@ -99,39 +79,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $created = null;
         try {
             $created = db_transaction($conn, function () use ($conn, $claim_id, $billed_to, $inc_date, $rep_date, $parts_cost, $labor_cost, $other_cost, $deductible, $signer_name, $signer_title) {
-                $lock = $conn->prepare("SELECT claim_id FROM claims WHERE claim_id = ? FOR UPDATE");
-                $lock->bind_param('i', $claim_id);
-                $lock->execute();
-                $lock->get_result()->free();   // read the locked row, or the next query fails with "Commands out of sync"
-
-                $dup = $conn->prepare("SELECT billing_id FROM billing WHERE claim_id = ?");
-                $dup->bind_param('i', $claim_id);
-                $dup->execute();
-                if ($dup->get_result()->num_rows > 0) return ['duplicate' => true];
+                billing_lock_claim($conn, $claim_id);
+                if (billing_exists_for_claim($conn, $claim_id)) return ['duplicate' => true];
 
                 [$billing_id, $bill_num] = insert_with_sequential_number($conn, 'billing', 'billing_number', record_number_prefix('BL'),
                     function (string $num) use ($conn, $claim_id, $billed_to, $inc_date, $rep_date, $parts_cost, $labor_cost, $other_cost, $deductible, $signer_name, $signer_title) {
-                        $ins = $conn->prepare("
-                            INSERT INTO billing
-                              (claim_id, billing_number, billed_to, incident_date, repair_date, parts_cost, labor_cost, other_cost, deductible, signed_by_name, signed_by_title, created_by)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        ");
-                        $ins->bind_param(
-                            'issssddddssi',
-                            $claim_id, $num, $billed_to, $inc_date, $rep_date,
-                            $parts_cost, $labor_cost, $other_cost, $deductible,
-                            $signer_name, $signer_title,
-                            $_SESSION['user_id']
-                        );
-                        $ins->execute();
-                        return [$conn->insert_id, $num];
+                        $id = billing_create($conn, $num, [
+                            'claim_id' => $claim_id, 'billed_to' => $billed_to, 'incident_date' => $inc_date, 'repair_date' => $rep_date,
+                            'parts_cost' => $parts_cost, 'labor_cost' => $labor_cost, 'other_cost' => $other_cost, 'deductible' => $deductible,
+                            'signed_by_name' => $signer_name, 'signed_by_title' => $signer_title,
+                        ], (int)$_SESSION['user_id']);
+                        return [$id, $num];
                     }
                 );
 
-                $log  = $conn->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, 'BILLING_CREATED', ?)");
                 $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' created billing ' . $bill_num . '.';
-                $log->bind_param('is', $_SESSION['user_id'], $desc);
-                $log->execute();
+                audit_log_add($conn, $_SESSION['user_id'], 'BILLING_CREATED', $desc);
 
                 return ['num' => $bill_num];
             });
@@ -151,20 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // ── LOAD APPROVED CLAIMS (for dropdown) ──
-$claims_res = $conn->query("
-    SELECT cl.claim_id, cl.incident_date,
-           c.full_name,
-           ip.policy_number,
-           v.plate_number, v.make, v.model
-    FROM claims cl
-    INNER JOIN clients c          ON cl.client_id  = c.client_id
-    INNER JOIN insurance_policies ip ON cl.policy_id  = ip.policy_id
-    LEFT  JOIN vehicles v         ON ip.vehicle_id = v.vehicle_id
-    LEFT  JOIN billing b          ON b.claim_id = cl.claim_id
-    WHERE cl.status IN ('" . implode("','", CLAIM_BILLABLE_STATUSES) . "')
-      AND b.billing_id IS NULL
-    ORDER BY cl.created_at DESC
-");
+$unbilled_claims = billing_unbilled_claims($conn);
 
 $page_title  = 'New Billing';
 $active_page = 'billing';
@@ -215,13 +165,13 @@ require_once '../../includes/topbar.php';
                 ?>
                 <select name="claim_id" id="claim_select" class="field-select" required style="width:100%;" onchange="if (this.value) window.location.href = 'add_billing.php?claim_id=' + encodeURIComponent(this.value)">
                   <option value="">— Select approved claim —</option>
-                  <?php while ($cr = $claims_res->fetch_assoc()): ?>
+                  <?php foreach ($unbilled_claims as $cr): ?>
                   <option value="<?= $cr['claim_id'] ?>" <?= $sel_claim == $cr['claim_id'] ? 'selected' : '' ?>>
                     #<?= $cr['claim_id'] ?> — <?= htmlspecialchars($cr['full_name']) ?>
                     (<?= htmlspecialchars($cr['plate_number'] ?: 'No plate') ?>
                     · <?= htmlspecialchars($cr['policy_number']) ?>)
                   </option>
-                  <?php endwhile; ?>
+                  <?php endforeach; ?>
                 </select>
                 <?php if ($prefill_claim): ?>
                 <div style="margin-top:0.5rem;padding:0.65rem 0.9rem;background:var(--bg-2);border-radius:8px;font-size:0.8rem;color:var(--text-secondary);">

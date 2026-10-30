@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../config/session.php';
+require_once __DIR__ . '/../includes/data_access.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/validators.php';
 require_once __DIR__ . '/../includes/api.php';
@@ -17,21 +18,7 @@ $like   = '%' . addcslashes($q, '\\%_') . '%';
 $results = [];
 
 // ── CLIENTS ── (mechanics only ever see walk-in clients, no insurance policy on record)
-$clients_walkin_sql = is_mechanic()
-    ? "AND NOT EXISTS (SELECT 1 FROM insurance_policies ip WHERE ip.client_id = clients.client_id)"
-    : '';
-$r = $conn->prepare("
-    SELECT client_id, full_name, contact_number, email
-    FROM clients
-    WHERE deleted_at IS NULL
-      AND (full_name LIKE ? OR contact_number LIKE ? OR email LIKE ?)
-      $clients_walkin_sql
-    LIMIT 4
-");
-$r->bind_param('sss', $like, $like, $like);
-$r->execute();
-$rows = $r->get_result();
-while ($row = $rows->fetch_assoc()) {
+foreach (search_clients($conn, $like, is_mechanic(), 4) as $row) {
     $results[] = [
         'type'    => 'client',
         'label'   => $row['full_name'],
@@ -42,21 +29,7 @@ while ($row = $rows->fetch_assoc()) {
 }
 
 // ── VEHICLES ── (mechanics only ever see walk-in clients' vehicles)
-$vehicles_walkin_sql = is_mechanic()
-    ? "AND NOT EXISTS (SELECT 1 FROM insurance_policies ip WHERE ip.client_id = c.client_id)"
-    : '';
-$r = $conn->prepare("
-    SELECT v.vehicle_id, v.plate_number, v.make, v.model, v.year_model, c.full_name, c.client_id
-    FROM vehicles v
-    INNER JOIN clients c ON v.client_id = c.client_id
-    WHERE (v.plate_number LIKE ? OR v.make LIKE ? OR v.model LIKE ?)
-      $vehicles_walkin_sql
-    LIMIT 4
-");
-$r->bind_param('sss', $like, $like, $like);
-$r->execute();
-$rows = $r->get_result();
-while ($row = $rows->fetch_assoc()) {
+foreach (search_vehicles($conn, $like, is_mechanic(), 4) as $row) {
     $results[] = [
         'type'    => 'vehicle',
         'label'   => strtoupper($row['plate_number']) . ' — ' . $row['make'] . ' ' . $row['model'],
@@ -68,18 +41,7 @@ while ($row = $rows->fetch_assoc()) {
 
 // ── POLICIES (non-mechanic only) ──
 if (!is_mechanic()) {
-    $r = $conn->prepare("
-        SELECT ip.policy_id, ip.policy_number, ip.coverage_type, ip.policy_end,
-               c.full_name, c.client_id
-        FROM insurance_policies ip
-        INNER JOIN clients c ON ip.client_id = c.client_id
-        WHERE ip.policy_number LIKE ? OR c.full_name LIKE ?
-        LIMIT 3
-    ");
-    $r->bind_param('ss', $like, $like);
-    $r->execute();
-    $rows = $r->get_result();
-    while ($row = $rows->fetch_assoc()) {
+    foreach (search_policies($conn, $like, 3) as $row) {
         $results[] = [
             'type'    => 'policy',
             'label'   => $row['policy_number'],
@@ -90,21 +52,7 @@ if (!is_mechanic()) {
     }
 
     // ── CLAIMS ──
-    $r = $conn->prepare("
-        SELECT cl.claim_id, cl.status, cl.claim_type,
-               c.full_name, c.client_id,
-               v.plate_number
-        FROM claims cl
-        INNER JOIN clients c ON cl.client_id = c.client_id
-        LEFT JOIN insurance_policies ip ON cl.policy_id = ip.policy_id
-        LEFT JOIN vehicles v ON ip.vehicle_id = v.vehicle_id
-        WHERE c.full_name LIKE ? OR v.plate_number LIKE ? OR ip.policy_number LIKE ?
-        LIMIT 3
-    ");
-    $r->bind_param('sss', $like, $like, $like);
-    $r->execute();
-    $rows = $r->get_result();
-    while ($row = $rows->fetch_assoc()) {
+    foreach (search_claims($conn, $like, 3) as $row) {
         $results[] = [
             'type'    => 'claim',
             'label'   => $row['full_name'] . ($row['plate_number'] ? ' — ' . $row['plate_number'] : ''),
@@ -116,20 +64,7 @@ if (!is_mechanic()) {
 }
 
 // ── REPAIR JOBS ──
-$r = $conn->prepare("
-    SELECT rj.job_id, rj.job_number, rj.service_type, rj.status,
-           c.full_name, c.client_id,
-           v.plate_number
-    FROM repair_jobs rj
-    INNER JOIN clients c ON rj.client_id = c.client_id
-    LEFT JOIN vehicles v ON rj.vehicle_id = v.vehicle_id
-    WHERE rj.job_number LIKE ? OR c.full_name LIKE ? OR v.plate_number LIKE ?
-    LIMIT 3
-");
-$r->bind_param('sss', $like, $like, $like);
-$r->execute();
-$rows = $r->get_result();
-while ($row = $rows->fetch_assoc()) {
+foreach (search_repair_jobs($conn, $like, 3) as $row) {
     $results[] = [
         'type'    => 'repair',
         'label'   => '#' . $row['job_number'] . ' — ' . $row['full_name'],

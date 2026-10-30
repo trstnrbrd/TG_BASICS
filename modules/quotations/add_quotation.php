@@ -1,7 +1,9 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
+require_once __DIR__ . '/../../includes/service_types.php';
 require_once '../../config/validators.php';
+require_once '../../config/access.php';
 
 require_role(['admin', 'super_admin', 'mechanic']);
 
@@ -62,25 +64,9 @@ $cl_stmt->bind_param('i', $job_id);
 $cl_stmt->execute();
 $damaged_areas = $cl_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
-$area_labels = [
-    'front_bumper' => 'Front Bumper', 'rear_bumper'  => 'Rear Bumper',
-    'hood'         => 'Hood',         'trunk'        => 'Trunk',
-    'windshield'   => 'Windshield',   'door_fl'      => 'Left Front Door',
-    'door_rl'      => 'Left Rear Door','door_fr'     => 'Right Front Door',
-    'door_rr'      => 'Right Rear Door','mirror_left' => 'Left Mirror',
-    'mirror_right' => 'Right Mirror', 'headlights'   => 'Headlights',
-    'taillights'   => 'Taillights',   'tires_wheels' => 'Tires & Wheels',
-];
+$area_labels = REPAIR_CHECKLIST_AREAS;   // config/access.php
 
-$service_labels = [
-    'repair_panel'   => 'Per Panel Repair',
-    'repair_full'    => 'Full Body Repair',
-    'paint_panel'    => 'Per Panel Paint',
-    'paint_full'     => 'Full Body Paint',
-    'washover_basic' => 'Basic Wash Over',
-    'washover_full'  => 'Fully Wash Over',
-    'custom'         => 'Custom / Mixed',
-];
+$service_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
 
 $is_mechanic = is_mechanic();
 
@@ -239,7 +225,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors && is_array($_POST['desc'] 
         $cond  = $dmg['condition_value'];
         $price = 3500.00;
         $suggested[] = [
-            'desc'       => ($cond === 'major' ? 'Major Damage Repair — ' : 'Minor Scratch Repair — ') . $lbl,
+            'desc'       => (REPAIR_DAMAGE_LEVELS[$cond]['label'] ?? 'Damage') . ' Repair — ' . $lbl,
             'area'       => $dmg['area_key'],
             'qty'        => 1,
             'unit_price' => $price,
@@ -247,13 +233,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors && is_array($_POST['desc'] 
         ];
     }
     if (empty($suggested)) {
-        $default_prices = [
-            'repair_panel' => 3500, 'repair_full' => 3500,
-            'paint_panel'  => 3500, 'paint_full'  => 3500,
-            'washover_basic' => 0,  'washover_full' => 0,
-            'custom' => 0,
-        ];
-        $default_price = $default_prices[$svc] ?? 0;
+        $default_price = service_type_default_price($conn, $svc);   // service_types.default_price
         $suggested[] = [
             'desc'       => $service_labels[$svc] ?? 'Service',
             'area'       => '',
@@ -308,7 +288,8 @@ document.addEventListener('DOMContentLoaded', function() {
           <div style="font-size:0.73rem;color:var(--text-muted);"><?= htmlspecialchars($job['plate_number']) ?> &nbsp;·&nbsp; <?= htmlspecialchars($job['year_model'] . ' ' . $job['make'] . ' ' . $job['model']) ?> &nbsp;·&nbsp; <?= htmlspecialchars($service_labels[$job['service_type']] ?? $job['service_type']) ?></div>
         </div>
       </div>
-      <span class="badge badge-yellow"><?= icon('clock', 10) ?> <?= ucfirst(str_replace('_', ' ', $job['status'])) ?></span>
+      <?php $jsb = repair_status_badge($job['status']); ?>
+      <span class="badge <?= $jsb['class'] ?>"><?= icon('clock', 10) ?> <?= htmlspecialchars($jsb['label']) ?></span>
     </div>
   </div>
 

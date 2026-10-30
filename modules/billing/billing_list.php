@@ -4,6 +4,7 @@ require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../includes/pagination.php';
+require_once '../../includes/billing_lists.php';
 
 require_role(['admin', 'super_admin']);
 
@@ -18,7 +19,7 @@ $eligible_claims = $conn->query("
 
 // ── FILTERS ──
 $search        = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
-$filter_status = san_enum($_GET['status'] ?? 'all', ['all', 'draft', 'sent', 'paid', 'unpaid']);
+$filter_status = san_enum($_GET['status'] ?? 'all', array_merge(['all'], array_column(billing_statuses_all($conn), 'code')));
 $sort_by       = san_enum($_GET['sort']   ?? 'newest', ['newest', 'oldest']);
 
 $where  = ["1=1"];
@@ -43,7 +44,6 @@ $order     = $sort_by === 'oldest' ? 'b.created_at ASC' : 'b.created_at DESC';
 $sql = "
     SELECT b.billing_id, b.billing_number, b.billed_to, b.status,
            b.parts_cost, b.labor_cost, b.other_cost, b.deductible, b.total_amount_due,
-           b.doc_release_of_claim, b.doc_drivers_license, b.doc_billing_statement,
            b.created_at, b.sent_at,
            b.claim_id,
            c.full_name, c.client_id,
@@ -59,13 +59,9 @@ $sql = "
 ";
 // One page at a time (includes/pagination.php) — the total is counted from this same query
 [$result, $pg] = paginate_query($conn, $sql, $types, $params);
-
-$status_map = [
-    'draft'  => ['Draft',   'badge-gray'],
-    'sent'   => ['Sent',    'badge-blue'],
-    'paid'   => ['Paid',    'badge-green'],
-    'unpaid' => ['Unpaid',  'badge-yellow'],
-];
+$rows     = $result->fetch_all(MYSQLI_ASSOC);
+// Required Documents: the types (billing_document_types) and which ones each billing on this page has received
+$docs_got = billing_docs_received($conn, array_column($rows, 'billing_id'));
 
 $page_title  = 'Billing';
 $active_page = 'billing';
@@ -103,11 +99,10 @@ require_once '../../includes/topbar.php';
             value="<?= htmlspecialchars($search) ?>" style="padding-left:2.4rem;width:100%;"/>
         </div>
         <select name="status" class="filter-input" style="width:150px;">
-          <option value="all"    <?= $filter_status==='all'    ?'selected':'' ?>>All Statuses</option>
-          <option value="draft"  <?= $filter_status==='draft'  ?'selected':'' ?>>Draft</option>
-          <option value="sent"   <?= $filter_status==='sent'   ?'selected':'' ?>>Sent</option>
-          <option value="paid"   <?= $filter_status==='paid'   ?'selected':'' ?>>Paid</option>
-          <option value="unpaid" <?= $filter_status==='unpaid' ?'selected':'' ?>>Unpaid</option>
+          <option value="all" <?= $filter_status === 'all' ? 'selected' : '' ?>>All Statuses</option>
+          <?php foreach (billing_statuses_all($conn) as $st): ?>
+          <option value="<?= htmlspecialchars($st['code']) ?>" <?= $filter_status === $st['code'] ? 'selected' : '' ?>><?= htmlspecialchars($st['label']) ?></option>
+          <?php endforeach; ?>
         </select>
         <select name="sort" class="filter-input" style="width:145px;">
           <option value="newest" <?= $sort_by==='newest'?'selected':'' ?>>Newest First</option>
@@ -141,7 +136,7 @@ require_once '../../includes/topbar.php';
         </div>
       </div>
 
-      <?php if ($result->num_rows > 0): ?>
+      <?php if ($rows): ?>
       <style>
       @media (min-width: 769px) {
         .mob-billing-table thead th { padding: 0.45rem 0.75rem; }
@@ -165,9 +160,10 @@ require_once '../../includes/topbar.php';
           </tr>
         </thead>
         <tbody>
-          <?php while ($row = $result->fetch_assoc()):
-            $sb        = $status_map[$row['status']] ?? ['Unknown', 'badge-gray'];
-            $docs_done = (int)$row['doc_release_of_claim'] + (int)$row['doc_drivers_license'] + (int)$row['doc_billing_statement'];
+          <?php foreach ($rows as $row):
+            $sb        = billing_status_badge($conn, $row['status']);
+            $row_docs  = billing_docs_for($conn, $docs_got[(int)$row['billing_id']] ?? []);
+            $docs_done = count(array_filter($row_docs, fn($d) => $d['received']));
             $total_repair = (float)$row['parts_cost'] + (float)$row['labor_cost'] + (float)$row['other_cost'];
           ?>
           <tr>
@@ -181,29 +177,25 @@ require_once '../../includes/topbar.php';
             <td style="font-size:0.8rem;color:var(--text-secondary);"><?= htmlspecialchars($row['billed_to']) ?></td>
             <td>
               <div style="display:flex;justify-content:center;align-items:center;gap:3px;">
-                <div class="doc-pip <?= $row['doc_release_of_claim']  ? 'filled' : 'empty' ?>" title="Release of Claim"></div>
-                <div class="doc-pip <?= $row['doc_drivers_license']   ? 'filled' : 'empty' ?>" title="Driver's License"></div>
-                <div class="doc-pip <?= $row['doc_billing_statement'] ? 'filled' : 'empty' ?>" title="Billing Statement"></div>
-                <span style="font-size:0.7rem;color:var(--text-muted);margin-left:3px;"><?= $docs_done ?>/3</span>
+                <?php foreach ($row_docs as $d): ?>
+                <div class="doc-pip <?= $d['received'] ? 'filled' : 'empty' ?>" title="<?= htmlspecialchars($d['name']) ?>"></div>
+                <?php endforeach; ?>
+                <span style="font-size:0.7rem;color:var(--text-muted);margin-left:3px;"><?= $docs_done ?>/<?= count($row_docs) ?></span>
               </div>
             </td>
             <td style="text-align:right;font-size:0.82rem;">₱<?= number_format($total_repair, 2) ?></td>
             <td style="text-align:right;font-size:0.82rem;color:var(--danger);">−₱<?= number_format($row['deductible'], 2) ?></td>
             <td style="text-align:right;font-weight:700;color:var(--gold);">₱<?= number_format($row['total_amount_due'], 2) ?></td>
-            <td><span class="badge <?= $sb[1] ?>"><?= $sb[0] ?></span></td>
+            <td><span class="badge <?= $sb['class'] ?>"><?= htmlspecialchars($sb['label']) ?></span></td>
             <td>
               <div style="display:flex;align-items:center;gap:0.35rem;justify-content:center;">
                 <a href="view_billing.php?id=<?= $row['billing_id'] ?>" class="btn-sm-gold" title="View">
                   <?= icon('eye', 14) ?>
                 </a>
-                <button type="button" class="btn-sm-danger js-delete-billing" title="Delete"
-                  data-id="<?= $row['billing_id'] ?>" data-num="<?= htmlspecialchars($row['billing_number']) ?>">
-                  <?= icon('trash', 14) ?>
-                </button>
               </div>
             </td>
           </tr>
-          <?php endwhile; ?>
+          <?php endforeach; ?>
         </tbody>
       </table>
       <?php render_pagination($pg); ?>
@@ -220,37 +212,5 @@ require_once '../../includes/topbar.php';
 
   </div>
 </div>
-
-<form id="delete-billing-form" method="POST" style="display:none;">
-  <?= csrf_field() ?>
-  <input type="hidden" name="action" value="delete_billing"/>
-</form>
-<script>
-document.querySelectorAll('.js-delete-billing').forEach(function(btn) {
-  btn.addEventListener('click', function() {
-    const id  = this.dataset.id;
-    const num = this.dataset.num;
-    Swal.fire({
-      icon: 'warning',
-      title: 'Delete Billing Record?',
-      text: num + ' will be permanently deleted. This cannot be undone.',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, delete it',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: '#c0392b',
-      cancelButtonColor: '#6c757d',
-    }).then(async function(result) {
-      if (result.isConfirmed) {
-        const ok = await requirePin();
-        if (!ok) return;
-        // POST + CSRF token (the hidden form below), not a GET link.
-        const form = document.getElementById('delete-billing-form');
-        form.action = 'view_billing.php?id=' + encodeURIComponent(id);
-        form.submit();
-      }
-    });
-  });
-});
-</script>
 
 <?php require_once '../../includes/footer.php'; ?>

@@ -1,17 +1,14 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
+require_once __DIR__ . '/../../includes/service_types.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../includes/transaction.php';
 
 require_role(['admin', 'super_admin', 'mechanic']);
 
-$checklist_area_keys = [
-    'front_bumper','rear_bumper','hood','trunk','windshield',
-    'door_fl','door_rl','door_fr','door_rr',
-    'mirror_left','mirror_right','headlights','taillights','tires_wheels',
-];
+$checklist_area_keys = array_keys(REPAIR_CHECKLIST_AREAS);   // config/access.php
 
 $errors  = [];
 $success = '';
@@ -50,10 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $vehicle_id  = (int)($_POST['vehicle_id']  ?? 0);
     $repair_date = san_str($_POST['repair_date']  ?? '', 10);
     $release_date= san_str($_POST['release_date'] ?? '', 10);
-    $service_type= san_enum($_POST['service_type'] ?? '', [
-        'repair_panel','repair_full','paint_panel','paint_full',
-        'washover_basic','washover_full','custom'
-    ]);
+    $service_type= san_enum($_POST['service_type'] ?? '', array_column(service_types_active($conn), 'code'));
     $additional  = san_str($_POST['additional_damages'] ?? '', MAX_NOTE);
     if (text_too_long($_POST['additional_damages'] ?? '', MAX_NOTE)) $errors[] = 'Additional damages note is too long (max ' . MAX_NOTE . ' characters).';
 
@@ -103,7 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Save checklist
                 $cins = $conn->prepare("INSERT INTO repair_checklist (job_id, area_key, condition_value, notes) VALUES (?, ?, ?, ?)");
                 foreach ($checklist_area_keys as $key) {
-                    $cond  = san_enum($_POST['area_' . $key] ?? 'none', ['none', 'minor', 'major']);
+                    $cond  = san_enum($_POST['area_' . $key] ?? 'none', array_keys(REPAIR_DAMAGE_LEVELS));
                     $note  = san_str($_POST['note_' . $key] ?? '', 255);
                     $cins->bind_param('isss', $job_id, $key, $cond, $note);
                     $cins->execute();
@@ -137,23 +131,8 @@ $extra_css   = '<link rel="stylesheet" href="../../assets/css/mechanic/add_repai
 require_once '../../includes/header.php';
 require_once '../../includes/navbar.php';
 
-// Exact areas from the physical Unit Inspection form
-$checklist_areas = [
-    'front_bumper'   => 'Front Bumper',
-    'rear_bumper'    => 'Rear Bumper',
-    'hood'           => 'Hood',
-    'trunk'          => 'Trunk',
-    'windshield'     => 'Windshield',
-    'door_fl'        => 'Left Front Door',
-    'door_rl'        => 'Left Rear Door',
-    'door_fr'        => 'Right Front Door',
-    'door_rr'        => 'Right Rear Door',
-    'mirror_left'    => 'Left Mirror',
-    'mirror_right'   => 'Right Mirror',
-    'headlights'     => 'Headlights',
-    'taillights'     => 'Taillights',
-    'tires_wheels'   => 'Tires / Wheels',
-];
+// Exact areas from the physical Unit Inspection form (config/access.php)
+$checklist_areas = REPAIR_CHECKLIST_AREAS;
 ?>
 
 <div class="main">
@@ -260,19 +239,16 @@ require_once '../../includes/topbar.php';
               <label class="field-label">Service Type <span class="req">*</span></label>
               <select name="service_type" class="field-select" required>
                 <option value="" disabled selected>Select service type</option>
-                <optgroup label="Repair &amp; Paint">
-                  <option value="repair_panel">Per Panel Repair</option>
-                  <option value="repair_full">Full Body Repair</option>
-                  <option value="paint_panel">Per Panel Paint</option>
-                  <option value="paint_full">Full Body Paint</option>
+                <?php // service_types table: one optgroup per group_label, in sort order
+                $svc_groups = [];
+                foreach (service_types_active($conn) as $st) $svc_groups[$st['group_label'] ?: 'Other'][] = $st;
+                foreach ($svc_groups as $group => $types): ?>
+                <optgroup label="<?= htmlspecialchars($group) ?>">
+                  <?php foreach ($types as $st): ?>
+                  <option value="<?= htmlspecialchars($st['code']) ?>"><?= htmlspecialchars($st['label']) ?></option>
+                  <?php endforeach; ?>
                 </optgroup>
-                <optgroup label="Wash Over">
-                  <option value="washover_basic">Basic Wash Over</option>
-                  <option value="washover_full">Fully Wash Over</option>
-                </optgroup>
-                <optgroup label="Other">
-                  <option value="custom">Custom / Mixed Services</option>
-                </optgroup>
+                <?php endforeach; ?>
               </select>
             </div>
 
@@ -517,9 +493,9 @@ require_once '../../includes/topbar.php';
           <!-- LEGEND -->
           <div style="display:flex;gap:1.25rem;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap;">
             <span style="font-size:0.72rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Legend:</span>
-            <span class="legend-dot" style="background:var(--bg-2);border:1.5px solid var(--border);">No Damage</span>
-            <span class="legend-dot" style="background:rgba(217,119,6,0.18);border:1.5px solid #D97706;">Minor Scratch</span>
-            <span class="legend-dot" style="background:rgba(220,38,38,0.18);border:1.5px solid #DC2626;">Major Damage</span>
+            <span class="legend-dot" style="background:var(--bg-2);border:1.5px solid var(--border);"><?= REPAIR_DAMAGE_LEVELS['none']['label'] ?></span>
+            <span class="legend-dot" style="background:rgba(217,119,6,0.18);border:1.5px solid #D97706;"><?= REPAIR_DAMAGE_LEVELS['minor']['label'] ?></span>
+            <span class="legend-dot" style="background:rgba(220,38,38,0.18);border:1.5px solid #DC2626;"><?= REPAIR_DAMAGE_LEVELS['major']['label'] ?></span>
           </div>
 
           <!-- HIDDEN INPUTS (submitted with form) -->
@@ -533,9 +509,9 @@ require_once '../../includes/topbar.php';
             <thead>
               <tr>
                 <th style="text-align:left;">Exterior Area</th>
-                <th style="width:13%;text-align:center;">No Damage</th>
-                <th style="width:13%;text-align:center;">Minor Scratch</th>
-                <th style="width:13%;text-align:center;">Major Damage</th>
+                <th style="width:13%;text-align:center;"><?= REPAIR_DAMAGE_LEVELS['none']['label'] ?></th>
+                <th style="width:13%;text-align:center;"><?= REPAIR_DAMAGE_LEVELS['minor']['label'] ?></th>
+                <th style="width:13%;text-align:center;"><?= REPAIR_DAMAGE_LEVELS['major']['label'] ?></th>
                 <th style="text-align:left;">Notes</th>
               </tr>
             </thead>
@@ -572,6 +548,7 @@ require_once '../../includes/topbar.php';
 
 <script>
 window.areaLabels   = <?= json_encode($checklist_areas) ?>;
+window.damageLabels = <?= json_encode(array_map(fn($d) => $d['label'], REPAIR_DAMAGE_LEVELS)) ?>;
 window.prefillData  = <?= $prefill_data ? json_encode($prefill_data) : 'null' ?>;
 </script>
 <script src="../../assets/js/mechanic/add_repair.js?v=<?= filemtime(__DIR__ . '/../../assets/js/mechanic/add_repair.js') ?>"></script>

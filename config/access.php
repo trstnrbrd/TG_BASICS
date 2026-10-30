@@ -5,6 +5,27 @@
  * Kept in one place so every page follows the same rule.
  */
 
+// The status lists themselves (billing, claim, repair) and the repair-flow rules read the `statuses` table
+require_once __DIR__ . '/../includes/statuses.php';
+
+// Where a claim can go next from each status (view_claim.php: the Update Status choices and its server check)
+const CLAIM_STATUS_FLOW = [
+    'compiling'            => ['sent_admin', 'lack_of_requirements'],
+    'sent_admin'           => ['sent_head_office', 'lack_of_requirements'],
+    'sent_head_office'     => ['waiting_loa', 'denied'],
+    'waiting_loa'          => ['loa_received', 'denied'],
+    'loa_received'         => ['pending', 'denied'],
+    'pending'              => ['approved', 'denied'],
+    'approved'             => ['resolved'],
+    'lack_of_requirements' => ['compiling'],
+];
+
+/** The statuses a claim in $status can move to ([] for denied / resolved, the end of the flow). */
+function claim_next_statuses(string $status): array
+{
+    return CLAIM_STATUS_FLOW[$status] ?? [];
+}
+
 // Claim statuses where each action is allowed
 const CLAIM_DOCS_OPEN_STATUSES = ['compiling', 'sent_admin', 'lack_of_requirements'];
 const CLAIM_DELETABLE_STATUSES = ['resolved', 'denied', 'lack_of_requirements'];
@@ -28,30 +49,31 @@ function claim_is_billable(string $status): bool
     return in_array($status, CLAIM_BILLABLE_STATUSES, true);
 }
 
-// Repair job statuses in the order a job moves through them. 'cancelled' is a dead end, reachable from any open status.
-const REPAIR_STATUS_FLOW = ['pending', 'in_progress', 'for_pickup', 'completed'];
+// Unit Inspection: the areas on the physical inspection form (repair_checklist.area_key). Each one is also a shape
+// drawn on the New Repair Job diagram (data-panel="<key>"), so an area is added in code with its shape, not as data.
+const REPAIR_CHECKLIST_AREAS = [
+    'front_bumper' => 'Front Bumper',
+    'rear_bumper'  => 'Rear Bumper',
+    'hood'         => 'Hood',
+    'trunk'        => 'Trunk',
+    'windshield'   => 'Windshield',
+    'door_fl'      => 'Left Front Door',
+    'door_rl'      => 'Left Rear Door',
+    'door_fr'      => 'Right Front Door',
+    'door_rr'      => 'Right Rear Door',
+    'mirror_left'  => 'Left Mirror',
+    'mirror_right' => 'Right Mirror',
+    'headlights'   => 'Headlights',
+    'taillights'   => 'Taillights',
+    'tires_wheels' => 'Tires / Wheels',
+];
 
-/**
- * May a repair job move from $from to $to?
- * $forward_only (mechanics): only to a later status or to cancelled, and never out of completed / cancelled.
- * Otherwise (owner, admins): any other status, so a wrong update can be corrected.
- */
-function repair_status_change_allowed(string $from, string $to, bool $forward_only): bool
-{
-    if ($from === $to) return false;
-    if (!$forward_only) return true;
-    if ($from === 'completed' || $from === 'cancelled') return false;
-    if ($to === 'cancelled') return true;
-    $i = array_search($from, REPAIR_STATUS_FLOW, true);
-    $j = array_search($to, REPAIR_STATUS_FLOW, true);
-    return $i !== false && $j !== false && $j > $i;
-}
-
-/** Is the repair job still open (pending, in progress, for pickup)? Photos show on the client's QR page only then. */
-function repair_job_is_open(string $status): bool
-{
-    return !in_array($status, ['completed', 'cancelled'], true);
-}
+// The condition an area can be marked with (repair_checklist.condition_value): label, text colour, background
+const REPAIR_DAMAGE_LEVELS = [
+    'none'  => ['label' => 'No Damage',     'color' => '#6B7280', 'bg' => 'rgba(107,114,128,0.1)'],
+    'minor' => ['label' => 'Minor Scratch', 'color' => '#B8860B', 'bg' => 'rgba(184,134,11,0.12)'],
+    'major' => ['label' => 'Major Damage',  'color' => '#C0392B', 'bg' => 'rgba(192,57,43,0.12)'],
+];
 
 /**
  * May the signed-in user show / hide / delete this repair photo? Only while the job is open (a finished job's
@@ -68,6 +90,27 @@ function repair_photo_editable(int $uploaded_by, string $job_status): bool
 function policy_is_expired(string $policy_end): bool
 {
     return $policy_end < date('Y-m-d');
+}
+
+/**
+ * Where a policy stands on renewal: 'expired', 'urgent', 'expiring' or 'stable'. The two thresholds are the
+ * renewal_urgent_days / renewal_expiring_days settings. Used by View Policy and the renewal list, so both always
+ * agree.
+ */
+function policy_renewal_status(string $policy_end, int $days_left, int $urgent_days, int $expiring_days): string
+{
+    if (policy_is_expired($policy_end)) return 'expired';
+    if ($days_left <= $urgent_days)     return 'urgent';
+    if ($days_left <= $expiring_days)   return 'expiring';
+    return 'stable';
+}
+
+const POLICY_RENEWED_BADGE_DAYS = 3;
+
+/** Renewed within the last POLICY_RENEWED_BADGE_DAYS days (the "Renewed" badge). */
+function policy_recently_renewed(?string $renewed_at): bool
+{
+    return !empty($renewed_at) && strtotime($renewed_at) >= strtotime('-' . POLICY_RENEWED_BADGE_DAYS . ' days');
 }
 
 /**

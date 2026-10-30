@@ -1,16 +1,24 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
+require_once __DIR__ . '/../../includes/service_types.php';
 require_once '../../config/validators.php';
+require_once '../../config/access.php';
+require_once '../../config/transaction_pin.php';
 require_once '../../includes/pagination.php';
+require_once '../../includes/transaction.php';
 
 require_role(['admin', 'super_admin', 'mechanic']);
 $is_admin = is_staff();
 
-// ── DELETE ──
+// ── DELETE ── behind the Transaction PIN prompt, so the server checks the PIN too
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
     if (!$is_admin) { header("Location: quotation_list.php"); exit; }
     csrf_verify();
+    if (!pin_consume($conn)) {
+        header("Location: quotation_list.php?error=" . urlencode(PIN_REQUIRED_MSG));
+        exit;
+    }
     $del_id = san_int($_POST['quotation_id'] ?? 0, 1);
     if ($del_id) {
         $qt_row = $conn->prepare("SELECT quotation_number FROM quotations WHERE quotation_id = ?");
@@ -18,22 +26,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $qt_row->execute();
         $qt_row = $qt_row->get_result()->fetch_assoc();
         if ($qt_row) {
-            $del = $conn->prepare("DELETE FROM quotations WHERE quotation_id = ?");
-            $del->bind_param('i', $del_id);
-            $del->execute();
-            $log = $conn->prepare("INSERT INTO audit_logs (user_id,action,description) VALUES (?,'QUOTATION_DELETED',?)");
-            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' deleted quotation ' . $qt_row['quotation_number'] . '.';
-            $log->bind_param('is', $_SESSION['user_id'], $desc);
-            $log->execute();
+            db_transaction($conn, function () use ($conn, $del_id, $qt_row) {
+                $del = $conn->prepare("DELETE FROM quotations WHERE quotation_id = ?");
+                $del->bind_param('i', $del_id);
+                $del->execute();
+                $log = $conn->prepare("INSERT INTO audit_logs (user_id,action,description) VALUES (?,'QUOTATION_DELETED',?)");
+                $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' deleted quotation ' . $qt_row['quotation_number'] . '.';
+                $log->bind_param('is', $_SESSION['user_id'], $desc);
+                $log->execute();
+            });
         }
     }
     header("Location: quotation_list.php?success=" . urlencode('Quotation deleted.'));
     exit;
 }
 
-// ── FILTERS ──
-$filter = san_enum($_GET['filter'] ?? 'all', ['all','draft','pending_approval','approved','converted','cancelled']);
-$search = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
+// ── FILTERS ── (same layout as the repair list: search, status dropdown, newest / oldest)
+$filter  = san_enum($_GET['status'] ?? 'all', array_merge(['all'], array_keys(quotation_statuses())));
+$search  = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
+$sort_by = san_enum($_GET['sort'] ?? 'newest', ['newest', 'oldest']);
 
 // ── BUILD QUERY ──
 $where = [];
@@ -66,31 +77,13 @@ $sql = "
     INNER JOIN vehicles    v ON j.vehicle_id = v.vehicle_id
     LEFT  JOIN receipts    r ON r.quotation_id = q.quotation_id
     $where_sql
-    ORDER BY q.created_at DESC
+    ORDER BY q.created_at " . ($sort_by === 'oldest' ? 'ASC' : 'DESC') . "
 ";
 
 // One page at a time (includes/pagination.php) — the total is counted from this same query
 [$rows, $pg] = paginate_query($conn, $sql, $types, $params);
 
-$service_labels = [
-    'repair_panel'   => 'Per Panel Repair',  'repair_full'    => 'Full Body Repair',
-    'paint_panel'    => 'Per Panel Paint',   'paint_full'     => 'Full Body Paint',
-    'washover_basic' => 'Basic Wash Over',   'washover_full'  => 'Fully Wash Over',
-    'custom'         => 'Custom / Mixed',
-];
-
-$status_cfg = [
-    'draft'            => ['Draft',            'badge-gray'],
-    'pending_approval' => ['Pending Approval', 'badge-yellow'],
-    'approved'         => ['Approved',         'badge-green'],
-    'converted'        => ['Converted',        'badge-blue'],
-    'cancelled'        => ['Cancelled',        'badge-red'],
-];
-$pay_cfg = [
-    'unpaid'  => ['Unpaid',  'badge-red'],
-    'partial' => ['Partial', 'badge-yellow'],
-    'paid'    => ['Paid',    'badge-green'],
-];
+$service_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
 
 $page_title  = 'Quotations & Receipts';
 $active_page = 'quotations';
@@ -116,33 +109,39 @@ document.addEventListener('DOMContentLoaded',function(){
 });
 </script>
 <?php endif; ?>
+<?php if (!empty($_GET['error'])): ?>
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  Swal.fire({icon:'error',title:'Not deleted',text:<?= json_encode(san_str($_GET['error'],200)) ?>,confirmButtonColor:'#D4A017'});
+});
+</script>
+<?php endif; ?>
 
-
-<!-- FILTER TABS + SEARCH -->
-<form method="GET" action="">
-  <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem;">
-    <div style="position:relative;flex:1;min-width:200px;max-width:360px;">
+<!-- FILTERS (same layout as the repair list) -->
+<form method="GET" action="" class="rl-filter-form" style="margin-bottom:1rem;">
+  <div class="rl-filter-inner" style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
+    <div class="rl-filter-search" style="position:relative;flex:1;min-width:200px;max-width:360px;">
       <span style="position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;"><?= icon('magnifying-glass', 14) ?></span>
       <input type="text" name="search" class="filter-input"
         placeholder="Search client, plate, quotation #..."
         value="<?= htmlspecialchars($search) ?>" style="padding-left:2.4rem;width:100%;"/>
     </div>
-    <input type="hidden" name="filter" value="<?= htmlspecialchars($filter) ?>"/>
-    <button type="submit" class="btn-primary"><?= icon('magnifying-glass', 14) ?> Search</button>
-    <?php if ($search): ?>
-    <a href="?filter=<?= $filter ?>" class="btn-ghost"><?= icon('x-mark', 14) ?> Clear</a>
+    <select name="status" class="filter-input rl-filter-status" style="width:170px;">
+      <option value="all" <?= $filter === 'all' ? 'selected' : '' ?>>All Statuses</option>
+      <?php foreach (quotation_statuses() as $key => $st): ?>
+      <option value="<?= htmlspecialchars($key) ?>" <?= $filter === $key ? 'selected' : '' ?>><?= htmlspecialchars($st['label']) ?></option>
+      <?php endforeach; ?>
+    </select>
+    <select name="sort" class="filter-input rl-filter-sort" style="width:140px;">
+      <option value="newest" <?= $sort_by === 'newest' ? 'selected' : '' ?>>Newest First</option>
+      <option value="oldest" <?= $sort_by === 'oldest' ? 'selected' : '' ?>>Oldest First</option>
+    </select>
+    <button type="submit" class="btn-primary rl-filter-btn"><?= icon('magnifying-glass', 14) ?> Search</button>
+    <?php if ($search !== '' || $filter !== 'all' || $sort_by !== 'newest'): ?>
+    <a href="quotation_list.php" class="btn-ghost rl-filter-clear"><?= icon('x-mark', 14) ?> Clear</a>
     <?php endif; ?>
   </div>
 </form>
-
-<!-- FILTER TABS -->
-<div style="display:flex;gap:0.35rem;flex-wrap:wrap;margin-bottom:1rem;">
-  <?php foreach (['all'=>'All', 'draft'=>'Draft', 'pending_approval'=>'Pending', 'approved'=>'Approved', 'converted'=>'Converted', 'cancelled'=>'Cancelled'] as $k => $l): ?>
-  <a href="?filter=<?= $k ?><?= $search ? '&search='.urlencode($search) : '' ?>"
-     class="<?= $filter === $k ? 'btn-primary' : 'btn-ghost' ?>"
-     style="font-size:0.78rem;padding:0.35rem 0.9rem;"><?= $l ?></a>
-  <?php endforeach; ?>
-</div>
 
 <!-- TABLE -->
 <div class="card">
@@ -182,7 +181,7 @@ document.addEventListener('DOMContentLoaded',function(){
       </thead>
       <tbody>
         <?php while ($row = $rows->fetch_assoc()):
-          $sc = $status_cfg[$row['status']] ?? ['Unknown','badge-gray'];
+          $sc = quotation_status_badge($row['status']);   // statuses table (includes/statuses.php)
         ?>
         <tr>
           <td style="text-align:left;">
@@ -195,15 +194,15 @@ document.addEventListener('DOMContentLoaded',function(){
           <td style="text-align:right;font-weight:700;font-size:0.82rem;color:var(--text-primary);">PHP <?= number_format($row['total'], 2) ?></td>
           <td style="text-align:center;">
             <?php if ($row['receipt_number']):
-              $pc = $pay_cfg[$row['payment_status']] ?? ['—','badge-gray'];
+              $pc = receipt_status_badge($row['payment_status']);
             ?>
               <div style="font-size:0.73rem;color:var(--text-muted);font-family:monospace;"><?= htmlspecialchars($row['receipt_number']) ?></div>
-              <span class="badge <?= $pc[1] ?>" style="font-size:0.65rem;margin-top:0.15rem;"><?= $pc[0] ?></span>
+              <span class="badge <?= $pc['class'] ?>" style="font-size:0.65rem;margin-top:0.15rem;"><?= htmlspecialchars($pc['label']) ?></span>
             <?php else: ?>
               <span style="color:var(--text-muted);font-size:0.75rem;">—</span>
             <?php endif; ?>
           </td>
-          <td style="text-align:center;"><span class="badge <?= $sc[1] ?>"><?= $sc[0] ?></span></td>
+          <td style="text-align:center;"><span class="badge <?= $sc['class'] ?>"><?= htmlspecialchars($sc['label']) ?></span></td>
           <td style="text-align:center;">
             <div style="display:flex;gap:0.35rem;justify-content:center;">
               <a href="view_quotation.php?id=<?= $row['quotation_id'] ?>" class="btn-sm-gold" title="View" style="padding:0.35rem 0.55rem;"><?= icon('eye', 14) ?></a>
@@ -238,6 +237,11 @@ document.addEventListener('DOMContentLoaded',function(){
   <input type="hidden" name="quotation_id" id="delete-qt-id"/>
 </form>
 <script>
+document.querySelectorAll('.rl-filter-form select[name="status"], .rl-filter-form select[name="sort"]').forEach(function (select) {
+  select.addEventListener('change', function () {
+    this.form.submit();
+  });
+});
 document.querySelectorAll('.btn-delete-qt').forEach(btn => {
   btn.addEventListener('click', function () {
     const id  = this.dataset.id;

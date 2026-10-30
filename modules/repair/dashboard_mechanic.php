@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
+require_once __DIR__ . '/../../includes/service_types.php';
+require_once '../../config/access.php';
 
 require_role(['mechanic']);
 
@@ -18,7 +20,7 @@ $jobs = $conn->query("
     FROM repair_jobs j
     INNER JOIN clients  c ON j.client_id  = c.client_id
     INNER JOIN vehicles v ON j.vehicle_id = v.vehicle_id
-    WHERE j.status IN ('pending','in_progress','for_pickup')
+    WHERE j.status IN ('" . implode("','", repair_open_statuses()) . "')
     ORDER BY j.created_at DESC
     LIMIT 5
 ");
@@ -32,23 +34,8 @@ $team = $conn->query("
     ORDER BY FIELD(role,'super_admin','admin','mechanic'), full_name ASC
 ");
 
-$service_labels = [
-    'repair_panel'   => 'Per Panel Repair',
-    'repair_full'    => 'Full Body Repair',
-    'paint_panel'    => 'Per Panel Paint',
-    'paint_full'     => 'Full Body Paint',
-    'washover_basic' => 'Basic Wash Over',
-    'washover_full'  => 'Fully Wash Over',
-    'custom'         => 'Custom / Mixed',
-];
+$service_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
 
-$status_badges = [
-    'pending'     => ['Pending',     'badge-yellow'],
-    'in_progress' => ['In Progress', 'badge-blue'],
-    'for_pickup'  => ['For Pickup',  'badge-gold'],
-    'completed'   => ['Completed',   'badge-green'],
-    'cancelled'   => ['Cancelled',   'badge-gray'],
-];
 
 $page_title  = 'Mechanic Dashboard';
 $active_page = 'dashboard';
@@ -132,7 +119,7 @@ require_once '../../includes/topbar.php';
           </thead>
           <tbody>
             <?php while ($j = $jobs->fetch_assoc()):
-              $sb  = $status_badges[$j['status']] ?? ['Unknown','badge-gray'];
+              $sb  = repair_status_badge($j['status']);
               $svc = $service_labels[$j['service_type']] ?? $j['service_type'];
             ?>
             <tr>
@@ -143,7 +130,7 @@ require_once '../../includes/topbar.php';
                 <div class="cell-sub"><?= htmlspecialchars($j['make'] . ' ' . $j['model']) ?></div>
               </td>
               <td><span class="cell-service"><?= htmlspecialchars($svc) ?></span></td>
-              <td><span class="badge <?= $sb[1] ?>"><?= $sb[0] ?></span></td>
+              <td><span class="badge <?= $sb['class'] ?>"><?= htmlspecialchars($sb['label']) ?></span></td>
               <td>
                 <a href="view_repair.php?id=<?= $j['job_id'] ?>" class="btn-sm-gold" style="padding:0.3rem 0.6rem;">
                   <?= icon('eye', 13) ?>

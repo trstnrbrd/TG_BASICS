@@ -11,6 +11,7 @@ require_once '../../includes/db_backup.php';
 require_once '../../includes/full_backup.php';
 require_once '../../config/dev_access.php';
 require_once '../../includes/insurance_companies.php';
+require_once '../../includes/themes.php';
 
 require_role(['admin', 'super_admin', 'mechanic']);
 
@@ -401,7 +402,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
 
         // ── DESIGN PREFERENCES ──
         case 'design_prefs':
-            $theme = in_array($_POST['theme'] ?? '', ['light', 'dark', 'warm', 'high-contrast', 'high-contrast-dark']) ? $_POST['theme'] : 'light';
+            $theme = theme_valid($_POST['theme'] ?? '');   // includes/themes.php
 
             $upd = $conn->prepare("UPDATE users SET theme = ? WHERE user_id = ?");
             $upd->bind_param('si', $theme, $user_id);
@@ -678,7 +679,7 @@ require_once '../../includes/topbar.php';
     <?php
     $has_photo   = !empty($current_user['profile_photo']);
     $photo_url   = $has_photo ? $base_path . 'uploads/avatars/' . htmlspecialchars($current_user['profile_photo']) : '';
-    $user_theme  = $current_user['theme'] ?? 'light';
+    $user_theme  = theme_valid($current_user['theme'] ?? null);
     ?>
 
     <?php if (is_developer() && empty($current_user['totp_enabled'])): ?>
@@ -1065,17 +1066,8 @@ require_once '../../includes/topbar.php';
           </div>
         </div>
         <div class="card-body">
-          <?php
-          $themes = [
-            'light'            => ['name' => 'Light',             'bg' => '#F4F1EC', 'bg2' => '#FAFAF8', 'sidebar' => '#1C1A17', 'accent' => '#D4A017', 'card' => '#FFFFFF'],
-            'dark'             => ['name' => 'Dark',              'bg' => '#141210', 'bg2' => '#1C1A17', 'sidebar' => '#0F0E0D', 'accent' => '#D4A017', 'card' => '#242220'],
-            'warm'             => ['name' => 'Warm',              'bg' => '#FAF5EE', 'bg2' => '#F3EBE0', 'sidebar' => '#2C1F12', 'accent' => '#A8865A', 'card' => '#FFFFFF'],
-            'high-contrast'    => ['name' => 'High Contrast',     'bg' => '#FFFFFF', 'bg2' => '#F0F0F0', 'sidebar' => '#000000', 'accent' => '#000000', 'card' => '#FFFFFF'],
-            'high-contrast-dark' => ['name' => 'High Contrast Dark', 'bg' => '#000000', 'bg2' => '#111111', 'sidebar' => '#000000', 'accent' => '#FFFFFF', 'card' => '#111111'],
-          ];
-          ?>
           <div class="theme-picker">
-            <?php foreach ($themes as $value => $t): ?>
+            <?php foreach (THEMES as $value => $t):   // includes/themes.php ?>
             <label class="theme-option <?= $user_theme === $value ? 'active' : '' ?>">
               <input type="radio" name="theme" value="<?= $value ?>" <?= $user_theme === $value ? 'checked' : '' ?> hidden/>
               <div class="theme-preview" style="background:<?= $t['bg'] ?>;border:1px solid <?= $t['bg2'] ?>;">

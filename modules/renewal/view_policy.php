@@ -305,6 +305,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
             }
             $ctrl_numbers[$k] = san_str(is_string($v) ? $v : '', MAX_PAYMENT_REF);
         }
+        // An installment already paid is locked on the page (only Undo changes it), so its amount, mode and control
+        // no. always come from the database, never from the hidden fields the browser sent back.
+        $locked_total = 0.0;
+        foreach ($installments as $row) {
+            if ((float)$row['amount_paid'] <= 0) continue;
+            $idx = $row['installment_no'] - 1;
+            $amounts[$idx]      = (float)$row['amount_paid'];
+            $pay_modes[$idx]    = $row['payment_mode'] ?? '';
+            $ctrl_numbers[$idx] = $row['control_number'] ?? '';
+            $locked_total      += (float)$row['amount_paid'];
+        }
+        // Each new payment on its own: no more than what is left to pay after the locked ones
+        $remaining = max(0, round($payable_amount - $locked_total, 2));
+        if ($valid) {
+            foreach ($installments as $row) {
+                if ((float)$row['amount_paid'] > 0) continue;
+                $amt = $amounts[$row['installment_no'] - 1] ?? 0.0;
+                if (payment_exceeds($amt, $remaining)) {
+                    $pay_errors[] = 'Payment ' . $row['installment_no'] . ' amount (₱' . number_format($amt, 2) . ') is more than the remaining balance of ₱' . number_format($remaining, 2) . '.';
+                    $valid = false;
+                }
+            }
+        }
+
         // Mode of payment required for any installment with amount > 0
         if ($valid) {
             foreach ($installments as $row) {
@@ -440,39 +464,19 @@ $claims_count_res->bind_param('i', $policy_id);
 $claims_count_res->execute();
 $claims_count = (int)$claims_count_res->get_result()->fetch_assoc()['cnt'];
 
-$recently_renewed = !empty($policy['renewed_at']) && strtotime($policy['renewed_at']) >= strtotime('-3 days');
-$policy_needs_action = $expired || $days <= $exp_days;
-if ($recently_renewed && !$policy_needs_action) {
-    $status_label = 'Renewed';
-    $status_color = 'var(--info)';
-    $status_bg    = 'var(--info-bg, rgba(59,130,246,0.1))';
-    $status_border= 'var(--info-border, rgba(59,130,246,0.3))';
-    $status_icon  = icon('arrow-path', 16);
-} elseif ($expired) {
-    $status_label = 'Expired';
-    $status_color = 'var(--text-muted)';
-    $status_bg    = 'var(--bg-2)';
-    $status_border= 'var(--border)';
-    $status_icon  = icon('x-mark', 16);
-} elseif ($days <= $urg_days) {
-    $status_label = 'Urgent - ' . $days . ' day' . ($days !== 1 ? 's' : '') . ' left';
-    $status_color = 'var(--danger)';
-    $status_bg    = 'var(--danger-bg)';
-    $status_border= 'var(--danger-border)';
-    $status_icon  = icon('exclamation-triangle', 16);
-} elseif ($days <= $exp_days) {
-    $status_label = 'Expiring - ' . $days . ' days left';
-    $status_color = 'var(--warning)';
-    $status_bg    = 'var(--warning-bg)';
-    $status_border= 'var(--warning-border)';
-    $status_icon  = icon('clock', 16);
-} else {
-    $status_label = 'Stable';
-    $status_color = 'var(--success)';
-    $status_bg    = 'var(--success-bg)';
-    $status_border= 'var(--success-border)';
-    $status_icon  = icon('check-circle', 16);
-}
+// Status pill at the top: the renewal status (config/access.php), shown as "Renewed" for a few days after a
+// renewal unless the new policy already needs attention
+$renewal_status = policy_renewal_status($policy['policy_end'], $days, $urg_days, $exp_days);
+if ($renewal_status === 'stable' && policy_recently_renewed($policy['renewed_at'] ?? null)) $renewal_status = 'renewed';
+$days_left = $days . ' day' . ($days !== 1 ? 's' : '') . ' left';
+[$status_label, $status_color, $status_bg, $status_border, $status_icon_name] = match ($renewal_status) {
+    'renewed'  => ['Renewed',               'var(--info)',       'var(--info-bg, rgba(59,130,246,0.1))', 'var(--info-border, rgba(59,130,246,0.3))', 'arrow-path'],
+    'expired'  => ['Expired',               'var(--text-muted)', 'var(--bg-2)',                          'var(--border)',                            'x-mark'],
+    'urgent'   => ['Urgent - ' . $days_left,   'var(--danger)',  'var(--danger-bg)',                     'var(--danger-border)',                     'exclamation-triangle'],
+    'expiring' => ['Expiring - ' . $days_left, 'var(--warning)', 'var(--warning-bg)',                    'var(--warning-border)',                    'clock'],
+    'stable'   => ['Stable',                'var(--success)',    'var(--success-bg)',                    'var(--success-border)',                    'check-circle'],
+};
+$status_icon = icon($status_icon_name, 16);
 
 $page_title  = 'View Policy';
 $active_page = 'renewal';
@@ -752,7 +756,7 @@ require_once '../../includes/topbar.php';
             <!-- Installment schedule table -->
             <?php $pay_mode_opts = ['Cash','Bank Transfer','Check','E-Wallet','Other']; ?>
             <div class="tg-table-wrap inst-table-wrap" style="margin-bottom:1rem;overflow-x:auto;">
-              <table class="tg-table inst-schedule-table" id="installment-view-table" style="min-width:700px;">
+              <table class="tg-table inst-schedule-table" id="installment-view-table" style="min-width:700px;" data-payable="<?= number_format($payable_amount, 2, '.', '') ?>">
                 <thead>
                   <tr>
                     <th style="text-align:center;white-space:nowrap;">Payment</th>
@@ -955,8 +959,53 @@ if ($has_inst_js) {
         const rows = document.querySelectorAll("#installment-view-table tbody tr");
 
         const today = new Date(); today.setHours(0,0,0,0);
+        const table   = document.getElementById("installment-view-table");
+        const saveBtn = document.getElementById("btn-save-payment");
+        const payable = parseFloat(table.dataset.payable) || 0;
+        const peso    = (n) => "₱" + n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        // already-paid (locked) rows carry their amount in a hidden field
+        let locked = 0;
+        rows.forEach(function (tr) {
+          if (tr.querySelector("input.inst-paid-input")) return;
+          const h = tr.querySelector("input[type=hidden][name=\"installment_amount[]\"]");
+          locked += h ? (parseFloat(h.value) || 0) : 0;
+        });
+        const inputs = Array.from(document.querySelectorAll("#installment-view-table input.inst-paid-input"));
+
+        // Each new amount: no more than the remaining balance after the locked rows and the other new amounts.
+        // The server checks the same on save (view_policy.php, record_payment).
+        function checkLimits() {
+          let bad = false;
+          inputs.forEach(function (input) {
+            const others = inputs.reduce((sum, o) => o === input ? sum : sum + (parseFloat(o.value) || 0), 0);
+            const max    = Math.max(0, Math.round((payable - locked - others) * 100) / 100);
+            const paid   = parseFloat(input.value) || 0;
+            input.max    = Math.max(0, payable - locked).toFixed(2);
+            let msg = input.parentNode.querySelector(".inst-paid-err");
+            if (paid > max + 0.005) {
+              bad = true;
+              if (!msg) {
+                msg = document.createElement("div");
+                msg.className = "inst-paid-err";
+                msg.style.cssText = "font-size:0.68rem;color:var(--danger);margin-top:0.25rem;";
+                input.parentNode.appendChild(msg);
+              }
+              msg.textContent = "Max " + peso(max) + " (remaining balance)";
+              input.style.borderColor = "var(--danger)";
+            } else {
+              if (msg) msg.remove();
+              input.style.borderColor = "";
+            }
+          });
+          if (saveBtn) {
+            saveBtn.disabled = bad;
+            saveBtn.style.opacity = bad ? "0.5" : "";
+            saveBtn.title = bad ? "An amount is more than the remaining balance" : "";
+          }
+        }
 
         function refresh() {
+          checkLimits();
           rows.forEach(function (tr) {
             const input = tr.querySelector("input.inst-paid-input");
             if (!input) return; // locked row — skip
@@ -982,6 +1031,7 @@ if ($has_inst_js) {
           const input = tr.querySelector("input.inst-paid-input");
           if (input) input.addEventListener("input", refresh); // locked (already paid) rows have no input
         });
+        checkLimits();   // e.g. amounts typed back in after a refused save
       })();
     ';
 } elseif ((float)$policy['balance'] > 0) {

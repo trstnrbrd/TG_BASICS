@@ -52,11 +52,6 @@ const ALLOWED_PAYMENT_MODES = [
     'Other',
 ];
 
-const ALLOWED_CLAIM_TYPES = [
-    'claims',
-    'repair',
-];
-
 const ALLOWED_ROLES = [
     'admin',
     'super_admin',

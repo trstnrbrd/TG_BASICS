@@ -1,9 +1,12 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
+require_once __DIR__ . '/../../includes/service_types.php';
 require_once '../../config/validators.php';
+require_once '../../config/access.php';
 require_once '../../includes/pagination.php';
 require_once '../../includes/transaction.php';
+require_once '../../config/transaction_pin.php';
 
 require_role(['admin', 'super_admin', 'mechanic']);
 
@@ -11,6 +14,10 @@ require_role(['admin', 'super_admin', 'mechanic']);
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
     if (!is_staff()) { header("Location: repair_list.php"); exit; }
     csrf_verify();
+    if (!pin_consume($conn)) {   // behind the Transaction PIN prompt, so the server checks the PIN too
+        header("Location: repair_list.php?error=" . urlencode(PIN_REQUIRED_MSG));
+        exit;
+    }
     $del_id = san_int($_POST['job_id'] ?? 0, 1);
     if ($del_id) {
         $job_row = $conn->prepare("SELECT job_number FROM repair_jobs WHERE job_id = ?");
@@ -35,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 // ── FILTERS ──
 $search        = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
-$filter_status = san_enum($_GET['status'] ?? 'all', ['all', 'pending', 'in_progress', 'for_pickup', 'completed', 'cancelled']);
+$filter_status = san_enum($_GET['status'] ?? 'all', array_merge(['all'], array_keys(repair_statuses())));
 $sort_by       = san_enum($_GET['sort'] ?? 'newest', ['newest', 'oldest']);
 
 // ── BUILD QUERY ──
@@ -72,23 +79,8 @@ $sql = "
 // One page at a time (includes/pagination.php) — the total is counted from this same query
 [$jobs, $pg] = paginate_query($conn, $sql, $types, $params);
 
-$service_labels = [
-    'repair_panel'   => 'Per Panel Repair',
-    'repair_full'    => 'Full Body Repair',
-    'paint_panel'    => 'Per Panel Paint',
-    'paint_full'     => 'Full Body Paint',
-    'washover_basic' => 'Basic Wash Over',
-    'washover_full'  => 'Fully Wash Over',
-    'custom'         => 'Custom / Mixed',
-];
+$service_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
 
-$status_badges = [
-    'pending'     => ['Pending',     'badge-yellow'],
-    'in_progress' => ['In Progress', 'badge-blue'],
-    'for_pickup'  => ['For Pickup',  'badge-gold'],
-    'completed'   => ['Completed',   'badge-green'],
-    'cancelled'   => ['Cancelled',   'badge-gray'],
-];
 
 $page_title  = 'Repair Jobs';
 $active_page = 'repair';
@@ -116,6 +108,13 @@ require_once '../../includes/topbar.php';
     });
     </script>
     <?php endif; ?>
+    <?php if (!empty($_GET['error'])): ?>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      Swal.fire({ icon:'error', title:'Not deleted', text:<?= json_encode(san_str($_GET['error'], 200)) ?>, confirmButtonColor:'#D4A017' });
+    });
+    </script>
+    <?php endif; ?>
 
     <!-- FILTERS -->
     <form method="GET" action="" class="rl-filter-form" style="margin-bottom:1rem;">
@@ -127,12 +126,10 @@ require_once '../../includes/topbar.php';
             value="<?= htmlspecialchars($search) ?>" style="padding-left:2.4rem;width:100%;"/>
         </div>
         <select name="status" class="filter-input rl-filter-status" style="width:160px;">
-          <option value="all"         <?= $filter_status === 'all'         ? 'selected' : '' ?>>All Statuses</option>
-          <option value="pending"     <?= $filter_status === 'pending'     ? 'selected' : '' ?>>Pending</option>
-          <option value="in_progress" <?= $filter_status === 'in_progress' ? 'selected' : '' ?>>In Progress</option>
-          <option value="for_pickup"  <?= $filter_status === 'for_pickup'  ? 'selected' : '' ?>>For Pickup</option>
-          <option value="completed"   <?= $filter_status === 'completed'   ? 'selected' : '' ?>>Completed</option>
-          <option value="cancelled"   <?= $filter_status === 'cancelled'   ? 'selected' : '' ?>>Cancelled</option>
+          <option value="all" <?= $filter_status === 'all' ? 'selected' : '' ?>>All Statuses</option>
+          <?php foreach (repair_statuses() as $key => $st): ?>
+          <option value="<?= $key ?>" <?= $filter_status === $key ? 'selected' : '' ?>><?= htmlspecialchars($st['label']) ?></option>
+          <?php endforeach; ?>
         </select>
         <select name="sort" class="filter-input rl-filter-sort" style="width:140px;">
           <option value="newest" <?= $sort_by === 'newest' ? 'selected' : '' ?>>Newest First</option>
@@ -174,7 +171,7 @@ require_once '../../includes/topbar.php';
         </thead>
         <tbody>
           <?php while ($j = $jobs->fetch_assoc()):
-              $sb  = $status_badges[$j['status']] ?? ['Unknown', 'badge-gray'];
+              $sb  = repair_status_badge($j['status']);
               $svc = $service_labels[$j['service_type']] ?? $j['service_type'];
           ?>
           <tr>
@@ -190,7 +187,7 @@ require_once '../../includes/topbar.php';
             <td><span class="cell-service"><?= htmlspecialchars($svc) ?></span></td>
             <td><span class="cell-date"><?= date('M d, Y', strtotime($j['repair_date'])) ?></span></td>
             <td><span class="cell-date-muted"><?= $j['release_date'] ? date('M d, Y', strtotime($j['release_date'])) : '—' ?></span></td>
-            <td><span class="badge <?= $sb[1] ?>"><?= $sb[0] ?></span></td>
+            <td><span class="badge <?= $sb['class'] ?>"><?= htmlspecialchars($sb['label']) ?></span></td>
             <td>
               <div style="display:flex;gap:0.35rem;justify-content:center;">
                 <a href="view_repair.php?id=<?= $j['job_id'] ?>" class="btn-sm-gold" title="View">

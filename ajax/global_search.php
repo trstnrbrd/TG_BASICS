@@ -3,6 +3,7 @@ require_once __DIR__ . '/../config/session.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/validators.php';
 require_once __DIR__ . '/../includes/api.php';
+require_once __DIR__ . '/../includes/claim_types.php';
 
 if (!isset($_SESSION['user_id'])) api_error('Not signed in.', 401);
 
@@ -107,7 +108,7 @@ if (!is_mechanic()) {
         $results[] = [
             'type'    => 'claim',
             'label'   => $row['full_name'] . ($row['plate_number'] ? ' — ' . $row['plate_number'] : ''),
-            'sub'     => ucfirst($row['claim_type']) . ' claim · ' . ucwords(str_replace('_', ' ', $row['status'])),
+            'sub'     => claim_type_badge($conn, $row['claim_type'])['label'] . ' claim · ' . ucwords(str_replace('_', ' ', $row['status'])),
             'url'     => 'modules/claims/view_claim.php?id=' . $row['claim_id'],
             'icon'    => 'clipboard-list',
         ];

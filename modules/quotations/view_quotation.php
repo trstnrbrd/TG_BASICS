@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
+require_once __DIR__ . '/../../includes/service_types.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../config/mailer.php';
@@ -37,35 +38,9 @@ $items_stmt->bind_param('i', $qt_id);
 $items_stmt->execute();
 $items = $items_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
-$area_labels = [
-    'front_bumper' => 'Front Bumper', 'rear_bumper'  => 'Rear Bumper',
-    'hood'         => 'Hood',         'trunk'        => 'Trunk',
-    'windshield'   => 'Windshield',   'door_fl'      => 'Left Front Door',
-    'door_rl'      => 'Left Rear Door','door_fr'     => 'Right Front Door',
-    'door_rr'      => 'Right Rear Door','mirror_left' => 'Left Mirror',
-    'mirror_right' => 'Right Mirror', 'headlights'   => 'Headlights',
-    'taillights'   => 'Taillights',   'tires_wheels' => 'Tires & Wheels',
-];
+$area_labels = REPAIR_CHECKLIST_AREAS;   // config/access.php
 
-$service_labels = [
-    'repair_panel'   => 'Per Panel Repair',  'repair_full'    => 'Full Body Repair',
-    'paint_panel'    => 'Per Panel Paint',   'paint_full'     => 'Full Body Paint',
-    'washover_basic' => 'Basic Wash Over',   'washover_full'  => 'Fully Wash Over',
-    'custom'         => 'Custom / Mixed',
-];
-
-$status_cfg = [
-    'draft'            => ['Draft',            'badge-gray',    '#6B7280'],
-    'pending_approval' => ['Pending Approval', 'badge-yellow',  '#B8860B'],
-    'approved'         => ['Approved',         'badge-green',   '#2E7D52'],
-    'converted'        => ['Converted',        'badge-blue',    '#1A6B9A'],
-    'cancelled'        => ['Cancelled',        'badge-red',     '#C0392B'],
-];
-$pay_cfg = [
-    'unpaid'  => ['Unpaid',  'badge-red'],
-    'partial' => ['Partial', 'badge-yellow'],
-    'paid'    => ['Paid',    'badge-green'],
-];
+$service_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
 
 // ── HANDLE POST ACTIONS ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_admin) {
@@ -155,11 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_admin) {
 
             // Send receipt email to client if they have an email address
             if (!empty($qt['email'])) {
-                $service_labels_map = [
-                    'repair_panel'=>'Per Panel Repair','repair_full'=>'Full Body Repair',
-                    'paint_panel'=>'Per Panel Paint','paint_full'=>'Full Body Paint',
-                    'washover_basic'=>'Basic Wash Over','washover_full'=>'Fully Wash Over','custom'=>'Custom / Mixed',
-                ];
+                $service_labels_map = service_type_labels($conn);   // service_types table (includes/service_types.php)
                 sendReceiptEmail(
                     $qt['email'],
                     $qt['full_name'],
@@ -199,7 +170,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_admin) {
     }
 }
 
-$sc   = $status_cfg[$qt['status']] ?? ['Unknown','badge-gray','#6B7280'];
+$sc   = quotation_status_badge($qt['status']);   // statuses table (includes/statuses.php)
 $svc  = $service_labels[$qt['service_type']] ?? $qt['service_type'];
 
 $page_title  = 'Quotation — ' . $qt['quotation_number'];
@@ -245,15 +216,15 @@ document.addEventListener('DOMContentLoaded',function(){
 <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
   <a href="quotation_list.php" class="back-link" onclick="goBack('quotation_list.php'); return false;"><?= icon('arrow-left', 14) ?> Back to Quotations</a>
   <div class="qt-action-bar">
-    <span class="badge <?= $sc[1] ?>"><?= $sc[0] ?></span>
+    <span class="badge <?= $sc['class'] ?>"><?= htmlspecialchars($sc['label']) ?></span>
     <?php if ($is_admin && $qt['status'] === 'draft'): ?>
       <a href="../quotations/add_quotation.php?quotation_id=<?= $qt_id ?>" class="btn-ghost" style="font-size:0.82rem;"><?= icon('pencil', 13) ?> Edit Draft</a>
-      <form method="POST" style="display:inline;">
+      <form method="POST" style="display:inline;" class="js-qt-confirm" data-title="Send for approval?" data-text="The quotation can no longer be edited once it is sent for approval." data-button="Yes, send it">
         <?= csrf_field() ?><input type="hidden" name="action" value="send_approval"/>
         <button type="submit" class="btn-primary" style="font-size:0.82rem;"><?= icon('paper-airplane', 13) ?> Send for Approval</button>
       </form>
     <?php elseif ($is_admin && $qt['status'] === 'pending_approval'): ?>
-      <form method="POST" style="display:inline;">
+      <form method="POST" style="display:inline;" class="js-qt-confirm" data-title="Mark this quotation as approved?" data-text="Do this once the client has agreed to the quotation." data-button="Yes, mark approved">
         <?= csrf_field() ?><input type="hidden" name="action" value="approve"/>
         <button type="submit" class="btn-primary" style="font-size:0.82rem;"><?= icon('check-circle', 13) ?> Mark Approved</button>
       </form>
@@ -261,7 +232,7 @@ document.addEventListener('DOMContentLoaded',function(){
       <button onclick="document.getElementById('convert-modal').style.display='flex'" class="btn-primary" style="font-size:0.82rem;"><?= icon('document-text', 13) ?> Convert to Billing Statement</button>
     <?php endif; ?>
     <?php if ($is_admin && in_array($qt['status'], ['draft','pending_approval'])): ?>
-      <form method="POST" style="display:inline;" onsubmit="return confirm('Cancel this quotation?')">
+      <form method="POST" style="display:inline;" class="js-qt-confirm" data-danger="1" data-title="Cancel this quotation?" data-text="A cancelled quotation cannot be approved or turned into a billing statement." data-button="Yes, cancel it">
         <?= csrf_field() ?><input type="hidden" name="action" value="cancel"/>
         <button type="submit" class="btn-ghost" style="font-size:0.82rem;color:var(--danger);"><?= icon('x-mark', 13) ?> Cancel</button>
       </form>
@@ -289,7 +260,7 @@ document.addEventListener('DOMContentLoaded',function(){
         ['Repair ID',    $qt['job_number']],
         ['Service Type', $svc],
         ['Repair Date',  date('F d, Y', strtotime($qt['repair_date']))],
-        ['Status',       $sc[0]],
+        ['Status',       $sc['label']],
         ['Created',      date('F d, Y', strtotime($qt['created_at']))],
       ];
       foreach ($qt_details as [$lbl, $val]): ?>
@@ -389,8 +360,8 @@ document.addEventListener('DOMContentLoaded',function(){
       <div class="card-title">Billing Statement Issued</div>
       <div class="card-sub"><?= htmlspecialchars($qt['receipt_number']) ?></div>
     </div>
-    <?php $pc = $pay_cfg[$qt['payment_status']] ?? ['Unknown','badge-gray']; ?>
-    <span class="badge <?= $pc[1] ?>" style="margin-left:auto;"><?= $pc[0] ?></span>
+    <?php $pc = receipt_status_badge((string)$qt['payment_status']); ?>
+    <span class="badge <?= $pc['class'] ?>" style="margin-left:auto;"><?= htmlspecialchars($pc['label']) ?></span>
   </div>
   <div style="padding:1rem 1.25rem;">
     <div class="receipt-info-grid">
@@ -469,4 +440,31 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape') document.
 </script>
 <?php endif; ?>
 
+<script>
+// Send for Approval / Mark Approved / Cancel: a SweetAlert confirmation before the form is sent
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('form.js-qt-confirm').forEach(function (form) {
+    form.addEventListener('submit', function (e) {
+      if (form.dataset.confirmed === '1') return;
+      e.preventDefault();
+      var danger = form.dataset.danger === '1';
+      Swal.fire({
+        title: form.dataset.title,
+        text: form.dataset.text,
+        icon: danger ? 'warning' : 'question',
+        showCancelButton: true,
+        confirmButtonText: form.dataset.button,
+        cancelButtonText: danger ? 'Keep it' : 'Not yet',
+        confirmButtonColor: danger ? '#C0392B' : '#D4A017',
+        cancelButtonColor: '#6B7280',
+        reverseButtons: true,
+      }).then(function (r) {
+        if (!r.isConfirmed) return;
+        form.dataset.confirmed = '1';
+        form.submit();
+      });
+    });
+  });
+});
+</script>
 <?php require_once '../../includes/footer.php'; ?>

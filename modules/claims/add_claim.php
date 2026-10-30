@@ -4,6 +4,7 @@ require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../includes/icons.php';
 require_once '../../includes/transaction.php';
+require_once '../../includes/claim_types.php';
 
 require_role(['admin', 'super_admin']);
 
@@ -45,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
     $client_id    = (int)($_POST['client_id'] ?? 0);
     $policy_id    = (int)($_POST['policy_id'] ?? 0);
-    $claim_type   = san_enum($_POST['claim_type'] ?? '', ALLOWED_CLAIM_TYPES);
+    $claim_type   = san_enum($_POST['claim_type'] ?? '', array_column(claim_types_active($conn), 'code'));
     $incident_date = san_str($_POST['incident_date'] ?? '', 10);
     $description  = san_str($_POST['description'] ?? '', MAX_NOTE);
 
@@ -241,8 +242,9 @@ require_once '../../includes/topbar.php';
                 <label class="field-label">Claim Type <span style="color:var(--danger);">*</span></label>
                 <select name="claim_type" class="field-input" required>
                   <option value="">— Select Type —</option>
-                  <option value="claims" <?= (($_POST['claim_type'] ?? '') === 'claims') ? 'selected' : '' ?>>Claims</option>
-                  <option value="repair" <?= (($_POST['claim_type'] ?? '') === 'repair') ? 'selected' : '' ?>>Repair</option>
+                  <?php foreach (claim_types_active($conn) as $ct): ?>
+                  <option value="<?= htmlspecialchars($ct['code']) ?>" <?= (($_POST['claim_type'] ?? '') === $ct['code']) ? 'selected' : '' ?>><?= htmlspecialchars($ct['label']) ?></option>
+                  <?php endforeach; ?>
                 </select>
               </div>
 

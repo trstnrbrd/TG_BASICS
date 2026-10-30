@@ -13,16 +13,17 @@ $role_label = match($_SESSION['role'] ?? '') {
 if (!empty($_SESSION['is_hidden'])) $role_label = 'Maintenance';
 
 require_once __DIR__ . '/icons.php';
+require_once __DIR__ . '/themes.php';
 
-// Load user theme preference
-$_user_theme = $_SESSION['theme'] ?? 'light';
-if ($_user_theme === 'light' && isset($_SESSION['user_id'], $conn)) {
+// Load user theme preference (only a theme listed in includes/themes.php, else the default)
+$_user_theme = theme_valid($_SESSION['theme'] ?? null);
+if ($_user_theme === THEME_DEFAULT && isset($_SESSION['user_id'], $conn)) {
     $__t = $conn->prepare("SELECT theme FROM users WHERE user_id = ?");
     $__t->bind_param('i', $_SESSION['user_id']);
     $__t->execute();
     $__tr = $__t->get_result()->fetch_assoc();
     if ($__tr) {
-        $_user_theme = $__tr['theme'] ?? 'light';
+        $_user_theme = theme_valid($__tr['theme'] ?? null);
         $_SESSION['theme'] = $_user_theme;
     }
 }

@@ -115,7 +115,7 @@ function showPopup(key, x, y) {
       document.querySelector(`#row_${key} .area-name`)?.textContent || key,
     cur = panelState[key]?.val || "none",
     note = panelState[key]?.note || "";
-  ((popup.innerHTML = `\n        <div class="pp-title">${label}</div>\n        <div class="pp-options">\n          <div class="pp-btn ${"none" === cur ? "active" : ""}" data-val="none"  onclick="pickVal('none')">No Damage</div>\n          <div class="pp-btn ${"minor" === cur ? "active" : ""}" data-val="minor" onclick="pickVal('minor')">Minor Scratch</div>\n          <div class="pp-btn ${"major" === cur ? "active" : ""}" data-val="major" onclick="pickVal('major')">Major Damage</div>\n        </div>\n        <input type="text" class="field-input" id="pp-note" placeholder="Notes (optional)"\n          value="${note}" style="font-size:0.78rem;padding:0.35rem 0.6rem;"\n          oninput="saveNote(this.value)"/>\n        <div style="text-align:right;margin-top:0.5rem;">\n          <button type="button" onclick="closePopup()"\n            style="font-size:0.72rem;padding:0.3rem 0.8rem;border-radius:6px;border:1px solid var(--border);\n                   background:var(--bg-3);color:var(--text-muted);cursor:pointer;">Done</button>\n        </div>`),
+  ((popup.innerHTML = `\n        <div class="pp-title">${label}</div>\n        <div class="pp-options">\n          <div class="pp-btn ${"none" === cur ? "active" : ""}" data-val="none"  onclick="pickVal('none')">${damageLabels.none}</div>\n          <div class="pp-btn ${"minor" === cur ? "active" : ""}" data-val="minor" onclick="pickVal('minor')">${damageLabels.minor}</div>\n          <div class="pp-btn ${"major" === cur ? "active" : ""}" data-val="major" onclick="pickVal('major')">${damageLabels.major}</div>\n        </div>\n        <input type="text" class="field-input" id="pp-note" placeholder="Notes (optional)"\n          value="${note}" style="font-size:0.78rem;padding:0.35rem 0.6rem;"\n          oninput="saveNote(this.value)"/>\n        <div style="text-align:right;margin-top:0.5rem;">\n          <button type="button" onclick="closePopup()"\n            style="font-size:0.72rem;padding:0.3rem 0.8rem;border-radius:6px;border:1px solid var(--border);\n                   background:var(--bg-3);color:var(--text-muted);cursor:pointer;">Done</button>\n        </div>`),
     (popup.style.display = "block"));
   const pw = popup.offsetWidth,
     ph = popup.offsetHeight,
@@ -146,6 +146,8 @@ function closePopup() {
   ((popup.style.display = "none"), (activeKey = null));
 }
 const areaLabels = window.areaLabels || {};
+// the condition names (No Damage / Minor Scratch / Major Damage) come from REPAIR_DAMAGE_LEVELS via the page
+const damageLabels = window.damageLabels || {};
 (document.querySelectorAll(".panel[data-panel]").forEach((el) => {
   const key = el.dataset.panel,
     label = areaLabels[key] || key;

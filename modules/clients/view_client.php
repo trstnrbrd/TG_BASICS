@@ -2,10 +2,12 @@
 require_once __DIR__ . '/../../includes/branding.php';
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
+require_once __DIR__ . '/../../includes/service_types.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../config/transaction_pin.php';
 require_once '../../config/uploads.php';
+require_once '../../includes/claim_types.php';
 
 require_role(['admin', 'super_admin', 'mechanic']);
 $is_mechanic = is_mechanic();
@@ -726,14 +728,6 @@ require_once '../../includes/topbar.php';
 
     <!-- CLAIMS HISTORY -->
     <?php
-    $claim_status_map = [
-        'document_collection' => ['label' => 'Document Collection', 'class' => 'badge-yellow'],
-        'submitted'           => ['label' => 'Submitted to Head Office', 'class' => 'badge-info'],
-        'under_review'        => ['label' => 'Under Adjuster Review', 'class' => 'badge-orange'],
-        'approved'            => ['label' => 'Approved', 'class' => 'badge-green'],
-        'denied'              => ['label' => 'Denied', 'class' => 'badge-red'],
-        'resolved'            => ['label' => 'Resolved', 'class' => 'badge-gray'],
-    ];
     ?>
     <div class="card">
       <div class="card-header">
@@ -762,7 +756,7 @@ require_once '../../includes/topbar.php';
           </thead>
           <tbody>
             <?php while ($cl = $claims->fetch_assoc()):
-              $cs = $claim_status_map[$cl['status']] ?? ['label' => $cl['status'], 'class' => 'badge-gray'];
+              $cs = claim_status_badge($cl['status']);
             ?>
             <tr>
               <td>
@@ -776,12 +770,9 @@ require_once '../../includes/topbar.php';
               <td style="font-size:0.72rem;color:var(--text-muted);white-space:nowrap;"><?= date('M d, Y', strtotime($cl['created_at'])) ?></td>
               <td>
                 <div style="display:flex;flex-direction:column;align-items:center;gap:0.3rem;">
-                  <?php if ($cl['claim_type'] === 'repair'): ?>
-                    <span class="badge badge-danger">Repair</span>
-                  <?php else: ?>
-                    <span class="badge badge-info">Cash</span>
-                  <?php endif; ?>
-                  <span class="badge <?= $cs['class'] ?>"><?= $cs['label'] ?></span>
+                  <?php $ctb = claim_type_badge($conn, $cl['claim_type']); ?>
+                  <span class="badge <?= $ctb['class'] ?>"><?= htmlspecialchars($ctb['label']) ?></span>
+                  <span class="badge <?= $cs['class'] ?>"><?= htmlspecialchars($cs['label']) ?></span>
                 </div>
               </td>
               <?php if (!$is_mechanic): ?>
@@ -807,22 +798,7 @@ require_once '../../includes/topbar.php';
 
     <!-- REPAIR JOBS -->
     <?php
-    $repair_status_badges = [
-        'pending'     => ['Pending',     'badge-yellow'],
-        'in_progress' => ['In Progress', 'badge-blue'],
-        'for_pickup'  => ['For Pickup',  'badge-gold'],
-        'completed'   => ['Completed',   'badge-green'],
-        'cancelled'   => ['Cancelled',   'badge-gray'],
-    ];
-    $repair_service_labels = [
-        'repair_panel'   => 'Per Panel Repair',
-        'repair_full'    => 'Full Body Repair',
-        'paint_panel'    => 'Per Panel Paint',
-        'paint_full'     => 'Full Body Paint',
-        'washover_basic' => 'Basic Wash Over',
-        'washover_full'  => 'Fully Wash Over',
-        'custom'         => 'Custom / Mixed',
-    ];
+    $repair_service_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
     ?>
     <div class="card">
       <div class="card-header" style="justify-content:space-between;">
@@ -854,7 +830,7 @@ require_once '../../includes/topbar.php';
         </thead>
         <tbody>
           <?php while ($rj = $repair_jobs->fetch_assoc()):
-              $rsb = $repair_status_badges[$rj['status']] ?? ['Unknown', 'badge-gray'];
+              $rsb = repair_status_badge($rj['status']);
               $rsv = $repair_service_labels[$rj['service_type']] ?? $rj['service_type'];
           ?>
           <tr>
@@ -868,7 +844,7 @@ require_once '../../includes/topbar.php';
             <td style="font-size:0.8rem;white-space:nowrap;color:var(--text-muted);">
               <?= $rj['release_date'] ? date('M d, Y', strtotime($rj['release_date'])) : '—' ?>
             </td>
-            <td><span class="badge <?= $rsb[1] ?>"><?= $rsb[0] ?></span></td>
+            <td><span class="badge <?= $rsb['class'] ?>"><?= htmlspecialchars($rsb['label']) ?></span></td>
             <td>
               <a href="../repair/view_repair.php?id=<?= $rj['job_id'] ?>" class="btn-sm-gold" title="View">
                 <?= icon('eye', 14) ?>

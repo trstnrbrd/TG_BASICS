@@ -147,7 +147,7 @@ function repair_dashboard_counts(mysqli $conn): array
 {
     return [
         'active'          => (int)dal_value($conn, "SELECT COUNT(*) FROM repair_jobs WHERE status = 'in_progress'"),
-        'completed_today' => (int)dal_value($conn, "SELECT COUNT(*) FROM repair_jobs WHERE status = 'completed' AND DATE(updated_at) = CURDATE()"),
+        'completed_today' => (int)dal_value($conn, "SELECT COUNT(*) FROM repair_jobs WHERE status = 'completed' AND updated_at >= CURDATE() AND updated_at < CURDATE() + INTERVAL 1 DAY"),
         'pending'         => (int)dal_value($conn, "SELECT COUNT(*) FROM repair_jobs WHERE status = 'pending'"),
     ];
 }

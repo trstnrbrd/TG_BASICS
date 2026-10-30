@@ -40,7 +40,7 @@ function policies_urgent_unreminded(mysqli $conn, int $days): array
         INNER JOIN clients  c ON c.client_id  = p.client_id
         INNER JOIN vehicles v ON v.vehicle_id = p.vehicle_id
         WHERE p.is_renewed = 0 AND c.deleted_at IS NULL
-          AND p.policy_end >= CURDATE() AND DATEDIFF(p.policy_end, CURDATE()) <= ?
+          AND p.policy_end BETWEEN CURDATE() AND CURDATE() + INTERVAL ? DAY
           AND (p.last_urgent_reminder_sent IS NULL OR p.last_urgent_reminder_sent < CURDATE())
         ORDER BY p.policy_end ASC, c.full_name ASC", 'i', [$days]);
 }
@@ -55,7 +55,7 @@ function policies_expiring_within(mysqli $conn, int $days): array
         INNER JOIN clients  c ON c.client_id  = p.client_id
         INNER JOIN vehicles v ON v.vehicle_id = p.vehicle_id
         WHERE p.is_renewed = 0 AND c.deleted_at IS NULL
-          AND p.policy_end >= CURDATE() AND DATEDIFF(p.policy_end, CURDATE()) <= ?
+          AND p.policy_end BETWEEN CURDATE() AND CURDATE() + INTERVAL ? DAY
         ORDER BY p.policy_end ASC", 'i', [$days]);
 }
 
@@ -195,14 +195,15 @@ function vehicle_has_active_policy(mysqli $conn, int $vehicle_id): bool
 
 /**
  * The WHERE condition of a renewal window (urgent / expiring / stable /
- * expired / renewed, or '' for all) and its bound values.
+ * expired / renewed, or '' for all) and its bound values. Written as date
+ * ranges on p.policy_end (not DATEDIFF()) so the index on it can be used.
  */
 function policy_window_sql(string $window, int $urgent_days, int $expiring_days): array
 {
     return match ($window) {
-        'urgent'   => ['p.policy_end >= CURDATE() AND DATEDIFF(p.policy_end, CURDATE()) <= ?', 'i', [$urgent_days]],
-        'expiring' => ['p.policy_end >= CURDATE() AND DATEDIFF(p.policy_end, CURDATE()) BETWEEN ? AND ?', 'ii', [$urgent_days + 1, $expiring_days]],
-        'stable'   => ['p.policy_end >= CURDATE() AND DATEDIFF(p.policy_end, CURDATE()) > ?', 'i', [$expiring_days]],
+        'urgent'   => ['p.policy_end BETWEEN CURDATE() AND CURDATE() + INTERVAL ? DAY', 'i', [$urgent_days]],
+        'expiring' => ['p.policy_end >= CURDATE() AND p.policy_end BETWEEN CURDATE() + INTERVAL ? DAY AND CURDATE() + INTERVAL ? DAY', 'ii', [$urgent_days + 1, $expiring_days]],
+        'stable'   => ['p.policy_end >= CURDATE() AND p.policy_end > CURDATE() + INTERVAL ? DAY', 'i', [$expiring_days]],
         'expired'  => ['p.policy_end < CURDATE()', '', []],
         'renewed'  => ['p.renewed_at IS NOT NULL', '', []],
         default    => ['1=1', '', []],
@@ -270,7 +271,7 @@ function policies_due_count(mysqli $conn, int $days): int
 {
     return (int)dal_value($conn, "
         SELECT COUNT(*) FROM insurance_policies p INNER JOIN clients c ON c.client_id = p.client_id
-        WHERE p.is_renewed = 0 AND DATEDIFF(p.policy_end, CURDATE()) BETWEEN 0 AND ? AND " . renewal_scope_sql('c'), 'i', [$days]);
+        WHERE p.is_renewed = 0 AND p.policy_end BETWEEN CURDATE() AND CURDATE() + INTERVAL ? DAY AND " . renewal_scope_sql('c'), 'i', [$days]);
 }
 
 /** The first $limit of those policies, soonest first, with client and vehicle. */
@@ -283,7 +284,7 @@ function policies_due_list(mysqli $conn, int $days, int $limit): array
         FROM insurance_policies p
         INNER JOIN vehicles v ON p.vehicle_id = v.vehicle_id
         INNER JOIN clients c  ON p.client_id  = c.client_id
-        WHERE p.is_renewed = 0 AND DATEDIFF(p.policy_end, CURDATE()) BETWEEN 0 AND ? AND " . renewal_scope_sql('c') . "
+        WHERE p.is_renewed = 0 AND p.policy_end BETWEEN CURDATE() AND CURDATE() + INTERVAL ? DAY AND " . renewal_scope_sql('c') . "
         ORDER BY p.policy_end ASC
         LIMIT ?", 'ii', [$days, $limit]);
 }

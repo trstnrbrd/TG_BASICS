@@ -536,3 +536,119 @@ function policy_payment_totals(mysqli $conn, int $policy_id): array
     $stmt->close();
     return $row;
 }
+
+/* =========================================================================
+ * Billing (statements of account for approved claims)
+ * ========================================================================= */
+
+/** Whether the claim already has a billing (one billing per claim). */
+function billing_exists_for_claim(mysqli $conn, int $claim_id): bool
+{
+    $stmt = $conn->prepare("SELECT 1 FROM billing WHERE claim_id = ? LIMIT 1");
+    $stmt->bind_param('i', $claim_id);
+    $stmt->execute();
+    $exists = $stmt->get_result()->num_rows > 0;
+    $stmt->close();
+    return $exists;
+}
+
+/**
+ * Locks the claim row until the transaction ends, so two people cannot bill
+ * the same claim at the same moment. Call inside db_transaction(), before
+ * billing_exists_for_claim().
+ */
+function billing_lock_claim(mysqli $conn, int $claim_id): void
+{
+    $stmt = $conn->prepare("SELECT claim_id FROM claims WHERE claim_id = ? FOR UPDATE");
+    $stmt->bind_param('i', $claim_id);
+    $stmt->execute();
+    $stmt->get_result()->free();   // read the locked row, or the next query fails with "Commands out of sync"
+    $stmt->close();
+}
+
+/**
+ * Creates a billing with the given billing number and returns its id.
+ * $b: claim_id, billed_to, incident_date, repair_date (null = none),
+ * parts_cost, labor_cost, other_cost, deductible, signed_by_name,
+ * signed_by_title.
+ */
+function billing_create(mysqli $conn, string $billing_number, array $b, int $created_by): int
+{
+    $stmt = $conn->prepare("INSERT INTO billing (claim_id, billing_number, billed_to, incident_date, repair_date,
+                                                 parts_cost, labor_cost, other_cost, deductible, signed_by_name, signed_by_title, created_by)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param('issssddddssi',
+        $b['claim_id'], $billing_number, $b['billed_to'], $b['incident_date'], $b['repair_date'],
+        $b['parts_cost'], $b['labor_cost'], $b['other_cost'], $b['deductible'],
+        $b['signed_by_name'], $b['signed_by_title'], $created_by);
+    $stmt->execute();
+    $id = (int)$conn->insert_id;
+    $stmt->close();
+    return $id;
+}
+
+/**
+ * Saves the edited amounts and details of a billing. $b: billed_to,
+ * incident_date, repair_date, parts_cost, labor_cost, other_cost,
+ * deductible, notes. $signer (name, title) is copied onto the billing when
+ * given; null keeps the current signatory.
+ */
+function billing_update(mysqli $conn, int $billing_id, array $b, ?array $signer = null): void
+{
+    $stmt = $conn->prepare("UPDATE billing SET billed_to = ?, incident_date = ?, repair_date = ?, parts_cost = ?, labor_cost = ?,
+                                               other_cost = ?, deductible = ?, notes = ?
+                            WHERE billing_id = ?");
+    $stmt->bind_param('sssddddsi', $b['billed_to'], $b['incident_date'], $b['repair_date'], $b['parts_cost'], $b['labor_cost'],
+                      $b['other_cost'], $b['deductible'], $b['notes'], $billing_id);
+    $stmt->execute();
+    $stmt->close();
+
+    if ($signer) {
+        $sg = $conn->prepare("UPDATE billing SET signed_by_name = ?, signed_by_title = ? WHERE billing_id = ?");
+        $sg->bind_param('ssi', $signer['name'], $signer['title'], $billing_id);
+        $sg->execute();
+        $sg->close();
+    }
+}
+
+/** Changes a billing's status. $sent_at stamps when it was sent; null keeps the earlier stamp. */
+function billing_set_status(mysqli $conn, int $billing_id, string $status, ?string $sent_at = null): void
+{
+    $stmt = $conn->prepare("UPDATE billing SET status = ?, sent_at = COALESCE(?, sent_at) WHERE billing_id = ?");
+    $stmt->bind_param('ssi', $status, $sent_at, $billing_id);
+    $stmt->execute();
+    $stmt->close();
+}
+
+/**
+ * Makes the billing's received Required Documents exactly $doc_type_ids:
+ * unticked ones are removed, newly ticked ones added, and one already
+ * received keeps its first received_at.
+ */
+function billing_set_documents(mysqli $conn, int $billing_id, array $doc_type_ids): void
+{
+    $ids = array_values(array_unique(array_map('intval', $doc_type_ids)));
+    if ($ids) {
+        $marks = implode(',', array_fill(0, count($ids), '?'));
+        $del   = $conn->prepare("DELETE FROM billing_documents WHERE billing_id = ? AND doc_type_id NOT IN ($marks)");
+        $del->bind_param('i' . str_repeat('i', count($ids)), $billing_id, ...$ids);
+    } else {
+        $del = $conn->prepare("DELETE FROM billing_documents WHERE billing_id = ?");
+        $del->bind_param('i', $billing_id);
+    }
+    $del->execute();
+    $del->close();
+
+    $ins = $conn->prepare("INSERT IGNORE INTO billing_documents (billing_id, doc_type_id) VALUES (?, ?)");
+    foreach ($ids as $t) { $ins->bind_param('ii', $billing_id, $t); $ins->execute(); }
+    $ins->close();
+}
+
+/** Deletes a billing. */
+function billing_delete(mysqli $conn, int $billing_id): void
+{
+    $stmt = $conn->prepare("DELETE FROM billing WHERE billing_id = ?");
+    $stmt->bind_param('i', $billing_id);
+    $stmt->execute();
+    $stmt->close();
+}

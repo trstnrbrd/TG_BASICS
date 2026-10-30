@@ -85,10 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Check no duplicate billing for same claim
     if (empty($errors)) {
-        $dup = $conn->prepare("SELECT billing_id FROM billing WHERE claim_id = ?");
-        $dup->bind_param('i', $claim_id);
-        $dup->execute();
-        if ($dup->get_result()->num_rows > 0) {
+        if (billing_exists_for_claim($conn, $claim_id)) {
             $errors[] = 'A billing record already exists for this claim.';
         }
     }
@@ -100,32 +97,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $created = null;
         try {
             $created = db_transaction($conn, function () use ($conn, $claim_id, $billed_to, $inc_date, $rep_date, $parts_cost, $labor_cost, $other_cost, $deductible, $signer_name, $signer_title) {
-                $lock = $conn->prepare("SELECT claim_id FROM claims WHERE claim_id = ? FOR UPDATE");
-                $lock->bind_param('i', $claim_id);
-                $lock->execute();
-                $lock->get_result()->free();   // read the locked row, or the next query fails with "Commands out of sync"
-
-                $dup = $conn->prepare("SELECT billing_id FROM billing WHERE claim_id = ?");
-                $dup->bind_param('i', $claim_id);
-                $dup->execute();
-                if ($dup->get_result()->num_rows > 0) return ['duplicate' => true];
+                billing_lock_claim($conn, $claim_id);
+                if (billing_exists_for_claim($conn, $claim_id)) return ['duplicate' => true];
 
                 [$billing_id, $bill_num] = insert_with_sequential_number($conn, 'billing', 'billing_number', record_number_prefix('BL'),
                     function (string $num) use ($conn, $claim_id, $billed_to, $inc_date, $rep_date, $parts_cost, $labor_cost, $other_cost, $deductible, $signer_name, $signer_title) {
-                        $ins = $conn->prepare("
-                            INSERT INTO billing
-                              (claim_id, billing_number, billed_to, incident_date, repair_date, parts_cost, labor_cost, other_cost, deductible, signed_by_name, signed_by_title, created_by)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        ");
-                        $ins->bind_param(
-                            'issssddddssi',
-                            $claim_id, $num, $billed_to, $inc_date, $rep_date,
-                            $parts_cost, $labor_cost, $other_cost, $deductible,
-                            $signer_name, $signer_title,
-                            $_SESSION['user_id']
-                        );
-                        $ins->execute();
-                        return [$conn->insert_id, $num];
+                        $id = billing_create($conn, $num, [
+                            'claim_id' => $claim_id, 'billed_to' => $billed_to, 'incident_date' => $inc_date, 'repair_date' => $rep_date,
+                            'parts_cost' => $parts_cost, 'labor_cost' => $labor_cost, 'other_cost' => $other_cost, 'deductible' => $deductible,
+                            'signed_by_name' => $signer_name, 'signed_by_title' => $signer_title,
+                        ], (int)$_SESSION['user_id']);
+                        return [$id, $num];
                     }
                 );
 

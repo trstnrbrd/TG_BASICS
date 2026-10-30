@@ -115,6 +115,27 @@ function policy_vehicle_with_client(mysqli $conn, int $vehicle_id): ?array
         WHERE v.vehicle_id = ? AND c.deleted_at IS NULL", 'i', [$vehicle_id]);
 }
 
+/** A vehicle of an active client found by its exact plate number, with the client's details; or null. */
+function policy_vehicle_by_plate(mysqli $conn, string $plate_number): ?array
+{
+    return dal_one($conn, "
+        SELECT c.client_id, c.full_name, c.contact_number, c.address,
+               v.vehicle_id, v.plate_number, v.make, v.model, v.year_model, v.color, v.motor_number, v.serial_number
+        FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id
+        WHERE v.plate_number = ? AND c.deleted_at IS NULL
+        LIMIT 1", 's', [$plate_number]);
+}
+
+/** The terms of the vehicle's latest policy (to pre-fill a new one), or null. */
+function vehicle_last_policy_terms(mysqli $conn, int $vehicle_id): ?array
+{
+    return dal_one($conn, "
+        SELECT coverage_type, sum_insured, total_premium, markup, participation_fee, payment_terms, mortgagee
+        FROM insurance_policies WHERE vehicle_id = ?
+        ORDER BY policy_end DESC
+        LIMIT 1", 'i', [$vehicle_id]);
+}
+
 /** Whether the vehicle has a policy that has not expired yet. */
 function vehicle_has_active_policy(mysqli $conn, int $vehicle_id): bool
 {

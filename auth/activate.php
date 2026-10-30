@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../includes/branding.php';
 require_once __DIR__ . "/../config/session.php";
+require_once __DIR__ . '/../includes/data_access.php';
 require_once '../config/db.php';
 require_once '../config/validators.php';
 require_once '../includes/icons.php';
@@ -15,10 +16,7 @@ if ($token === '') {
     exit;
 }
 
-$stmt = $conn->prepare("SELECT user_id, full_name, email, is_active FROM users WHERE activation_token = ?");
-$stmt->bind_param('s', $token);
-$stmt->execute();
-$user = $stmt->get_result()->fetch_assoc();
+$user = user_find_by_activation_token($conn, $token);
 
 if (!$user) {
     $error = 'This activation link is invalid or has already been used.';
@@ -35,14 +33,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user && !$user['is_active']) {
     } elseif ($new_password !== $confirm_pw) {
         $error = 'Passwords do not match.';
     } else {
-        $hashed = password_hash($new_password, PASSWORD_DEFAULT);
-        $upd = $conn->prepare("UPDATE users SET password = ?, is_active = 1, activation_token = NULL WHERE user_id = ?");
-        $upd->bind_param('si', $hashed, $user['user_id']);
-        if ($upd->execute()) {
-            $success = true;
-        } else {
-            $error = 'Something went wrong. Please try again.';
-        }
+        user_activate($conn, (int)$user['user_id'], password_hash($new_password, PASSWORD_DEFAULT));
+        $success = true;
     }
 }
 ?>

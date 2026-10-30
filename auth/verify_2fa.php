@@ -32,15 +32,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'cancel') {
 // Handle resend
 if (isset($_GET['action']) && $_GET['action'] === 'resend') {
     // Get user email
-    $em_stmt = $conn->prepare("SELECT email FROM users WHERE user_id = ?");
-    $em_stmt->bind_param('i', $pending_uid);
-    $em_stmt->execute();
-    $em_row = $em_stmt->get_result()->fetch_assoc();
+    $em = account_email($conn, (int)$pending_uid);
 
     $sent = false;
-    if ($em_row && $em_row['email']) {
+    if ($em !== '') {
         $code = two_factor_code_issue($conn, $pending_uid);
-        $sent = send2FACodeEmail($em_row['email'], $pending_name, $code);
+        $sent = send2FACodeEmail($em, $pending_name, $code);
     }
 
     if (!$sent) {

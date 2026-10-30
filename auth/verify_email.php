@@ -12,42 +12,21 @@ $message = '';
 $token   = san_str($_GET['token'] ?? '', MAX_TOKEN);
 
 if ($token !== '') {
-    $stmt = $conn->prepare("
-        SELECT v.id, v.user_id, v.new_email, u.full_name, u.is_hidden
-        FROM email_verifications v
-        JOIN users u ON u.user_id = v.user_id
-        WHERE v.token = ? AND v.used = 0 AND v.expires_at > NOW()
-        LIMIT 1
-    ");
-    $stmt->bind_param('s', $token);
-    $stmt->execute();
-    $row = $stmt->get_result()->fetch_assoc();
+    $row = email_change_find($conn, $token);   // only a still-valid, unused link
 
     if ($row) {
         // Check email isn't already taken by another user
-        $dup = $conn->prepare("SELECT user_id FROM users WHERE email = ? AND user_id != ?");
-        $dup->bind_param('si', $row['new_email'], $row['user_id']);
-        $dup->execute();
-
-        if ($dup->get_result()->num_rows > 0) {
+        if (account_email_taken($conn, $row['new_email'], (int)$row['user_id'])) {
             $status  = 'error';
             $message = 'This email address is now used by another account. Please try a different email.';
         } else {
-            // Update user's email
-            $upd = $conn->prepare("UPDATE users SET email = ? WHERE user_id = ?");
-            $upd->bind_param('si', $row['new_email'], $row['user_id']);
-            $upd->execute();
-
-            // Mark token as used
-            $mark = $conn->prepare("UPDATE email_verifications SET used = 1 WHERE id = ?");
-            $mark->bind_param('i', $row['id']);
-            $mark->execute();
-
-            // Audit log
-            // No session on this token-link page, so mask the hidden account's name here.
-            $actor = !empty($row['is_hidden']) ? 'Developer' : $row['full_name'];
-            $desc  = $actor . ' verified new email address: ' . $row['new_email'];
-            audit_log_add($conn, $row['user_id'], 'EMAIL_VERIFIED', $desc);
+            // New email, link used up and the audit entry: saved together
+            db_transaction($conn, function () use ($conn, $row) {
+                email_change_complete($conn, (int)$row['id'], (int)$row['user_id'], $row['new_email']);
+                // No session on this token-link page, so mask the hidden account's name here.
+                $actor = !empty($row['is_hidden']) ? 'Developer' : $row['full_name'];
+                audit_log_add($conn, $row['user_id'], 'EMAIL_VERIFIED', $actor . ' verified new email address: ' . $row['new_email']);
+            });
 
             $status  = 'success';
             $message = 'Your email address has been updated to <strong>' . htmlspecialchars($row['new_email']) . '</strong>.';

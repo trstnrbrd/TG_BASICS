@@ -74,6 +74,19 @@ function users_usernames(mysqli $conn, array $user_ids): array
     return $out;
 }
 
+/**
+ * The profile card of an active user (opened from the team list), or null.
+ * The developer account is only ever shown to itself ($viewer_id).
+ */
+function user_profile_card(mysqli $conn, int $user_id, int $viewer_id): ?array
+{
+    return dal_one($conn, "
+        SELECT user_id, full_name, username, role, email, profile_photo, last_active,
+               (last_active IS NOT NULL AND last_active >= NOW() - INTERVAL 5 MINUTE) AS is_online
+        FROM users
+        WHERE user_id = ? AND is_active = 1 AND (is_hidden = 0 OR user_id = ?)", 'ii', [$user_id, $viewer_id]);
+}
+
 /** Every user except the developer account, by name: [user_id, full_name] (filter dropdowns). */
 function users_listed(mysqli $conn): array
 {

@@ -16,6 +16,12 @@ function audit_log_add(mysqli $conn, ?int $user_id, string $action, string $desc
     return $ok;
 }
 
+/** The newest activity id (0 when none): live updates poll it, a bigger number means something was saved. */
+function audit_log_latest_id(mysqli $conn): int
+{
+    return (int)dal_value($conn, "SELECT COALESCE(MAX(log_id), 0) FROM audit_logs");
+}
+
 /** SQL condition that hides the developer account's entries (they are kept, just never listed). */
 const AUDIT_HIDE_DEVELOPER_SQL = "(a.user_id IS NULL OR a.user_id NOT IN (SELECT user_id FROM users WHERE is_hidden = 1))";
 

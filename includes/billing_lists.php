@@ -1,12 +1,13 @@
 <?php
 // The three billing lists are data, not code (panel revision), all changed by hand in phpMyAdmin:
-//   billing_statuses       - Draft / Sent / Paid / Unpaid ...  (billing.status stores the `code`)
+//   statuses (module 'billing') - Draft / Sent / Paid / Unpaid ... (billing.status stores the `code`)
 //   billing_document_types - the Required Documents; which ones a billing has received is in billing_documents
 //   billing_signatories    - who signs as "Authorized Representative / Cashier"; the chosen name and title are
 //                            copied onto the billing (signed_by_name / signed_by_title) so an old statement never
 //                            changes when the list does. is_default = 1 is pre-selected on a new billing.
 // is_active = 0 stops an entry being offered for new choices; billings that already use it keep showing it.
 // Nothing here falls back to a hardcoded list: until the SQL is run the lists are simply empty.
+require_once __DIR__ . '/statuses.php';
 // The one code with behaviour is BILLING_STATUS_SENT: moving a billing to it stamps sent_at.
 
 const BILLING_STATUS_SENT = 'sent';
@@ -21,35 +22,21 @@ function billing_list_query(mysqli $conn, string $sql): array {
     }
 }
 
-// ── STATUSES ──
+// ── STATUSES ── (the shared `statuses` table, module 'billing'; includes/statuses.php)
 
-/** Every billing status, active or not, in display order. Cached for the request. */
+/** Every billing status, active or not, in display order (rows carry 'code' and 'is_active'). */
 function billing_statuses_all(mysqli $conn): array {
-    static $cache = null;
-    return $cache ??= billing_list_query($conn, "SELECT code, label, badge_class, icon, description, is_active
-                                                 FROM billing_statuses ORDER BY sort_order, label");
+    return array_values(statuses_for('billing'));
 }
 
 /** The statuses a billing can be moved to. */
 function billing_statuses_active(mysqli $conn): array {
-    return array_values(array_filter(billing_statuses_all($conn), fn($s) => (int)$s['is_active'] === 1));
+    return array_values(statuses_active('billing'));
 }
 
-/**
- * Label, badge class, icon and description of a stored status code. badge_class and icon are typed in phpMyAdmin,
- * so only a plain "badge-<word>" class and a [a-z-] icon name are used; anything else falls back to a neutral one.
- */
+/** Label, badge class, icon and description of a stored status code. */
 function billing_status_badge(mysqli $conn, string $code): array {
-    foreach (billing_statuses_all($conn) as $s) {
-        if ($s['code'] !== $code) continue;
-        return [
-            'label' => $s['label'],
-            'class' => preg_match('/^badge-[a-z]+$/', $s['badge_class']) ? $s['badge_class'] : 'badge-gray',
-            'icon'  => preg_match('/^[a-z-]+$/', $s['icon']) ? $s['icon'] : 'document-text',
-            'desc'  => (string)$s['description'],
-        ];
-    }
-    return ['label' => ucfirst($code), 'class' => 'badge-gray', 'icon' => 'document-text', 'desc' => ''];
+    return status_badge('billing', $code);
 }
 
 // ── REQUIRED DOCUMENTS ──

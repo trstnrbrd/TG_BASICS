@@ -772,7 +772,7 @@ require_once '../../includes/topbar.php';
                 <div style="display:flex;flex-direction:column;align-items:center;gap:0.3rem;">
                   <?php $ctb = claim_type_badge($conn, $cl['claim_type']); ?>
                   <span class="badge <?= $ctb['class'] ?>"><?= htmlspecialchars($ctb['label']) ?></span>
-                  <span class="badge <?= $cs['class'] ?>"><?= $cs['label'] ?></span>
+                  <span class="badge <?= $cs['class'] ?>"><?= htmlspecialchars($cs['label']) ?></span>
                 </div>
               </td>
               <?php if (!$is_mechanic): ?>
@@ -844,7 +844,7 @@ require_once '../../includes/topbar.php';
             <td style="font-size:0.8rem;white-space:nowrap;color:var(--text-muted);">
               <?= $rj['release_date'] ? date('M d, Y', strtotime($rj['release_date'])) : '—' ?>
             </td>
-            <td><span class="badge <?= $rsb[1] ?>"><?= $rsb[0] ?></span></td>
+            <td><span class="badge <?= $rsb['class'] ?>"><?= htmlspecialchars($rsb['label']) ?></span></td>
             <td>
               <a href="../repair/view_repair.php?id=<?= $rj['job_id'] ?>" class="btn-sm-gold" title="View">
                 <?= icon('eye', 14) ?>

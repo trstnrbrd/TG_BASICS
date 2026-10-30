@@ -5,19 +5,8 @@
  * Kept in one place so every page follows the same rule.
  */
 
-// Every claim status, in flow order, with its label and badge class (claims list, its filter, view claim)
-const CLAIM_STATUSES = [
-    'compiling'            => ['label' => 'Compiling Requirements', 'class' => 'badge-info'],
-    'sent_admin'           => ['label' => 'Sent to Admin',          'class' => 'badge-info'],
-    'sent_head_office'     => ['label' => 'Sent to Head Office',    'class' => 'badge-info'],
-    'waiting_loa'          => ['label' => 'Waiting for LOA',        'class' => 'badge-info'],
-    'loa_received'         => ['label' => 'LOA Received',           'class' => 'badge-green'],
-    'pending'              => ['label' => 'Pending',                'class' => 'badge-info'],
-    'approved'             => ['label' => 'Approved',               'class' => 'badge-green'],
-    'lack_of_requirements' => ['label' => 'Lack of Requirements',   'class' => 'badge-yellow'],
-    'denied'               => ['label' => 'Denied',                 'class' => 'badge-red'],
-    'resolved'             => ['label' => 'Resolved',               'class' => 'badge-muted'],
-];
+// The status lists themselves (billing, claim, repair) and the repair-flow rules read the `statuses` table
+require_once __DIR__ . '/../includes/statuses.php';
 
 // Where a claim can go next from each status (view_claim.php: the Update Status choices and its server check)
 const CLAIM_STATUS_FLOW = [
@@ -35,12 +24,6 @@ const CLAIM_STATUS_FLOW = [
 function claim_next_statuses(string $status): array
 {
     return CLAIM_STATUS_FLOW[$status] ?? [];
-}
-
-/** The label and badge class for a claim status; an unknown one shows as itself. */
-function claim_status_badge(string $status): array
-{
-    return CLAIM_STATUSES[$status] ?? ['label' => $status, 'class' => 'badge-muted'];
 }
 
 // Claim statuses where each action is allowed
@@ -64,33 +47,6 @@ function claim_is_deletable(string $status): bool
 function claim_is_billable(string $status): bool
 {
     return in_array($status, CLAIM_BILLABLE_STATUSES, true);
-}
-
-// Every repair job status (repair list + filter, view repair, mechanic dashboard, view client, the client's QR
-// page): label, badge class, the colour of its choice in Update Status, and what the QR page shows the client
-// (its own wording, colour and progress bar %).
-const REPAIR_STATUSES = [
-    'pending'     => ['label' => 'Pending',     'class' => 'badge-yellow', 'color' => '#B8860B', 'public_label' => 'Pending',          'public_color' => '#B8860B', 'progress' => 10],
-    'in_progress' => ['label' => 'In Progress', 'class' => 'badge-blue',   'color' => '#1A6B9A', 'public_label' => 'In Progress',      'public_color' => '#2980B9', 'progress' => 50],
-    'for_pickup'  => ['label' => 'For Pickup',  'class' => 'badge-gold',   'color' => '#D4A017', 'public_label' => 'Ready for Pickup', 'public_color' => '#D4A017', 'progress' => 85],
-    'completed'   => ['label' => 'Completed',   'class' => 'badge-green',  'color' => '#2E7D52', 'public_label' => 'Completed',        'public_color' => '#27AE60', 'progress' => 100],
-    'cancelled'   => ['label' => 'Cancelled',   'class' => 'badge-gray',   'color' => '#6B7280', 'public_label' => 'Cancelled',        'public_color' => '#7F8C8D', 'progress' => 0],
-];
-
-// A job in one of these is finished: no more photos on the QR page, off the mechanic's open list
-const REPAIR_CLOSED_STATUSES = ['completed', 'cancelled'];
-
-/** Everything about a repair status; an unknown one shows as "Unknown". */
-function repair_status_badge(string $status): array
-{
-    return REPAIR_STATUSES[$status] ?? ['label' => 'Unknown', 'class' => 'badge-gray', 'color' => '#6B7280',
-                                        'public_label' => $status, 'public_color' => '#7F8C8D', 'progress' => 0];
-}
-
-/** The statuses of a job still being worked on (pending, in progress, for pickup). */
-function repair_open_statuses(): array
-{
-    return array_values(array_diff(array_keys(REPAIR_STATUSES), REPAIR_CLOSED_STATUSES));
 }
 
 // Unit Inspection: the areas on the physical inspection form (repair_checklist.area_key). Each one is also a shape
@@ -118,31 +74,6 @@ const REPAIR_DAMAGE_LEVELS = [
     'minor' => ['label' => 'Minor Scratch', 'color' => '#B8860B', 'bg' => 'rgba(184,134,11,0.12)'],
     'major' => ['label' => 'Major Damage',  'color' => '#C0392B', 'bg' => 'rgba(192,57,43,0.12)'],
 ];
-
-// Repair job statuses in the order a job moves through them. 'cancelled' is a dead end, reachable from any open status.
-const REPAIR_STATUS_FLOW = ['pending', 'in_progress', 'for_pickup', 'completed'];
-
-/**
- * May a repair job move from $from to $to?
- * $forward_only (mechanics): only to a later status or to cancelled, and never out of completed / cancelled.
- * Otherwise (owner, admins): any other status, so a wrong update can be corrected.
- */
-function repair_status_change_allowed(string $from, string $to, bool $forward_only): bool
-{
-    if ($from === $to) return false;
-    if (!$forward_only) return true;
-    if ($from === 'completed' || $from === 'cancelled') return false;
-    if ($to === 'cancelled') return true;
-    $i = array_search($from, REPAIR_STATUS_FLOW, true);
-    $j = array_search($to, REPAIR_STATUS_FLOW, true);
-    return $i !== false && $j !== false && $j > $i;
-}
-
-/** Is the repair job still open (pending, in progress, for pickup)? Photos show on the client's QR page only then. */
-function repair_job_is_open(string $status): bool
-{
-    return !in_array($status, REPAIR_CLOSED_STATUSES, true);
-}
 
 /**
  * May the signed-in user show / hide / delete this repair photo? Only while the job is open (a finished job's

@@ -139,7 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $billing = loadBilling($conn, $billing_id);
 
-$sb = billing_status_badge($conn, $billing['status']);   // statuses: billing_statuses table (includes/billing_lists.php)
+$sb = billing_status_badge($conn, $billing['status']);   // statuses: the statuses table, module 'billing' (includes/billing_lists.php)
 
 $total_repair = (float)$billing['parts_cost'] + (float)$billing['labor_cost'] + (float)$billing['other_cost'];
 $docs         = billing_docs_for($conn, billing_docs_received($conn, [$billing_id])[$billing_id] ?? []);

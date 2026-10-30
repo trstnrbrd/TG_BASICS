@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 // ── FILTERS ──
 $search        = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
-$filter_status = san_enum($_GET['status'] ?? 'all', array_merge(['all'], array_keys(REPAIR_STATUSES)));
+$filter_status = san_enum($_GET['status'] ?? 'all', array_merge(['all'], array_keys(repair_statuses())));
 $sort_by       = san_enum($_GET['sort'] ?? 'newest', ['newest', 'oldest']);
 
 // ── BUILD QUERY ──
@@ -115,7 +115,7 @@ require_once '../../includes/topbar.php';
         </div>
         <select name="status" class="filter-input rl-filter-status" style="width:160px;">
           <option value="all" <?= $filter_status === 'all' ? 'selected' : '' ?>>All Statuses</option>
-          <?php foreach (REPAIR_STATUSES as $key => $st): ?>
+          <?php foreach (repair_statuses() as $key => $st): ?>
           <option value="<?= $key ?>" <?= $filter_status === $key ? 'selected' : '' ?>><?= htmlspecialchars($st['label']) ?></option>
           <?php endforeach; ?>
         </select>
@@ -175,7 +175,7 @@ require_once '../../includes/topbar.php';
             <td><span class="cell-service"><?= htmlspecialchars($svc) ?></span></td>
             <td><span class="cell-date"><?= date('M d, Y', strtotime($j['repair_date'])) ?></span></td>
             <td><span class="cell-date-muted"><?= $j['release_date'] ? date('M d, Y', strtotime($j['release_date'])) : '—' ?></span></td>
-            <td><span class="badge <?= $sb['class'] ?>"><?= $sb['label'] ?></span></td>
+            <td><span class="badge <?= $sb['class'] ?>"><?= htmlspecialchars($sb['label']) ?></span></td>
             <td>
               <div style="display:flex;gap:0.35rem;justify-content:center;">
                 <a href="view_repair.php?id=<?= $j['job_id'] ?>" class="btn-sm-gold" title="View">

@@ -390,7 +390,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_claim'])) {
 // Handle status update
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
     csrf_verify();
-    $allowed_statuses = array_keys(CLAIM_STATUSES);
+    $allowed_statuses = array_keys(statuses_active('claim'));   // statuses table
     $new_status    = san_enum($_POST['new_status'] ?? '', $allowed_statuses);
     $denial_reason = san_str($_POST['denial_reason'] ?? '', MAX_TEXT);
     $notes         = san_str($_POST['notes'] ?? '', MAX_NOTE);
@@ -412,7 +412,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
     }
 
     // Guard: new status must be a valid next step for this claim
-    $next_statuses = claim_next_statuses($claim['status']);   // the flow lives in config/access.php
+    // the flow lives in config/access.php; a step whose status is switched off in the statuses table is skipped
+    $next_statuses = array_values(array_intersect(claim_next_statuses($claim['status']), array_keys(statuses_active('claim'))));
     if (!in_array($new_status, $next_statuses)) {
         header("Location: view_claim.php?id=$claim_id&error=" . urlencode('Invalid status transition.'));
         exit;
@@ -493,7 +494,7 @@ require_once '../../includes/topbar.php';
         <div style="display:flex;align-items:center;gap:0.75rem;">
           <a href="claims_list.php" class="back-link" onclick="goBack('claims_list.php'); return false;" style="margin-bottom:0;"><?= icon('arrow-left',14) ?> Back to Claims</a>
           <h2 style="font-size:1.1rem;font-weight:800;color:var(--text-primary);"><?= htmlspecialchars($claim['full_name']) ?></h2>
-          <span class="badge <?= $s['class'] ?>"><?= $s['label'] ?></span>
+          <span class="badge <?= $s['class'] ?>"><?= htmlspecialchars($s['label']) ?></span>
           <?php $ctb = claim_type_badge($conn, $claim['claim_type']); ?>
           <span class="badge <?= $ctb['class'] ?>"><?= htmlspecialchars($ctb['label']) ?></span>
         </div>
@@ -566,7 +567,7 @@ require_once '../../includes/topbar.php';
         <?php if ($i > 0 && !($is_denied && $step === 'approved')): ?><span class="status-arrow">&rsaquo;</span><?php endif; ?>
         <div class="status-step <?= $class ?>">
           <?php if ($class === 'done'): ?><?= icon('check-circle',11) ?><?php endif; ?>
-          <?= $step_label ?>
+          <?= htmlspecialchars($step_label) ?>
         </div>
       <?php endforeach; ?>
       <?php if ($is_denied): ?>
@@ -850,7 +851,7 @@ require_once '../../includes/topbar.php';
           </div>
           <div class="card-body">
             <?php
-            $next_statuses = claim_next_statuses($claim['status']);   // the flow lives in config/access.php
+            $next_statuses = array_values(array_intersect(claim_next_statuses($claim['status']), array_keys(statuses_active('claim'))));
             // When policy expired, only allow deny or resolve
             $allowed_next = $policy_expired
                 ? array_values(array_intersect($next_statuses, ['denied', 'resolved']))
@@ -877,7 +878,7 @@ require_once '../../includes/topbar.php';
                   <?php foreach ($allowed_next as $val):
                     $st = claim_status_badge($val);
                   ?>
-                  <option value="<?= $val ?>"><?= $st['label'] ?></option>
+                  <option value="<?= $val ?>"><?= htmlspecialchars($st['label']) ?></option>
                   <?php endforeach; ?>
                 </select>
               </div>

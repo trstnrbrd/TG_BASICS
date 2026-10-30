@@ -220,7 +220,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     csrf_verify();
 
     if ($_POST['action'] === 'update_status') {
-        $new_status = san_enum($_POST['status'] ?? '', array_keys(REPAIR_STATUSES));
+        $new_status = san_enum($_POST['status'] ?? '', array_keys(repair_statuses()));
         if ($new_status) {
             if (!repair_status_change_allowed($job['status'], $new_status, is_mechanic())) {
                 header("Location: view_repair.php?id=$job_id&error=" . urlencode('This job can no longer go back to that status.'));
@@ -305,7 +305,7 @@ $area_labels = REPAIR_CHECKLIST_AREAS;   // config/access.php
 
 $cond_map = array_map(fn($d) => [$d['label'], $d['color'], $d['bg']], REPAIR_DAMAGE_LEVELS);
 
-$sb      = repair_status_badge($job['status']);   // statuses live in config/access.php
+$sb      = repair_status_badge($job['status']);   // statuses table (includes/statuses.php)
 $svc_lbl = $service_labels[$job['service_type']] ?? $job['service_type'];
 
 $page_title  = 'Repair Job — ' . $job['job_number'];
@@ -344,10 +344,10 @@ document.addEventListener('DOMContentLoaded', function() {
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:0.75rem;">
     <a href="repair_list.php" class="back-link" onclick="goBack('repair_list.php'); return false;" style="margin-bottom:0;"><?= icon('arrow-left', 14) ?></a>
     <div style="display:flex;align-items:center;gap:0.5rem;">
-      <span class="badge <?= $sb['class'] ?>"><?= $sb['label'] ?></span>
+      <span class="badge <?= $sb['class'] ?>"><?= htmlspecialchars($sb['label']) ?></span>
       <?php
         // statuses this user may pick next; a mechanic on a completed / cancelled job has none, so no button
-        $next_statuses = array_filter(array_keys(REPAIR_STATUSES), fn($s) => repair_status_change_allowed($job['status'], $s, is_mechanic()));
+        $next_statuses = array_filter(array_keys(repair_statuses()), fn($s) => repair_status_change_allowed($job['status'], $s, is_mechanic()));
       ?>
       <?php if ($next_statuses): ?>
       <button onclick="document.getElementById('status-modal').style.display='flex'" class="btn-primary" style="padding:0.45rem 1rem;font-size:0.8rem;">
@@ -685,13 +685,13 @@ document.addEventListener('DOMContentLoaded', function() {
       <?= csrf_field() ?>
       <input type="hidden" name="action" value="update_status"/>
       <div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:1.25rem;">
-        <?php foreach (REPAIR_STATUSES as $val => ['label' => $lbl, 'class' => $badge, 'color' => $clr]):
+        <?php foreach (statuses_active('repair') as $val => ['label' => $lbl, 'class' => $badge, 'color' => $clr]):
             $is_current = $job['status'] === $val;
             $can_pick   = in_array($val, $next_statuses, true); ?>
         <label class="status-opt<?= $can_pick ? '' : ' is-locked' ?>" style="display:flex;align-items:center;gap:0.65rem;padding:0.65rem 0.85rem;border:1px solid var(--border);border-radius:10px;cursor:<?= $can_pick ? 'pointer' : 'not-allowed' ?>;transition:background 0.1s;<?= $can_pick ? '' : 'opacity:0.45;' ?>"
                <?php if ($can_pick): ?>onmouseover="this.style.background='var(--bg-3)'" onmouseout="this.style.background=''"<?php endif; ?>>
           <input type="radio" name="status" value="<?= $val ?>" class="status-radio" <?= $is_current ? 'checked' : '' ?> <?= $can_pick ? '' : 'disabled' ?> style="--rc:<?= $clr ?>;"/>
-          <span class="badge <?= $badge ?>"><?= $lbl ?></span>
+          <span class="badge <?= $badge ?>"><?= htmlspecialchars($lbl) ?></span>
           <?php if ($is_current): ?><span style="margin-left:auto;font-size:0.68rem;color:var(--text-muted);">Current</span><?php endif; ?>
         </label>
         <?php endforeach; ?>

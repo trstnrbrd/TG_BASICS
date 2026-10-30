@@ -130,7 +130,7 @@ require_once '../../includes/topbar.php';
                 <div class="cell-sub"><?= htmlspecialchars($j['make'] . ' ' . $j['model']) ?></div>
               </td>
               <td><span class="cell-service"><?= htmlspecialchars($svc) ?></span></td>
-              <td><span class="badge <?= $sb['class'] ?>"><?= $sb['label'] ?></span></td>
+              <td><span class="badge <?= $sb['class'] ?>"><?= htmlspecialchars($sb['label']) ?></span></td>
               <td>
                 <a href="view_repair.php?id=<?= $j['job_id'] ?>" class="btn-sm-gold" style="padding:0.3rem 0.6rem;">
                   <?= icon('eye', 13) ?>

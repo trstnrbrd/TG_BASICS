@@ -11,7 +11,7 @@ require_role(['admin', 'super_admin']);
 
 // ── FILTERS ──
 $search        = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
-$filter_status = san_enum($_GET['status'] ?? 'all', array_merge(['all'], array_keys(CLAIM_STATUSES)));
+$filter_status = san_enum($_GET['status'] ?? 'all', array_merge(['all'], array_keys(claim_statuses())));
 $filter_type   = san_enum($_GET['type'] ?? 'all', array_merge(['all'], array_column(claim_types_all($conn), 'code')));
 $sort_by       = $_GET['sort'] ?? 'newest';
 
@@ -119,7 +119,7 @@ require_once '../../includes/topbar.php';
         </div>
         <select name="status" class="filter-input" style="min-width:210px;">
           <option value="all" <?= $filter_status === 'all' ? 'selected' : '' ?>>All Statuses</option>
-          <?php foreach (CLAIM_STATUSES as $key => $st): ?>
+          <?php foreach (claim_statuses() as $key => $st): ?>
           <option value="<?= $key ?>" <?= $filter_status === $key ? 'selected' : '' ?>><?= htmlspecialchars($st['label']) ?></option>
           <?php endforeach; ?>
         </select>
@@ -189,7 +189,7 @@ require_once '../../includes/topbar.php';
                 </div>
               </td>
               <td style="font-size:0.72rem;color:var(--text-muted);white-space:nowrap;"><?= date('M d, Y', strtotime($row['created_at'])) ?></td>
-              <td><span class="badge <?= $s['class'] ?>"><?= $s['label'] ?></span></td>
+              <td><span class="badge <?= $s['class'] ?>"><?= htmlspecialchars($s['label']) ?></span></td>
               <td>
                 <div style="display:flex;align-items:center;gap:0.35rem;justify-content:center;" onclick="event.stopPropagation()">
                   <a href="view_claim.php?id=<?= $row['claim_id'] ?>" class="btn-sm-gold" title="View" style="padding:0.35rem 0.55rem;"><?= icon('eye',14) ?></a>

@@ -360,7 +360,7 @@ $initials = strtoupper(substr(implode('', array_map(fn($w) => $w[0], $words)), 0
           <?php if ($repair_jobs): ?>
           <div class="job-list">
             <?php foreach ($repair_jobs as $rj):
-              $rst    = repair_status_badge($rj['status']);   // config/access.php
+              $rst    = repair_status_badge($rj['status']);   // statuses table
               $pct    = $rst['progress'];
               $slabel = $rst['public_label'];
               $scolor = $rst['public_color'];

@@ -17,6 +17,15 @@ function claim_notify_recipients(mysqli $conn): array
         ORDER BY r.id ASC");
 }
 
+/** The addresses to email: a linked user's current email, otherwise the typed one (blanks skipped). */
+function claim_notify_emails(mysqli $conn): array
+{
+    $rows = dal_all($conn, "SELECT COALESCE(u.email, r.email) AS resolved_email
+                            FROM claim_notify_recipients r LEFT JOIN users u ON r.user_id = u.user_id
+                            ORDER BY r.id ASC");
+    return array_values(array_filter(array_column($rows, 'resolved_email')));
+}
+
 /** Users who can be linked as a recipient: listed accounts with an email on file, by name. */
 function claim_notify_pickable_users(mysqli $conn): array
 {

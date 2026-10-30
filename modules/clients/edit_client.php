@@ -21,16 +21,7 @@ if (!client_editable($conn, $client_id)) {
 }
 
 // Load client (exclude soft-deleted) with its current insurance agent
-$stmt = $conn->prepare("
-    SELECT c.*,
-           CASE WHEN ag.is_hidden = 1 THEN 'Developer' ELSE ag.full_name END AS agent_name
-    FROM clients c
-    LEFT JOIN users ag ON ag.user_id = c.agent_id
-    WHERE c.client_id = ? AND c.deleted_at IS NULL
-");
-$stmt->bind_param('i', $client_id);
-$stmt->execute();
-$client = $stmt->get_result()->fetch_assoc();
+$client = client_find($conn, $client_id);   // with the agent's name (developer's masked)
 
 if (!$client) {
     header("Location: client_list.php?error=Client not found.");

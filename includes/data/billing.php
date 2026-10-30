@@ -99,6 +99,13 @@ function billing_list_page(mysqli $conn, string $search, string $status, string 
     return [$result->fetch_all(MYSQLI_ASSOC), $pg];
 }
 
+/** The id of the claim's billing, or null when it has none. */
+function billing_id_for_claim(mysqli $conn, int $claim_id): ?int
+{
+    $id = dal_value($conn, "SELECT billing_id FROM billing WHERE claim_id = ? LIMIT 1", 'i', [$claim_id]);
+    return $id === null ? null : (int)$id;
+}
+
 /** Whether the claim already has a billing (one billing per claim). */
 function billing_exists_for_claim(mysqli $conn, int $claim_id): bool
 {

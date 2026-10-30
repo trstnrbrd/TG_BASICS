@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
@@ -11,26 +12,8 @@ require_role(['admin', 'super_admin', 'mechanic']);
 // AJAX autocomplete
 if (isset($_GET['ajax_ac']) && isset($_GET['q'])) {
     header('Content-Type: application/json');
-    $q = '%' . san_str($_GET['q'], 100) . '%';
-
     // Every admin sees every client; mechanics only ever see walk-in clients (config/access.php)
-    $ac_scope_sql = '';
-    if (is_mechanic()) $ac_scope_sql = "AND NOT EXISTS (SELECT 1 FROM insurance_policies ip WHERE ip.client_id = c.client_id)";
-
-    $stmt = $conn->prepare("
-        SELECT c.client_id, c.full_name, c.contact_number,
-               v.plate_number, v.make, v.model
-        FROM clients c
-        LEFT JOIN vehicles v ON c.client_id = v.client_id
-        WHERE c.deleted_at IS NULL $ac_scope_sql
-          AND (c.full_name LIKE ? OR c.contact_number LIKE ? OR v.plate_number LIKE ? OR v.make LIKE ? OR v.model LIKE ?)
-        GROUP BY c.client_id, v.vehicle_id
-        ORDER BY c.full_name ASC
-        LIMIT 8
-    ");
-    $stmt->bind_param('sssss', $q, $q, $q, $q, $q);
-    $stmt->execute();
-    echo json_encode($stmt->get_result()->fetch_all(MYSQLI_ASSOC));
+    echo json_encode(clients_autocomplete($conn, san_str($_GET['q'], 100), is_mechanic()));
     exit;
 }
 
@@ -43,47 +26,6 @@ $sort_by     = $_GET['sort'] ?? 'newest';
 $is_mechanic = is_mechanic();
 // Mechanics only ever see walk-in clients — force this regardless of any ?client_type= in the URL
 $filter_type = $is_mechanic ? 'walkin' : san_enum($_GET['client_type'] ?? 'all', ['all', 'insurance', 'walkin']);
-$where       = '';
-$params      = [];
-$types       = '';
-
-if ($search !== '') {
-    $like = "%$search%";
-    switch ($filter_by) {
-        case 'name':
-            $where  = "WHERE c.full_name LIKE ?";
-            $params = [$like];
-            $types  = 's';
-            break;
-        case 'plate':
-            $where  = "WHERE v.plate_number LIKE ?";
-            $params = [$like];
-            $types  = 's';
-            break;
-        case 'contact':
-            $where  = "WHERE c.contact_number LIKE ?";
-            $params = [$like];
-            $types  = 's';
-            break;
-        case 'email':
-            $where  = "WHERE c.email LIKE ?";
-            $params = [$like];
-            $types  = 's';
-            break;
-        default:
-            $where  = "WHERE (c.full_name LIKE ? OR v.plate_number LIKE ? OR c.contact_number LIKE ? OR c.email LIKE ?)";
-            $params = [$like, $like, $like, $like];
-            $types  = 'ssss';
-    }
-}
-
-$order = match ($sort_by) {
-    'oldest'   => 'c.created_at ASC',
-    'name_asc' => 'c.full_name ASC',
-    'name_desc'=> 'c.full_name DESC',
-    'vehicles' => 'vehicle_count DESC',
-    default    => 'c.created_at DESC',
-};
 
 // Insurance-agent filter (includes/agent_filter.php): an agent opens the list on THEIR OWN clients and can
 // switch to another agent, "Unassigned" or everyone. Mechanics have no agent filter.
@@ -92,51 +34,14 @@ $af            = agent_filter_state($conn, !$is_mechanic);
 $agent_filter  = $af['value'];
 $agent_default = $af['default'];
 $agent_names   = $af['names'];
-$agent_cond    = fn(string $col) => agent_filter_sql($af, $col);
-
-$type_having = '';
-if ($filter_type === 'insurance') {
-    $type_having = 'HAVING has_policy = 1';
-} elseif ($filter_type === 'walkin') {
-    $type_having = 'HAVING has_policy = 0';
-}
 
 // Every admin sees every client (owner's rule, 2026-09-24); who may change a client is decided per row
-// below. The soft-delete filter is the only scope here — mechanics are limited to walk-ins via $filter_type.
-$where_with_sd = ($where === ''
-    ? "WHERE c.deleted_at IS NULL"
-    : $where . " AND c.deleted_at IS NULL") . $agent_cond('c.agent_id');
+// below. Mechanics are limited to walk-ins via $filter_type. One page at a time (includes/pagination.php).
+[$rows, $pg] = clients_list_page($conn, $search, $filter_by, is_string($sort_by) ? $sort_by : '', $filter_type, $af);
 
-// Insurance agent (whose client it is) and who added the record, both masked if the hidden account
-$sql = "
-    SELECT c.client_id, c.full_name, c.contact_number, c.email, c.created_by, c.agent_id,
-           COUNT(DISTINCT v.vehicle_id) AS vehicle_count, c.created_at,
-           COUNT(DISTINCT ip.policy_id) > 0 AS has_policy,
-           CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.full_name END AS added_by_name,
-           CASE WHEN ag.is_hidden = 1 THEN 'Developer' ELSE ag.full_name END AS agent_name,
-           CASE WHEN ag.is_hidden = 1 THEN NULL ELSE ag.profile_photo END AS agent_photo
-    FROM clients c
-    LEFT JOIN vehicles v            ON c.client_id = v.client_id
-    LEFT JOIN insurance_policies ip ON c.client_id = ip.client_id
-    LEFT JOIN users u               ON c.created_by = u.user_id
-    LEFT JOIN users ag              ON c.agent_id = ag.user_id
-    $where_with_sd
-    GROUP BY c.client_id
-    $type_having
-    ORDER BY $order
-";
-
-// One page at a time (includes/pagination.php) — the total is counted from this same query
-[$result, $pg] = paginate_query($conn, $sql, $types, $params);
-$rows = $result->fetch_all(MYSQLI_ASSOC);
-
-// Mechanics only ever see walk-in clients — exclude anyone with an insurance policy on record
-// The stat cards follow the agent filter too, so they always describe the clients being listed
-$walkin_cond_bare = ($is_mechanic ? "AND NOT EXISTS (SELECT 1 FROM insurance_policies ip WHERE ip.client_id = clients.client_id)" : '') . $agent_cond('clients.agent_id');
-$walkin_cond_c    = ($is_mechanic ? "AND NOT EXISTS (SELECT 1 FROM insurance_policies ip WHERE ip.client_id = c.client_id)" : '') . $agent_cond('c.agent_id');
-$total_clients   = $conn->query("SELECT COUNT(*) as c FROM clients WHERE deleted_at IS NULL $walkin_cond_bare")->fetch_assoc()['c'];
-$total_vehicles  = $conn->query("SELECT COUNT(*) as c FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id WHERE c.deleted_at IS NULL $walkin_cond_c")->fetch_assoc()['c'];
-$recent          = $conn->query("SELECT COUNT(*) as c FROM clients WHERE deleted_at IS NULL AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) $walkin_cond_bare")->fetch_assoc()['c'];
+// Mechanics only ever see walk-in clients; the stat cards follow the agent filter too, so they always
+// describe the clients being listed
+['clients' => $total_clients, 'vehicles' => $total_vehicles, 'recent' => $recent] = clients_list_stats($conn, $is_mechanic, $af);
 
 // Card title for the current view
 $list_title = match (true) {

@@ -14,15 +14,7 @@ if ($vehicle_id === 0) {
 }
 
 // Load vehicle + client name
-$stmt = $conn->prepare("
-    SELECT v.*, c.full_name AS client_name
-    FROM vehicles v
-    INNER JOIN clients c ON v.client_id = c.client_id
-    WHERE v.vehicle_id = ?
-");
-$stmt->bind_param('i', $vehicle_id);
-$stmt->execute();
-$vehicle = $stmt->get_result()->fetch_assoc();
+$vehicle = vehicle_find($conn, $vehicle_id);
 
 if (!$vehicle) {
     header("Location: client_list.php?error=Vehicle not found.");

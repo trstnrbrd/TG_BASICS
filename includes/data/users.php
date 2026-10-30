@@ -62,6 +62,18 @@ function user_password_hash(mysqli $conn, int $user_id): string
     return (string)(dal_value($conn, "SELECT password FROM users WHERE user_id = ? AND is_active = 1", 'i', [$user_id]) ?? '');
 }
 
+/** user_id => username for the given accounts. */
+function users_usernames(mysqli $conn, array $user_ids): array
+{
+    $ids = array_values(array_map('intval', $user_ids));
+    if (!$ids) return [];
+    $out = [];
+    foreach (dal_all($conn, "SELECT user_id, username FROM users WHERE user_id IN (" . dal_in($ids) . ")", str_repeat('i', count($ids)), $ids) as $u) {
+        $out[(int)$u['user_id']] = $u['username'];
+    }
+    return $out;
+}
+
 /** Every user except the developer account, by name: [user_id, full_name] (filter dropdowns). */
 function users_listed(mysqli $conn): array
 {

@@ -20,10 +20,7 @@ if (!client_editable($conn, $client_id)) {
 }
 
 // Load client (exclude soft-deleted)
-$stmt = $conn->prepare("SELECT * FROM clients WHERE client_id = ? AND deleted_at IS NULL");
-$stmt->bind_param('i', $client_id);
-$stmt->execute();
-$client = $stmt->get_result()->fetch_assoc();
+$client = client_row($conn, $client_id);
 
 if (!$client) {
     header("Location: client_list.php?error=Client not found.");

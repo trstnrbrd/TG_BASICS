@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
+require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
@@ -14,15 +15,7 @@ if ($vehicle_id === 0) {
 }
 
 // Load vehicle + client
-$stmt = $conn->prepare("
-    SELECT v.*, c.full_name AS client_name, c.client_id, c.contact_number, c.email
-    FROM vehicles v
-    INNER JOIN clients c ON v.client_id = c.client_id
-    WHERE v.vehicle_id = ?
-");
-$stmt->bind_param('i', $vehicle_id);
-$stmt->execute();
-$v = $stmt->get_result()->fetch_assoc();
+$v = vehicle_find($conn, $vehicle_id);
 
 if (!$v) {
     header("Location: client_list.php?error=Vehicle not found.");
@@ -36,36 +29,6 @@ if (!client_in_scope($conn, (int)$v['client_id'])) {
 }
 
 $client_id = $v['client_id'];
-
-// Load insurance policies for this vehicle
-$pstmt = $conn->prepare("SELECT * FROM insurance_policies WHERE vehicle_id = ? ORDER BY created_at DESC");
-$pstmt->bind_param('i', $vehicle_id);
-$pstmt->execute();
-$policies = $pstmt->get_result();
-
-// Load repair jobs for this vehicle
-$rjstmt = $conn->prepare("
-    SELECT j.*, c.full_name AS client_name
-    FROM repair_jobs j
-    INNER JOIN clients c ON j.client_id = c.client_id
-    WHERE j.vehicle_id = ?
-    ORDER BY j.created_at DESC
-");
-$rjstmt->bind_param('i', $vehicle_id);
-$rjstmt->execute();
-$repair_jobs = $rjstmt->get_result();
-
-// Load claims for this vehicle (via policies)
-$clstmt = $conn->prepare("
-    SELECT cl.*, ip.policy_number
-    FROM claims cl
-    INNER JOIN insurance_policies ip ON cl.policy_id = ip.policy_id
-    WHERE ip.vehicle_id = ?
-    ORDER BY cl.created_at DESC
-");
-$clstmt->bind_param('i', $vehicle_id);
-$clstmt->execute();
-$claims = $clstmt->get_result();
 
 // Build Imagin Studio URL
 $color_map = [

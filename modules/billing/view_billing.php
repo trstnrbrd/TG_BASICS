@@ -3,7 +3,9 @@ require_once __DIR__ . '/../../includes/branding.php';
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
+require_once '../../config/access.php';
 require_once '../../includes/transaction.php';
+require_once '../../config/transaction_pin.php';
 
 require_role(['admin', 'super_admin']);
 
@@ -41,6 +43,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Delete is a POST with a CSRF token — it used to be a GET link, which any page could trigger.
     if ($action === 'delete_billing') {
+        // the Delete button asks for the Transaction PIN (requirePin), so the server checks it was given
+        if (!pin_consume($conn)) {
+            header("Location: view_billing.php?id=$billing_id&error=" . urlencode(PIN_REQUIRED_MSG)); exit;
+        }
         db_transaction($conn, function () use ($conn, $billing_id, $billing) {
             $del = $conn->prepare("DELETE FROM billing WHERE billing_id = ?");
             $del->bind_param('i', $billing_id);
@@ -54,7 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'update_status') {
-        $new_status = san_enum($_POST['status'] ?? '', ['draft', 'sent', 'paid', 'unpaid']);
+        $new_status = san_enum($_POST['status'] ?? '', array_keys(BILLING_STATUSES));
         if ($new_status) {
             $sent_at = ($new_status === 'sent' && !$billing['sent_at']) ? date('Y-m-d H:i:s') : null;
             db_transaction($conn, function () use ($conn, $billing_id, $billing, $new_status, $sent_at) {
@@ -122,13 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $billing = loadBilling($conn, $billing_id);
 
-$status_map = [
-    'draft'  => ['Draft',  'badge-gray',   'pencil'],
-    'sent'   => ['Sent',   'badge-blue',   'paper-airplane'],
-    'paid'   => ['Paid',   'badge-green',  'check-circle'],
-    'unpaid' => ['Unpaid', 'badge-yellow', 'clock'],
-];
-$sb = $status_map[$billing['status']] ?? ['Unknown', 'badge-gray', 'document-text'];
+$sb = billing_status_badge($billing['status']);   // statuses live in config/access.php
 
 $total_repair = (float)$billing['parts_cost'] + (float)$billing['labor_cost'] + (float)$billing['other_cost'];
 $docs_done    = (int)$billing['doc_release_of_claim'] + (int)$billing['doc_drivers_license'] + (int)$billing['doc_billing_statement'];
@@ -173,7 +173,7 @@ require_once '../../includes/topbar.php';
         <div>
           <div style="display:flex;align-items:center;gap:0.6rem;">
             <span style="font-size:1.1rem;font-weight:800;color:var(--text-primary);"><?= htmlspecialchars($billing['billing_number']) ?></span>
-            <span class="badge <?= $sb[1] ?>"><?= $sb[0] ?></span>
+            <span class="badge <?= $sb['class'] ?>"><?= $sb['label'] ?></span>
           </div>
           <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.15rem;">
             <?= htmlspecialchars($billing['full_name']) ?> &nbsp;·&nbsp;
@@ -188,6 +188,10 @@ require_once '../../includes/topbar.php';
         </button>
         <button type="button" class="btn-primary" onclick="window.print()">
           <?= icon('printer', 14) ?> Print
+        </button>
+        <button type="button" id="delete-billing-btn" data-num="<?= htmlspecialchars($billing['billing_number']) ?>"
+          style="display:inline-flex;align-items:center;gap:0.4rem;background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border);padding:0.45rem 1rem;border-radius:8px;font-size:0.78rem;font-weight:700;cursor:pointer;">
+          <?= icon('trash', 14) ?> Delete
         </button>
       </div>
     </div>
@@ -474,16 +478,16 @@ require_once '../../includes/topbar.php';
       <?= csrf_field() ?>
       <input type="hidden" name="action" value="update_status"/>
       <div style="padding:1.25rem;display:flex;flex-direction:column;gap:0.65rem;">
-        <?php foreach ($status_map as $val => [$label, $cls, $ico]): ?>
+        <?php foreach (BILLING_STATUSES as $val => $st): ?>
         <label class="vb-status-opt <?= $billing['status'] === $val ? 'selected' : '' ?>">
           <input type="radio" name="status" value="<?= $val ?>" <?= $billing['status'] === $val ? 'checked' : '' ?>
             onchange="document.querySelectorAll('.vb-status-opt').forEach(el=>el.classList.remove('selected'));this.closest('label').classList.add('selected')"
             style="display:none;"/>
-          <div class="vb-status-opt-icon"><?= icon($ico, 15) ?></div>
+          <div class="vb-status-opt-icon"><?= icon($st['icon'], 15) ?></div>
           <div>
-            <span class="badge <?= $cls ?>"><?= $label ?></span>
+            <span class="badge <?= $st['class'] ?>"><?= $st['label'] ?></span>
             <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.1rem;">
-              <?php $descs = ['draft'=>'Not yet sent','sent'=>'Sent to insurance company','paid'=>'Insurance company paid','unpaid'=>'Sent but unpaid']; echo $descs[$val] ?? ''; ?>
+              <?= $st['desc'] ?>
             </div>
           </div>
         </label>
@@ -506,6 +510,31 @@ function editCalc() {
     document.getElementById('ep_total').textContent = '₱' + (p+l+o-d).toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 document.addEventListener('keydown', e => { if (e.key==='Escape') document.getElementById('status-modal').classList.remove('open'); });
+</script>
+
+<!-- Delete: confirm, then the Transaction PIN, then a POST with the CSRF token (checked again on the server) -->
+<form id="delete-billing-form" method="POST" action="" style="display:none;">
+  <?= csrf_field() ?>
+  <input type="hidden" name="action" value="delete_billing"/>
+</form>
+<script>
+document.getElementById('delete-billing-btn').addEventListener('click', function () {
+  const num = this.dataset.num;
+  Swal.fire({
+    icon: 'warning',
+    title: 'Delete Billing Record?',
+    text: num + ' will be permanently deleted. This cannot be undone.',
+    showCancelButton: true,
+    confirmButtonText: 'Yes, delete it',
+    cancelButtonText: 'Cancel',
+    confirmButtonColor: '#c0392b',
+    cancelButtonColor: '#6c757d',
+  }).then(async function (result) {
+    if (!result.isConfirmed) return;
+    if (!(await requirePin())) return;
+    document.getElementById('delete-billing-form').submit();
+  });
+});
 </script>
 
 <?php require_once '../../includes/footer.php'; ?>

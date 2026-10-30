@@ -43,6 +43,20 @@ function claim_status_badge(string $status): array
     return CLAIM_STATUSES[$status] ?? ['label' => $status, 'class' => 'badge-muted'];
 }
 
+// Every billing status with its label, badge class, icon and what it means (billing list + filter, view billing)
+const BILLING_STATUSES = [
+    'draft'  => ['label' => 'Draft',  'class' => 'badge-gray',   'icon' => 'pencil',         'desc' => 'Not yet sent'],
+    'sent'   => ['label' => 'Sent',   'class' => 'badge-blue',   'icon' => 'paper-airplane', 'desc' => 'Sent to insurance company'],
+    'paid'   => ['label' => 'Paid',   'class' => 'badge-green',  'icon' => 'check-circle',   'desc' => 'Insurance company paid'],
+    'unpaid' => ['label' => 'Unpaid', 'class' => 'badge-yellow', 'icon' => 'clock',          'desc' => 'Sent but unpaid'],
+];
+
+/** The label, badge class, icon and description of a billing status; an unknown one shows as "Unknown". */
+function billing_status_badge(string $status): array
+{
+    return BILLING_STATUSES[$status] ?? ['label' => 'Unknown', 'class' => 'badge-gray', 'icon' => 'document-text', 'desc' => ''];
+}
+
 // Claim statuses where each action is allowed
 const CLAIM_DOCS_OPEN_STATUSES = ['compiling', 'sent_admin', 'lack_of_requirements'];
 const CLAIM_DELETABLE_STATUSES = ['resolved', 'denied', 'lack_of_requirements'];

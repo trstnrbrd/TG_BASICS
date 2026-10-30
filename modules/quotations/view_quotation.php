@@ -219,12 +219,12 @@ document.addEventListener('DOMContentLoaded',function(){
     <span class="badge <?= $sc['class'] ?>"><?= htmlspecialchars($sc['label']) ?></span>
     <?php if ($is_admin && $qt['status'] === 'draft'): ?>
       <a href="../quotations/add_quotation.php?quotation_id=<?= $qt_id ?>" class="btn-ghost" style="font-size:0.82rem;"><?= icon('pencil', 13) ?> Edit Draft</a>
-      <form method="POST" style="display:inline;">
+      <form method="POST" style="display:inline;" class="js-qt-confirm" data-title="Send for approval?" data-text="The quotation can no longer be edited once it is sent for approval." data-button="Yes, send it">
         <?= csrf_field() ?><input type="hidden" name="action" value="send_approval"/>
         <button type="submit" class="btn-primary" style="font-size:0.82rem;"><?= icon('paper-airplane', 13) ?> Send for Approval</button>
       </form>
     <?php elseif ($is_admin && $qt['status'] === 'pending_approval'): ?>
-      <form method="POST" style="display:inline;">
+      <form method="POST" style="display:inline;" class="js-qt-confirm" data-title="Mark this quotation as approved?" data-text="Do this once the client has agreed to the quotation." data-button="Yes, mark approved">
         <?= csrf_field() ?><input type="hidden" name="action" value="approve"/>
         <button type="submit" class="btn-primary" style="font-size:0.82rem;"><?= icon('check-circle', 13) ?> Mark Approved</button>
       </form>
@@ -232,7 +232,7 @@ document.addEventListener('DOMContentLoaded',function(){
       <button onclick="document.getElementById('convert-modal').style.display='flex'" class="btn-primary" style="font-size:0.82rem;"><?= icon('document-text', 13) ?> Convert to Billing Statement</button>
     <?php endif; ?>
     <?php if ($is_admin && in_array($qt['status'], ['draft','pending_approval'])): ?>
-      <form method="POST" style="display:inline;" onsubmit="return confirm('Cancel this quotation?')">
+      <form method="POST" style="display:inline;" class="js-qt-confirm" data-danger="1" data-title="Cancel this quotation?" data-text="A cancelled quotation cannot be approved or turned into a billing statement." data-button="Yes, cancel it">
         <?= csrf_field() ?><input type="hidden" name="action" value="cancel"/>
         <button type="submit" class="btn-ghost" style="font-size:0.82rem;color:var(--danger);"><?= icon('x-mark', 13) ?> Cancel</button>
       </form>
@@ -440,4 +440,31 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape') document.
 </script>
 <?php endif; ?>
 
+<script>
+// Send for Approval / Mark Approved / Cancel: a SweetAlert confirmation before the form is sent
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('form.js-qt-confirm').forEach(function (form) {
+    form.addEventListener('submit', function (e) {
+      if (form.dataset.confirmed === '1') return;
+      e.preventDefault();
+      var danger = form.dataset.danger === '1';
+      Swal.fire({
+        title: form.dataset.title,
+        text: form.dataset.text,
+        icon: danger ? 'warning' : 'question',
+        showCancelButton: true,
+        confirmButtonText: form.dataset.button,
+        cancelButtonText: danger ? 'Keep it' : 'Not yet',
+        confirmButtonColor: danger ? '#C0392B' : '#D4A017',
+        cancelButtonColor: '#6B7280',
+        reverseButtons: true,
+      }).then(function (r) {
+        if (!r.isConfirmed) return;
+        form.dataset.confirmed = '1';
+        form.submit();
+      });
+    });
+  });
+});
+</script>
 <?php require_once '../../includes/footer.php'; ?>

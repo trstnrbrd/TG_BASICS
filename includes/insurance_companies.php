@@ -142,10 +142,8 @@ function insurance_company_save(mysqli $conn, int $user_id, int $id, array $in):
                 $up->execute();
                 $log = "Updated insurance company: $name";
                 if ($old['name'] !== $name) {
-                    $mv = $conn->prepare("UPDATE insurance_policies SET insurance_company = ? WHERE insurance_company = ?");
-                    $mv->bind_param('ss', $name, $old['name']);
-                    $mv->execute();
-                    $log = "Renamed insurance company: {$old['name']} -> $name ({$mv->affected_rows} policies moved)";
+                    $moved = policies_rename_company($conn, $old['name'], $name);
+                    $log = "Renamed insurance company: {$old['name']} -> $name ($moved policies moved)";
                 }
                 $action = 'INSURANCE_COMPANY_UPDATED';
             }

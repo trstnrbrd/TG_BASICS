@@ -72,37 +72,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_policy'])) {
     csrf_verify();
     $with_claims = isset($_POST['delete_claims']) && $_POST['delete_claims'] === '1';
 
-    if ($with_claims) {
-        // Delete claim files first
-        $upload_dir = __DIR__ . '/../../uploads/claims/';
-        $cr_stmt = $conn->prepare("SELECT doc_or_cr_file, doc_drivers_license_file, doc_insurance_policy_file, doc_damage_photos_file, doc_police_report_file FROM claims WHERE policy_id = ?");
-        $cr_stmt->bind_param('i', $policy_id);
-        $cr_stmt->execute();
-        $claim_rows = $cr_stmt->get_result();
-        while ($cr = $claim_rows->fetch_assoc()) {
-            foreach ($cr as $f) {
-                if ($f && file_exists($upload_dir . $f)) unlink($upload_dir . $f);
-            }
-        }
-        $ph_stmt = $conn->prepare("SELECT filename FROM claim_damage_photos cdp INNER JOIN claims c ON cdp.claim_id = c.claim_id WHERE c.policy_id = ?");
-        $ph_stmt->bind_param('i', $policy_id);
-        $ph_stmt->execute();
-        $photos = $ph_stmt->get_result();
-        while ($p = $photos->fetch_assoc()) {
-            if (file_exists($upload_dir . $p['filename'])) unlink($upload_dir . $p['filename']);
-        }
-        $del_cl = $conn->prepare("DELETE cl FROM claims cl WHERE cl.policy_id = ?");
-        $del_cl->bind_param('i', $policy_id);
-        $del_cl->execute();
+    // The records and the audit entry are deleted together; the claim files only once that has committed,
+    // so a failed delete never leaves claims whose documents are already gone
+    $claim_files = db_transaction($conn, function () use ($conn, $policy_id, $with_claims, $policy) {
+        $files = policy_delete($conn, $policy_id, $with_claims);
+        $desc  = ($_SESSION['full_name'] ?? 'Unknown') . ' deleted policy ' . $policy['policy_number'] . ($with_claims ? ' and all associated claims.' : '.');
+        audit_log_add($conn, $_SESSION['user_id'], 'POLICY_DELETED', $desc);
+        return $files;
+    });
+    $upload_dir = __DIR__ . '/../../uploads/claims/';
+    foreach ($claim_files as $f) {
+        if (file_exists($upload_dir . $f)) unlink($upload_dir . $f);
     }
-
-    $del = $conn->prepare("DELETE FROM insurance_policies WHERE policy_id = ?");
-    $del->bind_param('i', $policy_id);
-    $del->execute();
-
-    $uid  = $_SESSION['user_id'];
-    $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' deleted policy ' . $policy['policy_number'] . ($with_claims ? ' and all associated claims.' : '.');
-    audit_log_add($conn, $uid, 'POLICY_DELETED', $desc);
 
     header("Location: renewal_list.php?msg=" . urlencode("Policy " . $policy['policy_number'] . " deleted."));
     exit;
@@ -132,17 +113,13 @@ if ($has_installments && $_SERVER['REQUEST_METHOD'] !== 'POST') {
     $auto_overdue = $total_due_past > 0 && round($total_paid_past, 2) < round($total_due_past, 2);
     $current_status = $policy['payment_status'];
     if ($auto_overdue && $current_status !== 'Paid' && $current_status !== 'Overdue') {
-        $ao_upd = $conn->prepare("UPDATE insurance_policies SET payment_status = 'Overdue' WHERE policy_id = ?");
-        $ao_upd->bind_param('i', $policy_id);
-        $ao_upd->execute();
+        policy_set_payment_status($conn, $policy_id, 'Overdue');
         $policy['payment_status'] = 'Overdue';
     } elseif (!$auto_overdue && $current_status === 'Overdue') {
         // Recalculate back to correct status
         $total_paid_check = array_sum(array_column($installments, 'amount_paid'));
         $revert = policy_payment_status($payable_amount, (float)$total_paid_check);
-        $rv_upd = $conn->prepare("UPDATE insurance_policies SET payment_status = ? WHERE policy_id = ?");
-        $rv_upd->bind_param('si', $revert, $policy_id);
-        $rv_upd->execute();
+        policy_set_payment_status($conn, $policy_id, $revert);
         $policy['payment_status'] = $revert;
     }
 }
@@ -176,9 +153,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_receipt'])) {
     }
 
     if (!move_uploaded_file($f['tmp_name'], $dest)) api_error('Upload failed. Check server permissions.', 500);
-    $upd_rc = $conn->prepare("UPDATE policy_payments SET receipt_file = ? WHERE payment_id = ?");
-    $upd_rc->bind_param('si', $filename, $payment_id);
-    $upd_rc->execute();
+    policy_payment_set_receipt($conn, $payment_id, $filename);
 
     $uid  = $_SESSION['user_id'];
     $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' uploaded receipt for payment #' . $payment_id . ' on policy ' . $policy['policy_number'] . '.';
@@ -198,9 +173,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_receipt'])) {
     if ($chk2_row && $chk2_row['receipt_file']) {
         $f2 = __DIR__ . '/../../uploads/receipts/' . $chk2_row['receipt_file'];
         if (file_exists($f2)) unlink($f2);
-        $clr = $conn->prepare("UPDATE policy_payments SET receipt_file = NULL WHERE payment_id = ?");
-        $clr->bind_param('i', $payment_id);
-        $clr->execute();
+        policy_payment_set_receipt($conn, $payment_id, null);
     }
     api_success();
 }
@@ -222,31 +195,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['undo_payment'])) {
     $conn->begin_transaction();
     try {
         // "amount_paid > 0" makes a double-click (or two tabs) undo it only once
-        $clr = $conn->prepare("UPDATE policy_payments SET amount_paid = 0, paid_at = NULL, payment_mode = NULL, control_number = NULL WHERE payment_id = ? AND policy_id = ? AND amount_paid > 0");
-        $clr->bind_param('ii', $payment_id, $policy_id);
-        $clr->execute();
-        if ($clr->affected_rows !== 1) {
+        if (!policy_payment_undo($conn, $payment_id, $policy_id)) {
             $conn->rollback();
             header("Location: view_policy.php?id=" . $policy_id . "&error=" . urlencode($nothing_msg));
             exit;
         }
 
         // Totals and status from what is stored now — same rules as saving the schedule below
-        $tot = $conn->prepare("
-            SELECT COALESCE(SUM(amount_paid), 0),
-                   COALESCE(SUM(CASE WHEN due_date < CURDATE() THEN amount_due  END), 0),
-                   COALESCE(SUM(CASE WHEN due_date < CURDATE() THEN amount_paid END), 0)
-            FROM policy_payments WHERE policy_id = ?
-        ");
-        $tot->bind_param('i', $policy_id);
-        $tot->execute();
-        [$total_paid, $due_past, $paid_past] = array_map('floatval', $tot->get_result()->fetch_row());
+        [$total_paid, $due_past, $paid_past] = policy_payment_totals($conn, $policy_id);
         $new_balance = round($payable_amount - $total_paid, 2);
         $new_status  = policy_payment_status($payable_amount, $total_paid, $due_past > 0 && round($paid_past, 2) < round($due_past, 2));
 
-        $upd = $conn->prepare("UPDATE insurance_policies SET amount_paid = ?, balance = ?, payment_status = ? WHERE policy_id = ?");
-        $upd->bind_param('ddsi', $total_paid, $new_balance, $new_status, $policy_id);
-        $upd->execute();
+        policy_set_totals($conn, $policy_id, $total_paid, $new_balance, $new_status);
 
         $ordinals_u = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
         $undo_label = count($installments) === 1 ? 'Full Payment' : ($ordinals_u[$undo_row['installment_no'] - 1] ?? $undo_row['installment_no'] . 'th') . ' Payment';
@@ -365,9 +325,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
                         $ctrl_num = !empty($ctrl_numbers[$idx]) ? $ctrl_numbers[$idx] : null;
                         $total_paid += $amt_paid;
 
-                        $upd_pp = $conn->prepare("UPDATE policy_payments SET amount_paid = ?, paid_at = ?, payment_mode = ?, control_number = ? WHERE payment_id = ?");
-                        $upd_pp->bind_param('dsssi', $amt_paid, $paid_at, $pay_mode, $ctrl_num, $row['payment_id']);
-                        $upd_pp->execute();
+                        policy_payment_record($conn, (int)$row['payment_id'], $amt_paid, $paid_at, $pay_mode, $ctrl_num);
                     }
 
                     $total_paid   = round($total_paid, 2);
@@ -384,9 +342,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
                     $has_overdue = $due_past > 0 && round($paid_past, 2) < round($due_past, 2);
                     $new_status  = policy_payment_status($payable_amount, $total_paid, $has_overdue);
 
-                    $upd = $conn->prepare("UPDATE insurance_policies SET amount_paid = ?, balance = ?, payment_status = ? WHERE policy_id = ?");
-                    $upd->bind_param('ddsi', $total_paid, $new_balance, $new_status, $policy_id);
-                    $upd->execute();
+                    policy_set_totals($conn, $policy_id, $total_paid, $new_balance, $new_status);
 
                     $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' updated installment payments for policy ' . $policy['policy_number'] . '. Total paid: PHP ' . number_format($total_paid, 2) . '. Status: ' . $new_status . '.';
                     audit_log_add($conn, $_SESSION['user_id'], 'PAYMENT_RECORDED', $desc);
@@ -428,9 +384,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
             // The policy totals and the audit entry are saved together or not at all (includes/transaction.php)
             try {
                 db_transaction($conn, function () use ($conn, $new_amount_paid, $new_balance, $new_status, $new_notes, $policy_id, $policy, $payment_amount) {
-                    $upd = $conn->prepare("UPDATE insurance_policies SET amount_paid = ?, balance = ?, payment_status = ?, notes = ? WHERE policy_id = ?");
-                    $upd->bind_param('ddssi', $new_amount_paid, $new_balance, $new_status, $new_notes, $policy_id);
-                    $upd->execute();
+                    policy_set_totals($conn, $policy_id, $new_amount_paid, $new_balance, $new_status, $new_notes);
 
                     $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' recorded payment of PHP ' . number_format($payment_amount, 2) . ' for policy ' . $policy['policy_number'] . '. New balance: PHP ' . number_format($new_balance, 2) . '. Status: ' . $new_status . '.';
                     audit_log_add($conn, $_SESSION['user_id'], 'PAYMENT_RECORDED', $desc);

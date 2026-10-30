@@ -60,8 +60,7 @@ function overdue_reminders_run(mysqli $conn): array
     if (!$policies) return ['emails_sent' => 0, 'policies' => 0];
 
     // Show them as "Overdue" in the lists too (same rule as opening the policy page)
-    $ids = implode(',', array_map('intval', array_column($policies, 'policy_id')));
-    $conn->query("UPDATE insurance_policies SET payment_status = 'Overdue' WHERE policy_id IN ($ids) AND payment_status IN ('Unpaid', 'Partial')");
+    policies_mark_overdue($conn, array_column($policies, 'policy_id'));
 
     // Group by agent (0 = no agent, only the owner sees those)
     $by_agent = [];

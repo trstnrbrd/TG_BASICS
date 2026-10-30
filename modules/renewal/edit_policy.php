@@ -172,27 +172,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $n = $terms_map[$in['payment_terms']] ?? count($inst);
                 if ($in['payment_terms'] !== $current['payment_terms']) {
                     // Only reachable while nothing is paid and no receipt is attached — rebuild the rows
-                    $del = $conn->prepare("DELETE FROM policy_payments WHERE policy_id = ?");
-                    $del->bind_param('i', $policy_id);
-                    $del->execute();
+                    policy_payments_clear($conn, $policy_id);
                     $inst = [];
-                    $ins = $conn->prepare("INSERT INTO policy_payments (policy_id, installment_no, due_date, amount_due, amount_paid) VALUES (?, ?, ?, 0, 0)");
                     for ($i = 1; $i <= $n; $i++) {
-                        $blank = '2000-01-01';
-                        $ins->bind_param('iis', $policy_id, $i, $blank);
-                        $ins->execute();
-                        $inst[] = ['payment_id' => $conn->insert_id, 'installment_no' => $i, 'amount_paid' => 0];
+                        // placeholder date and amount, set by the re-split right below
+                        $inst[] = ['payment_id' => policy_payment_add($conn, $policy_id, $i, '2000-01-01', 0.0), 'installment_no' => $i, 'amount_paid' => 0];
                     }
                 } else {
                     $n = count($inst);
                 }
                 $per = round($payable / $n, 2);
-                $upd_pp = $conn->prepare("UPDATE policy_payments SET due_date = ?, amount_due = ? WHERE payment_id = ?");
                 foreach ($inst as $i => $r) {
                     $due = date('Y-m-d', strtotime($in['policy_start'] . ' +' . $i . ' months'));
                     $amt = ($i === $n - 1) ? round($payable - $per * ($n - 1), 2) : $per;
-                    $upd_pp->bind_param('sdi', $due, $amt, $r['payment_id']);
-                    $upd_pp->execute();
+                    policy_payment_set_schedule($conn, (int)$r['payment_id'], $due, $amt);
                 }
                 if (abs((float)$current['total_premium'] - (float)$current['markup'] - $payable) >= 0.005 || $in['payment_terms'] !== $current['payment_terms']) {
                     $changes[] = 'Schedule re-split: ' . $n . ' x ' . $money($per);
@@ -200,30 +193,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             // Totals and status — same rules as saving payments on view_policy.php
-            $tot = $conn->prepare("
-                SELECT COALESCE(SUM(amount_paid), 0),
-                       COALESCE(SUM(CASE WHEN due_date < CURDATE() THEN amount_due  END), 0),
-                       COALESCE(SUM(CASE WHEN due_date < CURDATE() THEN amount_paid END), 0)
-                FROM policy_payments WHERE policy_id = ?
-            ");
-            $tot->bind_param('i', $policy_id);
-            $tot->execute();
-            [$total_paid, $due_past, $paid_past] = array_map('floatval', $tot->get_result()->fetch_row());
+            [$total_paid, $due_past, $paid_past] = policy_payment_totals($conn, $policy_id);
             if (!$inst) $total_paid = (float)$current['amount_paid'];   // older policy without a schedule
             $balance = round($payable - $total_paid, 2);
             $status  = policy_payment_status($payable, $total_paid, $due_past > 0 && round($paid_past, 2) < round($due_past, 2));
 
-            $upd = $conn->prepare("
-                UPDATE insurance_policies SET insurance_company = ?, policy_number = ?, coverage_type = ?, policy_start = ?, policy_end = ?,
-                       sum_insured = ?, markup = ?, total_premium = ?, participation_fee = ?, payment_terms = ?, mortgagee = ?, notes = ?,
-                       amount_paid = ?, balance = ?, payment_status = ?
-                WHERE policy_id = ?
-            ");
-            $upd->bind_param('sssssddddsssddsi',
-                $in['insurance_company'], $in['policy_number'], $in['coverage_type'], $in['policy_start'], $in['policy_end'],
-                $in['sum_insured'], $in['markup'], $in['total_premium'], $in['participation_fee'], $in['payment_terms'], $in['mortgagee'], $in['notes'],
-                $total_paid, $balance, $status, $policy_id);
-            $upd->execute();
+            policy_update($conn, $policy_id, $in, $total_paid, $balance, $status);
 
             $uid  = $_SESSION['user_id'];
             $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' edited policy ' . $current['policy_number'] . ' of ' . $current['full_name'] . ' — ' . implode('; ', $changes) . '.';

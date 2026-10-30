@@ -52,8 +52,7 @@ function renewal_reminders_run(mysqli $conn): array
     if (!$policies) return ['emails_sent' => 0, 'policies' => 0];
 
     // Mark them as reminded BEFORE sending, so another run won't send them again
-    $ids = implode(',', array_map('intval', array_column($policies, 'policy_id')));
-    $conn->query("UPDATE insurance_policies SET last_urgent_reminder_sent = CURDATE() WHERE policy_id IN ($ids)");
+    policies_stamp_urgent_reminder($conn, array_column($policies, 'policy_id'));
 
     // Group by agent (0 = no agent, only the owner sees those)
     $by_agent = [];

@@ -288,21 +288,15 @@ require_once '../../includes/topbar.php';
               $rid  = 'rnl-expand-' . $row['policy_id'];
               $days = (int)$row['days_left'];
 
-              if ($row['policy_end'] < date('Y-m-d')) {
-                $status_badge = '<span class="badge badge-gray">Expired</span>';
-                $row_style    = '';
-              } elseif ($days <= $urg_days) {
-                $status_badge = '<span class="badge badge-red">' . icon('exclamation-triangle', 10) . ' Urgent &mdash; ' . $days . 'd left</span>';
-                $row_style    = 'background:rgba(192,57,43,0.03);';
-              } elseif ($days <= $exp_days) {
-                $status_badge = '<span class="badge badge-yellow">' . icon('clock', 10) . ' Expiring &mdash; ' . $days . 'd left</span>';
-                $row_style    = 'background:rgba(184,134,11,0.03);';
-              } else {
-                $status_badge = '<span class="badge badge-green">' . icon('check-circle', 10) . ' Stable</span>';
-                $row_style    = '';
-              }
-              // Show Renewed badge for 3 days after renewal, then let it fade to normal status
-              if ($row['renewed_at'] && strtotime($row['renewed_at']) >= strtotime('-3 days')) {
+              // same rule as View Policy (policy_renewal_status() in config/access.php)
+              [$status_badge, $row_style] = match (policy_renewal_status($row['policy_end'], $days, $urg_days, $exp_days)) {
+                'expired'  => ['<span class="badge badge-gray">Expired</span>', ''],
+                'urgent'   => ['<span class="badge badge-red">' . icon('exclamation-triangle', 10) . ' Urgent &mdash; ' . $days . 'd left</span>', 'background:rgba(192,57,43,0.03);'],
+                'expiring' => ['<span class="badge badge-yellow">' . icon('clock', 10) . ' Expiring &mdash; ' . $days . 'd left</span>', 'background:rgba(184,134,11,0.03);'],
+                'stable'   => ['<span class="badge badge-green">' . icon('check-circle', 10) . ' Stable</span>', ''],
+              };
+              // Show Renewed badge for a few days after renewal, then let it fade to normal status
+              if (policy_recently_renewed($row['renewed_at'])) {
                 $status_badge .= ' <span class="badge badge-info">' . icon('arrow-path', 10) . ' Renewed</span>';
               }
 

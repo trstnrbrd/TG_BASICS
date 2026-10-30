@@ -464,39 +464,19 @@ $claims_count_res->bind_param('i', $policy_id);
 $claims_count_res->execute();
 $claims_count = (int)$claims_count_res->get_result()->fetch_assoc()['cnt'];
 
-$recently_renewed = !empty($policy['renewed_at']) && strtotime($policy['renewed_at']) >= strtotime('-3 days');
-$policy_needs_action = $expired || $days <= $exp_days;
-if ($recently_renewed && !$policy_needs_action) {
-    $status_label = 'Renewed';
-    $status_color = 'var(--info)';
-    $status_bg    = 'var(--info-bg, rgba(59,130,246,0.1))';
-    $status_border= 'var(--info-border, rgba(59,130,246,0.3))';
-    $status_icon  = icon('arrow-path', 16);
-} elseif ($expired) {
-    $status_label = 'Expired';
-    $status_color = 'var(--text-muted)';
-    $status_bg    = 'var(--bg-2)';
-    $status_border= 'var(--border)';
-    $status_icon  = icon('x-mark', 16);
-} elseif ($days <= $urg_days) {
-    $status_label = 'Urgent - ' . $days . ' day' . ($days !== 1 ? 's' : '') . ' left';
-    $status_color = 'var(--danger)';
-    $status_bg    = 'var(--danger-bg)';
-    $status_border= 'var(--danger-border)';
-    $status_icon  = icon('exclamation-triangle', 16);
-} elseif ($days <= $exp_days) {
-    $status_label = 'Expiring - ' . $days . ' days left';
-    $status_color = 'var(--warning)';
-    $status_bg    = 'var(--warning-bg)';
-    $status_border= 'var(--warning-border)';
-    $status_icon  = icon('clock', 16);
-} else {
-    $status_label = 'Stable';
-    $status_color = 'var(--success)';
-    $status_bg    = 'var(--success-bg)';
-    $status_border= 'var(--success-border)';
-    $status_icon  = icon('check-circle', 16);
-}
+// Status pill at the top: the renewal status (config/access.php), shown as "Renewed" for a few days after a
+// renewal unless the new policy already needs attention
+$renewal_status = policy_renewal_status($policy['policy_end'], $days, $urg_days, $exp_days);
+if ($renewal_status === 'stable' && policy_recently_renewed($policy['renewed_at'] ?? null)) $renewal_status = 'renewed';
+$days_left = $days . ' day' . ($days !== 1 ? 's' : '') . ' left';
+[$status_label, $status_color, $status_bg, $status_border, $status_icon_name] = match ($renewal_status) {
+    'renewed'  => ['Renewed',               'var(--info)',       'var(--info-bg, rgba(59,130,246,0.1))', 'var(--info-border, rgba(59,130,246,0.3))', 'arrow-path'],
+    'expired'  => ['Expired',               'var(--text-muted)', 'var(--bg-2)',                          'var(--border)',                            'x-mark'],
+    'urgent'   => ['Urgent - ' . $days_left,   'var(--danger)',  'var(--danger-bg)',                     'var(--danger-border)',                     'exclamation-triangle'],
+    'expiring' => ['Expiring - ' . $days_left, 'var(--warning)', 'var(--warning-bg)',                    'var(--warning-border)',                    'clock'],
+    'stable'   => ['Stable',                'var(--success)',    'var(--success-bg)',                    'var(--success-border)',                    'check-circle'],
+};
+$status_icon = icon($status_icon_name, 16);
 
 $page_title  = 'View Policy';
 $active_page = 'renewal';

@@ -71,6 +71,27 @@ function policy_is_expired(string $policy_end): bool
 }
 
 /**
+ * Where a policy stands on renewal: 'expired', 'urgent', 'expiring' or 'stable'. The two thresholds are the
+ * renewal_urgent_days / renewal_expiring_days settings. Used by View Policy and the renewal list, so both always
+ * agree.
+ */
+function policy_renewal_status(string $policy_end, int $days_left, int $urgent_days, int $expiring_days): string
+{
+    if (policy_is_expired($policy_end)) return 'expired';
+    if ($days_left <= $urgent_days)     return 'urgent';
+    if ($days_left <= $expiring_days)   return 'expiring';
+    return 'stable';
+}
+
+const POLICY_RENEWED_BADGE_DAYS = 3;
+
+/** Renewed within the last POLICY_RENEWED_BADGE_DAYS days (the "Renewed" badge). */
+function policy_recently_renewed(?string $renewed_at): bool
+{
+    return !empty($renewed_at) && strtotime($renewed_at) >= strtotime('-' . POLICY_RENEWED_BADGE_DAYS . ' days');
+}
+
+/**
  * Paid, Overdue, Partial or Unpaid.
  * Amounts are rounded to centavos first, because adding decimals in PHP is not exact
  * (1028.14 + 1028.13 = 2056.2700000000004).

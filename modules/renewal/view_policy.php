@@ -305,6 +305,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_payment'])) {
             }
             $ctrl_numbers[$k] = san_str(is_string($v) ? $v : '', MAX_PAYMENT_REF);
         }
+        // An installment already paid is locked on the page (only Undo changes it), so its amount, mode and control
+        // no. always come from the database, never from the hidden fields the browser sent back.
+        $locked_total = 0.0;
+        foreach ($installments as $row) {
+            if ((float)$row['amount_paid'] <= 0) continue;
+            $idx = $row['installment_no'] - 1;
+            $amounts[$idx]      = (float)$row['amount_paid'];
+            $pay_modes[$idx]    = $row['payment_mode'] ?? '';
+            $ctrl_numbers[$idx] = $row['control_number'] ?? '';
+            $locked_total      += (float)$row['amount_paid'];
+        }
+        // Each new payment on its own: no more than what is left to pay after the locked ones
+        $remaining = max(0, round($payable_amount - $locked_total, 2));
+        if ($valid) {
+            foreach ($installments as $row) {
+                if ((float)$row['amount_paid'] > 0) continue;
+                $amt = $amounts[$row['installment_no'] - 1] ?? 0.0;
+                if (payment_exceeds($amt, $remaining)) {
+                    $pay_errors[] = 'Payment ' . $row['installment_no'] . ' amount (₱' . number_format($amt, 2) . ') is more than the remaining balance of ₱' . number_format($remaining, 2) . '.';
+                    $valid = false;
+                }
+            }
+        }
+
         // Mode of payment required for any installment with amount > 0
         if ($valid) {
             foreach ($installments as $row) {
@@ -752,7 +776,7 @@ require_once '../../includes/topbar.php';
             <!-- Installment schedule table -->
             <?php $pay_mode_opts = ['Cash','Bank Transfer','Check','E-Wallet','Other']; ?>
             <div class="tg-table-wrap inst-table-wrap" style="margin-bottom:1rem;overflow-x:auto;">
-              <table class="tg-table inst-schedule-table" id="installment-view-table" style="min-width:700px;">
+              <table class="tg-table inst-schedule-table" id="installment-view-table" style="min-width:700px;" data-payable="<?= number_format($payable_amount, 2, '.', '') ?>">
                 <thead>
                   <tr>
                     <th style="text-align:center;white-space:nowrap;">Payment</th>
@@ -955,8 +979,53 @@ if ($has_inst_js) {
         const rows = document.querySelectorAll("#installment-view-table tbody tr");
 
         const today = new Date(); today.setHours(0,0,0,0);
+        const table   = document.getElementById("installment-view-table");
+        const saveBtn = document.getElementById("btn-save-payment");
+        const payable = parseFloat(table.dataset.payable) || 0;
+        const peso    = (n) => "₱" + n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        // already-paid (locked) rows carry their amount in a hidden field
+        let locked = 0;
+        rows.forEach(function (tr) {
+          if (tr.querySelector("input.inst-paid-input")) return;
+          const h = tr.querySelector("input[type=hidden][name=\"installment_amount[]\"]");
+          locked += h ? (parseFloat(h.value) || 0) : 0;
+        });
+        const inputs = Array.from(document.querySelectorAll("#installment-view-table input.inst-paid-input"));
+
+        // Each new amount: no more than the remaining balance after the locked rows and the other new amounts.
+        // The server checks the same on save (view_policy.php, record_payment).
+        function checkLimits() {
+          let bad = false;
+          inputs.forEach(function (input) {
+            const others = inputs.reduce((sum, o) => o === input ? sum : sum + (parseFloat(o.value) || 0), 0);
+            const max    = Math.max(0, Math.round((payable - locked - others) * 100) / 100);
+            const paid   = parseFloat(input.value) || 0;
+            input.max    = Math.max(0, payable - locked).toFixed(2);
+            let msg = input.parentNode.querySelector(".inst-paid-err");
+            if (paid > max + 0.005) {
+              bad = true;
+              if (!msg) {
+                msg = document.createElement("div");
+                msg.className = "inst-paid-err";
+                msg.style.cssText = "font-size:0.68rem;color:var(--danger);margin-top:0.25rem;";
+                input.parentNode.appendChild(msg);
+              }
+              msg.textContent = "Max " + peso(max) + " (remaining balance)";
+              input.style.borderColor = "var(--danger)";
+            } else {
+              if (msg) msg.remove();
+              input.style.borderColor = "";
+            }
+          });
+          if (saveBtn) {
+            saveBtn.disabled = bad;
+            saveBtn.style.opacity = bad ? "0.5" : "";
+            saveBtn.title = bad ? "An amount is more than the remaining balance" : "";
+          }
+        }
 
         function refresh() {
+          checkLimits();
           rows.forEach(function (tr) {
             const input = tr.querySelector("input.inst-paid-input");
             if (!input) return; // locked row — skip
@@ -982,6 +1051,7 @@ if ($has_inst_js) {
           const input = tr.querySelector("input.inst-paid-input");
           if (input) input.addEventListener("input", refresh); // locked (already paid) rows have no input
         });
+        checkLimits();   // e.g. amounts typed back in after a refused save
       })();
     ';
 } elseif ((float)$policy['balance'] > 0) {

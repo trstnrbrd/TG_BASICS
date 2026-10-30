@@ -210,3 +210,21 @@ document.addEventListener('input', function (e) {
   }
   if (clean !== el.value) el.value = clean;
 });
+
+// A type="number" peso field (data-money) accepts "e", "+" and "-" (scientific notation, "123e4567"), and while the
+// text is not a valid number its value reads '' so the input filter above never sees it. Stop those keys, and
+// clean pasted text down to digits and one ".". Covers every data-money field, rows added by JS included.
+document.addEventListener('keydown', function (e) {
+  var el = e.target;
+  if (el.matches && el.matches('input[data-money]') && !e.ctrlKey && !e.metaKey && /^[eE+\-]$/.test(e.key)) e.preventDefault();
+});
+document.addEventListener('paste', function (e) {
+  var el = e.target;
+  if (!el.matches || !el.matches('input[data-money]') || !e.clipboardData) return;
+  e.preventDefault();
+  var text = e.clipboardData.getData('text').replace(/,/g, '').replace(/[^\d.]/g, '');
+  var dot = text.indexOf('.');
+  if (dot !== -1) text = text.slice(0, dot + 1) + text.slice(dot + 1).replace(/\./g, '');
+  el.value = text;   // the input event below runs the 8-digit / 2-decimal filter
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+});

@@ -12,7 +12,8 @@ if (!defined('SESSION_IDLE_SECONDS')) define('SESSION_IDLE_SECONDS', 3600);
 if (!isset($conn)) {
     require_once __DIR__ . '/db.php';
 }
-$conn->query("SET time_zone = '+08:00'");
+require_once __DIR__ . '/../includes/data_access.php';
+db_use_ph_time($conn);
 
 require_once __DIR__ . '/app_url.php';
 
@@ -93,19 +94,12 @@ if (isset($_SESSION['user_id'])) {
         if (!isset($conn)) {
             require_once __DIR__ . '/db.php';
         }
-        $uid = (int)$_SESSION['user_id'];
-        $stmt = $conn->prepare("SELECT role, is_active FROM users WHERE user_id = ?");
-        $stmt->bind_param('i', $uid);
-        $stmt->execute();
-        $acct = $stmt->get_result()->fetch_assoc();
-        $stmt->close();
+        $uid  = (int)$_SESSION['user_id'];
+        $acct = user_role_state($conn, $uid);
         if (!$acct || !(int)$acct['is_active'] || $acct['role'] !== ($_SESSION['role'] ?? null)) {
             $_SESSION = ['login_notice' => 'Your account is no longer active or its access was changed. Please sign in again.'];
         } elseif (!$_tg_passive) {   // "online" means the person, not a tab refreshing itself
-            $stmt = $conn->prepare("UPDATE users SET last_active = NOW() WHERE user_id = ?");
-            $stmt->bind_param('i', $uid);
-            $stmt->execute();
-            $stmt->close();
+            user_mark_signed_in($conn, $uid);
         }
     }
 }

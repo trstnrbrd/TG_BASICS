@@ -6,18 +6,12 @@
  *        $val = getSetting($conn, 'key', 'default');
  */
 
+require_once __DIR__ . '/../includes/data_access.php';
+
 function getAllSettings(mysqli $conn): array {
     static $cache = null;
     if ($cache !== null) return $cache;
-
-    $cache = [];
-    $result = $conn->query("SELECT setting_key, setting_value FROM system_settings");
-    if ($result) {
-        while ($row = $result->fetch_assoc()) {
-            $cache[$row['setting_key']] = $row['setting_value'];
-        }
-    }
-    return $cache;
+    return $cache = settings_all($conn);
 }
 
 function getSetting(mysqli $conn, string $key, ?string $default = null): string {
@@ -27,10 +21,5 @@ function getSetting(mysqli $conn, string $key, ?string $default = null): string 
 }
 
 function setSetting(mysqli $conn, string $key, string $value): bool {
-    $stmt = $conn->prepare(
-        "INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?)
-         ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)"
-    );
-    $stmt->bind_param('ss', $key, $value);
-    return $stmt->execute();
+    return setting_save($conn, $key, $value);
 }

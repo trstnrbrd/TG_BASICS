@@ -10,15 +10,9 @@ const TG_PER_PAGE = 20;
  */
 function paginate_query(mysqli $conn, string $sql, string $types = '', array $params = [], int $per = TG_PER_PAGE): array
 {
-    $cnt = $conn->prepare("SELECT COUNT(*) FROM ($sql) AS pg_rows");
-    if ($params) $cnt->bind_param($types, ...$params);
-    $cnt->execute();
-    $pg = paginate((int)$cnt->get_result()->fetch_row()[0], $per);
-
-    $stmt = $conn->prepare($sql . ' LIMIT ' . (int)$pg['per'] . ' OFFSET ' . (int)$pg['offset']);
-    if ($params) $stmt->bind_param($types, ...$params);
-    $stmt->execute();
-    return [$stmt->get_result(), $pg];
+    require_once __DIR__ . '/data_access.php';
+    $pg = paginate(dal_count_rows($conn, $sql, $types, $params), $per);
+    return [dal_page($conn, $sql, $types, $params, $pg['per'], $pg['offset']), $pg];
 }
 
 /** Page numbers for $total rows. A page number past the end (e.g. after deleting) shows the last page. */

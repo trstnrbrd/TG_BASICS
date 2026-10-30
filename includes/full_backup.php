@@ -21,8 +21,7 @@ function full_backup_dir(): string
 /** Makes the full backup. Returns its details, or ['skipped' => true] if another backup is already running. */
 function full_backup_create(mysqli $conn): array
 {
-    $lock = $conn->query("SELECT GET_LOCK('tgb_full_backup', 0)")->fetch_row()[0] ?? 0;
-    if ((int)$lock !== 1) return ['skipped' => true];
+    if (!db_lock_get($conn, 'tgb_full_backup', 0)) return ['skipped' => true];
 
     $dir   = full_backup_dir();
     $stamp = date('Y-m-d-His');
@@ -63,7 +62,7 @@ function full_backup_create(mysqli $conn): array
     } finally {
         if (isset($fh) && is_resource($fh)) fclose($fh);
         if (is_file($sql)) unlink($sql);
-        $conn->query("SELECT RELEASE_LOCK('tgb_full_backup')")->free();
+        db_lock_release($conn, 'tgb_full_backup');
     }
 
     // Delete old backups, keep the newest ones
@@ -86,8 +85,7 @@ function full_backup_weekly_run(mysqli $conn): array
 
     // Tell the owner (not the hidden developer account)
     $info['emails_sent'] = 0;
-    $res = $conn->query("SELECT email, full_name FROM users WHERE role = 'super_admin' AND is_active = 1 AND is_hidden = 0 AND email <> ''");
-    foreach ($res->fetch_all(MYSQLI_ASSOC) as $owner) {
+    foreach (owners_with_email($conn) as $owner) {
         if (sendWeeklyBackupEmail($owner['email'], $owner['full_name'], $info, app_url('modules/admin/settings.php#db-backup'))) $info['emails_sent']++;
     }
     return $info;

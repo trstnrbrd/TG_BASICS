@@ -10,6 +10,55 @@ require_once __DIR__ . '/../../config/access.php';
 require_once __DIR__ . '/../pagination.php';
 require_once __DIR__ . '/../agent_filter.php';
 
+/* ---- Daily / weekly reminder emails (config/*_reminders.php) ---- */
+
+/** Policies of active clients whose installments already due are not fully paid, oldest due first. */
+function policies_overdue_unpaid(mysqli $conn): array
+{
+    return dal_all($conn, "
+        SELECT p.policy_id, p.policy_number, p.insurance_company, p.payment_status,
+               c.full_name AS client_name, c.agent_id, v.plate_number,
+               SUM(pp.amount_due) - SUM(pp.amount_paid) AS overdue_amount,
+               MIN(CASE WHEN pp.amount_paid < pp.amount_due THEN pp.due_date END) AS oldest_due
+        FROM insurance_policies p
+        INNER JOIN clients  c ON c.client_id  = p.client_id
+        INNER JOIN vehicles v ON v.vehicle_id = p.vehicle_id
+        INNER JOIN policy_payments pp ON pp.policy_id = p.policy_id AND pp.due_date < CURDATE()
+        WHERE c.deleted_at IS NULL AND p.payment_status <> 'Paid'
+        GROUP BY p.policy_id
+        HAVING ROUND(SUM(pp.amount_paid), 2) < ROUND(SUM(pp.amount_due), 2)
+        ORDER BY oldest_due ASC, c.full_name ASC");
+}
+
+/** Current policies of active clients expiring within $days that have not been reminded today, soonest first. */
+function policies_urgent_unreminded(mysqli $conn, int $days): array
+{
+    return dal_all($conn, "
+        SELECT p.policy_id, p.policy_number, p.insurance_company, p.policy_end,
+               DATEDIFF(p.policy_end, CURDATE()) AS days_left, c.full_name AS client_name, c.agent_id, v.plate_number
+        FROM insurance_policies p
+        INNER JOIN clients  c ON c.client_id  = p.client_id
+        INNER JOIN vehicles v ON v.vehicle_id = p.vehicle_id
+        WHERE p.is_renewed = 0 AND c.deleted_at IS NULL
+          AND p.policy_end >= CURDATE() AND DATEDIFF(p.policy_end, CURDATE()) <= ?
+          AND (p.last_urgent_reminder_sent IS NULL OR p.last_urgent_reminder_sent < CURDATE())
+        ORDER BY p.policy_end ASC, c.full_name ASC", 'i', [$days]);
+}
+
+/** Every current policy of an active client expiring within $days (reminded or not), soonest first (tools/ preview). */
+function policies_expiring_within(mysqli $conn, int $days): array
+{
+    return dal_all($conn, "
+        SELECT p.policy_number, p.insurance_company, p.policy_end, DATEDIFF(p.policy_end, CURDATE()) AS days_left,
+               c.full_name AS client_name, v.plate_number
+        FROM insurance_policies p
+        INNER JOIN clients  c ON c.client_id  = p.client_id
+        INNER JOIN vehicles v ON v.vehicle_id = p.vehicle_id
+        WHERE p.is_renewed = 0 AND c.deleted_at IS NULL
+          AND p.policy_end >= CURDATE() AND DATEDIFF(p.policy_end, CURDATE()) <= ?
+        ORDER BY p.policy_end ASC", 'i', [$days]);
+}
+
 /* ---- Reading a policy ---- */
 
 /** A policy with days left, its client (and agent's name, developer's masked) and vehicle, for View Policy; or null. */

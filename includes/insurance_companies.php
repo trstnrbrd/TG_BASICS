@@ -11,13 +11,7 @@ require_once __DIR__ . '/data_access.php';
 function insurance_companies_all(mysqli $conn): array {
     static $cache = null;
     if ($cache !== null) return $cache;
-    try {
-        $res = $conn->query("SELECT company_id, name, short_name, billing_name, is_active, sort_order
-                             FROM insurance_companies ORDER BY sort_order, name");
-        $cache = $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
-    } catch (mysqli_sql_exception $e) {
-        $cache = [];   // table not set up yet: no companies until the SQL is run
-    }
+    $cache = insurance_companies_rows($conn);   // table not set up yet: [] (no companies until the SQL is run)
     foreach ($cache as &$co) {
         $co['company_id'] = (int)$co['company_id'];
         $co['is_active']  = (int)$co['is_active'];
@@ -38,12 +32,7 @@ function insurance_companies_active(mysqli $conn): array {
 function insurance_companies_tracked(mysqli $conn): array {
     static $cache = null;
     if ($cache !== null) return $cache;
-    $with_policies = [];
-    try {
-        $res = $conn->query("SELECT DISTINCT insurance_company FROM insurance_policies");
-        if ($res) foreach ($res->fetch_all() as $r) $with_policies[$r[0]] = true;
-    } catch (mysqli_sql_exception $e) {
-    }
+    $with_policies = array_fill_keys(insurance_company_names_in_use($conn), true);
     return $cache = array_values(array_filter(insurance_companies_all($conn),
         fn($co) => $co['is_active'] === 1 || isset($with_policies[$co['name']])));
 }
@@ -85,11 +74,7 @@ const MAX_COMPANY_BILLING = 150;
 
 /** True once the insurance_companies table exists on this server. */
 function insurance_companies_table_ready(mysqli $conn): bool {
-    try {
-        return (bool)$conn->query("SHOW TABLES LIKE 'insurance_companies'")->num_rows;
-    } catch (mysqli_sql_exception $e) {
-        return false;
-    }
+    return insurance_companies_table_exists($conn);
 }
 
 /**
@@ -116,30 +101,17 @@ function insurance_company_save(mysqli $conn, int $user_id, int $id, array $in):
         return db_transaction($conn, function () use ($conn, $user_id, $id, $name, $short, $billing, $order) {
             $old = null;
             if ($id > 0) {
-                $st = $conn->prepare("SELECT name FROM insurance_companies WHERE company_id = ? FOR UPDATE");
-                $st->bind_param('i', $id);
-                $st->execute();
-                $old = $st->get_result()->fetch_assoc();
+                $old = insurance_company_lock($conn, $id);
                 if (!$old) return 'That company no longer exists. Refresh the page.';
             }
-            $dup = $conn->prepare("SELECT 1 FROM insurance_companies WHERE name = ? AND company_id <> ?");
-            $dup->bind_param('si', $name, $id);
-            $dup->execute();
-            if ($dup->get_result()->num_rows) return 'There is already a company named "' . $name . '".';
+            if (insurance_company_name_taken($conn, $name, $id)) return 'There is already a company named "' . $name . '".';
 
             if ($id === 0) {
-                $sort = $order !== '' ? (int)$order
-                      : (int)$conn->query("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM insurance_companies")->fetch_row()[0];
-                $ins = $conn->prepare("INSERT INTO insurance_companies (name, short_name, billing_name, sort_order) VALUES (?, ?, ?, ?)");
-                $ins->bind_param('sssi', $name, $short, $billing, $sort);
-                $ins->execute();
+                insurance_company_insert($conn, $name, $short, $billing, $order !== '' ? (int)$order : insurance_company_next_sort($conn));
                 $log = "Added insurance company: $name";
                 $action = 'INSURANCE_COMPANY_ADDED';
             } else {
-                $sort = $order !== '' ? (int)$order : null;
-                $up = $conn->prepare("UPDATE insurance_companies SET name = ?, short_name = ?, billing_name = ?, sort_order = COALESCE(?, sort_order) WHERE company_id = ?");
-                $up->bind_param('sssii', $name, $short, $billing, $sort, $id);
-                $up->execute();
+                insurance_company_update($conn, $id, $name, $short, $billing, $order !== '' ? (int)$order : null);
                 $log = "Updated insurance company: $name";
                 if ($old['name'] !== $name) {
                     $moved = policies_rename_company($conn, $old['name'], $name);
@@ -161,20 +133,11 @@ function insurance_company_set_active(mysqli $conn, int $user_id, int $id, bool 
     if (!insurance_companies_table_ready($conn)) return 'The insurance companies table is not set up on this server yet.';
     try {
         return db_transaction($conn, function () use ($conn, $user_id, $id, $active) {
-            $st = $conn->prepare("SELECT name, is_active FROM insurance_companies WHERE company_id = ? FOR UPDATE");
-            $st->bind_param('i', $id);
-            $st->execute();
-            $co = $st->get_result()->fetch_assoc();
+            $co = insurance_company_lock($conn, $id);
             if (!$co) return 'That company no longer exists. Refresh the page.';
             if ((int)$co['is_active'] === (int)$active) return '';
-            if (!$active) {
-                $others = (int)$conn->query("SELECT COUNT(*) FROM insurance_companies WHERE is_active = 1 AND company_id <> " . (int)$id . " FOR UPDATE")->fetch_row()[0];
-                if ($others === 0) return 'At least one insurance company must stay active.';
-            }
-            $flag = $active ? 1 : 0;
-            $up = $conn->prepare("UPDATE insurance_companies SET is_active = ? WHERE company_id = ?");
-            $up->bind_param('ii', $flag, $id);
-            $up->execute();
+            if (!$active && insurance_companies_other_active($conn, $id) === 0) return 'At least one insurance company must stay active.';
+            insurance_company_set_flag($conn, $id, $active);
             $action = $active ? 'INSURANCE_COMPANY_ACTIVATED' : 'INSURANCE_COMPANY_DEACTIVATED';
             $log = ($active ? 'Activated' : 'Deactivated') . ' insurance company: ' . $co['name'];
             audit_log_add($conn, $user_id, $action, $log);

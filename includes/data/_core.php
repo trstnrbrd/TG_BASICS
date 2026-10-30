@@ -11,12 +11,17 @@
  *   dal_in($ids)    -> "?,?,?" for an IN (...) list; bind the values with str_repeat('i', count($ids))
  */
 
-/** Runs one prepared statement and returns it (executed, not yet closed). */
+/**
+ * Runs one prepared statement and returns it (executed, not yet closed). A failure always throws
+ * mysqli_sql_exception, whatever mysqli_report() is set to on the server, so callers (and
+ * db_transaction()'s rollback) see the same thing everywhere.
+ */
 function dal_run(mysqli $conn, string $sql, string $types = '', array $params = []): mysqli_stmt
 {
     $stmt = $conn->prepare($sql);
+    if ($stmt === false) throw new mysqli_sql_exception($conn->error, $conn->errno);
     if ($types !== '') $stmt->bind_param($types, ...$params);
-    $stmt->execute();
+    if (!$stmt->execute()) throw new mysqli_sql_exception($stmt->error, $stmt->errno);
     return $stmt;
 }
 
@@ -27,6 +32,19 @@ function dal_all(mysqli $conn, string $sql, string $types = '', array $params = 
     $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
     return $rows;
+}
+
+/**
+ * dal_all(), but [] when the query fails (e.g. a list table whose SQL has
+ * not been run on this server yet). Only for lists that may be empty.
+ */
+function dal_all_or_empty(mysqli $conn, string $sql, string $types = '', array $params = []): array
+{
+    try {
+        return dal_all($conn, $sql, $types, $params);
+    } catch (mysqli_sql_exception $e) {
+        return [];
+    }
 }
 
 /** The first row the query returns, or null. */
@@ -54,6 +72,19 @@ function dal_exec(mysqli $conn, string $sql, string $types = '', array $params =
     $n    = $stmt->affected_rows;
     $stmt->close();
     return $n;
+}
+
+/** How many rows a whole list query returns (its pager's total). */
+function dal_count_rows(mysqli $conn, string $sql, string $types = '', array $params = []): int
+{
+    return (int)dal_value($conn, "SELECT COUNT(*) FROM ($sql) AS pg_rows", $types, $params);
+}
+
+/** One page of a list query: $sql (ORDER BY included, no LIMIT) with LIMIT and OFFSET bound as values too. */
+function dal_page(mysqli $conn, string $sql, string $types, array $params, int $limit, int $offset): mysqli_result
+{
+    $stmt = dal_run($conn, $sql . ' LIMIT ? OFFSET ?', $types . 'ii', array_merge($params, [$limit, $offset]));
+    return $stmt->get_result();
 }
 
 /** "?,?,?" for an IN (...) list of $values. The list must not be empty (check before the query). */

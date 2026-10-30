@@ -5,22 +5,23 @@
  * The file it makes can be imported straight into phpMyAdmin.
  */
 
+require_once __DIR__ . '/data_access.php';   // the reads: includes/data/backup.php
+
 const DB_BACKUP_WARN_DAYS = 7;   // remind the Owner if the last backup is older than this
 
 /** Writes the whole database as one SQL file. Returns ['tables' => n, 'rows' => n]. */
 function db_backup_write(mysqli $conn, callable $out): array
 {
-    $db       = (string)$conn->query('SELECT DATABASE()')->fetch_row()[0];
-    $old_tz   = (string)$conn->query('SELECT @@session.time_zone')->fetch_row()[0];
+    $db       = backup_database_name($conn);
+    $old_tz   = backup_session_time_zone($conn);
     $old_cs   = $conn->character_set_name();
     $binary   = ['binary', 'varbinary', 'tinyblob', 'blob', 'mediumblob', 'longblob', 'bit'];
     $n_tables = 0;
     $n_rows   = 0;
 
     $conn->set_charset('utf8mb4');            // so special characters (Ñ, emoji) come out correct
-    $conn->query("SET time_zone = '+00:00'"); // write timestamps in UTC
-    $conn->query('SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ');
-    $conn->query('START TRANSACTION WITH CONSISTENT SNAPSHOT');
+    backup_set_time_zone($conn, '+00:00');    // write timestamps in UTC
+    backup_begin_snapshot($conn);             // every table read from the same moment
     try {
         $out("-- TG-BASICS database backup\n"
            . "-- Database: {$db}\n"
@@ -34,29 +35,24 @@ function db_backup_write(mysqli $conn, callable $out): array
            . "SET FOREIGN_KEY_CHECKS = 0;\n"
            . "SET SQL_MODE = 'NO_AUTO_VALUE_ON_ZERO';\n\n");
 
-        $tables = [];
-        $res = $conn->query("SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'");
-        while ($row = $res->fetch_row()) $tables[] = $row[0];
-
-        foreach ($tables as $table) {
-            $q = '`' . str_replace('`', '``', $table) . '`';
-            $create = $conn->query("SHOW CREATE TABLE $q")->fetch_row()[1];
+        foreach (backup_tables($conn) as $table) {
+            $q = backtick_name($table);
+            $create = backup_create_table($conn, $table);
             $out("--\n-- Table {$q}\n--\n\nDROP TABLE IF EXISTS {$q};\n{$create};\n\n");
 
             // skip computed columns (e.g. users.full_name) — the database rebuilds them itself
             $cols = [];
-            $desc = $conn->query("SHOW COLUMNS FROM $q");
-            foreach ($desc->fetch_all(MYSQLI_ASSOC) as $c) {
+            foreach (backup_columns($conn, $table) as $c) {
                 if (preg_match('/\b(VIRTUAL|STORED|PERSISTENT) GENERATED\b/i', $c['Extra'])) continue;
                 preg_match('/^[a-z]+/i', $c['Type'], $t);
                 $cols[] = ['name' => $c['Field'], 'bin' => in_array(strtolower($t[0] ?? ''), $binary, true)];
             }
             if (!$cols) throw new RuntimeException("Could not read the columns of table {$table}.");
-            $names = implode(', ', array_map(fn($c) => '`' . str_replace('`', '``', $c['name']) . '`', $cols));
-            $select = implode(', ', array_map(fn($c) => $c['bin'] ? 'HEX(`' . str_replace('`', '``', $c['name']) . '`)' : '`' . str_replace('`', '``', $c['name']) . '`', $cols));
+            $names = implode(', ', array_map(fn($c) => backtick_name($c['name']), $cols));
+            $select = implode(', ', array_map(fn($c) => $c['bin'] ? 'HEX(' . backtick_name($c['name']) . ')' : backtick_name($c['name']), $cols));
 
-            // 100 rows per INSERT
-            $data  = $conn->query("SELECT $select FROM $q", MYSQLI_USE_RESULT);
+            // 100 rows per INSERT; read one row at a time (backup_rows_stream()), so a big table never fills the memory
+            $data  = backup_rows_stream($conn, $select, $table);
             $batch = [];
             $count = 0;
             while ($row = $data->fetch_row()) {
@@ -86,9 +82,7 @@ function db_backup_write(mysqli $conn, callable $out): array
         $conn->rollback();
         throw $e;
     } finally {
-        $st = $conn->prepare('SET time_zone = ?');
-        $st->bind_param('s', $old_tz);
-        $st->execute();
+        backup_set_time_zone($conn, $old_tz);
         $conn->set_charset($old_cs);
     }
     return ['tables' => $n_tables, 'rows' => $n_rows];
@@ -101,11 +95,7 @@ function db_backup_status(mysqli $conn): array
     $uid = (int)getSetting($conn, 'backup_last_by', '0');
     $by  = null;
     if ($uid > 0) {
-        // hide the developer account's real name
-        $st = $conn->prepare("SELECT CASE WHEN is_hidden = 1 THEN 'Developer' ELSE full_name END FROM users WHERE user_id = ?");
-        $st->bind_param('i', $uid);
-        $st->execute();
-        $by = $st->get_result()->fetch_row()[0] ?? null;
+        $by = user_display_name($conn, $uid);   // the developer account shows as "Developer"
     }
     $days = $at !== '' ? (int)floor((time() - strtotime($at)) / 86400) : null;
     return ['at' => $at !== '' ? $at : null, 'by' => $by, 'days' => $days, 'overdue' => $days === null || $days >= DB_BACKUP_WARN_DAYS];

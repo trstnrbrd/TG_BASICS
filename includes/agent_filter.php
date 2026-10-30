@@ -21,9 +21,8 @@ function agent_filter_state(mysqli $conn, bool $enabled = true): array
         // The signed-in agent's own entry reads "My Clients" and sits at the top, right under "All Agents"
         if (isset($opts[$me])) $opts = [$me => 'My Clients'] + $opts;
         // Agents who still hold clients but can no longer be picked (deactivated / role changed) stay filterable
-        $held = $conn->query("SELECT DISTINCT u.user_id, CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.full_name END AS name
-                              FROM clients c INNER JOIN users u ON u.user_id = c.agent_id WHERE c.deleted_at IS NULL ORDER BY name");
-        foreach ($held->fetch_all(MYSQLI_ASSOC) as $u) {
+        require_once __DIR__ . '/data_access.php';
+        foreach (agents_holding_clients($conn) as $u) {
             $uid = (int)$u['user_id'];
             if (!isset($opts[$uid])) { $names[$uid] = $u['name']; $opts[$uid] = $u['name'] . ' (former agent)'; }
         }

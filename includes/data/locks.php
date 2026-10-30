@@ -22,6 +22,31 @@ function db_locks_get(mysqli $conn, array $names, int $wait_seconds = 5): array
     return $out;
 }
 
+/** Takes one lock (waiting up to $wait_seconds; 0 = do not wait). True if taken. */
+function db_lock_get(mysqli $conn, string $name, int $wait_seconds = 5): bool
+{
+    return (int)dal_value($conn, 'SELECT GET_LOCK(?, ?)', 'si', [$name, $wait_seconds]) === 1;
+}
+
+/** Releases one lock (if this connection holds it). */
+function db_lock_release(mysqli $conn, string $name): void
+{
+    dal_value($conn, 'SELECT RELEASE_LOCK(?)', 's', [$name]);
+}
+
+/* ---- Record numbers (RJ-202610-0001 ...) ---- */
+
+/** The tables with a sequential record number, and its column. Names cannot be bound, so only these. */
+const RECORD_NUMBER_COLUMNS = ['repair_jobs' => 'job_number', 'quotations' => 'quotation_number', 'billing' => 'billing_number', 'receipts' => 'receipt_number'];
+
+/** The highest record number starting with $prefix in $table, or null when none yet. */
+function record_number_last(mysqli $conn, string $table, string $prefix): ?string
+{
+    $column = RECORD_NUMBER_COLUMNS[$table] ?? throw new InvalidArgumentException("No record number in table: $table");
+    $n = dal_value($conn, "SELECT `$column` FROM `$table` WHERE `$column` LIKE ? ORDER BY `$column` DESC LIMIT 1", 's', [$prefix . '%']);
+    return $n === null ? null : (string)$n;
+}
+
 /** Releases the given locks (ones not held are ignored). */
 function db_locks_release(mysqli $conn, array $names): void
 {

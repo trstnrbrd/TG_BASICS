@@ -3,6 +3,51 @@
  * Clients and vehicles
  * ========================================================================= */
 
+/* ---- Access rules (config/access.php decides; these only count) ---- */
+
+/** Whether an active client exists; with $walkins_only, only if it has never had a policy. */
+function client_exists_active(mysqli $conn, int $client_id, bool $walkins_only = false): bool
+{
+    return dal_value($conn, "SELECT 1 FROM clients c WHERE c.client_id = ? AND c.deleted_at IS NULL"
+                          . ($walkins_only ? ' AND ' . clients_walkin_sql('c') : '') . " LIMIT 1", 'i', [$client_id]) !== null;
+}
+
+/** Whether an active client was added by $user_id or has them as insurance agent. */
+function client_belongs_to(mysqli $conn, int $client_id, int $user_id): bool
+{
+    return dal_value($conn, "SELECT 1 FROM clients WHERE client_id = ? AND deleted_at IS NULL AND (created_by = ? OR agent_id = ?) LIMIT 1",
+                     'iii', [$client_id, $user_id, $user_id]) !== null;
+}
+
+/** How many policies, repair jobs and claims a client has: [policies, repairs, claims]. */
+function client_record_counts(mysqli $conn, int $client_id): array
+{
+    return dal_one($conn, "SELECT (SELECT COUNT(*) FROM insurance_policies WHERE client_id = ?) AS policies,
+                                  (SELECT COUNT(*) FROM repair_jobs        WHERE client_id = ?) AS repairs,
+                                  (SELECT COUNT(*) FROM claims             WHERE client_id = ?) AS claims",
+                   'iii', [$client_id, $client_id, $client_id]);
+}
+
+/** How many repair jobs and claims a vehicle has: [repairs, claims]. */
+function vehicle_record_counts(mysqli $conn, int $vehicle_id): array
+{
+    return dal_one($conn, "SELECT (SELECT COUNT(*) FROM repair_jobs WHERE vehicle_id = ?) AS repairs,
+                                  (SELECT COUNT(*) FROM claims cl INNER JOIN insurance_policies ip ON cl.policy_id = ip.policy_id
+                                     WHERE ip.vehicle_id = ?) AS claims", 'ii', [$vehicle_id, $vehicle_id]);
+}
+
+/** Active clients with exactly this (upper-case) name, with their plates, oldest first, at most $limit. */
+function clients_named(mysqli $conn, string $name, int $limit): array
+{
+    return dal_all($conn, "
+        SELECT c.client_id, c.full_name, GROUP_CONCAT(v.plate_number ORDER BY v.vehicle_id SEPARATOR ', ') AS plates
+        FROM clients c LEFT JOIN vehicles v ON v.client_id = c.client_id
+        WHERE c.deleted_at IS NULL AND c.full_name = ?
+        GROUP BY c.client_id
+        ORDER BY c.client_id
+        LIMIT ?", 'si', [$name, $limit]);
+}
+
 /* ---- Client Records list ---- */
 require_once __DIR__ . '/../pagination.php';
 require_once __DIR__ . '/../agent_filter.php';

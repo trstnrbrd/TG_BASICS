@@ -62,6 +62,51 @@ function user_password_hash(mysqli $conn, int $user_id): string
     return (string)(dal_value($conn, "SELECT password FROM users WHERE user_id = ? AND is_active = 1", 'i', [$user_id]) ?? '');
 }
 
+/** A user's name as shown to others ("Developer" for the developer account), or null. */
+function user_display_name(mysqli $conn, int $user_id): ?string
+{
+    $n = dal_value($conn, "SELECT CASE WHEN is_hidden = 1 THEN 'Developer' ELSE full_name END FROM users WHERE user_id = ?", 'i', [$user_id]);
+    return $n === null ? null : (string)$n;
+}
+
+/** A user's email and name (for sending them an email), or null. */
+function user_email_name(mysqli $conn, int $user_id): ?array
+{
+    return dal_one($conn, "SELECT email, full_name FROM users WHERE user_id = ?", 'i', [$user_id]);
+}
+
+/** The active Owner account(s) with an email address (never the developer account). */
+function owners_with_email(mysqli $conn): array
+{
+    return dal_all($conn, "SELECT email, full_name FROM users WHERE role = 'super_admin' AND is_active = 1 AND is_hidden = 0 AND email <> ''");
+}
+
+/** The users who can be a client's insurance agent: active admins and the Owner (not the developer), Owner first. */
+function insurance_agents_rows(mysqli $conn): array
+{
+    return dal_all($conn, "SELECT user_id, full_name, role, profile_photo FROM users
+                           WHERE role IN ('admin', 'super_admin') AND is_active = 1 AND is_hidden = 0
+                           ORDER BY FIELD(role, 'super_admin', 'admin'), full_name");
+}
+
+/** Every column that records a user as the one who did something. Fixed here: column names cannot be bound. */
+const USER_HISTORY_COLUMNS = [
+    ['audit_logs', 'user_id'],
+    ['clients', 'created_by'], ['clients', 'consent_recorded_by'], ['clients', 'agent_id'],
+    ['insurance_policies', 'created_by'], ['claims', 'created_by'],
+    ['repair_jobs', 'created_by'], ['repair_job_images', 'uploaded_by'],
+    ['quotations', 'created_by'], ['receipts', 'issued_by'],
+    ['billing', 'created_by'], ['client_documents', 'uploaded_by'],
+];
+
+/** The ids of every user named in USER_HISTORY_COLUMNS (they have history, so they are deactivated, not deleted). */
+function user_ids_with_history(mysqli $conn): array
+{
+    $parts = [];
+    foreach (USER_HISTORY_COLUMNS as [$table, $col]) $parts[] = "SELECT DISTINCT `$col` AS uid FROM `$table` WHERE `$col` IS NOT NULL";
+    return array_map('intval', array_column(dal_all($conn, implode(' UNION ', $parts)), 'uid'));
+}
+
 /** user_id => username for the given accounts. */
 function users_usernames(mysqli $conn, array $user_ids): array
 {

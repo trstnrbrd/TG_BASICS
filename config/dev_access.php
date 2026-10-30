@@ -7,6 +7,8 @@
  *   - must have an authenticator app on
  */
 
+require_once __DIR__ . '/../includes/data_access.php';
+
 /** True if the current user is the developer account. */
 function is_developer(): bool
 {
@@ -16,8 +18,5 @@ function is_developer(): bool
 /** Does this account have the authenticator app turned on? */
 function dev_has_authenticator(mysqli $conn, int $user_id): bool
 {
-    $st = $conn->prepare('SELECT totp_enabled FROM users WHERE user_id = ?');
-    $st->bind_param('i', $user_id);
-    $st->execute();
-    return (int)($st->get_result()->fetch_row()[0] ?? 0) === 1;
+    return account_totp_enabled($conn, $user_id);
 }

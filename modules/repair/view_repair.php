@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
+require_once __DIR__ . '/../../includes/service_types.php';
 require_once '../../config/validators.php';
 require_once '../../config/mailer.php';
 require_once '../../includes/transaction.php';
@@ -251,12 +252,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $pub_token = $tok_data['public_token'] ?? '';
                 $pub_url   = app_url('modules/public/client.php?token=' . urlencode($pub_token));
 
-                $svc_labels = [
-                    'repair_panel' => 'Per Panel Repair', 'repair_full' => 'Full Body Repair',
-                    'paint_panel'  => 'Per Panel Paint',  'paint_full'  => 'Full Body Paint',
-                    'washover_basic' => 'Basic Wash Over','washover_full'  => 'Fully Wash Over',
-                    'custom'       => 'Custom / Mixed',
-                ];
+                $svc_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
                 $svc = $svc_labels[$job['service_type']] ?? $job['service_type'];
                 sendRepairCompletedEmail(
                     $job['email'],
@@ -302,32 +298,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 }
 
 // ── LABEL MAPS ──
-$service_labels = [
-    'repair_panel'   => 'Per Panel Repair',
-    'repair_full'    => 'Full Body Repair',
-    'paint_panel'    => 'Per Panel Paint',
-    'paint_full'     => 'Full Body Paint',
-    'washover_basic' => 'Basic Wash Over',
-    'washover_full'  => 'Fully Wash Over',
-    'custom'         => 'Custom / Mixed',
-];
+$service_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
 
 
-$area_labels = [
-    'front_bumper' => 'Front Bumper', 'rear_bumper'  => 'Rear Bumper',
-    'hood'         => 'Hood',         'trunk'        => 'Trunk',
-    'windshield'   => 'Windshield',   'door_fl'      => 'Front-Left Door',
-    'door_rl'      => 'Rear-Left Door','door_fr'     => 'Front-Right Door',
-    'door_rr'      => 'Rear-Right Door','mirror_left' => 'Left Mirror',
-    'mirror_right' => 'Right Mirror', 'headlights'   => 'Headlights',
-    'taillights'   => 'Taillights',   'tires_wheels' => 'Tires & Wheels',
-];
+$area_labels = REPAIR_CHECKLIST_AREAS;   // config/access.php
 
-$cond_map = [
-    'none'  => ['No Damage',    '#6B7280', 'rgba(107,114,128,0.1)'],
-    'minor' => ['Minor Damage', '#B8860B', 'rgba(184,134,11,0.12)'],
-    'major' => ['Major Damage', '#C0392B', 'rgba(192,57,43,0.12)'],
-];
+$cond_map = array_map(fn($d) => [$d['label'], $d['color'], $d['bg']], REPAIR_DAMAGE_LEVELS);
 
 $sb      = repair_status_badge($job['status']);   // statuses live in config/access.php
 $svc_lbl = $service_labels[$job['service_type']] ?? $job['service_type'];

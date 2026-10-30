@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
+require_once __DIR__ . '/../../includes/service_types.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../config/mailer.php';
@@ -37,22 +38,9 @@ $items_stmt->bind_param('i', $qt_id);
 $items_stmt->execute();
 $items = $items_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
-$area_labels = [
-    'front_bumper' => 'Front Bumper', 'rear_bumper'  => 'Rear Bumper',
-    'hood'         => 'Hood',         'trunk'        => 'Trunk',
-    'windshield'   => 'Windshield',   'door_fl'      => 'Left Front Door',
-    'door_rl'      => 'Left Rear Door','door_fr'     => 'Right Front Door',
-    'door_rr'      => 'Right Rear Door','mirror_left' => 'Left Mirror',
-    'mirror_right' => 'Right Mirror', 'headlights'   => 'Headlights',
-    'taillights'   => 'Taillights',   'tires_wheels' => 'Tires & Wheels',
-];
+$area_labels = REPAIR_CHECKLIST_AREAS;   // config/access.php
 
-$service_labels = [
-    'repair_panel'   => 'Per Panel Repair',  'repair_full'    => 'Full Body Repair',
-    'paint_panel'    => 'Per Panel Paint',   'paint_full'     => 'Full Body Paint',
-    'washover_basic' => 'Basic Wash Over',   'washover_full'  => 'Fully Wash Over',
-    'custom'         => 'Custom / Mixed',
-];
+$service_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
 
 $status_cfg = [
     'draft'            => ['Draft',            'badge-gray',    '#6B7280'],
@@ -155,11 +143,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_admin) {
 
             // Send receipt email to client if they have an email address
             if (!empty($qt['email'])) {
-                $service_labels_map = [
-                    'repair_panel'=>'Per Panel Repair','repair_full'=>'Full Body Repair',
-                    'paint_panel'=>'Per Panel Paint','paint_full'=>'Full Body Paint',
-                    'washover_basic'=>'Basic Wash Over','washover_full'=>'Fully Wash Over','custom'=>'Custom / Mixed',
-                ];
+                $service_labels_map = service_type_labels($conn);   // service_types table (includes/service_types.php)
                 sendReceiptEmail(
                     $qt['email'],
                     $qt['full_name'],

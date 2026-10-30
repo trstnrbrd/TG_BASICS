@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../includes/branding.php';
 require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../includes/service_types.php';
 require_once __DIR__ . '/../../config/settings.php';
 require_once __DIR__ . '/../../includes/icons.php';
 
@@ -167,15 +168,7 @@ if (isset($_GET['state'])) {
 require_once __DIR__ . '/../../includes/realtime.php';
 $live_cfg = realtime_client_config();   // public values only (key, cluster); empty = polling only
 
-$svc_labels = [
-    'repair_panel'   => 'Per Panel Repair',
-    'repair_full'    => 'Full Body Repair',
-    'paint_panel'    => 'Per Panel Paint',
-    'paint_full'     => 'Full Body Paint',
-    'washover_basic' => 'Basic Wash Over',
-    'washover_full'  => 'Fully Wash Over',
-    'custom'         => 'Custom / Mixed',
-];
+$svc_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
 
 $company_name    = getSetting($conn, 'company_name',    'TG Customworks & Basic Car Insurance');
 $company_address = getSetting($conn, 'company_address', '49 Villa Tierra St., San Roque, Pandi, Bulacan');

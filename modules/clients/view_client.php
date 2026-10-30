@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../includes/branding.php';
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
+require_once __DIR__ . '/../../includes/service_types.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../config/transaction_pin.php';
@@ -797,15 +798,7 @@ require_once '../../includes/topbar.php';
 
     <!-- REPAIR JOBS -->
     <?php
-    $repair_service_labels = [
-        'repair_panel'   => 'Per Panel Repair',
-        'repair_full'    => 'Full Body Repair',
-        'paint_panel'    => 'Per Panel Paint',
-        'paint_full'     => 'Full Body Paint',
-        'washover_basic' => 'Basic Wash Over',
-        'washover_full'  => 'Fully Wash Over',
-        'custom'         => 'Custom / Mixed',
-    ];
+    $repair_service_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
     ?>
     <div class="card">
       <div class="card-header" style="justify-content:space-between;">

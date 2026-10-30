@@ -93,6 +93,32 @@ function repair_open_statuses(): array
     return array_values(array_diff(array_keys(REPAIR_STATUSES), REPAIR_CLOSED_STATUSES));
 }
 
+// Unit Inspection: the areas on the physical inspection form (repair_checklist.area_key). Each one is also a shape
+// drawn on the New Repair Job diagram (data-panel="<key>"), so an area is added in code with its shape, not as data.
+const REPAIR_CHECKLIST_AREAS = [
+    'front_bumper' => 'Front Bumper',
+    'rear_bumper'  => 'Rear Bumper',
+    'hood'         => 'Hood',
+    'trunk'        => 'Trunk',
+    'windshield'   => 'Windshield',
+    'door_fl'      => 'Left Front Door',
+    'door_rl'      => 'Left Rear Door',
+    'door_fr'      => 'Right Front Door',
+    'door_rr'      => 'Right Rear Door',
+    'mirror_left'  => 'Left Mirror',
+    'mirror_right' => 'Right Mirror',
+    'headlights'   => 'Headlights',
+    'taillights'   => 'Taillights',
+    'tires_wheels' => 'Tires / Wheels',
+];
+
+// The condition an area can be marked with (repair_checklist.condition_value): label, text colour, background
+const REPAIR_DAMAGE_LEVELS = [
+    'none'  => ['label' => 'No Damage',     'color' => '#6B7280', 'bg' => 'rgba(107,114,128,0.1)'],
+    'minor' => ['label' => 'Minor Scratch', 'color' => '#B8860B', 'bg' => 'rgba(184,134,11,0.12)'],
+    'major' => ['label' => 'Major Damage',  'color' => '#C0392B', 'bg' => 'rgba(192,57,43,0.12)'],
+];
+
 // Repair job statuses in the order a job moves through them. 'cancelled' is a dead end, reachable from any open status.
 const REPAIR_STATUS_FLOW = ['pending', 'in_progress', 'for_pickup', 'completed'];
 

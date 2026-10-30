@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../includes/branding.php';
 require_once __DIR__ . "/../../config/session.php";
 require_once '../../config/db.php';
+require_once __DIR__ . '/../../includes/service_types.php';
 require_once '../../config/validators.php';
 require_once '../../config/settings.php';
 
@@ -37,12 +38,7 @@ $items = $items_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $company_name    = getSetting($conn, 'company_name',    'TG Customworks & Basic Car Insurance');
 $company_address = getSetting($conn, 'company_address', '49 Villa Tierra St., San Roque, Pandi, Bulacan');
 
-$service_labels = [
-    'repair_panel'   => 'Per Panel Repair',  'repair_full'    => 'Full Body Repair',
-    'paint_panel'    => 'Per Panel Paint',   'paint_full'     => 'Full Body Paint',
-    'washover_basic' => 'Basic Wash Over',   'washover_full'  => 'Fully Wash Over',
-    'custom'         => 'Custom / Mixed',
-];
+$service_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
 $pay_methods = ['cash' => 'Cash', 'e_wallet' => 'E-Wallet', 'bank_transfer' => 'Bank Transfer'];
 $pay_status_labels = ['unpaid' => 'Unpaid', 'partial' => 'Partial', 'paid' => 'Paid'];
 ?>

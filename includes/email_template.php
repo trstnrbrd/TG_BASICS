@@ -323,13 +323,12 @@ function sendClaimStatusEmail(string $toEmail, string $toName, string $claimType
             'resolved'            => 'Resolved',
         ];
         $status_label = $status_labels[$newStatus] ?? ucfirst($newStatus);
-        $claim_label  = $claimType === 'repair' ? 'Repair Claim' : 'Cash Claim';
-
+        // $claimType is the type's label from the claim_types table (view_claim.php passes it), e.g. "Repair"
         $body = 'Dear <strong>' . htmlspecialchars($toName) . '</strong>,<br><br>'
-              . 'Your <strong>' . $claim_label . '</strong> has a new status update.<br><br>'
+              . 'Your claim has a new status update.<br><br>'
               . '<strong>Policy No.:</strong> ' . htmlspecialchars($policyNumber) . '<br>'
               . '<strong>Vehicle:</strong> ' . htmlspecialchars($plateNumber) . '<br>'
-              . '<strong>Claim Type:</strong> ' . $claim_label . '<br>'
+              . '<strong>Claim Type:</strong> ' . htmlspecialchars($claimType) . '<br>'
               . '<strong>New Status:</strong> ' . $status_label . '<br>';
 
         if ($newStatus === 'denied' && $denialReason) {
@@ -608,7 +607,7 @@ function sendClaimRequirementsEmail(
         <strong>Client:</strong> ' . htmlspecialchars($clientName) . '<br>
         <strong>Policy No.:</strong> ' . htmlspecialchars($policyNumber) . '<br>
         <strong>Vehicle:</strong> ' . htmlspecialchars($plateNumber) . '<br>
-        <strong>Claim Type:</strong> ' . htmlspecialchars(ucfirst($claimType)) . '<br>
+        <strong>Claim Type:</strong> ' . htmlspecialchars($claimType) . '<br>
         <strong>Incident Date:</strong> ' . htmlspecialchars($incidentDate) . '<br>'
         . $notes_block . '
         <br>

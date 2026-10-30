@@ -5,6 +5,7 @@ require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../config/transaction_pin.php';
 require_once '../../config/uploads.php';
+require_once '../../includes/claim_types.php';
 require_once '../../includes/icons.php';
 require_once '../../config/mailer.php';
 require_once '../../includes/transaction.php';
@@ -312,7 +313,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_send_admin_email
         $claim['full_name'],
         $claim['policy_number'],
         $claim['plate_number'],
-        $fresh['claim_type'],
+        claim_type_badge($conn, $fresh['claim_type'])['label'],
         date('F d, Y', strtotime($fresh['incident_date'])),
         $docStatus,
         $fresh['notes'] ?? null,
@@ -389,7 +390,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_claim'])) {
 // Handle status update
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
     csrf_verify();
-    $allowed_statuses = ['compiling','sent_admin','sent_head_office','waiting_loa','loa_received','pending','approved','denied','lack_of_requirements','resolved'];
+    $allowed_statuses = array_keys(CLAIM_STATUSES);
     $new_status    = san_enum($_POST['new_status'] ?? '', $allowed_statuses);
     $denial_reason = san_str($_POST['denial_reason'] ?? '', MAX_TEXT);
     $notes         = san_str($_POST['notes'] ?? '', MAX_NOTE);
@@ -411,17 +412,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
     }
 
     // Guard: new status must be a valid next step for this claim
-    $next_statuses = match($claim['status']) {
-        'compiling'            => ['sent_admin', 'lack_of_requirements'],
-        'sent_admin'           => ['sent_head_office', 'lack_of_requirements'],
-        'sent_head_office'     => ['waiting_loa', 'denied'],
-        'waiting_loa'          => ['loa_received', 'denied'],
-        'loa_received'         => ['pending', 'denied'],
-        'pending'              => ['approved', 'denied'],
-        'approved'             => ['resolved'],
-        'lack_of_requirements' => ['compiling'],
-        default                => [],
-    };
+    $next_statuses = claim_next_statuses($claim['status']);   // the flow lives in config/access.php
     if (!in_array($new_status, $next_statuses)) {
         header("Location: view_claim.php?id=$claim_id&error=" . urlencode('Invalid status transition.'));
         exit;
@@ -446,7 +437,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
             sendClaimStatusEmail(
                 $claim['email'],
                 $claim['full_name'],
-                $claim['claim_type'],
+                claim_type_badge($conn, $claim['claim_type'])['label'],
                 $new_status,
                 $claim['policy_number'],
                 $claim['plate_number'] ?: 'N/A',
@@ -459,20 +450,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
     }
 }
 
-$status_map = [
-    'compiling'            => ['label' => 'Compiling Requirements', 'class' => 'badge-info'],
-    'sent_admin'           => ['label' => 'Sent to Admin',          'class' => 'badge-info'],
-    'sent_head_office'     => ['label' => 'Sent to Head Office',    'class' => 'badge-info'],
-    'waiting_loa'          => ['label' => 'Waiting for LOA',        'class' => 'badge-info'],
-    'loa_received'         => ['label' => 'LOA Received',           'class' => 'badge-green'],
-    'pending'              => ['label' => 'Pending',                'class' => 'badge-info'],
-    'approved'             => ['label' => 'Approved',               'class' => 'badge-green'],
-    'denied'               => ['label' => 'Denied',                 'class' => 'badge-red'],
-    'lack_of_requirements' => ['label' => 'Lack of Requirements',   'class' => 'badge-yellow'],
-    'resolved'             => ['label' => 'Resolved',               'class' => 'badge-muted'],
-];
 
-$s = $status_map[$claim['status']] ?? ['label' => $claim['status'], 'class' => 'badge-muted'];
+$s = claim_status_badge($claim['status']);
 
 $page_title  = 'View Claim';
 $active_page = 'claims';
@@ -515,11 +494,8 @@ require_once '../../includes/topbar.php';
           <a href="claims_list.php" class="back-link" onclick="goBack('claims_list.php'); return false;" style="margin-bottom:0;"><?= icon('arrow-left',14) ?> Back to Claims</a>
           <h2 style="font-size:1.1rem;font-weight:800;color:var(--text-primary);"><?= htmlspecialchars($claim['full_name']) ?></h2>
           <span class="badge <?= $s['class'] ?>"><?= $s['label'] ?></span>
-          <?php if ($claim['claim_type'] === 'repair'): ?>
-          <span class="badge badge-danger">Repair</span>
-          <?php else: ?>
-          <span class="badge badge-info">Claims</span>
-          <?php endif; ?>
+          <?php $ctb = claim_type_badge($conn, $claim['claim_type']); ?>
+          <span class="badge <?= $ctb['class'] ?>"><?= htmlspecialchars($ctb['label']) ?></span>
         </div>
         <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.35rem;padding-left:0.2rem;">
           Filed <?= date('M d, Y', strtotime($claim['created_at'])) ?> by <?= htmlspecialchars($claim['filed_by'] ?? 'Unknown') ?>
@@ -580,7 +556,7 @@ require_once '../../includes/topbar.php';
     ?>
     <div class="status-flow">
       <?php foreach ($flow_statuses as $i => $step):
-        $step_label = $status_map[$step]['label'] ?? $step;
+        $step_label = claim_status_badge($step)['label'];
         if ($is_denied && $step === 'approved') continue;
         $class = '';
         if ($is_denied && $step === 'sent_head_office') $class = 'denied-step';
@@ -843,7 +819,7 @@ require_once '../../includes/topbar.php';
               </div>
               <div>
                 <div style="font-size:0.65rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:0.2rem;">Claim Type</div>
-                <div style="font-size:0.88rem;font-weight:600;color:var(--text-primary);"><?= $claim['claim_type'] === 'repair' ? 'Repair' : 'Claims' ?></div>
+                <div style="font-size:0.88rem;font-weight:600;color:var(--text-primary);"><?= htmlspecialchars(claim_type_badge($conn, $claim['claim_type'])['label']) ?></div>
               </div>
             </div>
             <div>
@@ -874,17 +850,7 @@ require_once '../../includes/topbar.php';
           </div>
           <div class="card-body">
             <?php
-            $next_statuses = match($claim['status']) {
-                'compiling'            => ['sent_admin', 'lack_of_requirements'],
-                'sent_admin'           => ['sent_head_office', 'lack_of_requirements'],
-                'sent_head_office'     => ['waiting_loa', 'denied'],
-                'waiting_loa'          => ['loa_received', 'denied'],
-                'loa_received'         => ['pending', 'denied'],
-                'pending'              => ['approved', 'denied'],
-                'approved'             => ['resolved'],
-                'lack_of_requirements' => ['compiling'],
-                default                => [],
-            };
+            $next_statuses = claim_next_statuses($claim['status']);   // the flow lives in config/access.php
             // When policy expired, only allow deny or resolve
             $allowed_next = $policy_expired
                 ? array_values(array_intersect($next_statuses, ['denied', 'resolved']))
@@ -909,7 +875,7 @@ require_once '../../includes/topbar.php';
                 <label class="field-label">New Status</label>
                 <select name="new_status" id="new_status" class="field-input">
                   <?php foreach ($allowed_next as $val):
-                    $st = $status_map[$val] ?? ['label' => $val];
+                    $st = claim_status_badge($val);
                   ?>
                   <option value="<?= $val ?>"><?= $st['label'] ?></option>
                   <?php endforeach; ?>

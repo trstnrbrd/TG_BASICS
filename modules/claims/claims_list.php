@@ -5,13 +5,14 @@ require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../includes/icons.php';
 require_once '../../includes/pagination.php';
+require_once '../../includes/claim_types.php';
 
 require_role(['admin', 'super_admin']);
 
 // ── FILTERS ──
 $search        = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
-$filter_status = san_enum($_GET['status'] ?? 'all', ['all', 'compiling', 'sent_admin', 'sent_head_office', 'waiting_loa', 'loa_received', 'pending', 'approved', 'lack_of_requirements', 'denied', 'resolved']);
-$filter_type   = san_enum($_GET['type'] ?? 'all', array_merge(['all'], ALLOWED_CLAIM_TYPES));
+$filter_status = san_enum($_GET['status'] ?? 'all', array_merge(['all'], array_keys(CLAIM_STATUSES)));
+$filter_type   = san_enum($_GET['type'] ?? 'all', array_merge(['all'], array_column(claim_types_all($conn), 'code')));
 $sort_by       = $_GET['sort'] ?? 'newest';
 
 $where   = ["1=1"];
@@ -61,18 +62,6 @@ $sql = "
 // One page at a time (includes/pagination.php) — the total is counted from this same query
 [$result, $pg] = paginate_query($conn, $sql, $types, $params);
 
-$status_map = [
-    'compiling'            => ['label' => 'Compiling Requirements', 'class' => 'badge-info'],
-    'sent_admin'           => ['label' => 'Sent to Admin',          'class' => 'badge-info'],
-    'sent_head_office'     => ['label' => 'Sent to Head Office',    'class' => 'badge-info'],
-    'waiting_loa'          => ['label' => 'Waiting for LOA',        'class' => 'badge-info'],
-    'loa_received'         => ['label' => 'LOA Received',           'class' => 'badge-green'],
-    'pending'              => ['label' => 'Pending',                'class' => 'badge-info'],
-    'approved'             => ['label' => 'Approved',               'class' => 'badge-green'],
-    'denied'               => ['label' => 'Denied',                 'class' => 'badge-red'],
-    'lack_of_requirements' => ['label' => 'Lack of Requirements',   'class' => 'badge-yellow'],
-    'resolved'             => ['label' => 'Resolved',               'class' => 'badge-muted'],
-];
 
 $page_title  = 'Claims';
 $active_page = 'claims';
@@ -129,22 +118,16 @@ require_once '../../includes/topbar.php';
             value="<?= htmlspecialchars($search) ?>" class="filter-input" style="padding-left:2.4rem;width:100%;"/>
         </div>
         <select name="status" class="filter-input" style="min-width:210px;">
-          <option value="all"                  <?= $filter_status==='all'                 ?'selected':'' ?>>All Statuses</option>
-          <option value="compiling"            <?= $filter_status==='compiling'           ?'selected':'' ?>>Compiling Requirements</option>
-          <option value="sent_admin"           <?= $filter_status==='sent_admin'          ?'selected':'' ?>>Sent to Admin</option>
-          <option value="sent_head_office"     <?= $filter_status==='sent_head_office'    ?'selected':'' ?>>Sent to Head Office</option>
-          <option value="waiting_loa"          <?= $filter_status==='waiting_loa'         ?'selected':'' ?>>Waiting for LOA</option>
-          <option value="loa_received"         <?= $filter_status==='loa_received'        ?'selected':'' ?>>LOA Received</option>
-          <option value="pending"              <?= $filter_status==='pending'             ?'selected':'' ?>>Pending</option>
-          <option value="approved"             <?= $filter_status==='approved'            ?'selected':'' ?>>Approved</option>
-          <option value="lack_of_requirements" <?= $filter_status==='lack_of_requirements'?'selected':'' ?>>Lack of Requirements</option>
-          <option value="denied"               <?= $filter_status==='denied'              ?'selected':'' ?>>Denied</option>
-          <option value="resolved"             <?= $filter_status==='resolved'            ?'selected':'' ?>>Resolved</option>
+          <option value="all" <?= $filter_status === 'all' ? 'selected' : '' ?>>All Statuses</option>
+          <?php foreach (CLAIM_STATUSES as $key => $st): ?>
+          <option value="<?= $key ?>" <?= $filter_status === $key ? 'selected' : '' ?>><?= htmlspecialchars($st['label']) ?></option>
+          <?php endforeach; ?>
         </select>
         <select name="type" class="filter-input" style="min-width:160px;">
           <option value="all"   <?= $filter_type==='all'?'selected':'' ?>>All Types</option>
-          <option value="claims" <?= $filter_type==='claims'?'selected':'' ?>>Claims</option>
-          <option value="repair" <?= $filter_type==='repair'?'selected':'' ?>>Repair</option>
+          <?php foreach (claim_types_all($conn) as $ct): ?>
+          <option value="<?= htmlspecialchars($ct['code']) ?>" <?= $filter_type === $ct['code'] ? 'selected' : '' ?>><?= htmlspecialchars($ct['label']) ?></option>
+          <?php endforeach; ?>
         </select>
         <select name="sort" class="filter-input" style="min-width:140px;">
           <option value="newest" <?= $sort_by==='newest'?'selected':'' ?>>Newest First</option>
@@ -187,7 +170,7 @@ require_once '../../includes/topbar.php';
               $docs_done = (int)$row['doc_insurance_policy'] + (int)$row['doc_or'] + (int)$row['doc_cr']
                          + (int)$row['doc_drivers_license'] + (int)$row['doc_affidavit']
                          + (int)$row['doc_estimate'] + (int)$row['doc_damage_photos'];
-              $s = $status_map[$row['status']] ?? ['label' => $row['status'], 'class' => 'badge-muted'];
+              $s = claim_status_badge($row['status']);
               $is_finished = claim_is_deletable($row['status']);
               $cid = 'claim-expand-' . $row['claim_id'];
               $aby_initials = !empty($row['added_by_name']) ? substr(implode('', array_map(fn($w) => strtoupper($w[0] ?? ''), explode(' ', trim($row['added_by_name'])))), 0, 2) : '';
@@ -231,11 +214,8 @@ require_once '../../includes/topbar.php';
                     <div class="tg-expand-item">
                       <span class="tg-expand-label">Type</span>
                       <span class="tg-expand-value">
-                        <?php if ($row['claim_type'] === 'repair'): ?>
-                          <span class="badge badge-red">Repair</span>
-                        <?php else: ?>
-                          <span class="badge badge-info">Claims</span>
-                        <?php endif; ?>
+                        <?php $ctb = claim_type_badge($conn, $row['claim_type']); ?>
+                        <span class="badge <?= $ctb['class'] ?>"><?= htmlspecialchars($ctb['label']) ?></span>
                       </span>
                     </div>
                     <div class="tg-expand-item">

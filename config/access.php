@@ -5,6 +5,44 @@
  * Kept in one place so every page follows the same rule.
  */
 
+// Every claim status, in flow order, with its label and badge class (claims list, its filter, view claim)
+const CLAIM_STATUSES = [
+    'compiling'            => ['label' => 'Compiling Requirements', 'class' => 'badge-info'],
+    'sent_admin'           => ['label' => 'Sent to Admin',          'class' => 'badge-info'],
+    'sent_head_office'     => ['label' => 'Sent to Head Office',    'class' => 'badge-info'],
+    'waiting_loa'          => ['label' => 'Waiting for LOA',        'class' => 'badge-info'],
+    'loa_received'         => ['label' => 'LOA Received',           'class' => 'badge-green'],
+    'pending'              => ['label' => 'Pending',                'class' => 'badge-info'],
+    'approved'             => ['label' => 'Approved',               'class' => 'badge-green'],
+    'lack_of_requirements' => ['label' => 'Lack of Requirements',   'class' => 'badge-yellow'],
+    'denied'               => ['label' => 'Denied',                 'class' => 'badge-red'],
+    'resolved'             => ['label' => 'Resolved',               'class' => 'badge-muted'],
+];
+
+// Where a claim can go next from each status (view_claim.php: the Update Status choices and its server check)
+const CLAIM_STATUS_FLOW = [
+    'compiling'            => ['sent_admin', 'lack_of_requirements'],
+    'sent_admin'           => ['sent_head_office', 'lack_of_requirements'],
+    'sent_head_office'     => ['waiting_loa', 'denied'],
+    'waiting_loa'          => ['loa_received', 'denied'],
+    'loa_received'         => ['pending', 'denied'],
+    'pending'              => ['approved', 'denied'],
+    'approved'             => ['resolved'],
+    'lack_of_requirements' => ['compiling'],
+];
+
+/** The statuses a claim in $status can move to ([] for denied / resolved, the end of the flow). */
+function claim_next_statuses(string $status): array
+{
+    return CLAIM_STATUS_FLOW[$status] ?? [];
+}
+
+/** The label and badge class for a claim status; an unknown one shows as itself. */
+function claim_status_badge(string $status): array
+{
+    return CLAIM_STATUSES[$status] ?? ['label' => $status, 'class' => 'badge-muted'];
+}
+
 // Claim statuses where each action is allowed
 const CLAIM_DOCS_OPEN_STATUSES = ['compiling', 'sent_admin', 'lack_of_requirements'];
 const CLAIM_DELETABLE_STATUSES = ['resolved', 'denied', 'lack_of_requirements'];

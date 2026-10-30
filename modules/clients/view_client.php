@@ -6,6 +6,7 @@ require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../config/transaction_pin.php';
 require_once '../../config/uploads.php';
+require_once '../../includes/claim_types.php';
 
 require_role(['admin', 'super_admin', 'mechanic']);
 $is_mechanic = is_mechanic();
@@ -776,11 +777,8 @@ require_once '../../includes/topbar.php';
               <td style="font-size:0.72rem;color:var(--text-muted);white-space:nowrap;"><?= date('M d, Y', strtotime($cl['created_at'])) ?></td>
               <td>
                 <div style="display:flex;flex-direction:column;align-items:center;gap:0.3rem;">
-                  <?php if ($cl['claim_type'] === 'repair'): ?>
-                    <span class="badge badge-danger">Repair</span>
-                  <?php else: ?>
-                    <span class="badge badge-info">Cash</span>
-                  <?php endif; ?>
+                  <?php $ctb = claim_type_badge($conn, $cl['claim_type']); ?>
+                  <span class="badge <?= $ctb['class'] ?>"><?= htmlspecialchars($ctb['label']) ?></span>
                   <span class="badge <?= $cs['class'] ?>"><?= $cs['label'] ?></span>
                 </div>
               </td>

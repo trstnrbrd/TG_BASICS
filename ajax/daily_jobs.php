@@ -11,7 +11,7 @@ require_once __DIR__ . '/../config/settings.php';
 require_once __DIR__ . '/../config/mailer.php';
 require_once __DIR__ . '/../config/renewal_reminders.php';
 require_once __DIR__ . '/../config/overdue_reminders.php';
-require_once __DIR__ . '/../config/token_cleanup.php';
+require_once __DIR__ . '/../config/data_purge.php';
 require_once __DIR__ . '/../includes/api.php';
 
 require_role_json(['admin', 'super_admin']);
@@ -23,5 +23,6 @@ session_write_close();
 api_success([
     'renewal' => send_renewal_reminders($conn),
     'overdue' => send_overdue_reminders($conn),
-    'cleanup' => cleanup_expired_tokens($conn),
+    'purge'   => purge_old_data($conn),
+
 ]);

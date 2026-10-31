@@ -44,6 +44,13 @@ function rate_limit_prune(mysqli $conn, string $before): void
     dal_exec($conn, "DELETE FROM rate_limit_attempts WHERE attempted_at < ?", 's', [$before]);
 }
 
+/** Deletes every attempt older than $days days, whoever made it. Returns how many went. */
+function rate_limit_purge(mysqli $conn, int $days): int
+{
+    return dal_exec($conn, "DELETE FROM rate_limit_attempts WHERE attempted_at < DATE_SUB(NOW(), INTERVAL ? DAY)", 'i', [$days]);
+}
+
+
 /** Records one failed attempt. */
 function rate_limit_attempt_add(mysqli $conn, string $who, string $endpoint, string $at): void
 {
@@ -81,8 +88,7 @@ function account_totp_enabled(mysqli $conn, int $user_id): bool
 {
     return (int)(dal_value($conn, "SELECT totp_enabled FROM users WHERE user_id = ?", 'i', [$user_id]) ?? 0) === 1;
 }
-
-/* ---- Expired token cleanup (config/token_cleanup.php) ---- */
+/* ---- Expired token cleanup (config/data_purge.php) ---- */
 
 /** The tables whose rows carry an expires_at and can be cleaned up. Table names cannot be bound, so only these. */
 const TOKEN_TABLES = ['two_factor_codes', 'password_resets', 'email_verifications'];

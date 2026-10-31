@@ -75,8 +75,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_forever_client
     exit;
 }
 
+// ── HANDLE DELETE ALL (Owner only) ──
+// Only the ids the Owner had on screen: a client someone deleted a moment ago is not wiped unseen
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_all_ids'])) {
+    csrf_verify();
+    if (!is_super_admin()) {
+        http_response_code(403);
+        exit('Not allowed.');
+    }
+    if (!pin_consume($conn)) {
+        header('Location: recently_deleted.php?error=' . urlencode(PIN_REQUIRED_MSG));
+        exit;
+    }
+    $ids = array_unique(array_map('intval', (array)$_POST['delete_all_ids']));
+    // The same guard as one client: the foreign keys would cascade through these records
+    [$deleted, $kept] = db_transaction($conn, function () use ($conn, $ids) {
+        $deleted = [];
+        $kept    = [];
+        foreach ($ids as $id) {
+            $cdata = client_find_deleted($conn, $id);
+            if (!$cdata) continue;
+            if (client_delete_blockers($conn, $id) !== '') { $kept[] = $cdata['full_name']; continue; }
+            if (client_delete_forever($conn, $id)) $deleted[] = $id;
+        }
+        // A count only: the point of deleting for good is that their personal data is gone
+        if ($deleted) audit_log_add($conn, $_SESSION['user_id'], 'CLIENTS_PURGED', ($_SESSION['full_name'] ?? 'Unknown') . ' permanently deleted ' . count($deleted) . ' client(s) from Recently Deleted.');
+        return [$deleted, $kept];
+    });
+    foreach ($deleted as $id) purge_client_files($id);
+
+    $kept_msg = '';
+    if ($kept) {
+        $more     = count($kept) - 3;
+        $kept_msg = count($kept) . ' kept because they still have a policy, repair job or claim on record: ' . implode(', ', array_slice($kept, 0, 3)) . ($more > 0 ? " and $more more" : '') . '.';
+    }
+    if ($deleted) {
+        $msg = count($deleted) . ' client' . (count($deleted) !== 1 ? 's' : '') . ' permanently deleted.';
+        header('Location: recently_deleted.php?' . ($kept ? 'error=' . urlencode("$msg $kept_msg") : 'success=' . urlencode($msg)));
+    } else {
+        header('Location: recently_deleted.php?error=' . urlencode($kept_msg ?: 'These clients are no longer in Recently Deleted.'));
+    }
+    exit;
+}
+
 // Same rule as deleting: the Owner sees all, an admin the clients they added or handle as agent
-$rows = clients_deleted_list($conn, is_super_admin() ? null : (int)$_SESSION['user_id']);
+$rows =clients_deleted_list($conn, is_super_admin() ? null : (int)$_SESSION['user_id']);
 
 // The Restore / Delete buttons of one row (the phone cards and the desktop table both print them)
 $row_actions = function (array $row): void { ?>
@@ -154,6 +197,15 @@ require_once '../../includes/topbar.php';
           <div class="card-title">Deleted Clients</div>
           <div class="card-sub">Kept for <?= PURGE_DELETED_CLIENTS_DAYS ?> days, then removed for good along with their vehicles and documents.</div>
         </div>
+        <?php if ($rows && is_super_admin()): ?>
+        <form method="POST" action="recently_deleted.php" style="margin-left:auto;">
+          <?= csrf_field() ?>
+          <?php foreach ($rows as $row): ?>
+          <input type="hidden" name="delete_all_ids[]" value="<?= (int)$row['client_id'] ?>"/>
+          <?php endforeach; ?>
+          <button type="button" class="btn-sm-danger js-delete-all" data-count="<?= count($rows) ?>"><?= icon('trash', 14) ?> Delete All</button>
+        </form>
+        <?php endif; ?>
       </div>
 
       <?php if ($rows): ?>

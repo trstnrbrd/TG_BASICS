@@ -50,6 +50,9 @@ $footer_extra_scripts  = $footer_extra_scripts  ?? '';
 <script>window.TG_LIVE = <?= json_encode($tg_live + ['base' => $base_path]) ?>;</script>
 <script src="<?= $base_path ?>assets/js/shared/realtime.js?v=<?= filemtime(__DIR__ . '/../assets/js/shared/realtime.js') ?>"></script>
 
+<!-- Images shrink in the browser before they are uploaded (assets/js/shared/image_compress.js) -->
+<script src="<?= $base_path ?>assets/js/shared/image_compress.js?v=<?= filemtime(__DIR__ . '/../assets/js/shared/image_compress.js') ?>"></script>
+
 <?php if ($footer_extra_scripts): ?>
   <?= $footer_extra_scripts ?>
 <?php endif; ?>

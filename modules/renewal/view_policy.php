@@ -1143,12 +1143,15 @@ require_once '../../includes/footer.php';
       var fd   = new FormData();
       fd.append('upload_receipt', '1');
       fd.append('payment_id', pid);
-      fd.append('receipt_file', file);
       fd.append('csrf_token', csrf);
 
       cell.innerHTML = '<span style="font-size:0.72rem;color:var(--text-muted);">Uploading...</span>';
 
-      fetch(window.location.href, { method: 'POST', body: fd })
+      window.tgCompressImage(file, 'document')
+        .then(function(small){
+          fd.append('receipt_file', small);
+          return fetch(window.location.href, { method: 'POST', body: fd });
+        })
         .then(function(r){ return r.json(); })
         .then(function(data){
           if (data.ok) {
@@ -1225,10 +1228,13 @@ require_once '../../includes/footer.php';
     var fd   = new FormData();
     fd.append('upload_receipt', '1');
     fd.append('payment_id', pid);
-    fd.append('receipt_file', file);
     fd.append('csrf_token', csrf);
     cell.innerHTML = '<span style="font-size:0.72rem;color:var(--text-muted);">Uploading...</span>';
-    fetch(window.location.href, { method: 'POST', body: fd })
+    window.tgCompressImage(file, 'document')
+      .then(function(small){
+        fd.append('receipt_file', small);
+        return fetch(window.location.href, { method: 'POST', body: fd });
+      })
       .then(function(r){ return r.json(); })
       .then(function(data){
         if (data.ok) {

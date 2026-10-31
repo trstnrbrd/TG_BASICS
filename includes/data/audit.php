@@ -95,3 +95,9 @@ function audit_log_recent(mysqli $conn, int $limit): array
         ORDER BY a.created_at DESC
         LIMIT ?", 'i', [$limit]);
 }
+
+/** Deletes sign-in and sign-out entries older than $days days; every other entry is kept. Returns how many went. */
+function audit_logs_purge_sign_ins(mysqli $conn, int $days): int
+{
+    return dal_exec($conn, "DELETE FROM audit_logs WHERE action IN ('LOGIN', 'LOGOUT') AND created_at < DATE_SUB(NOW(), INTERVAL ? DAY)", 'i', [$days]);
+}

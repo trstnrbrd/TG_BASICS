@@ -25,7 +25,7 @@ function confirmDeleteDoc(btn, name) {
           text:
             'Delete "' +
             name +
-            '" and all their records? This cannot be undone.',
+            '"? They move to Recently Deleted, where they can be restored for 30 days, then they are removed for good.',
           icon: "warning",
           showCancelButton: !0,
           confirmButtonColor: "#C0392B",

@@ -392,22 +392,80 @@ function client_update(mysqli $conn, int $client_id, array $c): bool
 }
 
 /**
- * Deletes a client: their vehicles are removed (which cascades through the
- * records hanging off them) and the client row is kept but marked deleted.
+ * Deletes a client: the row is kept but marked deleted, so it shows in Recently Deleted and can be
+ * restored. Its vehicles stay, hidden along with it. client_purge() removes it for good later.
  * The caller checks client_delete_blockers() first and wraps this, with its
  * audit entry, in db_transaction().
  */
 function client_soft_delete(mysqli $conn, int $client_id): void
 {
-    $del = $conn->prepare("DELETE FROM vehicles WHERE client_id = ?");
-    $del->bind_param('i', $client_id);
-    $del->execute();
-    $del->close();
+    dal_exec($conn, "UPDATE clients SET deleted_at = NOW() WHERE client_id = ?", 'i', [$client_id]);
+}
 
-    $upd = $conn->prepare("UPDATE clients SET deleted_at = NOW() WHERE client_id = ?");
-    $upd->bind_param('i', $client_id);
-    $upd->execute();
-    $upd->close();
+/** Soft-deleted clients, newest first. $user_id keeps only those that user added or handles as agent; null = all. */
+function clients_deleted_list(mysqli $conn, ?int $user_id = null): array
+{
+    $sql = "SELECT c.client_id, c.full_name, c.contact_number, c.deleted_at,
+                   (SELECT COUNT(*) FROM vehicles v WHERE v.client_id = c.client_id) AS vehicle_count
+            FROM clients c
+            WHERE c.deleted_at IS NOT NULL";
+    if ($user_id === null) return dal_all($conn, $sql . " ORDER BY c.deleted_at DESC");
+    return dal_all($conn, $sql . " AND (c.created_by = ? OR c.agent_id = ?) ORDER BY c.deleted_at DESC", 'ii', [$user_id, $user_id]);
+}
+
+/** One soft-deleted client (name, who added / handles them, when deleted), or null if not deleted or not found. */
+function client_find_deleted(mysqli $conn, int $client_id): ?array
+{
+    return dal_one($conn, "SELECT client_id, full_name, created_by, agent_id, deleted_at
+                           FROM clients WHERE client_id = ? AND deleted_at IS NOT NULL", 'i', [$client_id]);
+}
+
+/** Plates of this client's vehicles that an active client has registered since. Empty = safe to restore. */
+function client_restore_plate_conflicts(mysqli $conn, int $client_id): array
+{
+    return array_column(dal_all($conn, "
+        SELECT DISTINCT v.plate_number
+        FROM vehicles v
+        INNER JOIN vehicles v2 ON v2.plate_number = v.plate_number AND v2.client_id != v.client_id
+        INNER JOIN clients c2  ON c2.client_id = v2.client_id AND c2.deleted_at IS NULL
+        WHERE v.client_id = ?", 'i', [$client_id]), 'plate_number');
+}
+
+/** Brings a soft-deleted client back. Returns false if they were not deleted. */
+function client_restore(mysqli $conn, int $client_id): bool
+{
+    return dal_exec($conn, "UPDATE clients SET deleted_at = NULL WHERE client_id = ? AND deleted_at IS NOT NULL", 'i', [$client_id]) > 0;
+}
+
+/**
+ * Removes a client in Recently Deleted for good now, before their time is up. The foreign keys take its
+ * vehicles and document rows along. The caller deletes its files after the commit.
+ */
+function client_delete_forever(mysqli $conn, int $client_id): bool
+{
+    return dal_exec($conn, "DELETE FROM clients WHERE client_id = ? AND deleted_at IS NOT NULL", 'i', [$client_id]) > 0;
+}
+
+/** Deleted clients past their $days in Recently Deleted that hold no policy, repair job or claim. */
+function clients_purgeable_ids(mysqli $conn, int $days): array
+{
+    return array_map('intval', array_column(dal_all($conn, "
+        SELECT c.client_id
+        FROM clients c
+        WHERE c.deleted_at IS NOT NULL AND c.deleted_at < DATE_SUB(NOW(), INTERVAL ? DAY)
+          AND NOT EXISTS (SELECT 1 FROM insurance_policies p WHERE p.client_id = c.client_id)
+          AND NOT EXISTS (SELECT 1 FROM repair_jobs j        WHERE j.client_id = c.client_id)
+          AND NOT EXISTS (SELECT 1 FROM claims cl            WHERE cl.client_id = c.client_id)", 'i', [$days]), 'client_id'));
+}
+
+/**
+ * Removes a deleted client for good, if still past $days (not restored meanwhile). The foreign keys
+ * take its vehicles and document rows along. The caller deletes its files after the commit.
+ */
+function client_purge(mysqli $conn, int $client_id, int $days): bool
+{
+    return dal_exec($conn, "DELETE FROM clients WHERE client_id = ? AND deleted_at IS NOT NULL AND deleted_at < DATE_SUB(NOW(), INTERVAL ? DAY)",
+                    'ii', [$client_id, $days]) > 0;
 }
 
 /**

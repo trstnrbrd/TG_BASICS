@@ -155,6 +155,16 @@ function client_editable(mysqli $conn, int $client_id): bool
     return false;
 }
 
+/** Can this user restore the deleted client ($client: created_by, agent_id)? Same rule as deleting: owner all, admin their own. */
+function client_restorable(array $client): bool
+{
+    $role = $_SESSION['role'] ?? '';
+    if ($role === 'super_admin') return true;
+    if ($role !== 'admin') return false;
+    $me = (int)($_SESSION['user_id'] ?? 0);
+    return (int)$client['created_by'] === $me || (int)$client['agent_id'] === $me;
+}
+
 /** Can this user edit the policy? Owner: all. Admin: only if they are the client's agent. */
 function policy_editable(?int $agent_id): bool
 {

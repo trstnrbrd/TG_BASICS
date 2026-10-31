@@ -11,7 +11,8 @@ require_once __DIR__ . '/../config/settings.php';
 require_once __DIR__ . '/../config/mailer.php';
 require_once __DIR__ . '/../config/renewal_reminders.php';
 require_once __DIR__ . '/../config/overdue_reminders.php';
-require_once __DIR__ . '/../config/token_cleanup.php';
+require_once __DIR__ . '/../config/data_purge.php';
+
 
 header('Content-Type: text/plain; charset=utf-8');
 header('X-Robots-Tag: noindex, nofollow');
@@ -37,6 +38,7 @@ echo !empty($od['skipped'])  ? "Overdue: another run was already in progress\n"
    : (!empty($od['not_due']) ? "Overdue: already sent this week\n"
    : 'Overdue: ' . $od['emails_sent'] . ' email(s) sent for ' . $od['policies'] . " policy/policies\n");
 
-// 3. Delete expired 2FA codes and links
-$del = cleanup_expired_tokens($conn);
-echo 'Cleanup: ' . array_sum($del) . " expired code(s)/link(s) deleted\n";
+// 3. Purge expired 2FA codes and links, and old failed-login records
+$del = purge_old_data($conn);
+echo 'Purge: ' . array_sum($del) . " old row(s) deleted\n";
+

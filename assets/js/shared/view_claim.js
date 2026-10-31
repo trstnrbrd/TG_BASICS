@@ -107,8 +107,12 @@ function attachDmgRemoveBtn(btn) {
     (fd.append("ajax_upload", "1"),
       fd.append("csrf_token", CSRF_TOKEN),
       fd.append("doc_field", field),
-      fd.append("doc_file", file),
-      fetch(CLAIM_URL, { method: "POST", body: fd })
+      window
+        .tgCompressImage(file, "document")
+        .then((small) => {
+          fd.append("doc_file", small);
+          return fetch(CLAIM_URL, { method: "POST", body: fd });
+        })
         .then((r) => r.json())
         .then((data) => {
           if ((item.classList.remove("doc-uploading"), !data.ok))
@@ -151,8 +155,12 @@ function attachDmgRemoveBtn(btn) {
           const fd = new FormData();
           (fd.append("ajax_damage_upload", "1"),
             fd.append("csrf_token", CSRF_TOKEN),
-            fd.append("damage_file", file),
-            fetch(CLAIM_URL, { method: "POST", body: fd })
+            window
+              .tgCompressImage(file, "photo")
+              .then((small) => {
+                fd.append("damage_file", small);
+                return fetch(CLAIM_URL, { method: "POST", body: fd });
+              })
               .then((r) => r.json())
               .then((data) => {
                 if (!data.ok)

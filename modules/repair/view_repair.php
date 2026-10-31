@@ -512,7 +512,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <?= csrf_field() ?>
         <input type="hidden" name="action" value="upload_image"/>
         <label style="font-size:0.78rem;font-weight:600;color:var(--text-muted);">Select images (JPG, PNG, WEBP — multiple allowed, up to <?= REPAIR_PHOTO_MAX_BYTES >> 20 ?> MB each)</label>
-        <input type="file" name="job_images[]" multiple accept="image/jpeg,image/png,image/webp,image/gif"
+        <input type="file" name="job_images[]" multiple accept="image/jpeg,image/png,image/webp,image/gif" data-compress="photo"
           style="font-size:0.8rem;padding:0.5rem;border:1px dashed var(--gold-muted);border-radius:8px;background:var(--bg-3);color:var(--text-primary);width:100%;"/>
         <?php if (repair_job_is_open($job['status'])): ?>
         <label style="display:flex;align-items:flex-start;gap:0.55rem;font-size:0.8rem;color:var(--text-primary);cursor:pointer;">

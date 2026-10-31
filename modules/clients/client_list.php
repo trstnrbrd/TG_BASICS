@@ -108,6 +108,7 @@ require_once '../../includes/navbar.php';
   .client-toolbar-actions { display: contents; }
   .client-toolbar > div > .client-toolbar-actions > a[href*="add_client"]    { grid-column: span 4; }
   .client-toolbar > div > .client-toolbar-actions > a[href*="import_clients"] { grid-column: span 2; }
+  .client-toolbar > div > .client-toolbar-actions > a[href*="recently_deleted"] { grid-column: span 6; white-space: nowrap; }
   .client-toolbar a, .client-toolbar button { justify-content: center; }
 }
 
@@ -244,6 +245,7 @@ require_once '../../includes/topbar.php';
         <span class="client-toolbar-actions">
         <a href="add_client.php" class="btn-primary"><?= icon('plus', 14) ?> Add Client</a>
         <a href="import_clients.php" class="btn-ghost" title="Add many clients at once from a CSV file"><?= icon('arrow-up-tray', 14) ?> Import</a>
+        <a href="recently_deleted.php" class="btn-ghost" title="Deleted clients you can still restore"><?= icon('trash', 14) ?> Recently Deleted</a>
         </span>
         <?php endif; ?>
       </div>

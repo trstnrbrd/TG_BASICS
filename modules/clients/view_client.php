@@ -44,21 +44,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) 
     $del_id = $client_id;
     $cdata  = client_find_name($conn, $del_id);
     if ($cdata) {
-        // Same rule as the client list: policies, repair jobs and claims block the delete. Removing the
-        // vehicles below cascades straight through them (policies, payments, repair jobs, quotations, receipts).
+        // Same rule as the client list: policies, repair jobs and claims block the delete. The purge
+        // later removes the client for good, and its foreign keys would cascade through those records.
         $blockers = client_delete_blockers($conn, $del_id);
         if ($blockers !== '') {
             header("Location: view_client.php?id=" . $del_id . "&error=" . urlencode('"' . $cdata['full_name'] . '" cannot be deleted — they still have ' . $blockers . ' on record.'));
             exit;
         }
 
-        // vehicles removed, client marked deleted and the audit entry: all saved together or not at all
+        // client marked deleted and the audit entry: all saved together or not at all
         db_transaction($conn, function () use ($conn, $del_id, $cdata) {
             client_soft_delete($conn, $del_id);
-            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' deleted client "' . $cdata['full_name'] . '" and all associated records.';
+            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' deleted client "' . $cdata['full_name'] . '" (moved to Recently Deleted).';
             audit_log_add($conn, $_SESSION['user_id'], 'CLIENT_DELETED', $desc);
         });
-        header("Location: client_list.php?success=" . urlencode('"' . $cdata['full_name'] . '" has been deleted.'));
+        header("Location: client_list.php?success=" . urlencode('"' . $cdata['full_name'] . '" has been deleted. You can restore them from Recently Deleted.'));
         exit;
     }
 }

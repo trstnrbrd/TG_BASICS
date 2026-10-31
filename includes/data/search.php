@@ -20,7 +20,7 @@ function search_vehicles(mysqli $conn, string $like, bool $walkins_only, int $li
     return dal_all($conn, "
         SELECT v.vehicle_id, v.plate_number, v.make, v.model, v.year_model, c.full_name, c.client_id
         FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id
-        WHERE (v.plate_number LIKE ? OR v.make LIKE ? OR v.model LIKE ?)
+        WHERE c.deleted_at IS NULL AND (v.plate_number LIKE ? OR v.make LIKE ? OR v.model LIKE ?)
         " . ($walkins_only ? 'AND ' . clients_walkin_sql('c') : '') . "
         LIMIT ?", 'sssi', [$like, $like, $like, $limit]);
 }

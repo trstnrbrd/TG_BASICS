@@ -95,6 +95,25 @@ function quotation_set_status(mysqli $conn, int $quotation_id, string $status): 
     dal_exec($conn, "UPDATE quotations SET status = ?$stamp WHERE quotation_id = ?", 'si', [$status, $quotation_id]);
 }
 
+/** Cancelled quotations with no receipt, untouched for $days days (updated_at is when they were cancelled). */
+function quotations_purgeable_ids(mysqli $conn, int $days): array
+{
+    return array_map('intval', array_column(dal_all($conn, "
+        SELECT q.quotation_id
+        FROM quotations q
+        WHERE q.status = 'cancelled' AND q.updated_at < DATE_SUB(NOW(), INTERVAL ? DAY)
+          AND NOT EXISTS (SELECT 1 FROM receipts r WHERE r.quotation_id = q.quotation_id)", 'i', [$days]), 'quotation_id'));
+}
+
+/** Removes a cancelled quotation for good, if it still qualifies (its items go with it). */
+function quotation_purge(mysqli $conn, int $quotation_id, int $days): bool
+{
+    return dal_exec($conn, "
+        DELETE q FROM quotations q
+        WHERE q.quotation_id = ? AND q.status = 'cancelled' AND q.updated_at < DATE_SUB(NOW(), INTERVAL ? DAY)
+          AND NOT EXISTS (SELECT 1 FROM receipts r WHERE r.quotation_id = q.quotation_id)", 'ii', [$quotation_id, $days]) > 0;
+}
+
 /** Deletes a quotation (its items and receipt go with it, ON DELETE CASCADE). */
 function quotation_delete(mysqli $conn, int $quotation_id): void
 {

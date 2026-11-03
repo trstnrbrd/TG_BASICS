@@ -95,12 +95,14 @@ function clients_list_page(mysqli $conn, string $search, string $filter_by, stri
         }
     }
     $where[] = 'c.deleted_at IS NULL';
+    // Each order ends on c.client_id, so clients added in the same second (or with the same name / vehicle
+    // count) still come out in a fixed order: the newer one (higher Client ID) first, or last for 'oldest'.
     $order = match ($sort) {
-        'oldest'    => 'c.created_at ASC',
-        'name_asc'  => 'c.full_name ASC',
-        'name_desc' => 'c.full_name DESC',
-        'vehicles'  => 'vehicle_count DESC',
-        default     => 'c.created_at DESC',
+        'oldest'    => 'c.created_at ASC, c.client_id ASC',
+        'name_asc'  => 'c.full_name ASC, c.client_id ASC',
+        'name_desc' => 'c.full_name DESC, c.client_id DESC',
+        'vehicles'  => 'vehicle_count DESC, c.created_at DESC, c.client_id DESC',
+        default     => 'c.created_at DESC, c.client_id DESC',
     };
     $having = ['insurance' => 'HAVING has_policy = 1', 'walkin' => 'HAVING has_policy = 0'][$type] ?? '';
     [$result, $pg] = paginate_query($conn, "

@@ -167,7 +167,7 @@ require_once '../../includes/topbar.php';
               <label class="field-label">Client <span class="req">*</span></label>
               <div style="position:relative;">
                 <input type="text" id="client-search" class="field-input"
-                  placeholder="Search by name or plate number..." autocomplete="off"/>
+                  placeholder="Search by client ID, name or plate number..." autocomplete="off"/>
                 <input type="hidden" name="client_id" id="client_id_input"/>
                 <div id="client-dropdown"
                      style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;

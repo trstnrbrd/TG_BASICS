@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_client_id']))
     }
     db_transaction($conn, function () use ($conn, $restore_id, $cdata) {
         client_restore($conn, $restore_id);
-        $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' restored client "' . $cdata['full_name'] . '" from Recently Deleted.';
+        $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' restored client "' . $cdata['full_name'] . '"' . (!empty($cdata['client_code']) ? ' (' . $cdata['client_code'] . ')' : '') . ' from Recently Deleted.';
         audit_log_add($conn, $_SESSION['user_id'], 'CLIENT_RESTORED', $desc);
     });
     header('Location: recently_deleted.php?success=' . urlencode('"' . $cdata['full_name'] . '" has been restored.'));

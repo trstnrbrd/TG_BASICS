@@ -958,3 +958,7 @@ html.tg-loading, html.tg-loading * { cursor: wait !important; }
   .gs-wrap { display: none; }
 }
 
+
+/* Record numbers in list tables (Billing #, Repair ID, Client ID): one plain look everywhere, the table's own text */
+.record-id { white-space: nowrap; }
+.cl-card .record-id { display: block; font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.1rem; }

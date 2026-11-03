@@ -54,7 +54,7 @@ require_once '../../includes/topbar.php';
         <div style="position:relative;flex:1;width:100%;min-width:200px;max-width:360px;">
           <span style="position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;"><?= icon('magnifying-glass', 14) ?></span>
           <input type="text" name="search" class="filter-input"
-            placeholder="Search by billing #, client, plate, or insurer..."
+            placeholder="Search by billing #, client ID, client, plate, or insurer..."
             value="<?= htmlspecialchars($search) ?>" style="padding-left:2.4rem;width:100%;"/>
         </div>
         <select name="status" class="filter-input" style="width:150px;">
@@ -126,7 +126,7 @@ require_once '../../includes/topbar.php';
             $total_repair = (float)$row['parts_cost'] + (float)$row['labor_cost'] + (float)$row['other_cost'];
           ?>
           <tr>
-            <td><span class="job-num"><?= htmlspecialchars($row['billing_number']) ?></span></td>
+            <td><span class="record-id"><?= htmlspecialchars($row['billing_number']) ?></span></td>
             <td>
               <div class="cell-primary"><?= htmlspecialchars($row['full_name']) ?></div>
               <div class="cell-sub"><?= htmlspecialchars($row['plate_number'] ?? '—') ?>

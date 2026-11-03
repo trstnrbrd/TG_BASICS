@@ -21,7 +21,7 @@ $full_name = $_SESSION['full_name'];
 $initials  = substr(implode('', array_map(fn($w) => strtoupper($w[0] ?? ''), array_filter(explode(' ', $full_name), 'strlen'))), 0, 2);
 
 $search      = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
-$filter_by   = san_enum($_GET['filter_by'] ?? 'all', ['all', 'name', 'plate', 'contact', 'email']);
+$filter_by   = san_enum($_GET['filter_by'] ?? 'all', ['all', 'code', 'name', 'plate', 'contact', 'email']);
 $sort_by     = $_GET['sort'] ?? 'newest';
 $is_mechanic = is_mechanic();
 // Mechanics only ever see walk-in clients — force this regardless of any ?client_type= in the URL
@@ -127,8 +127,13 @@ require_once '../../includes/navbar.php';
    holds as the cursor moves from one row straight into the other. */
 .client-list-table thead th { padding: 0.45rem 0.75rem; }
 .client-list-table tbody td { padding: 0.45rem 0.75rem; }
+/* 1st column: Client ID, centered like Billing # / Repair ID, with room for the row chevron on its left;
+   2nd column: the client's name, left-aligned as before */
 .client-list-table thead th:first-child,
-.client-list-table tbody td:first-child { text-align: left !important; }
+.client-list-table tbody tr.tg-expandable-row td:first-child { padding-left: 2.25rem; }
+.client-list-table thead th:nth-child(2),
+.client-list-table tbody tr.tg-expandable-row td:nth-child(2),
+.client-list-table tbody tr.tg-expand-row td { text-align: left !important; }
 .client-list-table .tg-expand-row { display: none; }
 .client-list-table .tg-expandable-row:hover + .tg-expand-row,
 .client-list-table .tg-expand-row:hover {
@@ -201,7 +206,7 @@ require_once '../../includes/topbar.php';
         <div style="position:relative;flex:1;min-width:150px;max-width:400px;">
           <span style="position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;z-index:1;"><?= icon('magnifying-glass', 14) ?></span>
           <input type="text" name="search" id="client-search-input"
-            placeholder="Search clients..."
+            placeholder="Search by client ID, name, plate..."
             value="<?= htmlspecialchars($search) ?>"
             class="filter-input" style="padding-left:2.4rem;width:100%;"
             autocomplete="off"/>
@@ -213,6 +218,7 @@ require_once '../../includes/topbar.php';
         <!-- FILTER BY -->
         <select name="filter_by" class="filter-input" style="min-width:120px;">
           <option value="all"     <?= $filter_by === 'all' ? 'selected' : '' ?>>All Fields</option>
+          <option value="code"    <?= $filter_by === 'code' ? 'selected' : '' ?>>Client ID</option>
           <option value="name"    <?= $filter_by === 'name' ? 'selected' : '' ?>>Name</option>
           <option value="plate"   <?= $filter_by === 'plate' ? 'selected' : '' ?>>Plate Number</option>
           <option value="contact" <?= $filter_by === 'contact' ? 'selected' : '' ?>>Contact</option>
@@ -272,6 +278,7 @@ require_once '../../includes/topbar.php';
         ?>
         <a href="view_client.php?id=<?= $row['client_id'] ?>" class="cl-card">
           <div class="cl-card-body">
+            <div class="record-id"><?= htmlspecialchars($row['client_code']) ?></div>
             <div class="cl-card-name"><?= htmlspecialchars($row['full_name']) ?></div>
             <div class="cl-card-meta">
               <?php if (!empty($row['contact_number'])): ?><?= icon('phone', 11) ?> <?= htmlspecialchars($row['contact_number']) ?>
@@ -309,7 +316,8 @@ require_once '../../includes/topbar.php';
         <table class="tg-table client-list-table">
           <thead>
             <tr>
-              <th style="text-align:left;padding-left:2.5rem;">
+              <th>Client ID</th>
+              <th style="text-align:left;">
                 <?php
                 $next_sort  = $sort_by === 'name_asc' ? 'name_desc' : 'name_asc';
                 $sort_icon  = $sort_by === 'name_asc'
@@ -340,13 +348,12 @@ require_once '../../includes/topbar.php';
               }
             ?>
             <tr class="tg-expandable-row" data-expand="<?= $cid ?>" tabindex="0" style="cursor:pointer;">
+              <td style="position:relative;">
+                <svg class="row-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="position:absolute;left:1rem;top:50%;margin-top:-7px;opacity:0.35;transition:transform 0.2s;"><polyline points="9 18 15 12 9 6"/></svg>
+                <span class="record-id"><?= htmlspecialchars($row['client_code']) ?></span>
+              </td>
               <td style="text-align:left;">
-                <div style="display:flex;align-items:center;gap:0.6rem;">
-                  <svg class="row-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;opacity:0.35;transition:transform 0.2s;"><polyline points="9 18 15 12 9 6"/></svg>
-                  <div>
-                    <div style="font-weight:700;color:var(--text-primary);font-size:0.85rem;"><?= htmlspecialchars($row['full_name']) ?></div>
-                  </div>
-                </div>
+                <div style="font-weight:700;color:var(--text-primary);font-size:0.85rem;"><?= htmlspecialchars($row['full_name']) ?></div>
               </td>
               <td style="font-size:0.82rem;"><?= htmlspecialchars($row['contact_number'] ?: '—') ?></td>
               <?php if (!$is_mechanic): ?>
@@ -381,7 +388,7 @@ require_once '../../includes/topbar.php';
               </td>
             </tr>
             <tr class="tg-expand-row" id="<?= $cid ?>" style="display:none;">
-              <td colspan="<?= $is_mechanic ? 4 : 5 ?>" style="padding:0;">
+              <td colspan="<?= $is_mechanic ? 5 : 6 ?>" style="padding:0;">
                 <div class="tg-expand-body">
                   <div class="tg-expand-grid">
                     <div class="tg-expand-item">
@@ -421,7 +428,7 @@ require_once '../../includes/topbar.php';
         <a href="?<?= htmlspecialchars(http_build_query(array_merge(array_diff_key($_GET, ['success' => 1, 'error' => 1]), ['agent' => 'all']))) ?>" class="btn-primary" style="margin-top:0.9rem;"><?= icon('users', 14) ?> Show All Agents</a>
         <?php else: ?>
         <div class="empty-title"><?= $search ? 'No results found' : 'No clients yet' ?></div>
-        <div class="empty-desc"><?= $search ? 'Try a different name, plate number, or contact.' : 'Start by adding your first client record.' ?></div>
+        <div class="empty-desc"><?= $search ? 'Try a different client ID, name, plate number, or contact.' : 'Start by adding your first client record.' ?></div>
         <?php endif; ?>
       </div>
       <?php endif; ?>

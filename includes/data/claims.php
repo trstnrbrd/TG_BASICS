@@ -31,7 +31,7 @@ function claim_find(mysqli $conn, int $claim_id): ?array
 {
     return dal_one($conn, "
         SELECT cl.*,
-               c.full_name, c.contact_number, c.email, c.address, c.client_id,
+               c.client_code, c.full_name, c.contact_number, c.email, c.address, c.client_id,
                ip.policy_number, ip.coverage_type, ip.policy_start, ip.policy_end,
                ip.total_premium, ip.participation_fee, ip.payment_status,
                v.plate_number, v.make, v.model, v.year_model, v.color, v.motor_number, v.serial_number,
@@ -156,9 +156,9 @@ function claims_list_page(mysqli $conn, string $search, string $status, string $
     $where = ['1=1']; $types = ''; $params = [];
     if ($search !== '') {
         $like    = "%$search%";
-        $where[] = '(c.full_name LIKE ? OR v.plate_number LIKE ? OR ip.policy_number LIKE ? OR v.make LIKE ? OR v.model LIKE ?)';
-        array_push($params, $like, $like, $like, $like, $like);
-        $types  .= 'sssss';
+        $where[] = '(c.client_code LIKE ? OR c.full_name LIKE ? OR v.plate_number LIKE ? OR ip.policy_number LIKE ? OR v.make LIKE ? OR v.model LIKE ?)';
+        array_push($params, $like, $like, $like, $like, $like, $like);
+        $types  .= 'ssssss';
     }
     if ($status !== 'all') { $where[] = 'cl.status = ?';     $params[] = $status; $types .= 's'; }
     if ($type !== 'all')   { $where[] = 'cl.claim_type = ?'; $params[] = $type;   $types .= 's'; }
@@ -166,7 +166,7 @@ function claims_list_page(mysqli $conn, string $search, string $status, string $
     [$result, $pg] = paginate_query($conn, "
         SELECT cl.claim_id, cl.claim_type, cl.status, cl.incident_date, cl.created_at,
                cl." . implode(', cl.', CLAIM_DOC_FIELDS) . ",
-               c.full_name, c.client_id, v.plate_number, v.make, v.model, ip.policy_number, ip.coverage_type,
+               c.client_code, c.full_name, c.client_id, v.plate_number, v.make, v.model, ip.policy_number, ip.coverage_type,
                CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.full_name END AS added_by_name,
                CASE WHEN u.is_hidden = 1 THEN NULL ELSE u.profile_photo END AS added_by_photo
         FROM claims cl

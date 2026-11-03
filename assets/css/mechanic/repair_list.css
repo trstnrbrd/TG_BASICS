@@ -95,13 +95,6 @@
 .rl-search-wrap .field-input {
   padding-left: 2.1rem;
 }
-.job-num {
-  font-weight: 700;
-  color: var(--gold);
-  font-size: 0.8rem;
-  font-family: monospace;
-  letter-spacing: 0.3px;
-}
 .cell-primary {
   font-weight: 600;
   font-size: 0.82rem;

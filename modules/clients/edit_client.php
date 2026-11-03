@@ -66,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($saved) {
             // Audit log
             $uid = $_SESSION['user_id'];
-            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' updated client "' . $full_name . '" (ID ' . $client_id . ').';
+            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' updated client "' . $full_name . '" (' . (($client['client_code'] ?? '') ?: 'ID ' . $client_id) . ').';
             if ($agent_id !== $cur_agent_id) {
                 $desc .= ' Insurance agent changed from ' . ($client['agent_name'] ?? 'Unassigned') . ' to ' . $agents[$agent_id]['full_name'] . '.';
             }
@@ -132,6 +132,11 @@ require_once '../../includes/topbar.php';
         </div>
         <div style="padding:1.5rem;">
           <div class="form-grid" style="margin-bottom:1rem;">
+            <div class="field">
+              <label class="field-label">Client ID</label>
+              <input type="text" class="field-input" value="<?= htmlspecialchars(($client['client_code'] ?? '') ?: '—') ?>" disabled/>
+              <div class="field-hint">Given by the system when the client was added. It never changes.</div>
+            </div>
             <div class="field">
               <label class="field-label" for="agent_id">Insurance Agent<?= $is_super ? ' <span class="req">*</span>' : '' ?></label>
               <?php if ($is_super): ?>

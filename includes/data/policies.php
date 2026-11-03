@@ -17,7 +17,7 @@ function policies_overdue_unpaid(mysqli $conn): array
 {
     return dal_all($conn, "
         SELECT p.policy_id, p.policy_number, p.insurance_company, p.payment_status,
-               c.full_name AS client_name, c.agent_id, v.plate_number,
+               c.client_code, c.full_name AS client_name, c.agent_id, v.plate_number,
                SUM(pp.amount_due) - SUM(pp.amount_paid) AS overdue_amount,
                MIN(CASE WHEN pp.amount_paid < pp.amount_due THEN pp.due_date END) AS oldest_due
         FROM insurance_policies p
@@ -35,7 +35,7 @@ function policies_urgent_unreminded(mysqli $conn, int $days): array
 {
     return dal_all($conn, "
         SELECT p.policy_id, p.policy_number, p.insurance_company, p.policy_end,
-               DATEDIFF(p.policy_end, CURDATE()) AS days_left, c.full_name AS client_name, c.agent_id, v.plate_number
+               DATEDIFF(p.policy_end, CURDATE()) AS days_left, c.client_code, c.full_name AS client_name, c.agent_id, v.plate_number
         FROM insurance_policies p
         INNER JOIN clients  c ON c.client_id  = p.client_id
         INNER JOIN vehicles v ON v.vehicle_id = p.vehicle_id
@@ -50,7 +50,7 @@ function policies_expiring_within(mysqli $conn, int $days): array
 {
     return dal_all($conn, "
         SELECT p.policy_number, p.insurance_company, p.policy_end, DATEDIFF(p.policy_end, CURDATE()) AS days_left,
-               c.full_name AS client_name, v.plate_number
+               c.client_code, c.full_name AS client_name, v.plate_number
         FROM insurance_policies p
         INNER JOIN clients  c ON c.client_id  = p.client_id
         INNER JOIN vehicles v ON v.vehicle_id = p.vehicle_id
@@ -66,7 +66,7 @@ function policy_find(mysqli $conn, int $policy_id): ?array
 {
     return dal_one($conn, "
         SELECT p.*, DATEDIFF(p.policy_end, CURDATE()) AS days_left,
-               c.full_name, c.contact_number, c.email, c.address, c.agent_id,
+               c.client_code, c.full_name, c.contact_number, c.email, c.address, c.agent_id,
                (SELECT CASE WHEN ag.is_hidden = 1 THEN 'Developer' ELSE ag.full_name END FROM users ag WHERE ag.user_id = c.agent_id) AS agent_name,
                v.plate_number, v.make, v.model, v.year_model, v.color, v.motor_number, v.serial_number
         FROM insurance_policies p
@@ -79,7 +79,7 @@ function policy_find(mysqli $conn, int $policy_id): ?array
 function policy_find_for_edit(mysqli $conn, int $policy_id): ?array
 {
     return dal_one($conn, "
-        SELECT p.*, c.agent_id, c.full_name, v.plate_number, v.make, v.model, v.year_model
+        SELECT p.*, c.agent_id, c.client_code, c.full_name, v.plate_number, v.make, v.model, v.year_model
         FROM insurance_policies p
         INNER JOIN clients c  ON c.client_id = p.client_id
         INNER JOIN vehicles v ON v.vehicle_id = p.vehicle_id
@@ -128,29 +128,29 @@ function policy_number_taken(mysqli $conn, string $policy_number, int $except_po
 
 /* ---- Eligibility check / New Policy ---- */
 
-/** The search on Eligibility Check: client, contact, plate, make/model, engine or chassis no. */
-const POLICY_VEHICLE_SEARCH_SQL = "c.deleted_at IS NULL AND (c.full_name LIKE ? OR v.plate_number LIKE ? OR v.make LIKE ? OR v.model LIKE ?
+/** The search on Eligibility Check: client ID, client, contact, plate, make/model, engine or chassis no. */
+const POLICY_VEHICLE_SEARCH_SQL = "c.deleted_at IS NULL AND (c.client_code LIKE ? OR c.full_name LIKE ? OR v.plate_number LIKE ? OR v.make LIKE ? OR v.model LIKE ?
                                    OR c.contact_number LIKE ? OR v.motor_number LIKE ? OR v.serial_number LIKE ? OR CONCAT(v.make, ' ', v.model) LIKE ?)";
 
 /** Up to $limit vehicles (with client) matching $text, by client name — the live suggestions. */
 function policy_vehicle_suggest(mysqli $conn, string $text, int $limit = 8): array
 {
     return dal_all($conn, "
-        SELECT c.client_id, c.full_name, c.contact_number, v.vehicle_id, v.plate_number, v.make, v.model, v.year_model
+        SELECT c.client_id, c.client_code, c.full_name, c.contact_number, v.vehicle_id, v.plate_number, v.make, v.model, v.year_model
         FROM clients c INNER JOIN vehicles v ON c.client_id = v.client_id
         WHERE " . POLICY_VEHICLE_SEARCH_SQL . "
         ORDER BY c.full_name ASC
-        LIMIT ?", str_repeat('s', 8) . 'i', array_merge(array_fill(0, 8, "%$text%"), [$limit]));
+        LIMIT ?", str_repeat('s', 9) . 'i', array_merge(array_fill(0, 9, "%$text%"), [$limit]));
 }
 
 /** One page of vehicles (with client) matching $text, by client name. Returns [rows, pager]. */
 function policy_vehicle_search_page(mysqli $conn, string $text): array
 {
     [$result, $pg] = paginate_query($conn, "
-        SELECT c.client_id, c.full_name, c.contact_number, v.vehicle_id, v.plate_number, v.make, v.model, v.year_model, v.color
+        SELECT c.client_id, c.client_code, c.full_name, c.contact_number, v.vehicle_id, v.plate_number, v.make, v.model, v.year_model, v.color
         FROM clients c INNER JOIN vehicles v ON c.client_id = v.client_id
         WHERE " . POLICY_VEHICLE_SEARCH_SQL . "
-        ORDER BY c.full_name ASC", str_repeat('s', 8), array_fill(0, 8, "%$text%"));
+        ORDER BY c.full_name ASC", str_repeat('s', 9), array_fill(0, 9, "%$text%"));
     return [$result->fetch_all(MYSQLI_ASSOC), $pg];
 }
 
@@ -158,7 +158,7 @@ function policy_vehicle_search_page(mysqli $conn, string $text): array
 function policy_vehicle_with_client(mysqli $conn, int $vehicle_id): ?array
 {
     return dal_one($conn, "
-        SELECT c.client_id, c.full_name, c.contact_number, c.address,
+        SELECT c.client_id, c.client_code, c.full_name, c.contact_number, c.address,
                v.vehicle_id, v.plate_number, v.make, v.model, v.year_model, v.color, v.motor_number, v.serial_number
         FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id
         WHERE v.vehicle_id = ? AND c.deleted_at IS NULL", 'i', [$vehicle_id]);
@@ -168,7 +168,7 @@ function policy_vehicle_with_client(mysqli $conn, int $vehicle_id): ?array
 function policy_vehicle_by_plate(mysqli $conn, string $plate_number): ?array
 {
     return dal_one($conn, "
-        SELECT c.client_id, c.full_name, c.contact_number, c.address,
+        SELECT c.client_id, c.client_code, c.full_name, c.contact_number, c.address,
                v.vehicle_id, v.plate_number, v.make, v.model, v.year_model, v.color, v.motor_number, v.serial_number
         FROM vehicles v INNER JOIN clients c ON v.client_id = c.client_id
         WHERE v.plate_number = ? AND c.deleted_at IS NULL
@@ -221,9 +221,9 @@ function policies_renewal_page(mysqli $conn, string $company, string $filter, st
     $types = 's'; $params = [$company];
     if ($search !== '') {
         $like    = "%$search%";
-        $where[] = '(c.full_name LIKE ? OR c.contact_number LIKE ? OR v.plate_number LIKE ? OR p.policy_number LIKE ?)';
-        array_push($params, $like, $like, $like, $like);
-        $types  .= 'ssss';
+        $where[] = '(c.client_code LIKE ? OR c.full_name LIKE ? OR c.contact_number LIKE ? OR v.plate_number LIKE ? OR p.policy_number LIKE ?)';
+        array_push($params, $like, $like, $like, $like, $like);
+        $types  .= 'sssss';
     }
     [$wsql, $wt, $wp] = policy_window_sql($filter, $urgent_days, $expiring_days);
     $where[] = $wsql; $types .= $wt; $params = array_merge($params, $wp);
@@ -232,7 +232,7 @@ function policies_renewal_page(mysqli $conn, string $company, string $filter, st
                p.policy_start, p.policy_end, p.is_renewed, p.renewed_at,
                p.sum_insured, p.total_premium, p.amount_paid, p.balance, p.payment_status,
                DATEDIFF(p.policy_end, CURDATE()) AS days_left,
-               c.client_id, c.full_name, c.contact_number, v.plate_number, v.make, v.model, v.year_model,
+               c.client_id, c.client_code, c.full_name, c.contact_number, v.plate_number, v.make, v.model, v.year_model,
                CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.full_name END AS added_by_name,
                CASE WHEN ag.is_hidden = 1 THEN 'Developer' ELSE ag.full_name END AS agent_name,
                CASE WHEN ag.is_hidden = 1 THEN NULL ELSE ag.profile_photo END AS agent_photo
@@ -280,7 +280,7 @@ function policies_due_list(mysqli $conn, int $days, int $limit): array
     return dal_all($conn, "
         SELECT p.policy_id, p.policy_number, p.policy_end, p.coverage_type,
                DATEDIFF(p.policy_end, CURDATE()) AS days_left,
-               c.full_name, v.plate_number, v.make, v.model
+               c.client_code, c.full_name, v.plate_number, v.make, v.model
         FROM insurance_policies p
         INNER JOIN vehicles v ON p.vehicle_id = v.vehicle_id
         INNER JOIN clients c  ON p.client_id  = c.client_id

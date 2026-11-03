@@ -83,7 +83,7 @@ document.addEventListener('DOMContentLoaded',function(){
     <div class="rl-filter-search" style="position:relative;flex:1;min-width:200px;max-width:360px;">
       <span style="position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;"><?= icon('magnifying-glass', 14) ?></span>
       <input type="text" name="search" class="filter-input"
-        placeholder="Search client, plate, quotation #..."
+        placeholder="Search client ID, client, plate, quotation #..."
         value="<?= htmlspecialchars($search) ?>" style="padding-left:2.4rem;width:100%;"/>
     </div>
     <select name="status" class="filter-input rl-filter-status" style="width:170px;">

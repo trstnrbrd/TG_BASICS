@@ -55,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_client_id'])) 
         // client marked deleted and the audit entry: all saved together or not at all
         db_transaction($conn, function () use ($conn, $del_id, $cdata) {
             client_soft_delete($conn, $del_id);
-            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' deleted client "' . $cdata['full_name'] . '" (moved to Recently Deleted).';
+            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' deleted client "' . $cdata['full_name'] . '"' . (!empty($cdata['client_code']) ? ' (' . $cdata['client_code'] . ')' : '') . ' (moved to Recently Deleted).';
             audit_log_add($conn, $_SESSION['user_id'], 'CLIENT_DELETED', $desc);
         });
         header("Location: client_list.php?success=" . urlencode('"' . $cdata['full_name'] . '" has been deleted. You can restore them from Recently Deleted.'));
@@ -235,6 +235,7 @@ require_once '../../includes/topbar.php';
         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:0.65rem 2rem;min-width:0;">
           <?php
           $info_rows = [
+            ['Client ID',  ($client['client_code'] ?? '') ?: '—'],
             ['Full Name',  $client['full_name']],
             ['Contact',    $client['contact_number'] ?: 'Not provided'],
             ['Email',      $client['email'] ?: 'Not provided'],
@@ -540,7 +541,7 @@ require_once '../../includes/topbar.php';
             if (count($_client_vehicle_ids) === 1) {
                 $_elig_url = '../insurance/eligibility_check.php?vehicle_id=' . $_client_vehicle_ids[0];
             } elseif (count($_client_vehicle_ids) > 1) {
-                $_elig_url = '../insurance/eligibility_check.php?search=' . urlencode($client['full_name']);
+                $_elig_url = '../insurance/eligibility_check.php?search=' . urlencode(($client['client_code'] ?? '') ?: $client['full_name']);   // the ID finds only this client, the name could find namesakes
             } else {
                 $_elig_url = '../insurance/eligibility_check.php';
             }
@@ -812,13 +813,13 @@ require_once '../../includes/topbar.php';
       // Draw logo
       ctx.drawImage(logo, x, y, size, size);
       var link = document.createElement('a');
-      link.download = 'QR-<?= addslashes(htmlspecialchars($client['full_name'])) ?>.png';
+      link.download = 'QR-<?= addslashes(htmlspecialchars(trim(($client['client_code'] ?? '') . ' ' . $client['full_name']))) ?>.png';
       link.href = out.toDataURL('image/png');
       link.click();
     };
     logo.onerror = function() {
       var link = document.createElement('a');
-      link.download = 'QR-<?= addslashes(htmlspecialchars($client['full_name'])) ?>.png';
+      link.download = 'QR-<?= addslashes(htmlspecialchars(trim(($client['client_code'] ?? '') . ' ' . $client['full_name']))) ?>.png';
       link.href = out.toDataURL('image/png');
       link.click();
     };

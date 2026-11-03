@@ -40,7 +40,7 @@ function vehicle_record_counts(mysqli $conn, int $vehicle_id): array
 function clients_named(mysqli $conn, string $name, int $limit): array
 {
     return dal_all($conn, "
-        SELECT c.client_id, c.full_name, GROUP_CONCAT(v.plate_number ORDER BY v.vehicle_id SEPARATOR ', ') AS plates
+        SELECT c.client_id, c.client_code, c.full_name, GROUP_CONCAT(v.plate_number ORDER BY v.vehicle_id SEPARATOR ', ') AS plates
         FROM clients c LEFT JOIN vehicles v ON v.client_id = c.client_id
         WHERE c.deleted_at IS NULL AND c.full_name = ?
         GROUP BY c.client_id
@@ -51,6 +51,7 @@ function clients_named(mysqli $conn, string $name, int $limit): array
 /* ---- Client Records list ---- */
 require_once __DIR__ . '/../pagination.php';
 require_once __DIR__ . '/../agent_filter.php';
+require_once __DIR__ . '/../client_code.php';
 
 /** SQL that limits to walk-in clients (no policy ever); mechanics only ever see these. $alias: the clients table alias. */
 function clients_walkin_sql(string $alias): string
@@ -58,24 +59,24 @@ function clients_walkin_sql(string $alias): string
     return "NOT EXISTS (SELECT 1 FROM insurance_policies ip WHERE ip.client_id = $alias.client_id)";
 }
 
-/** The search box suggestions: up to 8 client/vehicle pairs matching name, contact, plate, make or model. */
+/** The search box suggestions: up to 8 client/vehicle pairs matching client ID, name, contact, plate, make or model. */
 function clients_autocomplete(mysqli $conn, string $text, bool $walkins_only): array
 {
     $q = '%' . $text . '%';
     return dal_all($conn, "
-        SELECT c.client_id, c.full_name, c.contact_number, v.plate_number, v.make, v.model
+        SELECT c.client_id, c.client_code, c.full_name, c.contact_number, v.plate_number, v.make, v.model
         FROM clients c
         LEFT JOIN vehicles v ON c.client_id = v.client_id
         WHERE c.deleted_at IS NULL " . ($walkins_only ? 'AND ' . clients_walkin_sql('c') : '') . "
-          AND (c.full_name LIKE ? OR c.contact_number LIKE ? OR v.plate_number LIKE ? OR v.make LIKE ? OR v.model LIKE ?)
+          AND (c.client_code LIKE ? OR c.full_name LIKE ? OR c.contact_number LIKE ? OR v.plate_number LIKE ? OR v.make LIKE ? OR v.model LIKE ?)
         GROUP BY c.client_id, v.vehicle_id
         ORDER BY c.full_name ASC
-        LIMIT 8", 'sssss', [$q, $q, $q, $q, $q]);
+        LIMIT 8", 'ssssss', [$q, $q, $q, $q, $q, $q]);
 }
 
 /**
- * One page of Client Records. $search in the $filter_by field ('all', 'name',
- * 'plate', 'contact', 'email'); $sort 'newest', 'oldest', 'name_asc',
+ * One page of Client Records. $search in the $filter_by field ('all', 'code',
+ * 'name', 'plate', 'contact', 'email'); $sort 'newest', 'oldest', 'name_asc',
  * 'name_desc', 'vehicles'; $type 'all', 'insurance', 'walkin'; $af the
  * insurance-agent filter (includes/agent_filter.php). Returns [rows, pager].
  */
@@ -84,26 +85,28 @@ function clients_list_page(mysqli $conn, string $search, string $filter_by, stri
     $where = []; $types = ''; $params = [];
     if ($search !== '') {
         $like = "%$search%";
-        $col  = ['name' => 'c.full_name', 'plate' => 'v.plate_number', 'contact' => 'c.contact_number', 'email' => 'c.email'][$filter_by] ?? null;
+        $col  = ['code' => 'c.client_code', 'name' => 'c.full_name', 'plate' => 'v.plate_number', 'contact' => 'c.contact_number', 'email' => 'c.email'][$filter_by] ?? null;
         if ($col !== null) {
             $where[] = "$col LIKE ?";
             $types  .= 's'; $params[] = $like;
         } else {
-            $where[] = '(c.full_name LIKE ? OR v.plate_number LIKE ? OR c.contact_number LIKE ? OR c.email LIKE ?)';
-            $types  .= 'ssss'; array_push($params, $like, $like, $like, $like);
+            $where[] = '(c.client_code LIKE ? OR c.full_name LIKE ? OR v.plate_number LIKE ? OR c.contact_number LIKE ? OR c.email LIKE ?)';
+            $types  .= 'sssss'; array_push($params, $like, $like, $like, $like, $like);
         }
     }
     $where[] = 'c.deleted_at IS NULL';
+    // Each order ends on c.client_id, so clients added in the same second (or with the same name / vehicle
+    // count) still come out in a fixed order: the newer one (higher Client ID) first, or last for 'oldest'.
     $order = match ($sort) {
-        'oldest'    => 'c.created_at ASC',
-        'name_asc'  => 'c.full_name ASC',
-        'name_desc' => 'c.full_name DESC',
-        'vehicles'  => 'vehicle_count DESC',
-        default     => 'c.created_at DESC',
+        'oldest'    => 'c.created_at ASC, c.client_id ASC',
+        'name_asc'  => 'c.full_name ASC, c.client_id ASC',
+        'name_desc' => 'c.full_name DESC, c.client_id DESC',
+        'vehicles'  => 'vehicle_count DESC, c.created_at DESC, c.client_id DESC',
+        default     => 'c.created_at DESC, c.client_id DESC',
     };
     $having = ['insurance' => 'HAVING has_policy = 1', 'walkin' => 'HAVING has_policy = 0'][$type] ?? '';
     [$result, $pg] = paginate_query($conn, "
-        SELECT c.client_id, c.full_name, c.contact_number, c.email, c.created_by, c.agent_id,
+        SELECT c.client_id, c.client_code, c.full_name, c.contact_number, c.email, c.created_by, c.agent_id,
                COUNT(DISTINCT v.vehicle_id) AS vehicle_count, c.created_at,
                COUNT(DISTINCT ip.policy_id) > 0 AS has_policy,
                CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.full_name END AS added_by_name,
@@ -137,7 +140,7 @@ function clients_list_stats(mysqli $conn, bool $walkins_only, array $af): array
 /** Plate number and client name of every vehicle of an active client (the import's duplicate check). */
 function vehicles_active_plates(mysqli $conn): array
 {
-    return dal_all($conn, "SELECT v.plate_number, c.full_name FROM vehicles v JOIN clients c ON c.client_id = v.client_id WHERE c.deleted_at IS NULL");
+    return dal_all($conn, "SELECT v.plate_number, c.client_code, c.full_name FROM vehicles v JOIN clients c ON c.client_id = v.client_id WHERE c.deleted_at IS NULL");
 }
 
 /** Which of $plates are now on an active client's vehicle (exact match). Returns the plate numbers found. */
@@ -149,17 +152,17 @@ function vehicles_plates_taken(mysqli $conn, array $plates): array
                                 str_repeat('s', count($plates)), array_values($plates)), 'plate_number');
 }
 
-/** UPPER name => ['ABC 1234, XYZ 789', ...] for active clients already in the system with one of these names. */
+/** UPPER name => ['CL-0007: ABC 1234, XYZ 789', ...] for active clients already in the system with one of these names. */
 function clients_with_names(mysqli $conn, array $names): array
 {
     $found = [];
     foreach (array_chunk(array_values($names), 200) as $chunk) {
         $rows = dal_all($conn, "
-            SELECT c.full_name, GROUP_CONCAT(v.plate_number ORDER BY v.vehicle_id SEPARATOR ', ') AS plates
+            SELECT c.client_code, c.full_name, GROUP_CONCAT(v.plate_number ORDER BY v.vehicle_id SEPARATOR ', ') AS plates
             FROM clients c LEFT JOIN vehicles v ON v.client_id = c.client_id
             WHERE c.deleted_at IS NULL AND c.full_name IN (" . dal_in($chunk) . ")
             GROUP BY c.client_id", str_repeat('s', count($chunk)), $chunk);
-        foreach ($rows as $row) $found[mb_strtoupper($row['full_name'])][] = $row['plates'] ?: 'no vehicle';
+        foreach ($rows as $row) $found[mb_strtoupper($row['full_name'])][] = ($row['client_code'] ? $row['client_code'] . ': ' : '') . ($row['plates'] ?: 'no vehicle');
     }
     return $found;
 }
@@ -170,7 +173,7 @@ function clients_with_names(mysqli $conn, array $names): array
 function vehicle_find(mysqli $conn, int $vehicle_id): ?array
 {
     return dal_one($conn, "
-        SELECT v.*, c.full_name AS client_name, c.contact_number, c.email
+        SELECT v.*, c.client_code, c.full_name AS client_name, c.contact_number, c.email
         FROM vehicles v
         INNER JOIN clients c ON v.client_id = c.client_id
         WHERE v.vehicle_id = ?", 'i', [$vehicle_id]);
@@ -193,7 +196,7 @@ function client_vehicle(mysqli $conn, int $client_id, int $vehicle_id): ?array
 /** An active client's id, name and contact number, or null. */
 function client_find_contact(mysqli $conn, int $client_id): ?array
 {
-    return dal_one($conn, "SELECT client_id, full_name, contact_number FROM clients WHERE client_id = ? AND deleted_at IS NULL", 'i', [$client_id]);
+    return dal_one($conn, "SELECT client_id, client_code, full_name, contact_number FROM clients WHERE client_id = ? AND deleted_at IS NULL", 'i', [$client_id]);
 }
 
 /** The token of a client's public QR page ('' when none). */
@@ -308,17 +311,19 @@ function client_document_delete(mysqli $conn, int $doc_id): void
     dal_exec($conn, "DELETE FROM client_documents WHERE doc_id = ?", 'i', [$doc_id]);
 }
 
-/** Active clients whose name contains $text, by name, at most $limit: [client_id, full_name]. */
+/** Active clients whose client ID or name contains $text, by name, at most $limit: [client_id, client_code, full_name]. */
 function clients_search_by_name(mysqli $conn, string $text, int $limit = 20): array
 {
-    return dal_all($conn, "SELECT client_id, full_name FROM clients WHERE deleted_at IS NULL AND full_name LIKE ? ORDER BY full_name ASC LIMIT ?",
-                   'si', ['%' . $text . '%', $limit]);
+    $like = '%' . $text . '%';
+    return dal_all($conn, "SELECT client_id, client_code, full_name FROM clients
+                           WHERE deleted_at IS NULL AND (client_code LIKE ? OR full_name LIKE ?) ORDER BY full_name ASC LIMIT ?",
+                   'ssi', [$like, $like, $limit]);
 }
 
 /** An active (not deleted) client's id and name, or null. */
 function client_find_name(mysqli $conn, int $client_id): ?array
 {
-    return dal_one($conn, "SELECT client_id, full_name FROM clients WHERE client_id = ? AND deleted_at IS NULL", 'i', [$client_id]);
+    return dal_one($conn, "SELECT client_id, client_code, full_name FROM clients WHERE client_id = ? AND deleted_at IS NULL", 'i', [$client_id]);
 }
 
 /**
@@ -337,19 +342,39 @@ function vehicle_plate_taken(mysqli $conn, string $plate_number, int $except_veh
 }
 
 /**
+ * The next client reference ID (CL-0001 ...). Bumps the client_code_seq counter in system_settings in
+ * one statement; inside the caller's transaction that row stays locked until the commit, so two clients
+ * saved at once can never get the same number, and a rolled-back save gives its number back. The
+ * migration seeds the counter; if the row is missing it is rebuilt from the highest code in use.
+ */
+function client_code_next(mysqli $conn): string
+{
+    $bump = "UPDATE system_settings SET setting_value = LAST_INSERT_ID(CAST(setting_value AS UNSIGNED) + 1) WHERE setting_key = 'client_code_seq'";
+    if (dal_exec($conn, $bump) !== 1) {
+        $last = (int)dal_value($conn, "SELECT COALESCE(MAX(CAST(SUBSTRING(client_code, ?) AS UNSIGNED)), 0) FROM clients WHERE client_code LIKE ?",
+                               'is', [strlen(CLIENT_CODE_PREFIX) + 1, CLIENT_CODE_PREFIX . '%']);
+        dal_exec($conn, "INSERT IGNORE INTO system_settings (setting_key, setting_value) VALUES ('client_code_seq', ?)", 's', [(string)$last]);
+        if (dal_exec($conn, $bump) !== 1) throw new RuntimeException('Could not number the new client (client_code_seq).');
+    }
+    return client_code_format((int)dal_value($conn, "SELECT LAST_INSERT_ID()"));
+}
+
+/**
  * Adds a client and returns its id. $c: full_name, contact_number, email,
- * facebook_name, address, agent_id. The Data Privacy consent is recorded as
- * signed now by $created_by, and the client gets a random token for their
- * public QR page.
+ * facebook_name, address, agent_id. The client gets the next reference ID
+ * (client_code_next(); call this inside db_transaction() so the number is
+ * held until the commit), the Data Privacy consent is recorded as signed now
+ * by $created_by, and a random token for their public QR page.
  */
 function client_create(mysqli $conn, array $c, int $created_by): int
 {
+    $code  = client_code_next($conn);
     $token = bin2hex(random_bytes(32));
-    $stmt  = dal_stmt($conn, "INSERT INTO clients (full_name, contact_number, email, facebook_name, address, created_by, agent_id,
+    $stmt  = dal_stmt($conn, "INSERT INTO clients (client_code, full_name, contact_number, email, facebook_name, address, created_by, agent_id,
                                                    consent_signed_at, consent_recorded_by, public_token)
-                              VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)");
+                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)");
     $agent_id = (int)$c['agent_id'];
-    $stmt->bind_param('sssssiiis', $c['full_name'], $c['contact_number'], $c['email'], $c['facebook_name'], $c['address'],
+    $stmt->bind_param('ssssssiiis', $code, $c['full_name'], $c['contact_number'], $c['email'], $c['facebook_name'], $c['address'],
                       $created_by, $agent_id, $created_by, $token);
     $stmt->execute();
     return (int)$conn->insert_id;
@@ -405,7 +430,7 @@ function client_soft_delete(mysqli $conn, int $client_id): void
 /** Soft-deleted clients, newest first. $user_id keeps only those that user added or handles as agent; null = all. */
 function clients_deleted_list(mysqli $conn, ?int $user_id = null): array
 {
-    $sql = "SELECT c.client_id, c.full_name, c.contact_number, c.deleted_at,
+    $sql = "SELECT c.client_id, c.client_code, c.full_name, c.contact_number, c.deleted_at,
                    (SELECT COUNT(*) FROM vehicles v WHERE v.client_id = c.client_id) AS vehicle_count
             FROM clients c
             WHERE c.deleted_at IS NOT NULL";
@@ -416,7 +441,7 @@ function clients_deleted_list(mysqli $conn, ?int $user_id = null): array
 /** One soft-deleted client (name, who added / handles them, when deleted), or null if not deleted or not found. */
 function client_find_deleted(mysqli $conn, int $client_id): ?array
 {
-    return dal_one($conn, "SELECT client_id, full_name, created_by, agent_id, deleted_at
+    return dal_one($conn, "SELECT client_id, client_code, full_name, created_by, agent_id, deleted_at
                            FROM clients WHERE client_id = ? AND deleted_at IS NOT NULL", 'i', [$client_id]);
 }
 

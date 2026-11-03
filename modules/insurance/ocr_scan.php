@@ -1,7 +1,7 @@
 <?php
 require_once '../../config/session.php';
-require_once '../../config/ocr.php';
 require_once __DIR__ . '/../../includes/api.php';
+require_once __DIR__ . '/../../includes/ocr.php';
 
 
 // Every call spends the shop's OCR.space quota, so it needs a logged-in staff session.
@@ -23,45 +23,8 @@ if (!in_array($mime, $allowed, true)) {
     api_error('Invalid file type.', 400);
 }
 
-$ch = curl_init('https://api.ocr.space/parse/image');
-curl_setopt_array($ch, [
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_POST           => true,
-    CURLOPT_POSTFIELDS     => [
-        'apikey'               => OCR_SPACE_API_KEY,
-        'language'             => 'eng',
-        'OCREngine'            => '2',
-        'isTable'              => 'true',
-        'isCreateSearchablePdf'=> 'false',
-        'file'                 => new CURLFile($file['tmp_name'], $mime, $file['name']),
-    ],
-    CURLOPT_TIMEOUT        => 30,
-]);
-
-$response = curl_exec($ch);
-$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-curl_close($ch);
-
-if (!$response || $httpCode !== 200) {
-    api_error('OCR request failed (HTTP ' . $httpCode . ').', 500);
+$r = ocr_extract_text($conn, $file['tmp_name'], $mime, $file['name']);
+if (!$r['ok']) {
+    api_error($r['error'], $r['status']);
 }
-
-$data = json_decode($response, true);
-
-if (empty($data['ParsedResults'])) {
-    $msg = $data['ErrorMessage'][0] ?? 'No text detected in the image.';
-    api_error($msg, 400);
-}
-
-// Concatenate all pages
-$text = '';
-foreach ($data['ParsedResults'] as $page) {
-    $text .= ($page['ParsedText'] ?? '') . "\n";
-}
-$text = trim($text);
-
-if (!$text) {
-    api_error('No text detected in the image.', 400);
-}
-
-api_success(['text' => $text]);
+api_success(['text' => $r['text']]);

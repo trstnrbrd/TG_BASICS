@@ -85,7 +85,7 @@ require_once '../../includes/topbar.php';
         <div class="rl-filter-search" style="position:relative;flex:1;min-width:200px;max-width:360px;">
           <span style="position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;"><?= icon('magnifying-glass', 14) ?></span>
           <input type="text" name="search" class="filter-input"
-            placeholder="Search by client, plate, or Repair ID..."
+            placeholder="Search by client ID, client, plate, or Repair ID..."
             value="<?= htmlspecialchars($search) ?>" style="padding-left:2.4rem;width:100%;"/>
         </div>
         <select name="status" class="filter-input rl-filter-status" style="width:160px;">
@@ -138,7 +138,7 @@ require_once '../../includes/topbar.php';
               $svc = $service_labels[$j['service_type']] ?? $j['service_type'];
           ?>
           <tr>
-            <td><span class="job-num"><?= htmlspecialchars($j['job_number']) ?></span></td>
+            <td><span class="record-id"><?= htmlspecialchars($j['job_number']) ?></span></td>
             <td>
               <div class="cell-primary"><?= htmlspecialchars($j['full_name']) ?></div>
               <div class="cell-sub"><?= htmlspecialchars($j['contact_number'] ?? '') ?></div>

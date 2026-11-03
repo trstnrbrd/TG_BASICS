@@ -91,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'plate_number' => $plate_number, 'make' => $make, 'model' => $model, 'year_model' => $year_model,
                     'color' => $color, 'motor_number' => $motor_number, 'serial_number' => $serial_number,
                 ]);
-                return ['client_id' => $client_id, 'vehicle_id' => $vehicle_id];
+                return ['client_id' => $client_id, 'vehicle_id' => $vehicle_id, 'client_code' => (string)(client_find_name($conn, $client_id)['client_code'] ?? '')];
             });
         });
 
@@ -102,10 +102,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $client_id  = $lock['result']['client_id'];
             $vehicle_id = $lock['result']['vehicle_id'];
+            $client_code = $lock['result']['client_code'];
 
             // Audit log
             $uid = $_SESSION['user_id'];
-            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' added client "' . $full_name . '" with vehicle ' . ($plate_number ?: 'no plate') . ' (' . $make . ' ' . $model . ')'
+            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' added client "' . $full_name . '"' . ($client_code !== '' ? ' (' . $client_code . ')' : '') . ' with vehicle ' . ($plate_number ?: 'no plate') . ' (' . $make . ' ' . $model . ')'
                   . ($agent_id !== (int)$uid ? ' for insurance agent ' . $agents[$agent_id]['full_name'] : '') . '.';
             audit_log_add($conn, $uid, 'CLIENT_ADDED', $desc);
 
@@ -116,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // The list opens on the user's own clients — when this client is another agent's, open that agent's
             // list instead so the new record is actually in view
             $list_agent = $agent_id !== (int)$_SESSION['user_id'] ? 'agent=' . $agent_id . '&' : '';
-            header("Location: client_list.php?" . $list_agent . "success=" . urlencode($full_name . ' has been added successfully.'));
+            header("Location: client_list.php?" . $list_agent . "success=" . urlencode($full_name . ($client_code !== '' ? ' (' . $client_code . ')' : '') . ' has been added successfully.'));
             exit;
         }
     }
@@ -922,10 +923,10 @@ function validateAddClientForm() {
           a.href = "view_client.php?id=" + encodeURIComponent(m.client_id);
           a.target = "_blank"; a.rel = "noopener";
           a.style.color = "inherit"; a.style.fontWeight = "700";
-          a.textContent = m.full_name + (m.plates ? " (" + m.plates + ")" : "");
+          a.textContent = (m.client_code ? m.client_code + " " : "") + m.full_name + (m.plates ? " (" + m.plates + ")" : "");
           dupBox.appendChild(a);
         });
-        dupBox.appendChild(document.createTextNode(". Make sure this is a different person before saving."));
+        dupBox.appendChild(document.createTextNode(". Make sure this is a different person before saving. A new client gets its own Client ID, so namesakes stay apart."));
         dupBox.hidden = false;
       })
       .catch(function () { /* the check is only a helper — saving still works without it */ }));
@@ -968,7 +969,7 @@ function validateAddClientForm() {
           "</table>" +
           (dupMatches.length
             ? "<p style=\"font-size:0.78rem;color:var(--warning);background:var(--warning-bg);border-radius:8px;padding:0.5rem 0.7rem;margin:0.8rem 0 0;text-align:left;\"><strong>Same name already on file:</strong> " +
-              dupMatches.map(function (m) { return esc(m.full_name + (m.plates ? " (" + m.plates + ")" : "")); }).join(", ") + ". Save only if this is a different person.</p>"
+              dupMatches.map(function (m) { return esc((m.client_code ? m.client_code + " " : "") + m.full_name + (m.plates ? " (" + m.plates + ")" : "")); }).join(", ") + ". Save only if this is a different person. The new client gets its own Client ID.</p>"
             : "") +
           (toPolicy ? "<p style=\"font-size:0.78rem;color:var(--text-muted);margin:0.8rem 0 0;\">After saving, you will go straight to the Eligibility Check for this vehicle.</p>" : ""),
         confirmButtonText: toPolicy ? "Yes, Save &amp; Check Eligibility" : "Yes, Save Client",

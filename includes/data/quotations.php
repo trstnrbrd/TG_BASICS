@@ -11,7 +11,7 @@ function quotation_find(mysqli $conn, int $quotation_id): ?array
     return dal_one($conn, "
         SELECT q.*,
                j.job_number, j.service_type, j.repair_date, j.status AS job_status,
-               c.client_id, c.full_name, c.contact_number, c.email, c.address,
+               c.client_id, c.client_code, c.full_name, c.contact_number, c.email, c.address,
                v.plate_number, v.make, v.model, v.year_model, v.color,
                r.receipt_id, r.receipt_number, r.amount_paid, r.balance AS receipt_balance,
                r.payment_method, r.payment_status, r.issued_at
@@ -145,7 +145,7 @@ function receipt_print_data(mysqli $conn, int $quotation_id): ?array
     return dal_one($conn, "
         SELECT q.quotation_number, q.total, q.discount, q.subtotal, q.notes AS qt_notes,
                j.job_number, j.service_type, j.repair_date,
-               c.full_name, c.contact_number, c.email, c.address,
+               c.client_code, c.full_name, c.contact_number, c.email, c.address,
                v.plate_number, v.make, v.model, v.year_model, v.color,
                r.receipt_number, r.amount_paid, r.balance, r.payment_method,
                r.payment_status, r.issued_at, r.notes AS receipt_notes
@@ -168,13 +168,13 @@ function quotations_list_page(mysqli $conn, string $status, string $search, stri
     if ($status !== 'all') { $where[] = 'q.status = ?'; $params[] = $status; $types .= 's'; }
     if ($search !== '') {
         $like    = "%$search%";
-        $where[] = '(c.full_name LIKE ? OR v.plate_number LIKE ? OR q.quotation_number LIKE ? OR j.job_number LIKE ?)';
-        array_push($params, $like, $like, $like, $like);
-        $types  .= 'ssss';
+        $where[] = '(c.client_code LIKE ? OR c.full_name LIKE ? OR v.plate_number LIKE ? OR q.quotation_number LIKE ? OR j.job_number LIKE ?)';
+        array_push($params, $like, $like, $like, $like, $like);
+        $types  .= 'sssss';
     }
     [$result, $pg] = paginate_query($conn, "
         SELECT q.quotation_id, q.quotation_number, q.status, q.total, q.discount, q.created_at,
-               j.job_id, j.job_number, j.service_type, c.full_name, c.contact_number,
+               j.job_id, j.job_number, j.service_type, c.client_code, c.full_name, c.contact_number,
                v.plate_number, v.make, v.model, v.year_model, r.receipt_number, r.payment_status
         FROM quotations q
         INNER JOIN repair_jobs j ON q.job_id = j.job_id

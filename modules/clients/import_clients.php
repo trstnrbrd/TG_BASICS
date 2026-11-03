@@ -202,7 +202,7 @@ function imp_build_preview(mysqli $conn, array $parsed, array $agent_lookup, int
         if (isset($on_file[$k])) {
             $v = $on_file[$k];
             $r['errors'][] = (strtoupper($v['plate_number']) === $plate ? 'Plate ' . $plate . ' is already in the system' : 'Plate ' . $plate . ' matches ' . $v['plate_number'] . ', already in the system')
-                           . ' (client ' . $v['full_name'] . ').';
+                           . ' (client ' . (!empty($v['client_code']) ? $v['client_code'] . ' ' : '') . $v['full_name'] . ').';
         } elseif (isset($seen[$k])) {
             $r['errors'][] = 'Same plate as row ' . $rows[$seen[$k]]['line'] . ' of this file.';
         } else {

@@ -107,7 +107,7 @@ require_once '../../includes/topbar.php';
               $svc = $service_labels[$j['service_type']] ?? $j['service_type'];
             ?>
             <tr>
-              <td><span class="job-num"><?= htmlspecialchars($j['job_number']) ?></span></td>
+              <td><span class="record-id"><?= htmlspecialchars($j['job_number']) ?></span></td>
               <td><div class="cell-primary"><?= htmlspecialchars($j['full_name']) ?></div></td>
               <td>
                 <div class="cell-primary"><?= htmlspecialchars($j['plate_number']) ?></div>

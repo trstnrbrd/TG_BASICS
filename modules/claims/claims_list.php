@@ -71,7 +71,7 @@ require_once '../../includes/topbar.php';
       <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
         <div style="position:relative;flex:1;min-width:200px;max-width:360px;">
           <span style="position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;"><?= icon('magnifying-glass',14) ?></span>
-          <input type="text" name="search" placeholder="Search by name, plate, policy, vehicle..."
+          <input type="text" name="search" placeholder="Search by client ID, name, plate, policy, vehicle..."
             value="<?= htmlspecialchars($search) ?>" class="filter-input" style="padding-left:2.4rem;width:100%;"/>
         </div>
         <select name="status" class="filter-input" style="min-width:210px;">

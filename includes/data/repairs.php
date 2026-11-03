@@ -10,7 +10,7 @@ function repair_job_find(mysqli $conn, int $job_id): ?array
 {
     return dal_one($conn, "
         SELECT j.*,
-               c.client_id, c.full_name, c.contact_number, c.email, c.address,
+               c.client_id, c.client_code, c.full_name, c.contact_number, c.email, c.address,
                v.vehicle_id, v.plate_number, v.make, v.model, v.year_model, v.color
         FROM repair_jobs j
         INNER JOIN clients  c ON j.client_id  = c.client_id
@@ -159,7 +159,7 @@ function repair_jobs_open_recent(mysqli $conn, int $limit): array
     if (!$open) return [];
     return dal_all($conn, "
         SELECT j.job_id, j.job_number, j.service_type, j.status, j.repair_date, j.release_date,
-               c.full_name, v.plate_number, v.make, v.model
+               c.client_code, c.full_name, v.plate_number, v.make, v.model
         FROM repair_jobs j
         INNER JOIN clients  c ON j.client_id  = c.client_id
         INNER JOIN vehicles v ON j.vehicle_id = v.vehicle_id
@@ -177,15 +177,15 @@ function repair_jobs_list_page(mysqli $conn, string $search, string $status, str
     $where = ['1=1']; $types = ''; $params = [];
     if ($search !== '') {
         $like    = "%$search%";
-        $where[] = '(c.full_name LIKE ? OR v.plate_number LIKE ? OR j.job_number LIKE ?)';
-        array_push($params, $like, $like, $like);
-        $types  .= 'sss';
+        $where[] = '(c.client_code LIKE ? OR c.full_name LIKE ? OR v.plate_number LIKE ? OR j.job_number LIKE ?)';
+        array_push($params, $like, $like, $like, $like);
+        $types  .= 'ssss';
     }
     if ($status !== 'all') { $where[] = 'j.status = ?'; $params[] = $status; $types .= 's'; }
     $order = $sort === 'oldest' ? 'j.created_at ASC' : 'j.created_at DESC';
     [$result, $pg] = paginate_query($conn, "
         SELECT j.job_id, j.job_number, j.service_type, j.status, j.repair_date, j.release_date,
-               c.client_id, c.full_name, c.contact_number,
+               c.client_id, c.client_code, c.full_name, c.contact_number,
                v.vehicle_id, v.plate_number, v.make, v.model, v.year_model
         FROM repair_jobs j
         INNER JOIN clients  c ON j.client_id  = c.client_id

@@ -161,7 +161,7 @@ require_once '../../includes/topbar.php';
         <div class="rnl-filter-search" style="position:relative;flex:1;min-width:200px;max-width:420px;">
           <span style="position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;"><?= icon('magnifying-glass', 14) ?></span>
           <input type="text" name="search" class="filter-input"
-            placeholder="Search by client, contact number, plate number, or policy number..."
+            placeholder="Search by client ID, client, contact number, plate number, or policy number..."
             value="<?= htmlspecialchars($search) ?>"
             style="padding-left:2.4rem;width:100%;"/>
         </div>

@@ -67,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             // Audit log
             $uid = $_SESSION['user_id'];
-            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' added vehicle ' . ($plate_number ?: 'no plate') . ' (' . $make . ' ' . $model . ') to client ID ' . $client_id . '.';
+            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' added vehicle ' . ($plate_number ?: 'no plate') . ' (' . $make . ' ' . $model . ') to client ' . (($client['client_code'] ?? '') ?: 'ID ' . $client_id) . ' (' . $client['full_name'] . ').';
             audit_log_add($conn, $uid, 'VEHICLE_ADDED', $desc);
 
             header("Location: view_client.php?id=" . $client_id . "&success=Vehicle added successfully.");

@@ -46,7 +46,7 @@ if (!is_mechanic()) {
             'type'    => 'policy',
             'label'   => $row['policy_number'],
             'sub'     => $row['full_name'] . ' · ' . $row['coverage_type'] . ' · expires ' . date('M d, Y', strtotime($row['policy_end'])),
-            'url'     => 'modules/insurance/eligibility_check.php?search=' . urlencode($row['full_name']),
+            'url'     => 'modules/insurance/eligibility_check.php?search=' . urlencode($row['client_code'] ?: $row['full_name']),
             'icon'    => 'shield-check',
         ];
     }

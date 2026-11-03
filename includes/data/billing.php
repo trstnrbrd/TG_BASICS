@@ -11,7 +11,7 @@ function billing_find(mysqli $conn, int $billing_id): ?array
     return dal_one($conn, "
         SELECT b.*,
                cl.claim_id, cl.status AS claim_status,
-               c.full_name, c.contact_number, c.client_id,
+               c.client_code, c.full_name, c.contact_number, c.client_id,
                v.plate_number, v.make, v.model, v.year_model,
                ip.policy_number, ip.coverage_type, ip.participation_fee,
                CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.full_name END AS created_by_name
@@ -29,7 +29,7 @@ function billing_claim_prefill(mysqli $conn, int $claim_id): ?array
 {
     return dal_one($conn, "
         SELECT cl.claim_id, cl.incident_date,
-               c.full_name, c.client_id,
+               c.client_code, c.full_name, c.client_id,
                ip.policy_number, ip.participation_fee, ip.insurance_company,
                v.make, v.model, v.plate_number
         FROM claims cl
@@ -44,7 +44,7 @@ function billing_unbilled_claims(mysqli $conn): array
 {
     $st = CLAIM_BILLABLE_STATUSES;
     return dal_all($conn, "
-        SELECT cl.claim_id, cl.incident_date, c.full_name, ip.policy_number, v.plate_number, v.make, v.model
+        SELECT cl.claim_id, cl.incident_date, c.client_code, c.full_name, ip.policy_number, v.plate_number, v.make, v.model
         FROM claims cl
         INNER JOIN clients c             ON cl.client_id  = c.client_id
         INNER JOIN insurance_policies ip ON cl.policy_id  = ip.policy_id
@@ -74,9 +74,9 @@ function billing_list_page(mysqli $conn, string $search, string $status, string 
     $where = ['1=1']; $types = ''; $params = [];
     if ($search !== '') {
         $like    = "%$search%";
-        $where[] = '(b.billing_number LIKE ? OR c.full_name LIKE ? OR v.plate_number LIKE ? OR b.billed_to LIKE ?)';
-        array_push($params, $like, $like, $like, $like);
-        $types  .= 'ssss';
+        $where[] = '(b.billing_number LIKE ? OR c.client_code LIKE ? OR c.full_name LIKE ? OR v.plate_number LIKE ? OR b.billed_to LIKE ?)';
+        array_push($params, $like, $like, $like, $like, $like);
+        $types  .= 'sssss';
     }
     if ($status !== 'all') {
         $where[]  = 'b.status = ?';
@@ -88,7 +88,7 @@ function billing_list_page(mysqli $conn, string $search, string $status, string 
         SELECT b.billing_id, b.billing_number, b.billed_to, b.status,
                b.parts_cost, b.labor_cost, b.other_cost, b.deductible, b.total_amount_due,
                b.created_at, b.sent_at, b.claim_id,
-               c.full_name, c.client_id, v.plate_number, v.make, v.model, ip.policy_number
+               c.client_code, c.full_name, c.client_id, v.plate_number, v.make, v.model, ip.policy_number
         FROM billing b
         INNER JOIN claims cl             ON b.claim_id    = cl.claim_id
         INNER JOIN clients c             ON cl.client_id  = c.client_id

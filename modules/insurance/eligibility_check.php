@@ -145,7 +145,7 @@ require_once '../../includes/topbar.php';
       <input
         type="text"
         id="live-search"
-        placeholder="Search by name, plate, make, model, contact, engine no., chassis no..."
+        placeholder="Search by client ID, name, plate, make, model, contact, engine no., chassis no..."
         autocomplete="off"
         autofocus
         style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text-primary);padding:0.7rem 0.9rem 0.7rem 2.4rem;border-radius:9px;font-family:'Plus Jakarta Sans',sans-serif;font-size:0.85rem;outline:none;transition:border-color 0.15s,box-shadow 0.15s;"

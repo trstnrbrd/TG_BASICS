@@ -24,18 +24,27 @@ jobs:
         run: |
           node <<'EOF'
           const puppeteer = require('puppeteer');
+          // InfinityFree sometimes stalls GitHub's runners, so try up to 3 times before failing the run.
+          // Safe to repeat: the endpoint locks and stamps "sent" before it emails, so it never double-sends.
           (async () => {
             const url = process.env.CRON_URL + '?key=' + process.env.CRON_KEY;
-            const browser = await puppeteer.launch({ args: ['--no-sandbox'] });
-            const page = await browser.newPage();
-            const res = await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
-            const text = (await page.evaluate(() => document.body.innerText)).trim();
-            console.log('HTTP', res.status(), '-', text);
-            await browser.close();
-            if (!text.startsWith('OK -')) {
-              console.error('Unexpected reply — the endpoint may be down, the key may be wrong, or InfinityFree changed its challenge.');
-              process.exit(1);
+            for (let attempt = 1; attempt <= 3; attempt++) {
+              const browser = await puppeteer.launch({ args: ['--no-sandbox'] });
+              try {
+                const page = await browser.newPage();
+                const res = await page.goto(url, { waitUntil: 'networkidle2', timeout: 90000 });
+                const text = (await page.evaluate(() => document.body.innerText)).trim();
+                console.log('Attempt', attempt, '- HTTP', res.status(), '-', text);
+                if (text.startsWith('OK -')) return;
+              } catch (e) {
+                console.log('Attempt', attempt, 'failed:', e.message);
+              } finally {
+                await browser.close();
+              }
+              if (attempt < 3) await new Promise(r => setTimeout(r, 20000));
             }
+            console.error('Unexpected reply — the endpoint may be down, the key may be wrong, or InfinityFree changed its challenge.');
+            process.exit(1);
           })();
           EOF
 
@@ -56,17 +65,26 @@ jobs:
         run: |
           node <<'EOF'
           const puppeteer = require('puppeteer');
+          // InfinityFree sometimes stalls GitHub's runners, so try up to 3 times before failing the run.
+          // Safe to repeat: the endpoint locks and stamps "sent" before it emails, so it never double-sends.
           (async () => {
             const url = process.env.CRON_URL + '?key=' + process.env.CRON_KEY;
-            const browser = await puppeteer.launch({ args: ['--no-sandbox'] });
-            const page = await browser.newPage();
-            const res = await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
-            const text = (await page.evaluate(() => document.body.innerText)).trim();
-            console.log('HTTP', res.status(), '-', text);
-            await browser.close();
-            if (!text.startsWith('OK -')) {
-              console.error('Unexpected reply — the endpoint may be down, the key may be wrong, or InfinityFree changed its challenge.');
-              process.exit(1);
+            for (let attempt = 1; attempt <= 3; attempt++) {
+              const browser = await puppeteer.launch({ args: ['--no-sandbox'] });
+              try {
+                const page = await browser.newPage();
+                const res = await page.goto(url, { waitUntil: 'networkidle2', timeout: 90000 });
+                const text = (await page.evaluate(() => document.body.innerText)).trim();
+                console.log('Attempt', attempt, '- HTTP', res.status(), '-', text);
+                if (text.startsWith('OK -')) return;
+              } catch (e) {
+                console.log('Attempt', attempt, 'failed:', e.message);
+              } finally {
+                await browser.close();
+              }
+              if (attempt < 3) await new Promise(r => setTimeout(r, 20000));
             }
+            console.error('Unexpected reply — the endpoint may be down, the key may be wrong, or InfinityFree changed its challenge.');
+            process.exit(1);
           })();
           EOF

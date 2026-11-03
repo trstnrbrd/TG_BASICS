@@ -50,7 +50,7 @@ It is **live and used every day** by the owner and staff, so changes are built o
 
 | Module | What it does |
 |---|---|
-| **Client & Vehicle Records** | Client profiles with their vehicles. Each client has an **insurance agent** (whose client it is) separate from who encoded it. Optional contact, email, Facebook name, engine and chassis numbers. OR/CR scanning (OCR), document attachments, data-privacy consent, soft delete. |
+| **Client & Vehicle Records** | Client profiles with their vehicles. Every client gets a permanent **Client ID** (`CL-0001`, `CL-0002` …), given in order and never reused, so clients with the same name stay apart; it can be searched from every module. Each client has an **insurance agent** (whose client it is) separate from who encoded it. Optional contact, email, Facebook name, engine and chassis numbers. OR/CR scanning (OCR), document attachments, data-privacy consent, soft delete. |
 | **Eligibility & Policy** | Vehicle-age eligibility check for **PhilBritish** and **Alpha Insurance & Surety Company Inc.** (age limit set in Settings). Policy encoding with premium, commission, participation fee and an installment schedule (1 time / 3 / 4 / 6 months). Amounts show thousands separators while typing. **Save & Check Eligibility** goes straight from a new client to the policy. |
 | **Renewal Tracking** | Per-company lists with Urgent / Expiring / Stable / Expired / Renewed cards (thresholds set in Settings), an **insurance-agent filter**, a one-click PhilBritish / Alpha switch and an urgent-count badge in the sidebar. From a policy: record installment payments and receipts, **undo** a wrong payment, **edit** the policy, renew or delete it. |
 | **Claims** | Claim filing with a 10-step status flow (Compiling Requirements → … → Resolved / Denied), a 7-document checklist, damage photos and OCR. |
@@ -104,7 +104,7 @@ It is **live and used every day** by the owner and staff, so changes are built o
 | Charts & motion | Chart.js 4 · [Motion](https://motion.dev) (dashboard/report animations) · GSAP (public client page) |
 | UI helpers | SweetAlert2 dialogs · inline SVG icon helper (`includes/icons.php`) |
 | Email | PHPMailer over Gmail SMTP (bundled in `vendor/src`) |
-| Integrations | OCR.space (OR/CR scanning) · QRCodeJS (client IDs) · Imagin Studio (vehicle preview) |
+| Integrations | OCR.space (OR/CR scanning) · QRCodeJS (Client Digital ID QR codes) · Imagin Studio (vehicle preview) |
 | Testing | PHPUnit 11 — validators and premium/commission math (the test suite is kept locally, not in this repository) |
 | Hosting | XAMPP locally · InfinityFree in production · GitHub Actions FTP deploy |
 

@@ -85,6 +85,19 @@ function realtime_publish(string $channel, string $event, array $data, ?string &
     if (!realtime_enabled()) { $error = 'not configured'; return false; }
     if (!function_exists('curl_init')) { $error = 'curl is not available'; return false; }
 
+    // Circuit breaker: after 3 failed sends in a row, skip Pusher for 5 minutes instead of waiting up to 3 s on
+    // every save. Open pages keep updating through the 20 s ajax/live.php poll meanwhile.
+    require_once __DIR__ . '/circuit_breaker.php';
+    $conn = ($GLOBALS['conn'] ?? null) instanceof mysqli ? $GLOBALS['conn'] : null;
+    $r = breaker_call($conn, 'pusher', fn() => realtime_send($channel, $event, $data));
+    if ($r === null) { $error = 'paused (circuit breaker open)'; return false; }
+    if (!$r['ok']) { $error = $r['error']; error_log('[TG-BASICS] realtime_publish failed: ' . $error); }
+    return $r['ok'];
+}
+
+/** One signed request to Pusher's HTTP API: ['ok' => bool, 'error' => string]. */
+function realtime_send(string $channel, string $event, array $data): array
+{
     $path = '/apps/' . PUSHER_APP_ID . '/events';
     $msg  = ['name' => $event, 'channels' => [$channel], 'data' => json_encode($data)];
     $body = json_encode($msg);
@@ -105,8 +118,6 @@ function realtime_publish(string $channel, string $event, array $data, ?string &
     $err  = curl_error($ch);
     curl_close($ch);
 
-    if ($code === 200) return true;
-    $error = $err !== '' ? $err : ('HTTP ' . $code . ' ' . substr((string)$out, 0, 120));
-    error_log('[TG-BASICS] realtime_publish failed: ' . $error);
-    return false;
+    if ($code === 200) return ['ok' => true, 'error' => ''];
+    return ['ok' => false, 'error' => $err !== '' ? $err : ('HTTP ' . $code . ' ' . substr((string)$out, 0, 120))];
 }

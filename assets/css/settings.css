@@ -249,9 +249,57 @@
 }
 .theme-picker {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 1rem;
 }
+@media (max-width: 1280px) and (min-width: 769px) {
+  .theme-picker { grid-template-columns: repeat(3, 1fr); }
+}
+/* Auto: half the Light preview, half the Dark one */
+.theme-preview.tp-split { display: flex; }
+.theme-preview.tp-split .tp-half { flex: 1; display: flex; overflow: hidden; }
+.theme-preview.tp-split .tp-half + .tp-half { border-left: 1px solid rgba(128, 128, 128, 0.35); }
+.theme-name-sub { font-weight: 500; color: var(--text-muted); font-size: 0.75rem; }
+
+/* ── Layout & Text (Design Preferences) ── */
+#panel-design > .card + .card { margin-top: 1.25rem; }
+.pref-groups { display: flex; flex-direction: column; gap: 1.4rem; }
+.pref-group-label {
+  font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px;
+  color: var(--text-muted); margin-bottom: 0.6rem;
+}
+.pref-options { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.pref-option {
+  display: flex; align-items: center; gap: 0.75rem; min-width: 170px; cursor: pointer;
+  padding: 0.75rem 1rem; border: 2px solid var(--border); border-radius: 12px; background: var(--bg-2);
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+}
+.pref-option:hover { border-color: var(--gold-muted); transform: translateY(-1px); }
+.pref-option.active { border-color: var(--gold-bright); background: var(--gold-pale); box-shadow: 0 0 0 3px rgba(212, 160, 23, 0.15); }
+.pref-option-label { display: flex; flex-direction: column; font-size: 0.85rem; font-weight: 600; color: var(--text-primary); }
+.pref-option-label small { font-size: 0.7rem; font-weight: 500; color: var(--text-muted); margin-top: 0.1rem; }
+/* "Aa" samples: fixed px so each shows its own size whatever the current text size is */
+.pref-aa { font-weight: 800; color: var(--gold); line-height: 1; width: 2.2rem; text-align: center; }
+.pref-aa--small  { font-size: 15px; }
+.pref-aa--normal { font-size: 18px; }
+.pref-aa--large  { font-size: 22px; }
+.pref-aa--xlarge { font-size: 26px; }
+/* Tiny diagrams: <i> = sidebar / page, <b> = content */
+.pref-diagram {
+  position: relative; width: 52px; height: 36px; flex-shrink: 0;
+  border: 1.5px solid var(--border); border-radius: 6px; background: var(--bg-3); overflow: hidden;
+}
+.pref-diagram i, .pref-diagram b { position: absolute; top: 0; bottom: 0; }
+.pref-diagram i { left: 0; background: var(--sidebar-bg); }
+.pref-diagram b { top: 6px; bottom: 6px; background: var(--gold-muted); border-radius: 2px; opacity: 0.8; }
+.pref-diagram--sidebar-full i    { width: 16px; }
+.pref-diagram--sidebar-full b    { left: 21px; right: 5px; }
+.pref-diagram--sidebar-compact i { width: 6px; }
+.pref-diagram--sidebar-compact b { left: 11px; right: 5px; }
+.pref-diagram--width-full i      { width: 9px; }
+.pref-diagram--width-full b      { left: 13px; right: 3px; }
+.pref-diagram--width-centered i  { width: 9px; }
+.pref-diagram--width-centered b  { left: 19px; right: 9px; }
 .theme-option {
   cursor: pointer;
   border: 2px solid var(--border);

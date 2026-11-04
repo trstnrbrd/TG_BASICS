@@ -15,20 +15,39 @@ if (!empty($_SESSION['is_hidden'])) $role_label = 'Maintenance';
 require_once __DIR__ . '/icons.php';
 require_once __DIR__ . '/themes.php';
 
-// Load user theme preference (only a theme listed in includes/themes.php, else the default)
-$_user_theme = theme_valid($_SESSION['theme'] ?? null);
-if ($_user_theme === THEME_DEFAULT && isset($_SESSION['user_id'], $conn)) {
+// Load the user's theme choice (a theme in includes/themes.php, or "Auto") and layout preferences, once
+// per session; Settings > Design Preferences updates both in the session when they are saved.
+$_theme_choice = theme_choice_valid($_SESSION['theme'] ?? null);
+if ($_theme_choice === THEME_DEFAULT && isset($_SESSION['user_id'], $conn)) {
     require_once __DIR__ . '/data_access.php';
     $__tr = account_get($conn, (int)$_SESSION['user_id']);
     if ($__tr) {
-        $_user_theme = theme_valid($__tr['theme'] ?? null);
-        $_SESSION['theme'] = $_user_theme;
+        $_theme_choice = theme_choice_valid($__tr['theme'] ?? null);
+        $_SESSION['theme'] = $_theme_choice;
     }
 }
+$_user_theme = theme_for_choice($_theme_choice);
+if (!isset($_SESSION['ui_prefs']) && isset($_SESSION['user_id'], $conn)) {
+    require_once __DIR__ . '/data_access.php';
+    $_SESSION['ui_prefs'] = ui_prefs_clean(account_ui_prefs_get($conn, (int)$_SESSION['user_id']));
+}
+$_ui_prefs = ui_prefs_clean($_SESSION['ui_prefs'] ?? null);
 ?>
 <!DOCTYPE html>
-<html lang="en" data-theme="<?= htmlspecialchars($_user_theme) ?>">
+<html lang="en" data-theme="<?= htmlspecialchars($_user_theme) ?>" data-theme-choice="<?= htmlspecialchars($_theme_choice) ?>" <?= ui_prefs_attrs($_ui_prefs) ?>>
 <head>
+<?php if ($_theme_choice === THEME_SYSTEM): ?>
+<script>
+/* Auto theme: before anything is drawn, use the dark theme when the device is in dark mode, and follow it
+   when that changes while the page is open (includes/themes.php THEME_SYSTEM_*) */
+(function () {
+  var mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+  function apply() { if (document.documentElement.getAttribute('data-theme-choice') === <?= json_encode(THEME_SYSTEM) ?>) document.documentElement.setAttribute('data-theme', mq && mq.matches ? <?= json_encode(THEME_SYSTEM_DARK) ?> : <?= json_encode(THEME_SYSTEM_LIGHT) ?>); }
+  apply();
+  if (mq && mq.addEventListener) mq.addEventListener('change', apply);
+})();
+</script>
+<?php endif; ?>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <meta name="format-detection" content="telephone=no, date=no, email=no, address=no"/>

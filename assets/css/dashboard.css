@@ -172,7 +172,8 @@
   color: var(--text-muted);
   border: 1px solid var(--border);
 }
-.dash-stat-badge.is-up {   /* "+3 this month" */
+.dash-stat-badge.is-up {
+  /* "+3 this month" */
   background: var(--success-bg);
   color: var(--success);
   border: none;
@@ -181,16 +182,88 @@
 /* Card colours: <a class="dash-stat dash-stat--green"> (Admin Dashboard, Monthly Report, Mechanic
    Dashboard). The one place they are set, so a theme can restyle them ([data-theme] rules in app.css);
    they used to be a $theme_map copied into each of the three pages as inline styles. */
-.dash-stat--gold  .dash-stat-accent { background: linear-gradient(90deg, #D4A017, #E8D5A3); }
-.dash-stat--green .dash-stat-accent { background: linear-gradient(90deg, #2E7D52, #52B788); }
-.dash-stat--amber .dash-stat-accent { background: linear-gradient(90deg, #B8860B, #D4A017); }
-.dash-stat--red   .dash-stat-accent { background: linear-gradient(90deg, #C0392B, #E74C3C); }
-.dash-stat--blue  .dash-stat-accent { background: linear-gradient(90deg, #1A6B9A, #3498DB); }
-.dash-stat--gold  .dash-stat-icon { background: var(--gold-light); color: var(--gold); }
-.dash-stat--green .dash-stat-icon { background: var(--success-bg); color: var(--success); }
-.dash-stat--amber .dash-stat-icon { background: var(--warning-bg); color: var(--warning); }
-.dash-stat--red   .dash-stat-icon { background: var(--danger-bg);  color: var(--danger); }
-.dash-stat--blue  .dash-stat-icon { background: var(--info-bg);    color: var(--info); }
+.dash-stat--gold .dash-stat-accent {
+  background: linear-gradient(90deg, #d4a017, #e8d5a3);
+}
+.dash-stat--green .dash-stat-accent {
+  background: linear-gradient(90deg, #2e7d52, #52b788);
+}
+.dash-stat--amber .dash-stat-accent {
+  background: linear-gradient(90deg, #b8860b, #d4a017);
+}
+.dash-stat--red .dash-stat-accent {
+  background: linear-gradient(90deg, #c0392b, #e74c3c);
+}
+.dash-stat--blue .dash-stat-accent {
+  background: linear-gradient(90deg, #1a6b9a, #3498db);
+}
+/* Warm / High Contrast / HC Dark: the accent line takes the theme's own colours (the fixed gradients above
+   are the Light / Dark look; on these themes the bright yellow line clashed with their palette) */
+:is(
+    [data-theme="warm"],
+    [data-theme="high-contrast"],
+    [data-theme="high-contrast-dark"]
+  )
+  .dash-stat--gold
+  .dash-stat-accent {
+  background: var(--gold);
+}
+:is(
+    [data-theme="warm"],
+    [data-theme="high-contrast"],
+    [data-theme="high-contrast-dark"]
+  )
+  .dash-stat--amber
+  .dash-stat-accent {
+  background: var(--warning);
+}
+:is(
+    [data-theme="warm"],
+    [data-theme="high-contrast"],
+    [data-theme="high-contrast-dark"]
+  )
+  .dash-stat--green
+  .dash-stat-accent {
+  background: var(--success);
+}
+:is(
+    [data-theme="warm"],
+    [data-theme="high-contrast"],
+    [data-theme="high-contrast-dark"]
+  )
+  .dash-stat--red
+  .dash-stat-accent {
+  background: var(--danger);
+}
+:is(
+    [data-theme="warm"],
+    [data-theme="high-contrast"],
+    [data-theme="high-contrast-dark"]
+  )
+  .dash-stat--blue
+  .dash-stat-accent {
+  background: var(--info);
+}
+.dash-stat--gold .dash-stat-icon {
+  background: var(--gold-light);
+  color: var(--gold);
+}
+.dash-stat--green .dash-stat-icon {
+  background: var(--success-bg);
+  color: var(--success);
+}
+.dash-stat--amber .dash-stat-icon {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+.dash-stat--red .dash-stat-icon {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.dash-stat--blue .dash-stat-icon {
+  background: var(--info-bg);
+  color: var(--info);
+}
 .dash-stat-value {
   font-size: 2.1rem;
   font-weight: 800;
@@ -228,7 +301,7 @@
     border-radius: 12px 12px 0 0;
   }
   .dash-stat-top {
-    display: contents;   /* its icon and badge join the card's grid */
+    display: contents; /* its icon and badge join the card's grid */
   }
   .dash-stat-icon {
     grid-column: 1;
@@ -246,7 +319,7 @@
     margin-bottom: 0.15rem;
   }
   .dash-stat-label {
-    grid-column: 2 / 4;   /* runs under the badge too, so it stays on one line */
+    grid-column: 2 / 4; /* runs under the badge too, so it stays on one line */
     grid-row: 2;
     align-self: start;
     font-size: 0.62rem;

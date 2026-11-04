@@ -261,8 +261,32 @@ const avatarRemoveBtn = document.getElementById("avatar-remove-btn");
         .forEach((o) => o.classList.remove("active")),
         opt.classList.add("active"),
         (opt.querySelector('input[type="radio"]').checked = !0));
+      tgApplyThemeChoice(opt.querySelector('input[type="radio"]').value);   // preview right away
     });
   }));
+
+// Design Preferences: the theme choice ("system" = Auto, follows the device) and the Layout & Text options
+// (text size / sidebar / page width, UI_PREFS in includes/themes.php) show as soon as they are picked;
+// Save Changes keeps them. The CSS reads them from <html> (data-theme, data-text-size, data-sidebar, data-width).
+function tgApplyThemeChoice(choice) {
+  const html = document.documentElement;
+  html.setAttribute("data-theme-choice", choice);
+  if (choice === "system") {
+    const dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    html.setAttribute("data-theme", dark ? "dark" : "light");
+  } else {
+    html.setAttribute("data-theme", choice);
+  }
+}
+const TG_PREF_ATTRS = { text_size: "data-text-size", sidebar: "data-sidebar", width: "data-width" };
+document.querySelectorAll(".pref-option").forEach((opt) => {
+  opt.addEventListener("click", () => {
+    const input = opt.querySelector('input[type="radio"]');
+    input.checked = true;
+    opt.closest(".pref-options").querySelectorAll(".pref-option").forEach((o) => o.classList.toggle("active", o === opt));
+    document.documentElement.setAttribute(TG_PREF_ATTRS[input.name], input.value);
+  });
+});
 const saveDesignBtn = document.getElementById("save-design-btn");
 saveDesignBtn &&
   saveDesignBtn.addEventListener("click", async function () {
@@ -276,6 +300,10 @@ saveDesignBtn &&
     (fd.append("section", "design_prefs"),
       fd.append("csrf_token", csrfToken()),
       fd.append("theme", theme));
+    Object.keys(TG_PREF_ATTRS).forEach((name) => {
+      const v = document.querySelector('input[name="' + name + '"]:checked');
+      if (v) fd.append(name, v.value);
+    });
     let data = null;
     try {
       const res = await fetch("settings.php", { method: "POST", body: fd });
@@ -290,14 +318,13 @@ saveDesignBtn &&
       data
         ? data.ok
           ? (Swal.fire({
-              icon: "success",
-              title: "Saved!",
+              icon: data.prefs_saved === false ? "warning" : "success",
+              title: data.prefs_saved === false ? "Partly saved" : "Saved!",
               text: data.message,
-              confirmButtonColor: "#B8860B",
-              timer: 2e3,
-              timerProgressBar: !0,
+              timer: data.prefs_saved === false ? undefined : 2e3,
+              timerProgressBar: data.prefs_saved !== false,
             }),
-            document.documentElement.setAttribute("data-theme", theme))
+            tgApplyThemeChoice(theme))
           : Swal.fire({
               icon: "error",
               title: "Error",

@@ -217,7 +217,7 @@ require_once '../../includes/topbar.php';
     </div>
 
     <?php
-    ['vehicles' => $vc, 'policies' => $pc, 'active_policies' => $apc, 'claims' => $clc] = client_counts($conn, $client_id);
+    ['vehicles' => $vc, 'policies' => $pc] = client_counts($conn, $client_id);   // the Vehicles / Policies card subtitles
     ?>
 
     <!-- CLIENT INFO CARD (with QR embedded on the right) -->
@@ -278,26 +278,6 @@ require_once '../../includes/topbar.php';
 
       </div>
     </div>
-
-    <!-- STATS ROW -->
-    <?php
-    $quick_stats = [
-      [icon('vehicle', 16),        $vc,  'Registered Vehicles'],
-      [icon('document', 16),       $pc,  'Total Policies'],
-      [icon('check-circle', 16),   $apc, 'Active Policies'],
-      [icon('clipboard-list', 16), $clc, 'Total Claims'],
-    ];
-    ?>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.25rem;">
-      <?php foreach ($quick_stats as $qs): ?>
-      <div class="card" style="margin-bottom:0;display:flex;align-items:center;gap:1rem;padding:1rem 1.25rem;">
-        <div class="card-icon" style="width:42px;height:42px;border-radius:10px;flex-shrink:0;"><?= $qs[0] ?></div>
-        <div>
-          <div style="font-size:1.5rem;font-weight:800;color:var(--text-primary);line-height:1;letter-spacing:-0.5px;"><?= $qs[1] ?></div>
-          <div style="font-size:0.7rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-top:0.15rem;"><?= $qs[2] ?></div>
-        </div>
-      </div>
-      <?php endforeach; ?></div>
 
     <!-- VEHICLES -->
     <div class="card">

@@ -90,6 +90,23 @@
   border-left-color: var(--sidebar-active);
   font-weight: 600;
 }
+/* Sliding highlight (assets/js/shared/sidebar_motion.js): on a click the active look moves onto one
+   pill that slides to the chosen section before the page opens. Only while sliding; otherwise the
+   .nav-item.active rule above draws it. */
+.sidebar-nav { position: relative; }
+.nav-slide-pill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  pointer-events: none;
+  background: rgba(212, 160, 23, 0.12);
+  border-left: 3px solid var(--sidebar-active);
+}
+.sidebar-nav.is-sliding .nav-item.active {
+  background: transparent;
+  border-left-color: transparent;
+}
 .nav-item svg {
   flex-shrink: 0;
   opacity: 0.7;
@@ -215,6 +232,10 @@
 [data-theme="high-contrast"] .nav-item.active {
   background: rgba(0, 0, 0, 0.08);
   color: #000;
+  border-left-color: #000;
+}
+[data-theme="high-contrast"] .nav-slide-pill {
+  background: rgba(0, 0, 0, 0.08);
   border-left-color: #000;
 }
 [data-theme="high-contrast"] .nav-flyout {

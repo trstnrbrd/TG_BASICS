@@ -6,10 +6,17 @@
 
 /* ---- Account activation (Manage Users invite) ---- */
 
-/** The invited account an activation link belongs to [user_id, full_name, email, is_active], or null. */
-function user_find_by_activation_token(mysqli $conn, string $token): ?array
+/**
+ * The invited account an activation link belongs to [user_id, full_name, email, is_active, link_expired],
+ * or null. link_expired = 1 once the account is older than $expiry_hours: the link is made only when the
+ * account is created (there is no resend), so created_at is when it was sent. Worked out with MySQL's
+ * NOW() so the PHP and MySQL clocks cannot disagree.
+ */
+function user_find_by_activation_token(mysqli $conn, string $token, int $expiry_hours): ?array
 {
-    return dal_one($conn, "SELECT user_id, full_name, email, is_active FROM users WHERE activation_token = ?", 's', [$token]);
+    return dal_one($conn, "SELECT user_id, full_name, email, is_active,
+                                  (created_at < DATE_SUB(NOW(), INTERVAL ? HOUR)) AS link_expired
+                           FROM users WHERE activation_token = ?", 'is', [$expiry_hours, $token]);
 }
 
 /** Sets the invited user's own password, turns the account on and uses up the link. */

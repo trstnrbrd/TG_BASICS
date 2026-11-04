@@ -8,6 +8,15 @@ All notable changes to TG-BASICS. Versions follow [Semantic Versioning](https://
 
 The current version is set in `config/version.php` and shown at the bottom of the sidebar, in the landing-page footer, and in Settings > My Account > About This System. Versions before 1.0.0 were reconstructed from the Git history (first commit 2026-03-17).
 
+## [2.3.0] - 2026-11-04
+
+### Added
+- Sidebar: the gold highlight slides to the clicked section before the page opens (Motion; a shorter, gentler slide when Windows animation effects are off)
+- Renewal Tracking: the insurance company switch slides its highlight to the chosen company
+
+### Removed
+- View Client: the four count cards (Registered Vehicles, Total Policies, Active Policies, Total Claims); the Vehicles and Policies cards still show their counts
+
 ## [2.2.1] - 2026-11-04
 
 ### Fixed

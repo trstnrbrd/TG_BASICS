@@ -359,6 +359,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                 api_error('Company contact number must have 7 to ' . PHONE_DIGITS . ' digits, e.g. 09XXXXXXXXX or (044) 123-4567.');
             }
             if ($company['company_email'] !== '' && !validate_email($company['company_email'])) api_error('Please enter a valid company email address.');
+            // Insurance + Security numbers: limits from SETTING_NUMBERS (config/settings.php), checked here on the server
+            [$numbers, $num_error] = setting_numbers_check($_POST);
+            if ($num_error !== '') api_error($num_error);
             foreach ($company as $k => $v) setSetting($conn, $k, $v);
             // Email (simplified — no host/port/encryption)
             foreach (['smtp_username', 'smtp_password', 'smtp_sender_name', 'smtp_sender_email'] as $k) {
@@ -391,18 +394,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
 
             // old list removed and new one saved together, so a failure never leaves no one to notify
             db_transaction($conn, fn() => claim_notify_recipients_replace($conn, $new_recipients));
-            // Insurance
-            foreach (['eligibility_max_age', 'renewal_urgent_days', 'renewal_expiring_days'] as $k) {
-                setSetting($conn, $k, (string)max(1, (int)($_POST[$k] ?? 0)));
-            }
-            // Security
-            foreach (['max_login_attempts', 'lockout_duration', 'activation_link_expiry', 'reset_link_expiry'] as $k) {
-                setSetting($conn, $k, (string)max(1, (int)($_POST[$k] ?? 0)));
-            }
-            // System
-            foreach (['timezone', 'date_format'] as $k) {
-                setSetting($conn, $k, trim($_POST[$k] ?? ''));
-            }
+            // Insurance + Security (checked above, before anything was saved)
+            foreach ($numbers as $k => $v) setSetting($conn, $k, (string)$v);
+            // (Timezone and Date Format were removed 2026-11-04: nothing ever read them. The app's clock is
+            //  fixed to Asia/Manila / +08:00 in config/session.php, and each page formats its own dates.)
 
             $desc = $_SESSION['full_name'] . ' updated system settings.';
             audit_log_add($conn, $user_id, 'SETTINGS_UPDATED', $desc);
@@ -500,25 +495,14 @@ $pending_email     = $pending_new_email === null ? null : ['new_email' => $pendi
 
 // All system settings. The defaults fill in any key that has no row yet (a fresh or local database),
 // so the form never prints an undefined-key warning; saved values always win over these.
-$settings = array_merge([
-    'company_name'         => 'TG Customworks & Basic Car Insurance',
-    'company_address'      => '49 Villa Tierra St., San Roque, Pandi, Bulacan',
-    'company_contact'      => '',
-    'company_email'        => 'tgcustomworksbulacan@gmail.com',
+$settings = array_merge(COMPANY_DEFAULTS, [   // company_* defaults: config/settings.php
     'smtp_username'        => '',
     'smtp_password'        => '',
     'smtp_sender_name'     => '',
     'smtp_sender_email'    => '',
-    'eligibility_max_age'  => '10',
-    'renewal_urgent_days'  => '7',
-    'renewal_expiring_days'=> '30',
-    'max_login_attempts'   => '5',
-    'lockout_duration'     => '15',
-    'activation_link_expiry' => '24',
-    'reset_link_expiry'    => '1',
-    'timezone'             => 'Asia/Manila',
-    'date_format'          => 'M d, Y',
 ], getAllSettings($conn));
+// The number settings: the saved value kept within its limits, the default when missing (SETTING_NUMBERS)
+foreach (SETTING_NUMBERS as $k => $_) $settings[$k] = (string)setting_int($conn, $k);
 
 // Claim notify recipients (up to 5) — each is either a linked user (email follows their account)
 // or a raw typed email address.
@@ -1181,19 +1165,19 @@ require_once '../../includes/topbar.php';
               <div class="field">
                 <label class="field-label">Max Vehicle Age (years)</label>
                 <input type="number" name="eligibility_max_age" class="field-input"
-                  value="<?= htmlspecialchars($settings['eligibility_max_age']) ?>" min="1" max="50"/>
+                  value="<?= htmlspecialchars($settings['eligibility_max_age']) ?>" min="<?= SETTING_NUMBERS['eligibility_max_age'][1] ?>" max="<?= SETTING_NUMBERS['eligibility_max_age'][2] ?>"/>
                 <span class="field-hint">Vehicles older than this are not eligible.</span>
               </div>
               <div class="field">
                 <label class="field-label">Urgent Threshold (days)</label>
                 <input type="number" name="renewal_urgent_days" class="field-input"
-                  value="<?= htmlspecialchars($settings['renewal_urgent_days']) ?>" min="1" max="365"/>
+                  value="<?= htmlspecialchars($settings['renewal_urgent_days']) ?>" min="<?= SETTING_NUMBERS['renewal_urgent_days'][1] ?>" max="<?= SETTING_NUMBERS['renewal_urgent_days'][2] ?>"/>
                 <span class="field-hint">Policies within this range marked "Urgent".</span>
               </div>
               <div class="field">
                 <label class="field-label">Expiring Threshold (days)</label>
                 <input type="number" name="renewal_expiring_days" class="field-input"
-                  value="<?= htmlspecialchars($settings['renewal_expiring_days']) ?>" min="1" max="365"/>
+                  value="<?= htmlspecialchars($settings['renewal_expiring_days']) ?>" min="<?= SETTING_NUMBERS['renewal_expiring_days'][1] ?>" max="<?= SETTING_NUMBERS['renewal_expiring_days'][2] ?>"/>
                 <span class="field-hint">Policies within this range marked "Expiring".</span>
               </div>
             </div>
@@ -1276,13 +1260,13 @@ require_once '../../includes/topbar.php';
               <div class="field">
                 <label class="field-label">Max Login Attempts</label>
                 <input type="number" name="max_login_attempts" class="field-input"
-                  value="<?= htmlspecialchars($settings['max_login_attempts']) ?>" min="1" max="20"/>
+                  value="<?= htmlspecialchars($settings['max_login_attempts']) ?>" min="<?= SETTING_NUMBERS['max_login_attempts'][1] ?>" max="<?= SETTING_NUMBERS['max_login_attempts'][2] ?>"/>
                 <span class="field-hint">Account locks after this many failed attempts.</span>
               </div>
               <div class="field">
                 <label class="field-label">Lockout Duration (minutes)</label>
                 <input type="number" name="lockout_duration" class="field-input"
-                  value="<?= htmlspecialchars($settings['lockout_duration']) ?>" min="1" max="120"/>
+                  value="<?= htmlspecialchars($settings['lockout_duration']) ?>" min="<?= SETTING_NUMBERS['lockout_duration'][1] ?>" max="<?= SETTING_NUMBERS['lockout_duration'][2] ?>"/>
                 <span class="field-hint">How long the account stays locked.</span>
               </div>
             </div>
@@ -1291,64 +1275,20 @@ require_once '../../includes/topbar.php';
               <div class="field">
                 <label class="field-label">Activation Link Expiry (hours)</label>
                 <input type="number" name="activation_link_expiry" class="field-input"
-                  value="<?= htmlspecialchars($settings['activation_link_expiry']) ?>" min="1" max="168"/>
+                  value="<?= htmlspecialchars($settings['activation_link_expiry']) ?>" min="<?= SETTING_NUMBERS['activation_link_expiry'][1] ?>" max="<?= SETTING_NUMBERS['activation_link_expiry'][2] ?>"/>
                 <span class="field-hint">How long account activation links remain valid.</span>
               </div>
               <div class="field">
                 <label class="field-label">Reset Link Expiry (hours)</label>
                 <input type="number" name="reset_link_expiry" class="field-input"
-                  value="<?= htmlspecialchars($settings['reset_link_expiry']) ?>" min="1" max="24"/>
+                  value="<?= htmlspecialchars($settings['reset_link_expiry']) ?>" min="<?= SETTING_NUMBERS['reset_link_expiry'][1] ?>" max="<?= SETTING_NUMBERS['reset_link_expiry'][2] ?>"/>
                 <span class="field-hint">How long password reset links remain valid.</span>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- System Preferences -->
-        <div class="card">
-          <div class="card-header">
-            <div class="card-icon"><?= icon('cog', 16) ?></div>
-            <div>
-              <div class="card-title">System Preferences</div>
-              <div class="card-sub">Timezone and display format settings</div>
-            </div>
-          </div>
-          <div class="card-body">
-            <div class="form-grid">
-              <div class="field">
-                <label class="field-label">Timezone</label>
-                <select name="timezone" class="field-select">
-                  <?php
-                  $timezones = [
-                      'Asia/Manila', 'Asia/Singapore', 'Asia/Tokyo', 'Asia/Hong_Kong',
-                      'Asia/Shanghai', 'Asia/Kolkata', 'Australia/Sydney',
-                      'UTC', 'US/Eastern', 'US/Pacific', 'Europe/London',
-                  ];
-                  foreach ($timezones as $tz): ?>
-                  <option value="<?= $tz ?>" <?= $settings['timezone'] === $tz ? 'selected' : '' ?>><?= $tz ?></option>
-                  <?php endforeach; ?>
-                </select>
-              </div>
-              <div class="field">
-                <label class="field-label">Date Format</label>
-                <select name="date_format" class="field-select">
-                  <?php
-                  $formats = [
-                      'M d, Y'  => 'Mar 26, 2026',
-                      'F j, Y'  => 'March 26, 2026',
-                      'd M Y'   => '26 Mar 2026',
-                      'm/d/Y'   => '03/26/2026',
-                      'd/m/Y'   => '26/03/2026',
-                      'Y-m-d'   => '2026-03-26',
-                  ];
-                  foreach ($formats as $fmt => $example): ?>
-                  <option value="<?= $fmt ?>" <?= $settings['date_format'] === $fmt ? 'selected' : '' ?>><?= $example ?> (<?= $fmt ?>)</option>
-                  <?php endforeach; ?>
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
+        <!-- (System Preferences — Timezone / Date Format — removed 2026-11-04: nothing ever read them) -->
 
         <!-- Bottom save button -->
         <div class="panel-save-bar">

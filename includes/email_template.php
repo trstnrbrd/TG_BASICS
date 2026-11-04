@@ -13,18 +13,20 @@ require_once __DIR__ . '/branding.php';
  * authenticated PHPMailer instance) and _smtpSetting(), which the functions below depend on.
  */
 
-/** Internal helpers — read company info from DB settings when available. */
+/** Internal helpers — company info from Settings (company_info(), config/settings.php), its defaults without a connection. */
+require_once __DIR__ . '/../config/settings.php';
 function _getCompanyName(): string {
     global $conn;
-    return (isset($conn) && function_exists('getSetting'))
-        ? getSetting($conn, 'company_name', 'TG Customworks & Basic Car Insurance')
-        : 'TG Customworks & Basic Car Insurance';
+    return $conn instanceof mysqli ? company_info($conn)['name'] : COMPANY_DEFAULTS['company_name'];
 }
 function _getCompanyAddress(): string {
     global $conn;
-    return (isset($conn) && function_exists('getSetting'))
-        ? getSetting($conn, 'company_address', '49 Villa Tierra St., San Roque, Pandi, Bulacan')
-        : '49 Villa Tierra St., San Roque, Pandi, Bulacan';
+    return $conn instanceof mysqli ? company_info($conn)['address'] : COMPANY_DEFAULTS['company_address'];
+}
+/** A number setting (SETTING_NUMBERS, config/settings.php) for the email text; its default without a connection. */
+function _settingInt(string $key): int {
+    global $conn;
+    return $conn instanceof mysqli ? setting_int($conn, $key) : SETTING_NUMBERS[$key][0];
 }
 
 /**
@@ -153,7 +155,7 @@ function sendActivationEmail(string $toEmail, string $toName, string $activation
         $mail->addAddress($toEmail, $toName);
         embedEmailLogos($mail);
 
-        $expiry = _smtpSetting('activation_link_expiry', '24');
+        $expiry = _settingInt('activation_link_expiry');
 
         $mail->Subject = 'Activate Your TG-BASICS Account';
         $mail->Body = buildEmailTemplate(
@@ -486,7 +488,7 @@ function sendPasswordResetEmail(string $toEmail, string $toName, string $resetLi
         $mail->addAddress($toEmail, $toName);
         embedEmailLogos($mail);
 
-        $expiry = _smtpSetting('reset_link_expiry', '1');
+        $expiry = _settingInt('reset_link_expiry');
 
         $mail->Subject = 'Reset Your TG-BASICS Password';
         $mail->Body = buildEmailTemplate(

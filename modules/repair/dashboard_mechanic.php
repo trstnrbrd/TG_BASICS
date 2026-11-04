@@ -48,22 +48,17 @@ require_once '../../includes/topbar.php';
         ['icon' => 'check-circle', 'theme' => 'green', 'label' => 'Completed Today',     'value' => $completed_today, 'trend' => 'Today',          'href' => 'repair_list.php?status=completed'],
         ['icon' => 'clock',        'theme' => 'amber', 'label' => 'Pending Jobs',        'value' => $pending_jobs,    'trend' => 'Awaiting start', 'href' => 'repair_list.php?status=pending'],
     ];
-    $theme_map = [
-        'gold'  => ['accent' => 'linear-gradient(90deg,#D4A017,#E8D5A3)', 'icon_bg' => 'var(--gold-light)',  'icon_color' => 'var(--gold)'],
-        'green' => ['accent' => 'linear-gradient(90deg,#2E7D52,#52B788)', 'icon_bg' => 'var(--success-bg)', 'icon_color' => 'var(--success)'],
-        'amber' => ['accent' => 'linear-gradient(90deg,#B8860B,#D4A017)', 'icon_bg' => 'var(--warning-bg)', 'icon_color' => 'var(--warning)'],
-    ];
+    // Card colours: the dash-stat--<theme> classes in assets/css/dashboard.css
     ?>
     <div class="dash-stats">
-      <?php foreach ($mech_stats as $s):
-          $t = $theme_map[$s['theme']]; ?>
-      <a class="dash-stat" href="<?= htmlspecialchars($s['href']) ?>" aria-label="<?= htmlspecialchars($s['label'] . ': ' . $s['value']) ?>">
-        <div class="dash-stat-accent" style="background:<?= $t['accent'] ?>;"></div>
+      <?php foreach ($mech_stats as $s): ?>
+      <a class="dash-stat dash-stat--<?= $s['theme'] ?>" href="<?= htmlspecialchars($s['href']) ?>" aria-label="<?= htmlspecialchars($s['label'] . ': ' . $s['value']) ?>">
+        <div class="dash-stat-accent"></div>
         <div class="dash-stat-top">
-          <div class="dash-stat-icon" style="background:<?= $t['icon_bg'] ?>;color:<?= $t['icon_color'] ?>;">
+          <div class="dash-stat-icon">
             <?= icon($s['icon'], 18) ?>
           </div>
-          <span class="dash-stat-badge" style="background:var(--bg);color:var(--text-muted);border:1px solid var(--border);">
+          <span class="dash-stat-badge">
             <?= $s['trend'] ?>
           </span>
         </div>

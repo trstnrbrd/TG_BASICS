@@ -24,7 +24,7 @@ function send_renewal_reminders(mysqli $conn): array
 
 function renewal_reminders_run(mysqli $conn): array
 {
-    $urg_days = (int)getSetting($conn, 'renewal_urgent_days', '7');
+    $urg_days = setting_int($conn, 'renewal_urgent_days');
 
     // Active, not renewed, expiring soon, and not emailed yet today
     $policies = policies_urgent_unreminded($conn, $urg_days);

@@ -8,8 +8,8 @@ require_once '../../includes/insurance_companies.php';
 require_once '../../includes/db_backup.php';
 require_once '../../config/dev_access.php';
 
-$urg_days = (int)getSetting($conn, 'renewal_urgent_days', '7');
-$exp_days = (int)getSetting($conn, 'renewal_expiring_days', '30');
+$urg_days = setting_int($conn, 'renewal_urgent_days');
+$exp_days = setting_int($conn, 'renewal_expiring_days');
 
 require_role(['admin', 'super_admin']);
 require_once '../../config/validators.php';   // csrf_token() for the reminder call below
@@ -130,23 +130,16 @@ require_once '../../includes/topbar.php';
           ['icon' => 'vehicle',      'theme' => 'blue',  'label' => 'Total Vehicles', 'value' => $total_vehicles, 'trend' => ($recent_vehicles > 0 ? '+' . $recent_vehicles . ' this month' : 'Registered'), 'up' => $recent_vehicles > 0,
            'href' => '../clients/client_list.php?agent=all'],
       ];
-      $theme_map = [
-          'gold'  => ['accent' => 'linear-gradient(90deg,#D4A017,#E8D5A3)', 'icon_bg' => 'var(--gold-light)',   'icon_color' => 'var(--gold)'],
-          'green' => ['accent' => 'linear-gradient(90deg,#2E7D52,#52B788)', 'icon_bg' => 'var(--success-bg)',   'icon_color' => 'var(--success)'],
-          'amber' => ['accent' => 'linear-gradient(90deg,#B8860B,#D4A017)', 'icon_bg' => 'var(--warning-bg)',   'icon_color' => 'var(--warning)'],
-          'red'   => ['accent' => 'linear-gradient(90deg,#C0392B,#E74C3C)', 'icon_bg' => 'var(--danger-bg)',    'icon_color' => 'var(--danger)'],
-          'blue'  => ['accent' => 'linear-gradient(90deg,#1A6B9A,#3498DB)', 'icon_bg' => 'var(--info-bg)',      'icon_color' => 'var(--info)'],
-      ];
+      // Card colours: the dash-stat--<theme> classes in assets/css/dashboard.css
       foreach ($stats as $s):
-          $t = $theme_map[$s['theme']];
       ?>
-      <a class="dash-stat" href="<?= htmlspecialchars($s['href']) ?>" aria-label="<?= htmlspecialchars($s['label'] . ': ' . $s['value']) ?>">
-        <div class="dash-stat-accent" style="background:<?= $t['accent'] ?>;"></div>
+      <a class="dash-stat dash-stat--<?= $s['theme'] ?>" href="<?= htmlspecialchars($s['href']) ?>" aria-label="<?= htmlspecialchars($s['label'] . ': ' . $s['value']) ?>">
+        <div class="dash-stat-accent"></div>
         <div class="dash-stat-top">
-          <div class="dash-stat-icon" style="background:<?= $t['icon_bg'] ?>;color:<?= $t['icon_color'] ?>;">
+          <div class="dash-stat-icon">
             <?= icon($s['icon'], 18) ?>
           </div>
-          <span class="dash-stat-badge" style="background:<?= $s['up'] ? 'var(--success-bg)' : 'var(--bg)' ?>;color:<?= $s['up'] ? 'var(--success)' : 'var(--text-muted)' ?>;<?= $s['up'] ? '' : 'border:1px solid var(--border);' ?>">
+          <span class="dash-stat-badge<?= $s['up'] ? ' is-up' : '' ?>">
             <?= $s['trend'] ?>
           </span>
         </div>
@@ -254,16 +247,10 @@ require_once '../../includes/topbar.php';
         <div style="padding:2rem;text-align:center;color:var(--text-muted);font-size:0.8rem;">No recent activity.</div>
         <?php else: ?>
           <?php
-          $dot_colors = [
-            'LOGIN'=>'var(--success)','LOGOUT'=>'var(--text-muted)',
-            'ACCOUNT_CREATED'=>'var(--gold-bright)','ACCOUNT_DELETED'=>'var(--danger)',
-            'PASSWORD_RESET'=>'var(--warning)','CLIENT_ADDED'=>'var(--success)','CLIENT_IMPORTED'=>'var(--success)','DATABASE_BACKUP'=>'var(--info)',
-            'CLIENT_UPDATED'=>'var(--warning)','VEHICLE_ADDED'=>'var(--success)',
-            'POLICY_CREATED'=>'var(--gold-bright)','POLICY_SAVED'=>'var(--success)',
-          ];
+          require_once __DIR__ . '/../../includes/audit_actions.php';   // one colour per action, shared with the Activity Log
           $total_items = count($activity_items);
           foreach ($activity_items as $i => $item):
-            $dot_color = $dot_colors[$item['action']] ?? 'var(--border)';
+            $dot_color = audit_action_style($item['action'])['dot'];
             $desc = htmlspecialchars($item['description']);
             $desc = preg_replace('/^(\S+\s\S+)/', '<strong>$1</strong>', $desc);
           ?>

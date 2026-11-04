@@ -18,8 +18,9 @@ if (!$d) { header("Location: quotation_list.php"); exit; }
 
 $items = quotation_items($conn, $qt_id);
 
-$company_name    = getSetting($conn, 'company_name',    'TG Customworks & Basic Car Insurance');
-$company_address = getSetting($conn, 'company_address', '49 Villa Tierra St., San Roque, Pandi, Bulacan');
+$company         = company_info($conn);   // Settings > Company Info (config/settings.php)
+$company_name    = $company['name'];
+$company_address = $company['address'];
 
 $service_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
 $pay_methods = ['cash' => 'Cash', 'e_wallet' => 'E-Wallet', 'bank_transfer' => 'Bank Transfer'];

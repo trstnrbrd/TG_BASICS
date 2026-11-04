@@ -8,6 +8,7 @@ require_once '../../config/access.php';
 require_once '../../includes/transaction.php';
 require_once '../../config/transaction_pin.php';
 require_once '../../includes/billing_lists.php';
+require_once __DIR__ . '/../../config/settings.php';   // company_info(): the shop name on the printed statement
 
 require_role(['admin', 'super_admin']);
 
@@ -182,7 +183,7 @@ require_once '../../includes/topbar.php';
             <div class="vb-print-logo-divider"></div>
             <img src="<?= brand_logo('basic', '../../') ?>" alt="Basic Car Insurance"/>
             <div class="vb-print-logo-divider"></div>
-            <div class="vb-print-logo-text">TG Customworks &amp; Basic Car Insurance<br>Official Billing Statement</div>
+            <div class="vb-print-logo-text"><?= htmlspecialchars(company_info($conn)['name']) ?><br>Official Billing Statement</div>
           </div>
 
           <!-- Statement header -->

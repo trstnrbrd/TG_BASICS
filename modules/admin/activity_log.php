@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../config/session.php';
 require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
+require_once __DIR__ . '/../../includes/audit_actions.php';   // badge / icon / export colour per action
 
 require_role(['super_admin']);
 
@@ -95,39 +96,10 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     <td class="th" width="90">Time</td>
   </tr>
     <?php
-    $action_colors = [
-        'LOGIN'                  => '#e8f5e9', 'LOGOUT'                 => '#f0f0f0',
-        'ACCOUNT_CREATED'        => '#fff8e1', 'ACCOUNT_DELETED'        => '#ffebee',
-        'PROFILE_UPDATED'        => '#fff8e1', 'PASSWORD_CHANGED'       => '#fff8e1',
-        'SECURITY_UPDATED'       => '#fff8e1', 'TOTP_ENABLED'           => '#e8f5e9',
-        'TOTP_DISABLED'          => '#f0f0f0', 'SETTINGS_UPDATED'       => '#fff8e1',
-        'CLIENT_ADDED'           => '#e8f5e9', 'CLIENT_UPDATED'         => '#fff8e1',
-        'CLIENT_DELETED'         => '#ffebee', 'CLIENT_IMPORTED'        => '#e8f5e9',
-        'DATABASE_BACKUP'        => '#e3f2fd',
-        'RENEWAL_REMINDERS_SENT' => '#e3f2fd', 'OVERDUE_REMINDERS_SENT' => '#e3f2fd',
-        'CLIENTS_PURGED'         => '#f0f0f0', 'QUOTATIONS_PURGED'      => '#f0f0f0',
-        'SIGN_IN_LOGS_PURGED'    => '#f0f0f0',
-        'VEHICLE_ADDED'          => '#e8f5e9', 'VEHICLE_UPDATED'        => '#fff8e1',
-        'VEHICLE_UNREGISTERED'   => '#ffebee',
-        'POLICY_CREATED'         => '#fff8e1', 'POLICY_RENEWED'         => '#e8f5e9',
-        'POLICY_DELETED'         => '#ffebee', 'PAYMENT_RECORDED'       => '#e8f5e9',
-        'PAYMENT_UNDONE'         => '#ffebee', 'POLICY_UPDATED'         => '#fff8e1',
-        'RECEIPT_UPLOADED'       => '#fff8e1',
-        'CLAIM_FILED'            => '#fff8e1', 'CLAIM_UPDATED'          => '#fff8e1',
-        'CLAIM_DELETED'          => '#ffebee',
-        'REPAIR_JOB_CREATED'     => '#fff8e1', 'REPAIR_JOB_DELETED'     => '#ffebee',
-        'REPAIR_STATUS_UPDATED'  => '#fff8e1',
-        'BILLING_CREATED'        => '#fff8e1', 'BILLING_UPDATED'        => '#fff8e1',
-        'BILLING_DELETED'        => '#ffebee', 'BILLING_STATUS_UPDATED' => '#fff8e1',
-        'BILLING_DOCS_UPDATED'   => '#fff8e1',
-        'QUOTATION_CREATED'      => '#fff8e1', 'QUOTATION_UPDATED'      => '#fff8e1',
-        'QUOTATION_DELETED'      => '#ffebee', 'QUOTATION_APPROVED'     => '#e8f5e9',
-        'RECEIPT_CREATED'        => '#e8f5e9',
-    ];
     $n = 1; $stripe = false;
     foreach ($exp_rows as $r):
         $ts  = strtotime($r['created_at']);
-        $bg  = $action_colors[$r['action']] ?? ($stripe ? '#f9f9f9' : '#ffffff');
+        $bg  = audit_action_style($r['action'])['row'] ?? ($stripe ? '#f9f9f9' : '#ffffff');
         $stripe = !$stripe;
     ?>
   <tr style="background:<?= $bg ?>;">
@@ -292,66 +264,9 @@ require_once '../../includes/topbar.php';
             $row_num = $offset;
             foreach ($logs as $log):
               $row_num++;
-              $action_badges = [
-                // Auth
-                'LOGIN'                  => ['badge-green',  'arrow-right-on-rectangle'],
-                'LOGOUT'                 => ['badge-gray',   'arrow-left-on-rectangle'],
-                // Account
-                'ACCOUNT_CREATED'        => ['badge-gold',   'user-plus'],
-                'ACCOUNT_DELETED'        => ['badge-red',    'trash'],
-                'PROFILE_UPDATED'        => ['badge-yellow', 'pencil'],
-                'PASSWORD_CHANGED'       => ['badge-yellow', 'lock-closed'],
-                'SECURITY_UPDATED'       => ['badge-yellow', 'lock-closed'],
-                'TOTP_ENABLED'           => ['badge-green',  'shield-check'],
-                'TOTP_DISABLED'          => ['badge-gray',   'shield-check'],
-                'SETTINGS_UPDATED'       => ['badge-yellow', 'cog-6-tooth'],
-                // Clients
-                'CLIENT_ADDED'           => ['badge-green',  'user-plus'],
-                'CLIENT_UPDATED'         => ['badge-yellow', 'pencil'],
-                'CLIENT_DELETED'         => ['badge-red',    'trash'],
-                'CLIENT_IMPORTED'        => ['badge-green',  'arrow-up-tray'],
-                'DATABASE_BACKUP'        => ['badge-blue',   'arrow-down-tray'],
-                // Scheduled jobs
-                'RENEWAL_REMINDERS_SENT' => ['badge-blue',   'envelope'],
-                'OVERDUE_REMINDERS_SENT' => ['badge-blue',   'envelope'],
-                'CLIENTS_PURGED'         => ['badge-gray',   'trash'],
-                'QUOTATIONS_PURGED'      => ['badge-gray',   'trash'],
-                'SIGN_IN_LOGS_PURGED'    => ['badge-gray',   'trash'],
-                // Vehicles
-                'VEHICLE_ADDED'          => ['badge-green',  'plus'],
-                'VEHICLE_UPDATED'        => ['badge-yellow', 'pencil'],
-                'VEHICLE_UNREGISTERED'   => ['badge-red',    'trash'],
-                // Policies
-                'POLICY_CREATED'         => ['badge-gold',   'shield-check'],
-                'POLICY_RENEWED'         => ['badge-green',  'shield-check'],
-                'POLICY_DELETED'         => ['badge-red',    'trash'],
-                'PAYMENT_RECORDED'       => ['badge-green',  'banknotes'],
-                'PAYMENT_UNDONE'         => ['badge-red',    'arrow-path'],
-                'POLICY_UPDATED'         => ['badge-yellow', 'pencil'],
-                'RECEIPT_UPLOADED'       => ['badge-yellow', 'arrow-up-tray'],
-                // Claims
-                'CLAIM_FILED'            => ['badge-gold',   'clipboard-list'],
-                'CLAIM_UPDATED'          => ['badge-yellow', 'clipboard-list'],
-                'CLAIM_DELETED'          => ['badge-red',    'trash'],
-                // Repair
-                'REPAIR_JOB_CREATED'     => ['badge-gold',   'wrench'],
-                'REPAIR_JOB_DELETED'     => ['badge-red',    'trash'],
-                'REPAIR_STATUS_UPDATED'  => ['badge-yellow', 'wrench'],
-                // Billing
-                'BILLING_CREATED'        => ['badge-gold',   'receipt'],
-                'BILLING_UPDATED'        => ['badge-yellow', 'receipt'],
-                'BILLING_DELETED'        => ['badge-red',    'trash'],
-                'BILLING_STATUS_UPDATED' => ['badge-yellow', 'receipt'],
-                'BILLING_DOCS_UPDATED'   => ['badge-yellow', 'document'],
-                // Quotations
-                'QUOTATION_CREATED'      => ['badge-gold',   'receipt'],
-                'QUOTATION_UPDATED'      => ['badge-yellow', 'receipt'],
-                'QUOTATION_DELETED'      => ['badge-red',    'trash'],
-                'QUOTATION_APPROVED'     => ['badge-green',  'check-circle'],
-                'RECEIPT_CREATED'        => ['badge-green',  'receipt'],
-              ];
-              $ab   = $action_badges[$log['action']][0] ?? 'badge-gray';
-              $aico = $action_badges[$log['action']][1] ?? 'clipboard-list';
+              $astyle = audit_action_style($log['action']);   // includes/audit_actions.php
+              $ab     = $astyle['badge'];
+              $aico   = $astyle['icon'];
 
               // Time formatting
               $ts       = strtotime($log['created_at']);

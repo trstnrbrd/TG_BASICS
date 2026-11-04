@@ -60,7 +60,7 @@ if ($selected_vid > 0) {
         $current_year    = (int)date('Y');
         $year_model      = (int)$row['year_model'];
         $age             = $current_year - $year_model;
-        $max_vehicle_age = (int)getSetting($conn, 'eligibility_max_age', '10');
+        $max_vehicle_age = setting_int($conn, 'eligibility_max_age');
 
         $eligible = $age <= $max_vehicle_age;
 
@@ -125,7 +125,7 @@ require_once '../../includes/topbar.php';
     <!-- INFO BOX -->
     <div class="info-box" style="margin-bottom:1.25rem;">
       <?= icon('information-circle', 16) ?>
-      <span><?= count(insurance_companies_active($conn)) === 2 ? 'Both ' : '' ?><?= htmlspecialchars(insurance_companies_phrase($conn)) ?> cover vehicles that are <strong><?= (int)getSetting($conn, 'eligibility_max_age', '10') ?> years old or newer</strong> based on the year model. Vehicles older than <?= (int)getSetting($conn, 'eligibility_max_age', '10') ?> years are not eligible for new policy coverage<?= count(insurance_companies_active($conn)) > 1 ? ' with any of them' : '' ?>.</span>
+      <span><?= count(insurance_companies_active($conn)) === 2 ? 'Both ' : '' ?><?= htmlspecialchars(insurance_companies_phrase($conn)) ?> cover vehicles that are <strong><?= setting_int($conn, 'eligibility_max_age') ?> years old or newer</strong> based on the year model. Vehicles older than <?= setting_int($conn, 'eligibility_max_age') ?> years are not eligible for new policy coverage<?= count(insurance_companies_active($conn)) > 1 ? ' with any of them' : '' ?>.</span>
     </div>
 
     <!-- SEARCH CARD -->

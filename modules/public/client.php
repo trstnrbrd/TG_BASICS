@@ -134,10 +134,9 @@ $live_cfg = realtime_client_config();   // public values only (key, cluster); em
 
 $svc_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
 
-$company_name    = getSetting($conn, 'company_name',    'TG Customworks & Basic Car Insurance');
-$company_address = getSetting($conn, 'company_address', '49 Villa Tierra St., San Roque, Pandi, Bulacan');
-$company_phone   = getSetting($conn, 'company_phone',   '09171453448');
-$company_email   = getSetting($conn, 'company_email',   'tgcustomworksbulacan@gmail.com');
+[
+    'name' => $company_name, 'address' => $company_address, 'contact' => $company_phone, 'email' => $company_email,
+] = company_info($conn);   // Settings > Company Info (config/settings.php)
 $fb_tg           = getSetting($conn, 'fb_tg',           'https://www.facebook.com/TGCustomworks');
 $fb_basiccar     = getSetting($conn, 'fb_basiccar',     'https://www.facebook.com/BasicCarInsurance');
 $words    = array_filter(explode(' ', $client['full_name']));

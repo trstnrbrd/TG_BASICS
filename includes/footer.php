@@ -56,6 +56,19 @@ $footer_extra_scripts  = $footer_extra_scripts  ?? '';
 <?php if ($footer_extra_scripts): ?>
   <?= $footer_extra_scripts ?>
 <?php endif; ?>
+
+<!-- Sidebar: the active highlight slides to the clicked section (assets/js/shared/sidebar_motion.js).
+     Motion is fetched in the background only when the page has not loaded it already (dashboard, monthly
+     report and renewal list do, above); the slide reads window.Motion at click time. -->
+<script>
+  if (!window.Motion && document.querySelector('.sidebar-nav')) {
+    var tgMotion = document.createElement('script');
+    tgMotion.src = 'https://cdn.jsdelivr.net/npm/motion@13.4.3/dist/motion.min.js';
+    tgMotion.async = true;
+    document.head.appendChild(tgMotion);
+  }
+</script>
+<script src="<?= $base_path ?>assets/js/shared/sidebar_motion.js?v=<?= filemtime(__DIR__ . '/../assets/js/shared/sidebar_motion.js') ?>"></script>
 <?php if ($footer_scripts): ?>
 <!-- Every current caller passes plain JS here (checked 2026-09-25) — no page actually needed JSX/Babel for this.
      If a future caller genuinely writes JSX into $footer_scripts, precompile it (see layout_react.js's header

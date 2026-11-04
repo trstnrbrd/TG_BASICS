@@ -61,6 +61,16 @@ require_once '../../includes/navbar.php';
 }
 .rnl-company-opt:hover { color: var(--gold); background: var(--gold-pale); }
 .rnl-company-opt.is-active { color: var(--gold); background: var(--gold-pale); border-color: var(--gold-bright); font-weight: 700; }
+/* Sliding pill (assets/js/shared/company_switch.js): once the script is ready the active look moves from
+   the option onto one pill behind the options, which slides to the clicked company before the page opens */
+.rnl-company-switch.has-pill { position: relative; }
+.rnl-company-pill {
+  position: absolute; left: 0; top: 0; border-radius: 100px; pointer-events: none; z-index: 0;
+  background: var(--gold-pale); border: 1px solid var(--gold-bright); box-shadow: 0 2px 10px rgba(184,134,11,0.18);
+}
+.rnl-company-switch.has-pill .rnl-company-opt { position: relative; z-index: 1; }
+.rnl-company-switch.has-pill .rnl-company-opt.is-active { background: transparent; border-color: transparent; }
+.rnl-company-switch.has-pill .rnl-company-opt.is-active:hover { background: transparent; }
 
 /* Phones: the switch spans the width (equal parts, scrolling sideways if there are many); the agent filter takes its own full row in the
    toolbar grid (mobile_tables.css) */
@@ -355,6 +365,9 @@ $footer_scripts .= '
 var rnlTable = document.querySelector(".renewal-list-table");
 if (rnlTable) rnlTable.addEventListener("click", function(e) { if (window.innerWidth > 768) e.stopPropagation(); });
 ';
-$footer_extra_scripts = '<script src="../../assets/js/shared/agent_filter.js?v=' . filemtime(__DIR__ . '/../../assets/js/shared/agent_filter.js') . '"></script>';
+$footer_extra_scripts = '<script src="../../assets/js/shared/agent_filter.js?v=' . filemtime(__DIR__ . '/../../assets/js/shared/agent_filter.js') . '"></script>'
+    // Company switch: the pill slides to the chosen company (Motion, same build as the dashboard)
+    . '<script src="https://cdn.jsdelivr.net/npm/motion@13.4.3/dist/motion.min.js"></script>'
+    . '<script src="../../assets/js/shared/company_switch.js?v=' . filemtime(__DIR__ . '/../../assets/js/shared/company_switch.js') . '"></script>';
 require_once '../../includes/footer.php';
 ?>

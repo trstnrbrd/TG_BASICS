@@ -8,6 +8,7 @@ require_once '../../config/access.php';
 require_once '../../includes/transaction.php';
 require_once '../../config/transaction_pin.php';
 require_once '../../includes/billing_lists.php';
+require_once '../../includes/billing_form.php';
 require_once __DIR__ . '/../../config/settings.php';   // company_info(): the shop name on the printed statement
 
 require_role(['admin', 'super_admin']);
@@ -39,14 +40,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'update_status') {
         $new_status = san_enum($_POST['status'] ?? '', array_column(billing_statuses_active($conn), 'code'));
-        if ($new_status) {
-            $sent_at = ($new_status === BILLING_STATUS_SENT && !$billing['sent_at']) ? date('Y-m-d H:i:s') : null;
-            db_transaction($conn, function () use ($conn, $billing_id, $billing, $new_status, $sent_at) {
-                billing_set_status($conn, $billing_id, $new_status, $sent_at);
-                $desc = ($_SESSION['full_name'] ?? '') . ' changed billing ' . $billing['billing_number'] . ' to ' . $new_status . '.';
-                audit_log_add($conn, $_SESSION['user_id'], 'BILLING_STATUS_UPDATED', $desc);
-            });
-        }
+        // not one of the active statuses: say so (it used to report "Status updated" with nothing saved)
+        if (!$new_status) { header("Location: view_billing.php?id=$billing_id&error=" . urlencode('Please choose one of the listed statuses.')); exit; }
+        $sent_at = ($new_status === BILLING_STATUS_SENT && !$billing['sent_at']) ? date('Y-m-d H:i:s') : null;
+        db_transaction($conn, function () use ($conn, $billing_id, $billing, $new_status, $sent_at) {
+            billing_set_status($conn, $billing_id, $new_status, $sent_at);
+            $desc = ($_SESSION['full_name'] ?? '') . ' changed billing ' . $billing['billing_number'] . ' to ' . $new_status . '.';
+            audit_log_add($conn, $_SESSION['user_id'], 'BILLING_STATUS_UPDATED', $desc);
+        });
         header("Location: view_billing.php?id=$billing_id&success=Status+updated"); exit;
     }
 
@@ -65,33 +66,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'update_costs') {
-        // Each amount checked by read_money() (blank = 0); the amount due must never go below zero
-        [$parts,  $e1] = read_money($_POST['parts_cost'] ?? '', 'Parts cost');
-        [$labor,  $e2] = read_money($_POST['labor_cost'] ?? '', 'Labor cost');
-        [$other,  $e3] = read_money($_POST['other_cost'] ?? '', 'Other cost');
-        [$deduct, $e4] = read_money($_POST['deductible'] ?? '', 'Deductible');
-        $billed = san_str($_POST['billed_to']      ?? '', 255);
-        $notes  = san_str($_POST['notes']           ?? '', MAX_NOTE);
-        $inc_d  = san_str($_POST['incident_date']   ?? '', 10) ?: null;
-        $rep_d  = san_str($_POST['repair_date']     ?? '', 10) ?: null;
+        // Billed To, the four amounts, notes and dates: the check shared with Add Billing (includes/billing_form.php)
+        [$bf, $form_errors] = billing_form_check($_POST);
+        if ($form_errors) { header("Location: view_billing.php?id=$billing_id&error=" . urlencode($form_errors[0])); exit; }
         // the cashier who signs (billing_signatories); their name and title are copied onto the billing
+        // (none chosen = keep the one it has)
         $signer = billing_signatory_pick($conn, $_POST['signatory_id'] ?? 0);
 
-        $bad = null;
-        foreach ([$e1, $e2, $e3, $e4] as $e) if (!$bad && $e !== '') $bad = $e;
-        if (!$bad && round($deduct, 2) > round($parts + $labor + $other, 2)) {
-            $bad = 'The deductible cannot be more than the total cost of repair (₱' . number_format($parts + $labor + $other, 2) . ').';
-        }
-        if (!$bad && text_too_long($_POST['notes'] ?? '', MAX_NOTE)) $bad = 'Notes are too long (max ' . MAX_NOTE . ' characters).';
-        if (!$bad && $inc_d !== null && !validate_date($inc_d)) $bad = 'Incident date is not a valid date.';
-        if (!$bad && $rep_d !== null && !validate_date($rep_d)) $bad = 'Repair date is not a valid date.';
-        if ($bad) { header("Location: view_billing.php?id=$billing_id&error=" . urlencode($bad)); exit; }
-
-        db_transaction($conn, function () use ($conn, $billing_id, $billing, $billed, $inc_d, $rep_d, $parts, $labor, $other, $deduct, $notes, $signer) {
-            billing_update($conn, $billing_id, [
-                'billed_to' => $billed, 'incident_date' => $inc_d, 'repair_date' => $rep_d,
-                'parts_cost' => $parts, 'labor_cost' => $labor, 'other_cost' => $other, 'deductible' => $deduct, 'notes' => $notes,
-            ], $signer ?: null);
+        db_transaction($conn, function () use ($conn, $billing_id, $billing, $bf, $signer) {
+            billing_update($conn, $billing_id, $bf, $signer ?: null);
             $desc = ($_SESSION['full_name'] ?? '') . ' updated billing ' . $billing['billing_number'] . '.';
             audit_log_add($conn, $_SESSION['user_id'], 'BILLING_UPDATED', $desc);
         });
@@ -135,7 +118,7 @@ require_once '../../includes/topbar.php';
     <?php if (!empty($_GET['error'])): ?>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-      Swal.fire({ icon:'error', title:'Could not save', text:<?= json_encode(san_str($_GET['error'], 200)) ?>, confirmButtonColor:'#B8860B' });
+      Swal.fire({ icon:'error', title:'Could not save', text:<?= json_encode(san_str($_GET['error'], 200)) ?> });
     });
     </script>
     <?php endif; ?>
@@ -143,13 +126,13 @@ require_once '../../includes/topbar.php';
     <!-- PAGE HEADER -->
     <div class="vb-header">
       <div class="vb-header-left">
-        <a href="billing_list.php" class="btn-ghost" style="padding:0.4rem 0.7rem;" onclick="goBack('billing_list.php'); return false;"><?= icon('arrow-left', 14) ?></a>
+        <a href="billing_list.php" class="btn-ghost vb-back" onclick="goBack('billing_list.php'); return false;"><?= icon('arrow-left', 14) ?></a>
         <div>
-          <div style="display:flex;align-items:center;gap:0.6rem;">
-            <span style="font-size:1.1rem;font-weight:800;color:var(--text-primary);"><?= htmlspecialchars($billing['billing_number']) ?></span>
+          <div class="vb-title-row">
+            <span class="vb-title"><?= htmlspecialchars($billing['billing_number']) ?></span>
             <span class="badge <?= $sb['class'] ?>"><?= htmlspecialchars($sb['label']) ?></span>
           </div>
-          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.15rem;">
+          <div class="vb-subtitle">
             <?= htmlspecialchars($billing['full_name']) ?> &nbsp;·&nbsp;
             <?= htmlspecialchars($billing['plate_number'] ?? '—') ?> &nbsp;·&nbsp;
             Created <?= date('M d, Y', strtotime($billing['created_at'])) ?>
@@ -163,8 +146,7 @@ require_once '../../includes/topbar.php';
         <button type="button" class="btn-primary" onclick="window.print()">
           <?= icon('printer', 14) ?> Print
         </button>
-        <button type="button" id="delete-billing-btn" data-num="<?= htmlspecialchars($billing['billing_number']) ?>"
-          style="display:inline-flex;align-items:center;gap:0.4rem;background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border);padding:0.45rem 1rem;border-radius:8px;font-size:0.78rem;font-weight:700;cursor:pointer;">
+        <button type="button" id="delete-billing-btn" data-num="<?= htmlspecialchars($billing['billing_number']) ?>" class="vb-btn-delete">
           <?= icon('trash', 14) ?> Delete
         </button>
       </div>
@@ -174,8 +156,8 @@ require_once '../../includes/topbar.php';
     <div class="vb-grid">
 
       <!-- LEFT: STATEMENT + TIMELINE -->
-      <div style="display:flex;flex-direction:column;gap:1rem;">
-        <div class="card vb-statement" id="printable-statement" style="margin-bottom:0;">
+      <div class="vb-left-col">
+        <div class="card vb-statement" id="printable-statement">
 
           <!-- Print-only logo header -->
           <div class="vb-print-logo">
@@ -193,9 +175,9 @@ require_once '../../includes/topbar.php';
               <div class="vb-stmt-meta">No. <?= htmlspecialchars($billing['billing_number']) ?> &nbsp;·&nbsp; <?= date('F d, Y', strtotime($billing['created_at'])) ?></div>
             </div>
             <?php if ($billing['sent_at']): ?>
-            <div style="text-align:right;">
+            <div class="vb-sent">
               <div class="vb-stmt-meta">Sent to insurer</div>
-              <div style="font-size:0.78rem;font-weight:600;color:var(--info);"><?= date('M d, Y', strtotime($billing['sent_at'])) ?></div>
+              <div class="vb-sent-date"><?= date('M d, Y', strtotime($billing['sent_at'])) ?></div>
             </div>
             <?php endif; ?>
           </div>
@@ -254,23 +236,23 @@ require_once '../../includes/topbar.php';
 
           <!-- Signature footer -->
           <div class="vb-sig-row">
-            <div style="font-size:0.75rem;color:var(--text-muted);">
-              Prepared by: <strong style="color:var(--text-primary);"><?= htmlspecialchars($billing['created_by_name'] ?? '—') ?></strong>
+            <div class="vb-prepared">
+              Prepared by: <strong><?= htmlspecialchars($billing['created_by_name'] ?? '—') ?></strong>
             </div>
             <div class="vb-sig-block">
-              <div class="vb-sig-label"><?= htmlspecialchars($billing['signed_by_title'] ?: 'Authorized Representative / Cashier') ?></div>
+              <div class="vb-sig-label"><?= htmlspecialchars($billing['signed_by_title'] ?: BILLING_SIGNER_TITLE) ?></div>
               <div class="vb-sig-name"><?= htmlspecialchars($billing['signed_by_name'] ?? '') ?></div>
             </div>
           </div>
         </div>
 
         <!-- TIMELINE -->
-        <div class="card" style="margin-bottom:0;">
+        <div class="card">
           <div class="card-header">
             <div class="card-icon"><?= icon('clock', 16) ?></div>
             <div><div class="card-title">Timeline</div></div>
           </div>
-          <div style="padding:0.75rem 1.25rem;display:flex;flex-wrap:wrap;gap:0.5rem 2.5rem;">
+          <div class="vb-timeline">
             <?php
             $tl = [
                 ['Created',      date('M d, Y g:i A', strtotime($billing['created_at']))],
@@ -280,8 +262,8 @@ require_once '../../includes/topbar.php';
             if ($billing['sent_at']) $tl[] = ['Sent to Insurer', date('M d, Y g:i A', strtotime($billing['sent_at']))];
             foreach ($tl as [$lbl, $val]): ?>
             <div>
-              <div style="font-size:0.62rem;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);font-weight:700;"><?= $lbl ?></div>
-              <div style="font-size:0.8rem;font-weight:600;color:var(--text-primary);margin-top:0.1rem;"><?= $val ?></div>
+              <div class="vb-tl-label"><?= $lbl ?></div>
+              <div class="vb-tl-val"><?= $val ?></div>
             </div>
             <?php endforeach; ?>
           </div>
@@ -293,7 +275,7 @@ require_once '../../includes/topbar.php';
       <div>
 
         <!-- QUICK INFO -->
-        <div class="card" style="margin-bottom:0;">
+        <div class="card">
           <div class="card-header">
             <div class="card-icon"><?= icon('user', 16) ?></div>
             <div>
@@ -301,7 +283,7 @@ require_once '../../includes/topbar.php';
               <div class="card-sub"><?= htmlspecialchars($billing['policy_number']) ?></div>
             </div>
           </div>
-          <div style="padding:0.6rem 1rem;display:flex;flex-direction:column;gap:0.3rem;">
+          <div class="vb-info-list">
             <?php
             $info_rows = [
                 ['Client',   htmlspecialchars($billing['full_name'])],
@@ -315,7 +297,7 @@ require_once '../../includes/topbar.php';
               <span class="billing-detail-val"><?= $val ?></span>
             </div>
             <?php endforeach; ?>
-            <div style="display:flex;gap:0.4rem;margin-top:0.3rem;">
+            <div class="vb-info-links">
               <a href="../claims/view_claim.php?id=<?= $billing['claim_id'] ?>" class="btn-sm-gold"><?= icon('clipboard-list', 12) ?> Claim</a>
               <a href="../clients/view_client.php?id=<?= $billing['client_id'] ?>" class="btn-sm-gold"><?= icon('user', 12) ?> Client</a>
             </div>
@@ -323,15 +305,15 @@ require_once '../../includes/topbar.php';
         </div>
 
         <!-- REQUIRED DOCUMENTS -->
-        <div class="card" style="margin-bottom:0;">
+        <div class="card">
           <div class="card-header">
-            <div class="card-icon" style="background:var(--gold-light);color:var(--gold);"><?= icon('paper-clip', 16) ?></div>
+            <div class="card-icon vb-icon-soft"><?= icon('paper-clip', 16) ?></div>
             <div>
               <div class="card-title">Required Documents</div>
               <div class="card-sub"><?= $docs_done ?>/<?= count($docs) ?> received</div>
             </div>
           </div>
-          <form method="POST" action="" style="padding:0.6rem 1rem;display:flex;flex-direction:column;gap:0.35rem;">
+          <form method="POST" action="" class="vb-docs-form">
             <?= csrf_field() ?>
             <input type="hidden" name="action" value="update_docs"/>
             <?php foreach ($docs as $d):
@@ -350,7 +332,7 @@ require_once '../../includes/topbar.php';
         </div>
 
         <!-- EDIT DETAILS -->
-        <div class="card" style="margin-bottom:0;">
+        <div class="card">
           <div class="card-header">
             <div class="card-icon"><?= icon('pencil', 16) ?></div>
             <div>
@@ -358,22 +340,22 @@ require_once '../../includes/topbar.php';
               <div class="card-sub">Update costs, dates, or insurer</div>
             </div>
           </div>
-          <form method="POST" action="" style="padding:0.6rem 1rem;display:flex;flex-direction:column;gap:0.5rem;">
+          <form method="POST" action="" class="vb-edit-form">
             <?= csrf_field() ?>
             <input type="hidden" name="action" value="update_costs"/>
 
             <div>
               <label class="field-label">Billed To</label>
-              <input type="text" name="billed_to" class="field-input" value="<?= htmlspecialchars($billing['billed_to']) ?>" style="width:100%;"/>
+              <input type="text" name="billed_to" class="field-input" value="<?= htmlspecialchars($billing['billed_to']) ?>"/>
             </div>
 
             <div>
-              <label class="field-label">Authorized Representative / Cashier</label>
+              <label class="field-label"><?= BILLING_SIGNER_TITLE ?></label>
               <?php
               $signers   = billing_signatories_active($conn);
               $on_list   = in_array($billing['signed_by_name'], array_column($signers, 'name'), true);
               ?>
-              <select name="signatory_id" class="field-input" style="width:100%;">
+              <select name="signatory_id" class="field-input">
                 <?php if (!$on_list): ?>
                 <option value=""><?= htmlspecialchars($billing['signed_by_name'] ?: '— None —') ?> (keep)</option>
                 <?php endif; ?>
@@ -383,18 +365,18 @@ require_once '../../includes/topbar.php';
               </select>
             </div>
 
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
+            <div class="vb-two-col">
               <div>
                 <label class="field-label">Incident Date</label>
-                <input type="date" name="incident_date" class="field-input" value="<?= htmlspecialchars($billing['incident_date'] ?? '') ?>" style="width:100%;"/>
+                <input type="date" name="incident_date" class="field-input" value="<?= htmlspecialchars($billing['incident_date'] ?? '') ?>"/>
               </div>
               <div>
                 <label class="field-label">Repair Date</label>
-                <input type="date" name="repair_date" class="field-input" value="<?= htmlspecialchars($billing['repair_date'] ?? '') ?>" style="width:100%;"/>
+                <input type="date" name="repair_date" class="field-input" value="<?= htmlspecialchars($billing['repair_date'] ?? '') ?>"/>
               </div>
             </div>
 
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
+            <div class="vb-two-col">
               <div>
                 <label class="field-label">Total Parts</label>
                 <div class="field-prefix-wrap">
@@ -436,10 +418,10 @@ require_once '../../includes/topbar.php';
 
             <div>
               <label class="field-label">Notes</label>
-              <textarea name="notes" class="field-input" rows="1" maxlength="<?= MAX_NOTE ?>" style="width:100%;resize:vertical;"><?= htmlspecialchars($billing['notes'] ?? '') ?></textarea>
+              <textarea name="notes" class="field-input" rows="1" maxlength="<?= MAX_NOTE ?>"><?= htmlspecialchars($billing['notes'] ?? '') ?></textarea>
             </div>
 
-            <div style="display:flex;justify-content:flex-end;">
+            <div class="vb-form-actions">
               <button type="submit" class="btn-sm-gold"><?= icon('check', 13) ?> Save Changes</button>
             </div>
           </form>
@@ -462,7 +444,7 @@ require_once '../../includes/topbar.php';
     <form method="POST" action="">
       <?= csrf_field() ?>
       <input type="hidden" name="action" value="update_status"/>
-      <div style="padding:1.25rem;display:flex;flex-direction:column;gap:0.65rem;">
+      <div class="vb-modal-body">
         <?php foreach (billing_statuses_active($conn) as $row_st):
           $val = $row_st['code'];
           $st  = billing_status_badge($conn, $val); ?>
@@ -473,14 +455,14 @@ require_once '../../includes/topbar.php';
           <div class="vb-status-opt-icon"><?= icon($st['icon'], 15) ?></div>
           <div>
             <span class="badge <?= $st['class'] ?>"><?= htmlspecialchars($st['label']) ?></span>
-            <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.1rem;">
+            <div class="vb-status-desc">
               <?= htmlspecialchars($st['desc']) ?>
             </div>
           </div>
         </label>
         <?php endforeach; ?>
       </div>
-      <div style="padding:0 1.25rem 1.25rem;display:flex;justify-content:flex-end;gap:0.5rem;">
+      <div class="vb-modal-actions">
         <button type="button" class="btn-ghost" onclick="document.getElementById('status-modal').classList.remove('open')">Cancel</button>
         <button type="submit" class="btn-primary">Save</button>
       </div>
@@ -494,7 +476,10 @@ function editCalc() {
     const l = parseFloat(document.getElementById('ep_labor').value)  || 0;
     const o = parseFloat(document.getElementById('ep_other').value)  || 0;
     const d = parseFloat(document.getElementById('ep_deduct').value) || 0;
-    document.getElementById('ep_total').textContent = '₱' + (p+l+o-d).toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2});
+    const t = document.getElementById('ep_total');
+    t.textContent = '₱' + (p+l+o-d).toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2});
+    t.classList.toggle('is-negative', p+l+o-d < 0);   // the save would be refused: deductible > total cost
+    t.title = p+l+o-d < 0 ? 'The deductible cannot be more than the total cost of repair.' : '';
 }
 document.addEventListener('keydown', e => { if (e.key==='Escape') document.getElementById('status-modal').classList.remove('open'); });
 </script>
@@ -514,8 +499,7 @@ document.getElementById('delete-billing-btn').addEventListener('click', function
     showCancelButton: true,
     confirmButtonText: 'Yes, delete it',
     cancelButtonText: 'Cancel',
-    confirmButtonColor: '#c0392b',
-    cancelButtonColor: '#6c757d',
+    confirmButtonColor: 'var(--danger)',
   }).then(async function (result) {
     if (!result.isConfirmed) return;
     if (!(await requirePin())) return;

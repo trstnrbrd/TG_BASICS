@@ -139,13 +139,15 @@ function billing_lock_claim(mysqli $conn, int $claim_id): void
  */
 function billing_create(mysqli $conn, string $billing_number, array $b, int $created_by): int
 {
+    // notes: Add Billing's Notes box (until 2026-11-04 it was read and checked but never saved)
+    $notes = $b['notes'] ?? '';
     $stmt = $conn->prepare("INSERT INTO billing (claim_id, billing_number, billed_to, incident_date, repair_date,
-                                                 parts_cost, labor_cost, other_cost, deductible, signed_by_name, signed_by_title, created_by)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param('issssddddssi',
+                                                 parts_cost, labor_cost, other_cost, deductible, signed_by_name, signed_by_title, notes, created_by)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param('issssddddsssi',
         $b['claim_id'], $billing_number, $b['billed_to'], $b['incident_date'], $b['repair_date'],
         $b['parts_cost'], $b['labor_cost'], $b['other_cost'], $b['deductible'],
-        $b['signed_by_name'], $b['signed_by_title'], $created_by);
+        $b['signed_by_name'], $b['signed_by_title'], $notes, $created_by);
     $stmt->execute();
     $id = (int)$conn->insert_id;
     $stmt->close();

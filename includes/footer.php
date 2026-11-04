@@ -14,6 +14,9 @@ $footer_extra_scripts  = $footer_extra_scripts  ?? '';
 
 <!-- SweetAlert2 -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<!-- Default button colours for every Swal.fire(): the theme's gold (so Warm / High Contrast follow their own),
+     gray Cancel. A call that sets its own colour still wins; use 'var(--danger)' for a delete. -->
+<script>if (window.Swal && Swal.mixin) window.Swal = Swal.mixin({ confirmButtonColor: 'var(--gold)', cancelButtonColor: '#6B7280' });</script>
 
 <!-- React (UMD) — no more babel-standalone (2026-09-25): it was the single heaviest thing loaded on every
      signed-in page, compiling this same unchanging JSX in the browser on every page view for no reason.

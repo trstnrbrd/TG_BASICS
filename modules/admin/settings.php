@@ -924,6 +924,24 @@ require_once '../../includes/topbar.php';
           </div>
         </div>
 
+      <!-- About This System: the release number (config/version.php, history in CHANGELOG.md) -->
+      <div class="card" id="about">
+        <div class="card-header">
+          <div class="card-icon"><?= icon('information-circle', 16) ?></div>
+          <div>
+            <div class="card-title">About This System</div>
+            <div class="card-sub">Version and release information</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="info-box"><?= icon('information-circle', 14) ?><span>
+            <strong>TG-BASICS v<?= APP_VERSION ?></strong>, released <?= date('F j, Y', strtotime(APP_RELEASE_DATE)) ?>.
+            Versions follow Semantic Versioning (MAJOR.MINOR.PATCH): a major number for changes that rework what came before,
+            a minor number for new features, a patch number for bug fixes. Every change is tracked in Git.
+          </span></div>
+        </div>
+      </div>
+
     </div>
 
     <!-- ── DESIGN PREFERENCES ── -->

@@ -232,6 +232,25 @@
   background: rgba(0, 0, 0, 0.08);
   color: #000;
 }
+.sidebar-version {
+  display: block;
+  padding: 0.45rem 1.1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.28);
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  flex-shrink: 0;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+.sidebar-version:hover {
+  color: rgba(255, 255, 255, 0.6);
+}
+[data-theme="high-contrast"] .sidebar-version {
+  color: rgba(0, 0, 0, 0.55);
+  border-top-color: rgba(0, 0, 0, 0.1);
+}
 .sidebar-collapse-btn {
   display: flex;
   align-items: center;

@@ -26,14 +26,36 @@ function audit_log_latest_id(mysqli $conn): int
 const AUDIT_HIDE_DEVELOPER_SQL = "(a.user_id IS NULL OR a.user_id NOT IN (SELECT user_id FROM users WHERE is_hidden = 1))";
 
 /**
+ * Actions written by the scheduled jobs (cron/), with no user. The Activity
+ * Log shows these as "System" instead of "Deleted User". The action is checked
+ * as well as the empty user_id, so an entry whose account was later deleted
+ * still reads "Deleted User". A new scheduled job's action belongs here.
+ */
+const AUDIT_SYSTEM_ACTIONS = [
+    'RENEWAL_REMINDERS_SENT', 'OVERDUE_REMINDERS_SENT', 'DATABASE_BACKUP',
+    'CLIENTS_PURGED', 'QUOTATIONS_PURGED', 'SIGN_IN_LOGS_PURGED',
+];
+
+/** True when a log row (needs user_id and action) was written by a scheduled job. */
+function audit_is_system_entry(array $row): bool
+{
+    return ($row['user_id'] ?? null) === null && in_array($row['action'] ?? '', AUDIT_SYSTEM_ACTIONS, true);
+}
+
+/**
  * WHERE parts for the Activity Log filters (developer's entries always
- * hidden). $f: user (id, 0 = all), action ('' = all), search ('' = none),
- * from / to (Y-m-d, '' = open). Returns [where list, types, params].
+ * hidden). $f: user (id, 0 = all), system (true = scheduled jobs only),
+ * action ('' = all), search ('' = none), from / to (Y-m-d, '' = open).
+ * Returns [where list, types, params].
  */
 function audit_log_where(array $f): array
 {
     $where = [AUDIT_HIDE_DEVELOPER_SQL]; $types = ''; $params = [];
-    if (($f['user'] ?? 0) > 0)       { $where[] = 'a.user_id = ?';                          $types .= 'i';  $params[] = (int)$f['user']; }
+    if (!empty($f['system'])) {
+        $where[] = 'a.user_id IS NULL AND a.action IN (' . dal_in(AUDIT_SYSTEM_ACTIONS) . ')';
+        $types  .= str_repeat('s', count(AUDIT_SYSTEM_ACTIONS));
+        array_push($params, ...AUDIT_SYSTEM_ACTIONS);
+    } elseif (($f['user'] ?? 0) > 0) { $where[] = 'a.user_id = ?';                          $types .= 'i';  $params[] = (int)$f['user']; }
     if (($f['action'] ?? '') !== '') { $where[] = 'a.action = ?';                           $types .= 's';  $params[] = $f['action']; }
     if (($f['search'] ?? '') !== '') { $where[] = '(a.description LIKE ? OR a.action LIKE ?)'; $types .= 'ss'; array_push($params, "%{$f['search']}%", "%{$f['search']}%"); }
     if (($f['from'] ?? '') !== '')   { $where[] = 'a.created_at >= ?';                      $types .= 's';  $params[] = $f['from'] . ' 00:00:00'; }
@@ -69,7 +91,7 @@ function audit_log_export(mysqli $conn, array $f): array
 {
     [$where, $types, $params] = audit_log_where($f);
     return dal_all($conn, "
-        SELECT a.log_id, CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.full_name END AS full_name,
+        SELECT a.log_id, a.user_id, CASE WHEN u.is_hidden = 1 THEN 'Developer' ELSE u.full_name END AS full_name,
                a.action, a.description, a.created_at
         FROM audit_logs a
         LEFT JOIN users u ON a.user_id = u.user_id

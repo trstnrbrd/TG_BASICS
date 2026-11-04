@@ -2,6 +2,7 @@
 require_once __DIR__ . '/includes/branding.php';
 require_once 'includes/icons.php';
 require_once __DIR__ . '/config/app_url.php';
+require_once __DIR__ . '/config/version.php';
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/includes/testimonials.php';
 $testimonials = load_testimonials($conn);
@@ -975,7 +976,7 @@ $_desc = 'TG-BASICS is the management system of TG Customworks and Basic Car Ins
 
   </div>
   <div class="footer-bottom">
-    <p>TG-BASICS &mdash; <span>TG Customworks and Basic Car Insurance</span></p>
+    <p>TG-BASICS v<?= APP_VERSION ?> &mdash; <span>TG Customworks and Basic Car Insurance</span></p>
     <p>&copy; <?= date('Y') ?> TG Customworks &amp; Basic Car Insurance. All rights reserved. &nbsp;&middot;&nbsp; Internal use only.</p>
   </div>
 </footer>

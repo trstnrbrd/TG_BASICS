@@ -16,6 +16,7 @@ require_once __DIR__ . '/../includes/data_access.php';
 db_use_ph_time($conn);
 
 require_once __DIR__ . '/app_url.php';
+require_once __DIR__ . '/version.php';   // APP_VERSION, shown in the sidebar and Settings
 
 // Live updates: after a save, every open page refreshes itself (includes/realtime.php)
 require_once __DIR__ . '/../includes/realtime.php';

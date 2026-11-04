@@ -8,9 +8,9 @@ All notable changes to TG-BASICS. Versions follow [Semantic Versioning](https://
 
 The current version is set in `config/version.php` and shown at the bottom of the sidebar, in the landing-page footer, and in Settings > My Account > About This System. Versions before 1.0.0 were reconstructed from the Git history (first commit 2026-03-17).
 
-## [Unreleased]
+## [2.2.1] - 2026-11-04
 
-### Changed
+### Fixed
 - Activity Log: entries written by the scheduled jobs (renewal / overdue reminders, weekly backup, automatic purges) show as "System — Automatic job" instead of "Deleted User", in the table and the Excel export; the User filter has a "System (automatic jobs)" option
 
 ## [2.2.0] - 2026-11-03

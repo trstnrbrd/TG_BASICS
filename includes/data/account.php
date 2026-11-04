@@ -139,3 +139,24 @@ function account_set_theme(mysqli $conn, int $user_id, string $theme): void
 {
     dal_exec($conn, "UPDATE users SET theme = ? WHERE user_id = ?", 'si', [$theme, $user_id]);
 }
+
+/**
+ * The user's layout preferences as stored (JSON text, see UI_PREFS in includes/themes.php), or null when
+ * none are saved or the users.ui_prefs column does not exist yet (the page then uses the defaults).
+ */
+function account_ui_prefs_get(mysqli $conn, int $user_id): ?string
+{
+    $rows = dal_all_or_empty($conn, "SELECT ui_prefs FROM users WHERE user_id = ?", 'i', [$user_id]);
+    return $rows[0]['ui_prefs'] ?? null;
+}
+
+/** Saves the user's layout preferences (JSON text). False when the users.ui_prefs column does not exist yet. */
+function account_set_ui_prefs(mysqli $conn, int $user_id, string $json): bool
+{
+    try {
+        dal_exec($conn, "UPDATE users SET ui_prefs = ? WHERE user_id = ?", 'si', [$json, $user_id]);
+        return true;
+    } catch (mysqli_sql_exception $e) {
+        return false;
+    }
+}

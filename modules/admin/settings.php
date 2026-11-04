@@ -323,13 +323,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
 
         // ── DESIGN PREFERENCES ──
         case 'design_prefs':
-            $theme = theme_valid($_POST['theme'] ?? '');   // includes/themes.php
+            $theme = theme_choice_valid($_POST['theme'] ?? '');   // a theme or "Auto" (includes/themes.php)
+            // text size / sidebar / page width: only listed values (UI_PREFS), anything else gives the default
+            $prefs = ui_prefs_clean([
+                'text_size' => $_POST['text_size'] ?? null, 'sidebar' => $_POST['sidebar'] ?? null, 'width' => $_POST['width'] ?? null,
+            ]);
 
             account_set_theme($conn, $user_id, $theme);
-
             $_SESSION['theme'] = $theme;
+            $prefs_saved = account_set_ui_prefs($conn, $user_id, json_encode($prefs));
+            if ($prefs_saved) $_SESSION['ui_prefs'] = $prefs;
 
-            api_success([], 'Design preferences saved.');
+            api_success(['theme' => theme_for_choice($theme), 'prefs' => $prefs, 'prefs_saved' => $prefs_saved],
+                $prefs_saved ? 'Design preferences saved.'
+                             : 'Theme saved. Text size, sidebar and page width need a database update first (users.ui_prefs), so they were not kept.');
             break;
 
         // ── INSURANCE COMPANIES (Owner only) — add/edit one company, or turn it on/off for new policies ──
@@ -533,7 +540,8 @@ require_once '../../includes/topbar.php';
     <?php
     $has_photo   = !empty($current_user['profile_photo']);
     $photo_url   = $has_photo ? $base_path . 'uploads/avatars/' . htmlspecialchars($current_user['profile_photo']) : '';
-    $user_theme  = theme_valid($current_user['theme'] ?? null);
+    $user_theme  = theme_choice_valid($current_user['theme'] ?? null);   // a theme, or THEME_SYSTEM ("Auto")
+    $user_prefs  = ui_prefs_clean($_SESSION['ui_prefs'] ?? account_ui_prefs_get($conn, $user_id));   // UI_PREFS
     ?>
 
     <?php if (is_developer() && empty($current_user['totp_enabled'])): ?>
@@ -958,6 +966,81 @@ require_once '../../includes/topbar.php';
               </div>
             </label>
             <?php endforeach; ?>
+            <!-- Auto: follows the device's light / dark mode (THEME_SYSTEM, includes/themes.php) -->
+            <?php $tl = THEMES[THEME_SYSTEM_LIGHT]; $td = THEMES[THEME_SYSTEM_DARK]; ?>
+            <label class="theme-option <?= $user_theme === THEME_SYSTEM ? 'active' : '' ?>" title="Light or Dark, following this device's setting">
+              <input type="radio" name="theme" value="<?= THEME_SYSTEM ?>" <?= $user_theme === THEME_SYSTEM ? 'checked' : '' ?> hidden/>
+              <div class="theme-preview tp-split">
+                <?php foreach ([$tl, $td] as $t): ?>
+                <div class="tp-half" style="background:<?= $t['bg'] ?>;">
+                  <div class="tp-sidebar" style="background:<?= $t['sidebar'] ?>;"></div>
+                  <div class="tp-main"><div class="tp-topbar" style="background:<?= $t['bg2'] ?>;"></div>
+                    <div class="tp-content"><div class="tp-card" style="background:<?= $t['card'] ?>;"></div>
+                      <div class="tp-card short" style="background:<?= $t['card'] ?>;border-top:2px solid <?= $t['accent'] ?>;"></div></div></div>
+                </div>
+                <?php endforeach; ?>
+              </div>
+              <div class="theme-label">
+                <span class="theme-radio"></span>
+                <span class="theme-name">Auto <span class="theme-name-sub">(match device)</span></span>
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Layout & Text: each user's own (UI_PREFS in includes/themes.php, saved in users.ui_prefs). Picking an
+           option shows it right away; Save Changes keeps it. -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon"><?= icon('dashboard', 16) ?></div>
+          <div>
+            <div class="card-title">Layout &amp; Text</div>
+            <div class="card-sub">Text size, sidebar and page width, for your account on every device</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="pref-groups">
+
+            <div class="pref-group">
+              <div class="pref-group-label">Text size</div>
+              <div class="pref-options" role="radiogroup" aria-label="Text size">
+                <?php foreach (UI_PREFS['text_size'][1] as $val => $label): ?>
+                <label class="pref-option <?= $user_prefs['text_size'] === $val ? 'active' : '' ?>">
+                  <input type="radio" name="text_size" value="<?= $val ?>" <?= $user_prefs['text_size'] === $val ? 'checked' : '' ?> hidden/>
+                  <span class="pref-aa pref-aa--<?= $val ?>">Aa</span>
+                  <span class="pref-option-label"><?= $label ?></span>
+                </label>
+                <?php endforeach; ?>
+              </div>
+            </div>
+
+            <div class="pref-group">
+              <div class="pref-group-label">Sidebar</div>
+              <div class="pref-options" role="radiogroup" aria-label="Sidebar">
+                <?php foreach (UI_PREFS['sidebar'][1] as $val => $label): ?>
+                <label class="pref-option <?= $user_prefs['sidebar'] === $val ? 'active' : '' ?>">
+                  <input type="radio" name="sidebar" value="<?= $val ?>" <?= $user_prefs['sidebar'] === $val ? 'checked' : '' ?> hidden/>
+                  <span class="pref-diagram pref-diagram--sidebar-<?= $val ?>" aria-hidden="true"><i></i><b></b></span>
+                  <span class="pref-option-label"><?= $label ?><small><?= $val === 'compact' ? 'Icons only, more room' : 'Icons and labels' ?></small></span>
+                </label>
+                <?php endforeach; ?>
+              </div>
+            </div>
+
+            <div class="pref-group">
+              <div class="pref-group-label">Page width</div>
+              <div class="pref-options" role="radiogroup" aria-label="Page width">
+                <?php foreach (UI_PREFS['width'][1] as $val => $label): ?>
+                <label class="pref-option <?= $user_prefs['width'] === $val ? 'active' : '' ?>">
+                  <input type="radio" name="width" value="<?= $val ?>" <?= $user_prefs['width'] === $val ? 'checked' : '' ?> hidden/>
+                  <span class="pref-diagram pref-diagram--width-<?= $val ?>" aria-hidden="true"><i></i><b></b></span>
+                  <span class="pref-option-label"><?= $label ?><small><?= $val === 'centered' ? 'Easier to read on wide screens' : 'Uses the whole screen' ?></small></span>
+                </label>
+                <?php endforeach; ?>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>

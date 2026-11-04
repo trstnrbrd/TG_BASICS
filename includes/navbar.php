@@ -39,7 +39,7 @@ $dash_url = is_mechanic()
     <!-- Client Records (no flyout — single page) -->
     <div class="nav-item-wrap">
       <a href="<?= $base_path ?>modules/clients/client_list.php"
-         class="nav-item <?= $active_group === 'clients' ? 'active' : '' ?>">
+         class="nav-item <?= $active_group === 'clients' ? 'active' : '' ?>" data-label="Client Records">
         <?= icon('users', 16) ?> Client Records
       </a>
     </div>
@@ -49,12 +49,12 @@ $dash_url = is_mechanic()
     <!-- Policy -->
     <div class="nav-item-wrap">
       <a href="<?= $base_path ?>modules/renewal/renewal_list.php"
-         class="nav-item <?= $active_group === 'renewals' ? 'active' : '' ?>">
+         class="nav-item <?= $active_group === 'renewals' ? 'active' : '' ?>" data-label="Policy">
         <?= icon('shield-check', 16) ?> Policy
         <span class="nav-badge" id="expiry-badge" style="display:none;"></span>
         <?= $chevron ?>
       </a>
-      <div class="nav-flyout">
+      <div class="nav-flyout" data-label="Policy">
         <a href="<?= $base_path ?>modules/insurance/eligibility_check.php"
            class="nav-flyout-item <?= $active_page === 'insurance' ? 'active' : '' ?>">
           <?= icon('shield-check', 13) ?> Eligibility &amp; Policy
@@ -80,11 +80,11 @@ $dash_url = is_mechanic()
     <!-- Claims -->
     <div class="nav-item-wrap">
       <a href="<?= $base_path ?>modules/claims/claims_list.php"
-         class="nav-item <?= $active_group === 'claims' ? 'active' : '' ?>">
+         class="nav-item <?= $active_group === 'claims' ? 'active' : '' ?>" data-label="Claims">
         <?= icon('clipboard-list', 16) ?> Claims
         <?= $chevron ?>
       </a>
-      <div class="nav-flyout">
+      <div class="nav-flyout" data-label="Claims">
         <a href="<?= $base_path ?>modules/claims/claims_list.php"
            class="nav-flyout-item <?= $active_page === 'claims' ? 'active' : '' ?>">
           <?= icon('clipboard-list', 13) ?> Claims List
@@ -101,11 +101,11 @@ $dash_url = is_mechanic()
     <!-- Repairs -->
     <div class="nav-item-wrap">
       <a href="<?= $base_path ?>modules/repair/repair_list.php"
-         class="nav-item <?= $active_group === 'repairs' ? 'active' : '' ?>">
+         class="nav-item <?= $active_group === 'repairs' ? 'active' : '' ?>" data-label="Repairs">
         <?= icon('wrench', 16) ?> Repairs
         <?= $chevron ?>
       </a>
-      <div class="nav-flyout">
+      <div class="nav-flyout" data-label="Repairs">
         <a href="<?= $base_path ?>modules/repair/repair_list.php"
            class="nav-flyout-item <?= $active_page === 'repair' ? 'active' : '' ?>">
           <?= icon('wrench', 13) ?> Repair Jobs
@@ -121,11 +121,11 @@ $dash_url = is_mechanic()
     <!-- User Management -->
     <div class="nav-item-wrap">
       <a href="<?= $base_path ?>modules/admin/manage_users.php"
-         class="nav-item <?= $active_group === 'admin' ? 'active' : '' ?>">
+         class="nav-item <?= $active_group === 'admin' ? 'active' : '' ?>" data-label="User Management">
         <?= icon('user-cog', 16) ?> User Management
         <?= $chevron ?>
       </a>
-      <div class="nav-flyout">
+      <div class="nav-flyout" data-label="User Management">
         <a href="<?= $base_path ?>modules/admin/manage_users.php"
            class="nav-flyout-item <?= $active_page === 'manage_users' ? 'active' : '' ?>">
           <?= icon('users', 13) ?> Manage Users

@@ -36,8 +36,8 @@ if (!empty($_SESSION['login_notice'])) {
 if (isset($_GET['otp_failed'])) {
     $error = 'We could not send your verification code right now. Please try again in a moment, or contact your administrator.';
 }
-$_max_attempts = (int)getSetting($conn, 'max_login_attempts', '5');
-$_lockout_mins = (int)getSetting($conn, 'lockout_duration', '15');
+$_max_attempts = setting_int($conn, 'max_login_attempts');
+$_lockout_mins = setting_int($conn, 'lockout_duration');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     rate_limit_check($conn, 'login');

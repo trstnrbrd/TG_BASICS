@@ -12,6 +12,6 @@ if (!isset($_SESSION['user_id'])) api_success(['count' => 0]);
 // Sidebar badge = the urgent policies this user is responsible for, with the same window setting as Renewal
 // Tracking: the Owner counts all of them; an admin only their own clients' (the page's "My Clients" view —
 // the other agents they can browse there are not their follow-ups); anyone else nothing (policies_due_count()).
-$urg_days = (int)getSetting($conn, 'renewal_urgent_days', '7');
+$urg_days = setting_int($conn, 'renewal_urgent_days');
 
 api_success(['count' => policies_due_count($conn, $urg_days)]);

@@ -2,7 +2,7 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
-require_once __DIR__ . '/../../includes/service_types.php';
+require_once __DIR__ . '/../../includes/lookups.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
 
@@ -44,7 +44,7 @@ $damaged_areas = repair_checklist_damaged($conn, (int)$job_id);
 
 $area_labels = REPAIR_CHECKLIST_AREAS;   // config/access.php
 
-$service_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
+$service_labels = service_type_labels($conn);   // service_types table (includes/lookups.php)
 
 $is_mechanic = is_mechanic();
 

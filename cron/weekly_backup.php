@@ -2,14 +2,14 @@
 /**
  * Weekly trigger for the full backup (database + uploaded files), called once a week by GitHub Actions:
  *   https://<host>/TG-BASICS/cron/weekly_backup.php?key=<cron_secret_key>
- * Same secret key as the daily cron. No one is signed in here. The logic is in includes/full_backup.php.
+ * Same secret key as the daily cron. No one is signed in here. The logic is in includes/backup.php.
  */
 
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/settings.php';
 require_once __DIR__ . '/../config/app_url.php';
 require_once __DIR__ . '/../config/mailer.php';
-require_once __DIR__ . '/../includes/full_backup.php';
+require_once __DIR__ . '/../includes/backup.php';
 
 header('Content-Type: text/plain; charset=utf-8');
 header('X-Robots-Tag: noindex, nofollow');

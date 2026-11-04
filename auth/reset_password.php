@@ -5,6 +5,7 @@ require_once __DIR__ . "/../config/session.php";
 require_once '../config/db.php';
 require_once '../config/validators.php';
 require_once '../includes/icons.php';
+require_once __DIR__ . '/../config/settings.php';   // company_info(): the shop name in the card header
 
 if (isset($_SESSION['user_id'])) {
     header("Location: ../modules/admin/dashboard_admin.php");
@@ -125,7 +126,7 @@ $invalid = !$record || $record['used'] || strtotime($record['expires_at']) < tim
         <div class="card-head-icon default"><?= icon('lock-closed', 22) ?></div>
         <div class="card-head-text">
           <div class="card-head-title">Set New Password</div>
-          <div class="card-head-sub">TG Customworks &amp; Basic Car Insurance</div>
+          <div class="card-head-sub"><?= htmlspecialchars(company_info($conn)['name']) ?></div>
         </div>
       <?php endif; ?>
     </div>

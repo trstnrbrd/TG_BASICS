@@ -16,12 +16,17 @@ if ($token === '') {
     exit;
 }
 
-$user = user_find_by_activation_token($conn, $token);
+require_once __DIR__ . '/../config/settings.php';
+// The link lasts Settings > Security > Activation Link Expiry hours (the invite email states the same number)
+$user = user_find_by_activation_token($conn, $token, setting_int($conn, 'activation_link_expiry'));
 
 if (!$user) {
     $error = 'This activation link is invalid or has already been used.';
 } elseif ($user['is_active']) {
     $error = 'This account is already activated. Please log in.';
+} elseif ((int)$user['link_expired']) {
+    $error = 'This activation link has expired. Ask the administrator to create your account again.';
+    $user  = null;   // shows the "Invalid Link" card, and the password form is not offered
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user && !$user['is_active']) {
@@ -96,7 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user && !$user['is_active']) {
         <div class="card-head-icon default"><?= icon('lock-closed', 22) ?></div>
         <div class="card-head-text">
           <div class="card-head-title">Set Your Password</div>
-          <div class="card-head-sub">TG Customworks &amp; Basic Car Insurance</div>
+          <div class="card-head-sub"><?= htmlspecialchars(company_info($conn)['name']) ?></div>
         </div>
       <?php endif; ?>
     </div>

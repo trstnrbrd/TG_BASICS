@@ -13,8 +13,8 @@ require_once '../../includes/icons.php';
 require_once '../../includes/api.php';
 require_once '../../includes/transaction.php';
 
-$urg_days = (int)getSetting($conn, 'renewal_urgent_days', '7');
-$exp_days = (int)getSetting($conn, 'renewal_expiring_days', '30');
+$urg_days = setting_int($conn, 'renewal_urgent_days');
+$exp_days = setting_int($conn, 'renewal_expiring_days');
 
 $policy_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if ($policy_id === 0) {

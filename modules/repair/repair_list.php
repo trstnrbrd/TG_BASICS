@@ -2,7 +2,7 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
-require_once __DIR__ . '/../../includes/service_types.php';
+require_once __DIR__ . '/../../includes/lookups.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../includes/pagination.php';
@@ -42,7 +42,7 @@ $sort_by       = san_enum($_GET['sort'] ?? 'newest', ['newest', 'oldest']);
 // One page at a time (includes/pagination.php)
 [$jobs, $pg] = repair_jobs_list_page($conn, $search, $filter_status, $sort_by);
 
-$service_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
+$service_labels = service_type_labels($conn);   // service_types table (includes/lookups.php)
 
 
 $page_title  = 'Repair Jobs';

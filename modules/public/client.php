@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../../includes/branding.php';
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../includes/data_access.php';
-require_once __DIR__ . '/../../includes/service_types.php';
+require_once __DIR__ . '/../../includes/lookups.php';
 require_once __DIR__ . '/../../config/settings.php';
 require_once __DIR__ . '/../../includes/icons.php';
 
@@ -132,12 +132,11 @@ if (isset($_GET['state'])) {
 require_once __DIR__ . '/../../includes/realtime.php';
 $live_cfg = realtime_client_config();   // public values only (key, cluster); empty = polling only
 
-$svc_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
+$svc_labels = service_type_labels($conn);   // service_types table (includes/lookups.php)
 
-$company_name    = getSetting($conn, 'company_name',    'TG Customworks & Basic Car Insurance');
-$company_address = getSetting($conn, 'company_address', '49 Villa Tierra St., San Roque, Pandi, Bulacan');
-$company_phone   = getSetting($conn, 'company_phone',   '09171453448');
-$company_email   = getSetting($conn, 'company_email',   'tgcustomworksbulacan@gmail.com');
+[
+    'name' => $company_name, 'address' => $company_address, 'contact' => $company_phone, 'email' => $company_email,
+] = company_info($conn);   // Settings > Company Info (config/settings.php)
 $fb_tg           = getSetting($conn, 'fb_tg',           'https://www.facebook.com/TGCustomworks');
 $fb_basiccar     = getSetting($conn, 'fb_basiccar',     'https://www.facebook.com/BasicCarInsurance');
 $words    = array_filter(explode(' ', $client['full_name']));

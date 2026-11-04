@@ -5,7 +5,7 @@ require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../includes/pagination.php';
-require_once '../../includes/billing_lists.php';
+require_once '../../includes/billing.php';
 
 require_role(['admin', 'super_admin']);
 

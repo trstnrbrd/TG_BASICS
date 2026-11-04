@@ -7,7 +7,7 @@ require_once '../../config/settings.php';
 require_once '../../config/access.php';
 require_once '../../includes/transaction.php';
 require_once '../../includes/insurance_companies.php';
-require_once '../../includes/mortgagees.php';
+require_once '../../includes/lookups.php';
 
 require_role(['admin', 'super_admin']);
 

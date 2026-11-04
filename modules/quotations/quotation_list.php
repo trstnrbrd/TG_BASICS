@@ -2,7 +2,7 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
-require_once __DIR__ . '/../../includes/service_types.php';
+require_once __DIR__ . '/../../includes/lookups.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../config/transaction_pin.php';
@@ -43,7 +43,7 @@ $sort_by = san_enum($_GET['sort'] ?? 'newest', ['newest', 'oldest']);
 // One page at a time (includes/pagination.php)
 [$rows, $pg] = quotations_list_page($conn, $filter, $search, $sort_by);
 
-$service_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
+$service_labels = service_type_labels($conn);   // service_types table (includes/lookups.php)
 
 $page_title  = 'Quotations & Receipts';
 $active_page = 'quotations';

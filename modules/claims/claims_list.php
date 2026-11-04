@@ -6,7 +6,7 @@ require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../includes/icons.php';
 require_once '../../includes/pagination.php';
-require_once '../../includes/claim_types.php';
+require_once '../../includes/lookups.php';
 
 require_role(['admin', 'super_admin']);
 

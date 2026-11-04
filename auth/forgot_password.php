@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($user) {
             // A new link; any earlier unused one for this user stops working
-            $reset_expiry_hours = (int)getSetting($conn, 'reset_link_expiry', '1');
+            $reset_expiry_hours = setting_int($conn, 'reset_link_expiry');
             $token      = bin2hex(random_bytes(32));
             $expires_at = date('Y-m-d H:i:s', strtotime('+' . $reset_expiry_hours . ' hours'));
             password_reset_issue($conn, (int)$user['user_id'], $token, $expires_at);
@@ -115,7 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </p>
         <div style="background:var(--gold-pale);border:1px solid var(--gold-muted);border-radius:10px;padding:0.85rem 1rem;font-size:0.78rem;color:var(--text-secondary);line-height:1.6;margin-bottom:1.25rem;display:flex;gap:0.6rem;align-items:flex-start;">
           <?= icon('information-circle', 14) ?>
-          <?php $re = (int)getSetting($conn, 'reset_link_expiry', '1'); ?>
+          <?php $re = setting_int($conn, 'reset_link_expiry'); ?>
           <span>The link expires in <strong><?= $re ?> hour<?= $re != 1 ? 's' : '' ?></strong>. If it does not arrive, check your spam folder or try again.</span>
         </div>
         <a href="login.php" class="btn-submit">

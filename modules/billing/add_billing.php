@@ -6,7 +6,7 @@ require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../includes/transaction.php';
 require_once '../../includes/insurance_companies.php';
-require_once '../../includes/billing_lists.php';
+require_once '../../includes/billing.php';
 
 require_role(['admin', 'super_admin']);
 
@@ -27,33 +27,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
 
     $claim_id      = (int)($_POST['claim_id']    ?? 0);
-    $billed_to     = san_str($_POST['billed_to']     ?? '', 255);
-    $incident_date = san_str($_POST['incident_date']  ?? '', 10);
-    $repair_date   = san_str($_POST['repair_date']    ?? '', 10);
-    // Each amount checked by read_money(): a typo is an error, never a silent ₱0
-    [$parts_cost, $e1] = read_money($_POST['parts_cost'] ?? '', 'Parts cost');
-    [$labor_cost, $e2] = read_money($_POST['labor_cost'] ?? '', 'Labor cost');
-    [$other_cost, $e3] = read_money($_POST['other_cost'] ?? '', 'Other cost');
-    [$deductible, $e4] = read_money($_POST['deductible'] ?? '', 'Deductible');
-    foreach ([$e1, $e2, $e3, $e4] as $e) if ($e !== '') $errors[] = $e;
-    // the amount due is (parts + labor + other) - deductible: it must never go below zero
-    if ($e1 . $e2 . $e3 . $e4 === '' && round($deductible, 2) > round($parts_cost + $labor_cost + $other_cost, 2)) {
-        $errors[] = 'The deductible cannot be more than the total cost of repair (₱' . number_format($parts_cost + $labor_cost + $other_cost, 2) . ').';
-    }
-    $notes         = san_str($_POST['notes'] ?? '', MAX_NOTE);
-    if (text_too_long($_POST['notes'] ?? '', MAX_NOTE)) $errors[] = 'Notes are too long (max ' . MAX_NOTE . ' characters).';
+    // Billed To, the four amounts, notes and dates: the check shared with Edit Details (includes/billing.php)
+    [$bf, $form_errors] = billing_form_check($_POST);
+    $errors        = array_merge($errors, $form_errors);
+    $billed_to     = $bf['billed_to'];
+    $incident_date = (string)$bf['incident_date'];
+    $repair_date   = (string)$bf['repair_date'];
+    $parts_cost    = $bf['parts_cost'];
+    $labor_cost    = $bf['labor_cost'];
+    $other_cost    = $bf['other_cost'];
+    $deductible    = $bf['deductible'];
+    $notes         = $bf['notes'];
 
     if ($claim_id === 0) $errors[] = 'A linked claim is required.';
-    if ($billed_to === '') $errors[] = 'Billed To (insurance company) is required.';
     // who signs as cashier (billing_signatories); their name and title are copied onto the billing
     // (none sent = the default one, first in the list; one sent that is not on the list is refused)
     $signer = ($_POST['signatory_id'] ?? '') === '' ? (billing_signatories_active($conn)[0] ?? null)
                                                     : billing_signatory_pick($conn, $_POST['signatory_id']);
-    if (!$signer && billing_signatories_active($conn)) $errors[] = 'Please choose the Authorized Representative / Cashier.';
+    if (!$signer && billing_signatories_active($conn)) $errors[] = 'Please choose the ' . BILLING_SIGNER_TITLE . '.';
     $signer_name  = $signer['name']  ?? null;
     $signer_title = $signer['title'] ?? null;
-    if ($incident_date !== '' && !validate_date($incident_date)) $errors[] = 'Incident date is not a valid date.';
-    if ($repair_date   !== '' && !validate_date($repair_date))   $errors[] = 'Repair date is not a valid date.';
 
     // only approved claims can be billed
     if (empty($errors)) {
@@ -78,16 +71,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // lock the claim first, so two people can't both bill it at once
         $created = null;
         try {
-            $created = db_transaction($conn, function () use ($conn, $claim_id, $billed_to, $inc_date, $rep_date, $parts_cost, $labor_cost, $other_cost, $deductible, $signer_name, $signer_title) {
+            $created = db_transaction($conn, function () use ($conn, $claim_id, $billed_to, $inc_date, $rep_date, $parts_cost, $labor_cost, $other_cost, $deductible, $signer_name, $signer_title, $notes) {
                 billing_lock_claim($conn, $claim_id);
                 if (billing_exists_for_claim($conn, $claim_id)) return ['duplicate' => true];
 
                 [$billing_id, $bill_num] = insert_with_sequential_number($conn, 'billing', 'billing_number', record_number_prefix('BL'),
-                    function (string $num) use ($conn, $claim_id, $billed_to, $inc_date, $rep_date, $parts_cost, $labor_cost, $other_cost, $deductible, $signer_name, $signer_title) {
+                    function (string $num) use ($conn, $claim_id, $billed_to, $inc_date, $rep_date, $parts_cost, $labor_cost, $other_cost, $deductible, $signer_name, $signer_title, $notes) {
                         $id = billing_create($conn, $num, [
                             'claim_id' => $claim_id, 'billed_to' => $billed_to, 'incident_date' => $inc_date, 'repair_date' => $rep_date,
                             'parts_cost' => $parts_cost, 'labor_cost' => $labor_cost, 'other_cost' => $other_cost, 'deductible' => $deductible,
-                            'signed_by_name' => $signer_name, 'signed_by_title' => $signer_title,
+                            'signed_by_name' => $signer_name, 'signed_by_title' => $signer_title, 'notes' => $notes,
                         ], (int)$_SESSION['user_id']);
                         return [$id, $num];
                     }
@@ -202,7 +195,7 @@ require_once '../../includes/topbar.php';
                   placeholder="Insurance company name" required style="width:100%;"/>
               </div>
               <div>
-                <label class="field-label">Authorized Representative / Cashier <span style="color:var(--danger)">*</span></label>
+                <label class="field-label"><?= BILLING_SIGNER_TITLE ?> <span style="color:var(--danger)">*</span></label>
                 <select name="signatory_id" class="field-input" style="width:100%;">
                   <?php foreach (billing_signatories_active($conn) as $i => $sg):
                     $pick = isset($_POST['signatory_id']) ? (int)$_POST['signatory_id'] === (int)$sg['signatory_id'] : $i === 0;   // the default comes first ?>

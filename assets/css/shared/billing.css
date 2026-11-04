@@ -394,71 +394,43 @@
   font-weight: 800;
   color: var(--gold);
 }
-.modal-overlay {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  z-index: 200;
-  align-items: center;
-  justify-content: center;
-}
-.modal-overlay.open {
-  display: flex;
-}
-.modal-box {
-  background: var(--bg-3, #13151f);
-  border: 1px solid var(--border, #2a2d3e);
-  border-radius: 14px;
-  width: 100%;
-  max-width: 440px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-  animation: modal-in 0.18s ease;
-  position: relative;
-  z-index: 201;
-}
-@keyframes modal-in {
-  from {
-    opacity: 0;
-    transform: translateY(-12px) scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--border);
-}
-.modal-title {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.modal-close {
-  background: 0 0;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 0.2rem;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-}
-.modal-close:hover {
-  background: var(--bg-3);
-  color: var(--text-primary);
-}
 .vb-print-logo {
   display: none;
 }
+
+/* ── View Billing: was inline style="" in view_billing.php until 2026-11-04 ── */
+.vb-back        { padding: 0.4rem 0.7rem; }
+.vb-title-row   { display: flex; align-items: center; gap: 0.6rem; }
+.vb-title       { font-size: 1.1rem; font-weight: 800; color: var(--text-primary); }
+.vb-subtitle    { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.15rem; }
+.vb-btn-delete {
+  display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.45rem 1rem; border-radius: 8px;
+  background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-border);
+  font-size: 0.78rem; font-weight: 700; cursor: pointer;
+}
+.vb-left-col    { display: flex; flex-direction: column; gap: 1rem; }
+.vb-grid .card  { margin-bottom: 0; }
+.vb-sent        { text-align: right; }
+.vb-sent-date   { font-size: 0.78rem; font-weight: 600; color: var(--info); }
+.vb-prepared    { font-size: 0.75rem; color: var(--text-muted); }
+.vb-prepared strong { color: var(--text-primary); }
+.vb-timeline    { padding: 0.75rem 1.25rem; display: flex; flex-wrap: wrap; gap: 0.5rem 2.5rem; }
+.vb-tl-label    { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); font-weight: 700; }
+.vb-tl-val      { font-size: 0.8rem; font-weight: 600; color: var(--text-primary); margin-top: 0.1rem; }
+.vb-info-list   { padding: 0.6rem 1rem; display: flex; flex-direction: column; gap: 0.3rem; }
+.vb-info-links  { display: flex; gap: 0.4rem; margin-top: 0.3rem; }
+.vb-icon-soft   { background: var(--gold-light); color: var(--gold); }
+.vb-docs-form   { padding: 0.6rem 1rem; display: flex; flex-direction: column; gap: 0.35rem; }
+.vb-edit-form   { padding: 0.6rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.vb-edit-form .field-input { width: 100%; }
+.vb-edit-form textarea.field-input { resize: vertical; }
+.vb-two-col     { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.vb-form-actions { display: flex; justify-content: flex-end; }
+.vb-modal-body  { padding: 1.25rem; display: flex; flex-direction: column; gap: 0.65rem; }
+.vb-status-desc { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.1rem; }
+.vb-modal-actions { padding: 0 1.25rem 1.25rem; display: flex; justify-content: flex-end; gap: 0.5rem; }
+.vb-total-preview span.is-negative { color: var(--danger); }   /* same weight as "span:last-child" above, later, so it wins */
+
 @media print {
   #page-loader,
   #status-modal,

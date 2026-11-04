@@ -4,12 +4,11 @@ require_once __DIR__ . '/../../includes/branding.php';
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../config/settings.php';
 
-$company_name    = getSetting($conn, 'company_name',    'TG Customworks & Basic Car Insurance');
-$company_address = getSetting($conn, 'company_address', '49 Villa Tierra St., San Roque, Pandi, Bulacan');
+[
+    'name' => $company_name, 'address' => $company_address, 'contact' => $company_phone, 'email' => $company_email,
+] = company_info($conn);   // Settings > Company Info (config/settings.php)
 $fb_tg           = getSetting($conn, 'fb_tg',           'https://www.facebook.com/TGCustomworks');
 $fb_basiccar     = getSetting($conn, 'fb_basiccar',     'https://www.facebook.com/BasicCarInsurance');
-$company_phone   = getSetting($conn, 'company_phone',   '09171453448');
-$company_email   = getSetting($conn, 'company_email',   'tgcustomworksbulacan@gmail.com');
 ?>
 <!DOCTYPE html>
 <html lang="en">

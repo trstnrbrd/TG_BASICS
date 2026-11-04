@@ -1,0 +1,180 @@
+/* Monthly Report (modules/admin/monthly_report.php). Until 2026-11-04 these were inline style=""
+   attributes, and the print rules found elements by matching text inside them (td[style*="padding…"]),
+   so editing one inline style quietly broke printing. */
+
+/* The four series colours: table columns AND the two bar charts (the page's JS reads these variables),
+   so a colour is changed here once. */
+:root {
+  --mr-insurance: #2E7D52;
+  --mr-walkin:    #B8860B;
+  --mr-policies:  #1A6B9A;
+  --mr-repairs:   #7B3FA0;
+}
+
+/* ── Print-only header (logos, company, title) ── */
+.mr-print-header { display: none; align-items: center; gap: 1rem; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 2px solid #B8860B; }
+.mr-print-logo   { height: 44px; width: auto; object-fit: contain; }
+.mr-print-sep    { width: 1px; height: 40px; background: #ddd; }
+.mr-print-name   { font-size: 1rem; font-weight: 800; color: #1a1710; }
+.mr-print-addr   { font-size: 0.75rem; color: #555; }
+.mr-print-meta   { margin-left: auto; text-align: right; }
+.mr-print-title  { font-size: 0.9rem; font-weight: 700; color: #B8860B; }
+.mr-print-gen    { font-size: 0.7rem; color: #888; }
+
+/* ── Heading row: title, Print button, year picker ── */
+.mr-year-filter-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+.mr-heading        { font-size: 1rem; font-weight: 700; color: var(--text-primary); }
+.mr-subheading     { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.1rem; }
+.mr-actions        { display: flex; align-items: center; gap: 0.6rem; }
+.mr-print-btn      { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.38rem 0.85rem; font-size: 0.8rem; }
+.mr-year-wrap      { position: relative; }
+.mr-year-btn {
+  display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.38rem 0.85rem;
+  background: var(--bg-2); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text-primary); font-size: 0.82rem; font-weight: 600; cursor: pointer;
+}
+.mr-year-dd {
+  display: none; position: absolute; top: calc(100% + 6px); right: 0; z-index: 200; min-width: 110px; overflow: hidden;
+  background: var(--bg-2); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-lg);
+}
+.mr-year-dd.open { display: block; }
+.mr-year-opt {
+  display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0.9rem;
+  font-size: 0.8rem; font-weight: 500; color: var(--text-secondary); text-decoration: none; transition: background 0.1s;
+}
+.mr-year-opt:hover      { background: var(--gold-pale); }
+.mr-year-opt.is-current { font-weight: 700; color: var(--gold); }
+
+/* ── Layout ── */
+.mr-stat-grid   { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.25rem; }
+.mr-charts-row  { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.25rem; }
+.mr-charts-row > .card, .mr-breakdown { margin-bottom: 0; }
+.mr-chart-body  { padding: 1rem 1.25rem 1.25rem; }
+.mr-table-wrap  { overflow-x: auto; }
+
+/* ── Monthly Breakdown table ── */
+.mr-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.mr-table thead tr { border-bottom: 2px solid var(--border); }
+.mr-table th {
+  padding: 0.75rem 1rem; text-align: center; color: var(--text-muted);
+  font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px;
+}
+.mr-table td { padding: 0.75rem 1rem; text-align: center; font-weight: 600; color: var(--text-primary); }
+.mr-table th:first-child, .mr-table td:first-child { padding-left: 1.25rem; padding-right: 1.25rem; text-align: left; }
+.mr-table tbody tr { border-bottom: 1px solid var(--border); }
+.mr-table tbody tr.is-current { background: rgba(212, 160, 23, 0.06); }
+.mr-table tfoot tr { border-top: 2px solid var(--border); background: var(--bg-2); }
+.mr-table tfoot td { font-weight: 700; }
+.mr-table .mr-c-insurance { color: var(--mr-insurance); }
+.mr-table .mr-c-walkin    { color: var(--mr-walkin); }
+.mr-table .mr-c-policies  { color: var(--mr-policies); }
+.mr-table .mr-c-repairs   { color: var(--mr-repairs); }
+.mr-month         { display: flex; align-items: center; gap: 0.5rem; font-weight: 500; }
+.is-current .mr-month { font-weight: 700; }
+.mr-current-badge { font-size: 0.62rem; background: rgba(212, 160, 23, 0.15); color: var(--gold); border-radius: 4px; padding: 0.1rem 0.4rem; font-weight: 600; }
+.mr-table td.mr-future { color: var(--text-muted); font-size: 0.75rem; font-weight: 400; }   /* months not reached yet: "—" */
+
+/* ── PRINT ── */
+@media print {
+  @page { size: A4 portrait; margin: 1cm 1.5cm; }
+
+  /* Hide all chrome */
+  .mob-nav, .mob-topbar, .mob-more-overlay, .mob-more-sheet,
+  .sidebar-overlay, #page-loader, .sidebar, .topbar,
+  .mr-year-wrap, .mr-print-btn, .mr-year-filter-row, .mr-no-print { display: none !important; }
+
+  /* Base */
+  body  { background: #fff !important; color: #111 !important; margin: 0 !important; font-size: 0.72rem !important; }
+  .main { padding-left: 0 !important; background: #fff !important; }
+  .content { padding: 0 !important; max-width: 100% !important; }
+
+  /* Print header */
+  .mr-print-header { display: flex; gap: 0.75rem; margin-bottom: 0.5rem; padding-bottom: 0.4rem; }
+  .mr-print-logo  { height: 32px; }
+  .mr-print-name  { font-size: 0.85rem; }
+  .mr-print-addr  { font-size: 0.62rem; }
+  .mr-print-title { font-size: 0.78rem; }
+  .mr-print-gen   { font-size: 0.6rem; }
+
+  /* ── STAT SUMMARY — flex row, always inline ── */
+  .mr-stat-grid {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 0 !important;
+    margin-bottom: 0.5rem !important;
+    border: 1px solid #ccc !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .dash-stat {
+    flex: 1 !important;
+    background: #fff !important;
+    border: none !important;
+    border-right: 1px solid #ccc !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 0.35rem 0.75rem !important;
+  }
+  .dash-stat:last-child { border-right: none !important; }
+  .dash-stat-accent { display: none !important; }
+  .dash-stat-icon   { display: none !important; }
+  .dash-stat-top    { margin-bottom: 0.1rem !important; }
+  .dash-stat-badge  {
+    background: none !important; border: none !important; padding: 0 !important;
+    color: #888 !important; font-size: 0.55rem !important; font-weight: 500 !important;
+  }
+  .dash-stat-value {
+    font-size: 1.5rem !important; font-weight: 800 !important;
+    color: #111 !important; line-height: 1 !important; margin-bottom: 0.1rem !important;
+  }
+  .dash-stat-label {
+    font-size: 0.52rem !important; font-weight: 700 !important;
+    text-transform: uppercase !important; letter-spacing: 1.2px !important; color: #555 !important;
+  }
+
+  /* ── CHARTS — side by side, compact ── */
+  .mr-charts-row {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.6rem !important;
+    margin-bottom: 0.5rem !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .mr-chart-body { padding: 0.3rem 0.5rem !important; }
+
+  /* ── CARDS — strip digital styling ── */
+  .card {
+    border: none !important; box-shadow: none !important;
+    border-radius: 0 !important; background: #fff !important; margin-bottom: 0 !important;
+  }
+  .card-header {
+    padding: 0 0 0.25rem 0 !important;
+    border-bottom: 1px solid #ccc !important;
+    margin-bottom: 0 !important;
+    background: none !important;
+  }
+  .card-icon  { display: none !important; }
+  .card-title {
+    font-size: 0.62rem !important; font-weight: 700 !important;
+    color: #111 !important; text-transform: uppercase !important; letter-spacing: 0.8px !important;
+  }
+  .card-sub { font-size: 0.55rem !important; color: #666 !important; }
+
+  /* ── TABLE ── */
+  .mr-table { font-size: 0.65rem; }
+  .mr-table th {
+    background: #f4f4f4 !important; color: #333 !important;
+    border: 1px solid #bbb; padding: 0.2rem 0.5rem; text-align: center;
+    print-color-adjust: exact; -webkit-print-color-adjust: exact;
+  }
+  .mr-table td, .mr-table th:first-child, .mr-table td:first-child { color: #111 !important; border: 1px solid #d0d0d0; padding: 0.15rem 0.5rem; }
+  .mr-table th:first-child { color: #333 !important; border-color: #bbb; }
+  .mr-table tfoot td {
+    background: #f0f0f0 !important;
+    print-color-adjust: exact; -webkit-print-color-adjust: exact;
+  }
+  /* Current month — subtle highlight, no "Current" badge on paper */
+  .mr-table tr.is-current td { background: #fdf8ea !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .mr-current-badge { display: none; }
+}

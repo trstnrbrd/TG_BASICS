@@ -7,7 +7,8 @@ require_once '../../config/validators.php';
 require_role(['super_admin']);
 
 // ── FILTERS ──
-$filter_user   = san_int($_GET['user'] ?? 0, 0);
+$filter_system = ($_GET['user'] ?? '') === 'system';   // scheduled jobs (shown as "System")
+$filter_user   = $filter_system ? 0 : san_int($_GET['user'] ?? 0, 0);
 $filter_action = san_str($_GET['action'] ?? '', 60);
 $filter_search = validate_search(san_str($_GET['q'] ?? '', MAX_SEARCH));
 $filter_from   = san_str($_GET['from'] ?? '', 10);
@@ -21,7 +22,7 @@ $offset        = ($page - 1) * $per_page;
 
 // Display is always limited to the last 7 days; use Export CSV for older records
 // The developer account's entries are kept in the database but not listed (owner's approval 2026-10-07)
-$filters = ['user' => $filter_user, 'action' => $filter_action, 'search' => $filter_search, 'from' => $filter_from, 'to' => $filter_to];
+$filters = ['user' => $filter_user, 'system' => $filter_system, 'action' => $filter_action, 'search' => $filter_search, 'from' => $filter_from, 'to' => $filter_to];
 [$logs, $total] = audit_log_page($conn, $filters, $page, $per_page);
 $total_pages = max(1, ceil($total / $per_page));
 
@@ -35,6 +36,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     $exp_rows = audit_log_export($conn, ['from' => $exp_month_start, 'to' => $exp_today] + $filters);
 
     $filter_labels = [date('M j, Y', strtotime($exp_month_start)) . ' — ' . date('M j, Y', strtotime($exp_today))];
+    if ($filter_system)        $filter_labels[] = 'User: System (automatic jobs)';
     if ($filter_user > 0)      $filter_labels[] = 'User: ' . $filter_user;
     if ($filter_action !== '') $filter_labels[] = 'Action: ' . $filter_action;
     if ($filter_search !== '') $filter_labels[] = 'Search: "' . $filter_search . '"';
@@ -102,6 +104,9 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
         'CLIENT_ADDED'           => '#e8f5e9', 'CLIENT_UPDATED'         => '#fff8e1',
         'CLIENT_DELETED'         => '#ffebee', 'CLIENT_IMPORTED'        => '#e8f5e9',
         'DATABASE_BACKUP'        => '#e3f2fd',
+        'RENEWAL_REMINDERS_SENT' => '#e3f2fd', 'OVERDUE_REMINDERS_SENT' => '#e3f2fd',
+        'CLIENTS_PURGED'         => '#f0f0f0', 'QUOTATIONS_PURGED'      => '#f0f0f0',
+        'SIGN_IN_LOGS_PURGED'    => '#f0f0f0',
         'VEHICLE_ADDED'          => '#e8f5e9', 'VEHICLE_UPDATED'        => '#fff8e1',
         'VEHICLE_UNREGISTERED'   => '#ffebee',
         'POLICY_CREATED'         => '#fff8e1', 'POLICY_RENEWED'         => '#e8f5e9',
@@ -127,7 +132,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     ?>
   <tr style="background:<?= $bg ?>;">
     <td class="td-num"><?= $n++ ?></td>
-    <td class="td"><?= htmlspecialchars($r['full_name'] ?? 'Deleted User') ?></td>
+    <td class="td"><?= audit_is_system_entry($r) ? 'System (automatic)' : htmlspecialchars($r['full_name'] ?? 'Deleted User') ?></td>
     <td class="td-act"><?= htmlspecialchars($r['action']) ?></td>
     <td class="td"><?= htmlspecialchars($r['description']) ?></td>
     <td class="td-dt"><?= date('M d, Y', $ts) ?></td>
@@ -192,6 +197,7 @@ require_once '../../includes/topbar.php';
           <label class="field-label">User</label>
           <select name="user" class="field-select">
             <option value="">All Users</option>
+            <option value="system" <?= $filter_system ? 'selected' : '' ?>>System (automatic jobs)</option>
             <?php foreach ($all_users as $u): ?>
             <option value="<?= $u['user_id'] ?>" <?= $filter_user == $u['user_id'] ? 'selected' : '' ?>>
               <?= htmlspecialchars($u['full_name']) ?>
@@ -234,7 +240,7 @@ require_once '../../includes/topbar.php';
           <button type="submit" class="btn-primary" style="padding:0.7rem 1.1rem;">
             <?= icon('search', 14) ?> Filter
           </button>
-          <?php if ($filter_user || $filter_action || $filter_search || $filter_from || $filter_to): ?>
+          <?php if ($filter_user || $filter_system || $filter_action || $filter_search || $filter_from || $filter_to): ?>
           <a href="activity_log.php" class="btn-ghost" style="padding:0.7rem 1.1rem;">
             <?= icon('x-mark', 14) ?> Clear
           </a>
@@ -305,6 +311,12 @@ require_once '../../includes/topbar.php';
                 'CLIENT_DELETED'         => ['badge-red',    'trash'],
                 'CLIENT_IMPORTED'        => ['badge-green',  'arrow-up-tray'],
                 'DATABASE_BACKUP'        => ['badge-blue',   'arrow-down-tray'],
+                // Scheduled jobs
+                'RENEWAL_REMINDERS_SENT' => ['badge-blue',   'envelope'],
+                'OVERDUE_REMINDERS_SENT' => ['badge-blue',   'envelope'],
+                'CLIENTS_PURGED'         => ['badge-gray',   'trash'],
+                'QUOTATIONS_PURGED'      => ['badge-gray',   'trash'],
+                'SIGN_IN_LOGS_PURGED'    => ['badge-gray',   'trash'],
                 // Vehicles
                 'VEHICLE_ADDED'          => ['badge-green',  'plus'],
                 'VEHICLE_UPDATED'        => ['badge-yellow', 'pencil'],
@@ -357,6 +369,17 @@ require_once '../../includes/topbar.php';
             <tr>
               <td style="font-size:0.7rem;color:var(--text-muted);font-weight:600;"><?= $row_num ?></td>
               <td>
+                <?php if (audit_is_system_entry($log)): ?>
+                <div style="display:flex;align-items:center;gap:0.5rem;" title="Done automatically by a scheduled job, not by a person">
+                  <div style="width:26px;height:26px;border-radius:50%;background:var(--text-secondary);display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;">
+                    <?= icon('user-cog', 15) ?>
+                  </div>
+                  <span style="display:flex;flex-direction:column;line-height:1.2;">
+                    <span style="font-weight:600;color:var(--text-primary);font-size:0.8rem;">System</span>
+                    <span style="font-size:0.65rem;color:var(--text-muted);">Automatic job</span>
+                  </span>
+                </div>
+                <?php else: ?>
                 <div style="display:flex;align-items:center;gap:0.5rem;">
                   <div style="width:26px;height:26px;border-radius:50%;background:<?= $log['full_name'] ? 'linear-gradient(135deg,var(--gold-bright),var(--gold))' : 'var(--border)' ?>;display:flex;align-items:center;justify-content:center;font-size:0.58rem;font-weight:800;color:#fff;flex-shrink:0;overflow:hidden;">
                     <?php if (!empty($log['profile_photo'])): ?>
@@ -369,6 +392,7 @@ require_once '../../includes/topbar.php';
                     <?= $log['full_name'] ? htmlspecialchars($log['full_name']) : 'Deleted User' ?>
                   </span>
                 </div>
+                <?php endif; ?>
               </td>
               <td>
                 <span class="badge <?= $ab ?>" style="gap:0.3rem;">

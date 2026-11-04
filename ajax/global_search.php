@@ -4,7 +4,7 @@ require_once __DIR__ . '/../includes/data_access.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/validators.php';
 require_once __DIR__ . '/../includes/api.php';
-require_once __DIR__ . '/../includes/claim_types.php';
+require_once __DIR__ . '/../includes/lookups.php';
 
 if (!isset($_SESSION['user_id'])) api_error('Not signed in.', 401);
 

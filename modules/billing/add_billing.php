@@ -6,8 +6,7 @@ require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../includes/transaction.php';
 require_once '../../includes/insurance_companies.php';
-require_once '../../includes/billing_lists.php';
-require_once '../../includes/billing_form.php';
+require_once '../../includes/billing.php';
 
 require_role(['admin', 'super_admin']);
 
@@ -28,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
 
     $claim_id      = (int)($_POST['claim_id']    ?? 0);
-    // Billed To, the four amounts, notes and dates: the check shared with Edit Details (includes/billing_form.php)
+    // Billed To, the four amounts, notes and dates: the check shared with Edit Details (includes/billing.php)
     [$bf, $form_errors] = billing_form_check($_POST);
     $errors        = array_merge($errors, $form_errors);
     $billed_to     = $bf['billed_to'];

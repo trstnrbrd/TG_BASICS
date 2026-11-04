@@ -2,7 +2,7 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
-require_once __DIR__ . '/../../includes/service_types.php';
+require_once __DIR__ . '/../../includes/lookups.php';
 require_once '../../config/validators.php';
 require_once '../../config/mailer.php';
 require_once '../../includes/transaction.php';
@@ -204,7 +204,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $pub_token = client_public_token($conn, (int)$job['client_id']);
                 $pub_url   = app_url('modules/public/client.php?token=' . urlencode($pub_token));
 
-                $svc_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
+                $svc_labels = service_type_labels($conn);   // service_types table (includes/lookups.php)
                 $svc = $svc_labels[$job['service_type']] ?? $job['service_type'];
                 sendRepairCompletedEmail(
                     $job['email'],
@@ -245,7 +245,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 }
 
 // ── LABEL MAPS ──
-$service_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
+$service_labels = service_type_labels($conn);   // service_types table (includes/lookups.php)
 
 
 $area_labels = REPAIR_CHECKLIST_AREAS;   // config/access.php

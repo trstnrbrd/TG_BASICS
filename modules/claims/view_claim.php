@@ -6,7 +6,7 @@ require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../config/transaction_pin.php';
 require_once '../../config/uploads.php';
-require_once '../../includes/claim_types.php';
+require_once '../../includes/lookups.php';
 require_once '../../includes/icons.php';
 require_once '../../config/mailer.php';
 require_once '../../includes/transaction.php';

@@ -4,7 +4,7 @@ require_once 'includes/icons.php';
 require_once __DIR__ . '/config/app_url.php';
 require_once __DIR__ . '/config/version.php';
 require_once __DIR__ . '/config/db.php';
-require_once __DIR__ . '/includes/testimonials.php';
+require_once __DIR__ . '/includes/lookups.php';
 $testimonials = load_testimonials($conn);
 require_once __DIR__ . '/includes/insurance_companies.php';
 // partner insurers for the page text, already escaped (Settings > Insurance Companies)

@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../../includes/branding.php';
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../includes/data_access.php';
-require_once __DIR__ . '/../../includes/service_types.php';
+require_once __DIR__ . '/../../includes/lookups.php';
 require_once __DIR__ . '/../../config/settings.php';
 require_once __DIR__ . '/../../includes/icons.php';
 
@@ -132,7 +132,7 @@ if (isset($_GET['state'])) {
 require_once __DIR__ . '/../../includes/realtime.php';
 $live_cfg = realtime_client_config();   // public values only (key, cluster); empty = polling only
 
-$svc_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
+$svc_labels = service_type_labels($conn);   // service_types table (includes/lookups.php)
 
 [
     'name' => $company_name, 'address' => $company_address, 'contact' => $company_phone, 'email' => $company_email,

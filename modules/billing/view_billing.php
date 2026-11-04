@@ -7,8 +7,7 @@ require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../includes/transaction.php';
 require_once '../../config/transaction_pin.php';
-require_once '../../includes/billing_lists.php';
-require_once '../../includes/billing_form.php';
+require_once '../../includes/billing.php';
 require_once __DIR__ . '/../../config/settings.php';   // company_info(): the shop name on the printed statement
 
 require_role(['admin', 'super_admin']);
@@ -66,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'update_costs') {
-        // Billed To, the four amounts, notes and dates: the check shared with Add Billing (includes/billing_form.php)
+        // Billed To, the four amounts, notes and dates: the check shared with Add Billing (includes/billing.php)
         [$bf, $form_errors] = billing_form_check($_POST);
         if ($form_errors) { header("Location: view_billing.php?id=$billing_id&error=" . urlencode($form_errors[0])); exit; }
         // the cashier who signs (billing_signatories); their name and title are copied onto the billing
@@ -84,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $billing = billing_find($conn, $billing_id);
 
-$sb = billing_status_badge($conn, $billing['status']);   // statuses: the statuses table, module 'billing' (includes/billing_lists.php)
+$sb = billing_status_badge($conn, $billing['status']);   // statuses: the statuses table, module 'billing' (includes/billing.php)
 
 $total_repair = (float)$billing['parts_cost'] + (float)$billing['labor_cost'] + (float)$billing['other_cost'];
 $docs         = billing_docs_for($conn, billing_docs_received($conn, [$billing_id])[$billing_id] ?? []);

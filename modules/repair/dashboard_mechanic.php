@@ -2,7 +2,7 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
-require_once __DIR__ . '/../../includes/service_types.php';
+require_once __DIR__ . '/../../includes/lookups.php';
 require_once '../../config/access.php';
 
 require_role(['mechanic']);
@@ -18,7 +18,7 @@ $jobs = repair_jobs_open_recent($conn, 5);
 // ── TEAM MEMBERS ──
 $team = users_team($conn);
 
-$service_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
+$service_labels = service_type_labels($conn);   // service_types table (includes/lookups.php)
 
 
 $page_title  = 'Mechanic Dashboard';

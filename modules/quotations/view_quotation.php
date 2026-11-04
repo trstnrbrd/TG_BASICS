@@ -2,7 +2,7 @@
 require_once __DIR__ . "/../../config/session.php";
 require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
-require_once __DIR__ . '/../../includes/service_types.php';
+require_once __DIR__ . '/../../includes/lookups.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../config/mailer.php';
@@ -22,7 +22,7 @@ $items = quotation_items($conn, $qt_id);
 
 $area_labels = REPAIR_CHECKLIST_AREAS;   // config/access.php
 
-$service_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
+$service_labels = service_type_labels($conn);   // service_types table (includes/lookups.php)
 
 // ── HANDLE POST ACTIONS ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_admin) {
@@ -95,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_admin) {
 
             // Send receipt email to client if they have an email address
             if (!empty($qt['email'])) {
-                $service_labels_map = service_type_labels($conn);   // service_types table (includes/service_types.php)
+                $service_labels_map = service_type_labels($conn);   // service_types table (includes/lookups.php)
                 sendReceiptEmail(
                     $qt['email'],
                     $qt['full_name'],

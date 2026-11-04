@@ -1,6 +1,6 @@
 <?php
 /* =========================================================================
- * Reading the whole database for a backup (includes/db_backup.php writes
+ * Reading the whole database for a backup (includes/backup.php writes
  * the SQL file). Table and column names come from the database itself
  * (SHOW TABLES / SHOW COLUMNS), never from a user, and are always quoted
  * with backtick_name().

@@ -3,7 +3,7 @@ require_once __DIR__ . '/../../includes/branding.php';
 require_once __DIR__ . "/../../config/session.php";
 require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
-require_once __DIR__ . '/../../includes/service_types.php';
+require_once __DIR__ . '/../../includes/lookups.php';
 require_once '../../config/validators.php';
 require_once '../../config/settings.php';
 require_once __DIR__ . '/../../includes/statuses.php';
@@ -22,7 +22,7 @@ $company         = company_info($conn);   // Settings > Company Info (config/set
 $company_name    = $company['name'];
 $company_address = $company['address'];
 
-$service_labels = service_type_labels($conn);   // service_types table (includes/service_types.php)
+$service_labels = service_type_labels($conn);   // service_types table (includes/lookups.php)
 $pay_methods = ['cash' => 'Cash', 'e_wallet' => 'E-Wallet', 'bank_transfer' => 'Bank Transfer'];
 ?>
 <!DOCTYPE html>

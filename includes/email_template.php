@@ -786,7 +786,7 @@ function buildOverduePaymentEmail(string $toName, array $policies, string $polic
         return [$subject, $html];
 }
 
-/** Email to the owner: the weekly full backup is saved and ready to download (includes/full_backup.php). */
+/** Email to the owner: the weekly full backup is saved and ready to download (includes/backup.php). */
 function sendWeeklyBackupEmail(string $toEmail, string $toName, array $info, string $settingsUrl): bool {
     try {
         $mail = newMailer();

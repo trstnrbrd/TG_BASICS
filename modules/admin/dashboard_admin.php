@@ -5,7 +5,7 @@ require_once '../../config/db.php';
 require_once '../../config/settings.php';
 require_once '../../config/access.php';
 require_once '../../includes/insurance_companies.php';
-require_once '../../includes/db_backup.php';
+require_once '../../includes/backup.php';
 require_once '../../config/dev_access.php';
 
 $urg_days = setting_int($conn, 'renewal_urgent_days');

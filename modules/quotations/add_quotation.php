@@ -115,6 +115,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_mechanic) {
                 header("Location: view_quotation.php?id=$edit_qt_id&success=" . urlencode('Quotation updated.'));
                 exit;
             } else {
+                // One quotation per job: the check at the top of this page catches the same person sending the form
+                // twice; this lock + second look catches two people creating one for the same job at the same moment.
+                repair_job_lock($conn, (int)$job_id);
+                $existing_id = quotation_id_for_job($conn, (int)$job_id);
+                if ($existing_id !== null) {
+                    $conn->rollback();
+                    header("Location: view_quotation.php?id={$existing_id}&msg=" . urlencode('Quotation already exists for this job.'));
+                    exit;
+                }
+
                 // ── INSERT new quotation ── (retries on a same-instant quotation_number collision — see
                 // insert_with_sequential_number(); the surrounding try/catch already rolls back on any
                 // other failure, this just avoids that for the common concurrent case)

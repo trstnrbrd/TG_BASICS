@@ -7,6 +7,7 @@ require_once '../../config/access.php';
 require_once '../../includes/transaction.php';
 require_once '../../includes/insurance_companies.php';
 require_once '../../includes/billing.php';
+require_once '../../includes/idempotency.php';
 
 require_role(['admin', 'super_admin']);
 
@@ -25,6 +26,7 @@ if ($prefill_claim_id) {
 // ── HANDLE POST ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
+    idem_replay();   // the same form sent twice (double click, Back + Submit): back to the first save's page
 
     $claim_id      = (int)($_POST['claim_id']    ?? 0);
     // Billed To, the four amounts, notes and dates: the check shared with Edit Details (includes/billing.php)
@@ -96,8 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if (isset($created['num'])) {
-            header("Location: billing_list.php?success=" . urlencode($created['num'] . ' created successfully.'));
-            exit;
+            idem_redirect("billing_list.php?success=" . urlencode($created['num'] . ' created successfully.'));
         } elseif (isset($created['duplicate'])) {
             $errors[] = 'A billing record already exists for this claim.';
         } else {
@@ -134,7 +135,7 @@ require_once '../../includes/topbar.php';
     <?php endif; ?>
 
     <form method="POST" action="">
-      <?= csrf_field() ?>
+      <?= csrf_field() ?><?= idem_field() ?>
 
       <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:1.25rem;align-items:start;">
 

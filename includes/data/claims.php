@@ -130,9 +130,12 @@ function claim_create(mysqli $conn, int $policy_id, int $client_id, string $clai
 }
 
 /** Moves a claim to a new status with its denial reason (null unless denied) and notes. */
-function claim_set_status(mysqli $conn, int $claim_id, string $status, ?string $denial_reason, string $notes): void
+function claim_set_status(mysqli $conn, int $claim_id, string $from_status, string $status, ?string $denial_reason, string $notes): bool
 {
-    dal_exec($conn, "UPDATE claims SET status = ?, denial_reason = ?, notes = ? WHERE claim_id = ?", 'sssi', [$status, $denial_reason, $notes, $claim_id]);
+    // only while the claim still has the status the page was showing: a form sent twice, or two people at once,
+    // change it (and email the client) once; false = it had already changed
+    return dal_exec($conn, "UPDATE claims SET status = ?, denial_reason = ?, notes = ? WHERE claim_id = ? AND status = ?",
+                    'sssis', [$status, $denial_reason, $notes, $claim_id, $from_status]) === 1;
 }
 
 /** A client's policies that have not expired, soonest first, with the vehicle (File New Claim's policy list). */

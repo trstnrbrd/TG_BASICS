@@ -8,6 +8,7 @@ require_once '../../config/access.php';
 require_once '../../includes/transaction.php';
 require_once '../../includes/insurance_companies.php';
 require_once '../../includes/lookups.php';
+require_once '../../includes/idempotency.php';
 
 require_role(['admin', 'super_admin']);
 
@@ -66,6 +67,7 @@ $success = false;
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
+    idem_replay();   // the same form sent twice (double click, Back + Submit): back to the first save's page
 
     // Validate receipt file if uploaded (for 1st installment)
     $receipt_file_name = null;
@@ -275,8 +277,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($saved) {
-            header("Location: ../renewal/renewal_list.php?success=" . urlencode("Policy " . $policy_number . " saved successfully for " . ($vehicle['full_name'] ?? '') . "."));
-            exit;
+            idem_redirect("../renewal/renewal_list.php?success=" . urlencode("Policy " . $policy_number . " saved successfully for " . ($vehicle['full_name'] ?? '') . "."));
         }
     }
     // Not saved (the success path exits above): let the next person with this policy number through
@@ -437,7 +438,7 @@ require_once '../../includes/topbar.php';
 
     <!-- POLICY FORM -->
     <form method="POST" action="" enctype="multipart/form-data" id="policy-form" <?= !$vehicle ? 'style="display:none;"' : '' ?>>
-      <?= csrf_field() ?>
+      <?= csrf_field() ?><?= idem_field() ?>
       <input type="hidden" name="vehicle_id_resolved" id="vehicle-id-hidden" value="<?= $vehicle ? $vehicle['vehicle_id'] : '' ?>"/>
       <input type="hidden" name="insurance_company" value="<?= htmlspecialchars($insurance_company) ?>"/>
       <div class="card">

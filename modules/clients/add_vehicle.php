@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
+require_once '../../includes/idempotency.php';
 
 require_role(['admin', 'super_admin']);
 
@@ -31,6 +32,7 @@ $errors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
+    idem_replay();   // the same form sent twice (double click, Back + Submit): back to the first save's page
     $plate_number  = strtoupper(san_str($_POST['plate_number'] ?? '', MAX_PLATE));
     $make          = san_str($_POST['make'] ?? '', MAX_MAKE_MODEL);
     $model         = san_str($_POST['model'] ?? '', MAX_MAKE_MODEL);
@@ -70,8 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' added vehicle ' . ($plate_number ?: 'no plate') . ' (' . $make . ' ' . $model . ') to client ' . (($client['client_code'] ?? '') ?: 'ID ' . $client_id) . ' (' . $client['full_name'] . ').';
             audit_log_add($conn, $uid, 'VEHICLE_ADDED', $desc);
 
-            header("Location: view_client.php?id=" . $client_id . "&success=Vehicle added successfully.");
-            exit;
+            idem_redirect("view_client.php?id=" . $client_id . "&success=Vehicle added successfully.");
         }
     }
 }
@@ -181,7 +182,7 @@ require_once '../../includes/topbar.php';
     </style>
 
     <form method="POST" action="">
-      <?= csrf_field() ?>
+      <?= csrf_field() ?><?= idem_field() ?>
       <div class="card">
         <div class="card-header">
           <div class="card-icon"><?= icon('vehicle', 16) ?></div>

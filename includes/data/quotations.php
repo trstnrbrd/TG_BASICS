@@ -86,13 +86,15 @@ function quotation_items_replace(mysqli $conn, int $quotation_id, array $items):
  * (stamps approved_at), 'converted' (stamps converted_at) or 'cancelled'.
  * The page decides which step is allowed from the current one.
  */
-function quotation_set_status(mysqli $conn, int $quotation_id, string $status): void
+function quotation_set_status(mysqli $conn, int $quotation_id, string $status, ?string $from_status = null): bool
 {
     $stamp = ['approved' => ', approved_at = NOW()', 'converted' => ', converted_at = NOW()'][$status] ?? '';
     if (!in_array($status, ['pending_approval', 'approved', 'converted', 'cancelled'], true)) {
         throw new InvalidArgumentException("Unknown quotation step: $status");
     }
-    dal_exec($conn, "UPDATE quotations SET status = ?$stamp WHERE quotation_id = ?", 'si', [$status, $quotation_id]);
+    // $from_status: only while the quotation is still at that step (a form sent twice changes it once); false = it was not
+    if ($from_status === null) return dal_exec($conn, "UPDATE quotations SET status = ?$stamp WHERE quotation_id = ?", 'si', [$status, $quotation_id]) === 1;
+    return dal_exec($conn, "UPDATE quotations SET status = ?$stamp WHERE quotation_id = ? AND status = ?", 'sis', [$status, $quotation_id, $from_status]) === 1;
 }
 
 /** Cancelled quotations with no receipt, untouched for $days days (updated_at is when they were cancelled). */

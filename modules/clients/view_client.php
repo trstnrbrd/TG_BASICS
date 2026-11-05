@@ -8,6 +8,7 @@ require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../config/transaction_pin.php';
 require_once '../../config/uploads.php';
+require_once '../../includes/idempotency.php';
 
 require_role(['admin', 'super_admin', 'mechanic']);
 $is_mechanic = is_mechanic();
@@ -70,6 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && in_array
 }
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'upload_doc') {
     csrf_verify();
+    idem_replay();   // the same upload sent twice (double click) attaches the PDF once
     if ($can_edit && !empty($_FILES['policy_doc']['tmp_name'])) {
         $tmp  = $_FILES['policy_doc']['tmp_name'];
         $orig = basename($_FILES['policy_doc']['name']);
@@ -83,8 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             }
         }
     }
-    header("Location: view_client.php?id=$client_id&success=Document uploaded.");
-    exit;
+    idem_redirect("view_client.php?id=$client_id&success=Document uploaded.");
 }
 
 // ── HANDLE DOC DELETE ──
@@ -448,7 +449,7 @@ require_once '../../includes/topbar.php';
       <?php if ($can_edit): ?>
       <div id="doc-upload-panel" style="display:none;padding:1rem 1.25rem;border-bottom:1px solid var(--border);background:var(--bg-2);">
         <form method="POST" enctype="multipart/form-data" style="display:flex;flex-direction:column;gap:0.75rem;">
-          <?= csrf_field() ?>
+          <?= csrf_field() ?><?= idem_field() ?>
           <input type="hidden" name="action" value="upload_doc"/>
           <label style="font-size:0.78rem;font-weight:600;color:var(--text-muted);">Select PDF file (policy document, LOA, etc.)</label>
           <input type="file" name="policy_doc" accept="application/pdf" required

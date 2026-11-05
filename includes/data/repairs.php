@@ -61,6 +61,12 @@ function repair_job_set_status(mysqli $conn, int $job_id, string $from_status, s
     return dal_exec($conn, "UPDATE repair_jobs SET status = ? WHERE job_id = ? AND status = ?", 'sis', [$to_status, $job_id, $from_status]) === 1;
 }
 
+/** Locks the job row until the transaction ends (Add Quotation: two people creating one for the same job at once). */
+function repair_job_lock(mysqli $conn, int $job_id): void
+{
+    dal_value($conn, "SELECT job_id FROM repair_jobs WHERE job_id = ? FOR UPDATE", 'i', [$job_id]);
+}
+
 /** Saves the job's additional damages note. */
 function repair_job_set_notes(mysqli $conn, int $job_id, string $notes): void
 {

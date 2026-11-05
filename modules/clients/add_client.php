@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
+require_once '../../includes/idempotency.php';
 
 require_role(['admin', 'super_admin']);
 
@@ -29,6 +30,7 @@ $success     = false;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
+    idem_replay();   // the same form sent twice (double click, Back + Submit): back to the first save's page
     $full_name      = strtoupper(san_str($_POST['full_name'] ?? '', MAX_NAME));
     // read whole, not through san_str(): an over-long value there turns into '' and would save as "no contact number"
     $contact_number = normalize_phone(is_string($_POST['contact_number'] ?? null) ? $_POST['contact_number'] : '');
@@ -111,13 +113,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             audit_log_add($conn, $uid, 'CLIENT_ADDED', $desc);
 
             if ($then_policy) {
-                header("Location: ../insurance/eligibility_check.php?vehicle_id=" . (int)$vehicle_id . "&added=1");
-                exit;
+                idem_redirect("../insurance/eligibility_check.php?vehicle_id=" . (int)$vehicle_id . "&added=1");
             }
             // The list opens on the user's own clients — when this client is another agent's, open that agent's
             // list instead so the new record is actually in view
             $list_agent = $agent_id !== (int)$_SESSION['user_id'] ? 'agent=' . $agent_id . '&' : '';
-            header("Location: client_list.php?" . $list_agent . "success=" . urlencode($full_name . ($client_code !== '' ? ' (' . $client_code . ')' : '') . ' has been added successfully.'));
+            idem_redirect("client_list.php?" . $list_agent . "success=" . urlencode($full_name . ($client_code !== '' ? ' (' . $client_code . ')' : '') . ' has been added successfully.'));
             exit;
         }
     }
@@ -248,7 +249,7 @@ require_once '../../includes/topbar.php';
     </script>
 
     <form method="POST" action="">
-      <?= csrf_field() ?>
+      <?= csrf_field() ?><?= idem_field() ?>
       <div class="card">
         <div class="card-header">
           <div class="card-icon"><?= icon('user', 16) ?></div>

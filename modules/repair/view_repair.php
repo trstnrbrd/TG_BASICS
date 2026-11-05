@@ -9,6 +9,7 @@ require_once '../../includes/transaction.php';
 require_once '../../config/uploads.php';
 require_once '../../config/access.php';
 require_once '../../config/transaction_pin.php';
+require_once '../../includes/idempotency.php';
 
 require_role(['admin', 'super_admin', 'mechanic']);
 
@@ -76,6 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'toggl
 // ── HANDLE PHOTO UPLOAD ── metadata (GPS, phone model, date) is stripped before the file is kept
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'upload_image') {
     csrf_verify();
+    idem_replay();   // the same upload sent twice (double click) saves the photos once
     require_once '../../includes/image_meta.php';
     $files = $_FILES['job_images'] ?? null;
     if (!$files || !is_array($files['tmp_name'] ?? null) || ($files['name'][0] ?? '') === '') {
@@ -116,7 +118,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'uploa
         }
     }
     $msg = count($saved) . ' photo(s) uploaded.' . ($skipped ? ' ' . $skipped . ' skipped (not a JPG/PNG/WEBP/GIF image, unreadable, or over ' . (REPAIR_PHOTO_MAX_BYTES >> 20) . ' MB).' : '');
-    header("Location: view_repair.php?id=$job_id&" . ($saved ? 'success=' : 'error=') . urlencode($msg));
+    if ($saved) idem_redirect("view_repair.php?id=$job_id&success=" . urlencode($msg));
+    header("Location: view_repair.php?id=$job_id&error=" . urlencode($msg));
     exit;
 }
 
@@ -509,7 +512,7 @@ document.addEventListener('DOMContentLoaded', function() {
     <!-- UPLOAD FORM -->
     <div id="upload-panel" style="display:none;padding:1rem 1.25rem;border-bottom:1px solid var(--border);background:var(--bg-2);">
       <form method="POST" enctype="multipart/form-data" style="display:flex;flex-direction:column;gap:0.75rem;">
-        <?= csrf_field() ?>
+        <?= csrf_field() ?><?= idem_field() ?>
         <input type="hidden" name="action" value="upload_image"/>
         <label style="font-size:0.78rem;font-weight:600;color:var(--text-muted);">Select images (JPG, PNG, WEBP — multiple allowed, up to <?= REPAIR_PHOTO_MAX_BYTES >> 20 ?> MB each)</label>
         <input type="file" name="job_images[]" multiple accept="image/jpeg,image/png,image/webp,image/gif" data-compress="photo"

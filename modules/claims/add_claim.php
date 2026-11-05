@@ -6,6 +6,7 @@ require_once '../../config/validators.php';
 require_once '../../includes/icons.php';
 require_once '../../includes/transaction.php';
 require_once '../../includes/lookups.php';
+require_once '../../includes/idempotency.php';
 
 require_role(['admin', 'super_admin']);
 
@@ -29,6 +30,7 @@ if (isset($_GET['ajax_policies']) && isset($_GET['client_id'])) {
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
+    idem_replay();   // the same form sent twice (double click, Back + Submit) files one claim, not two
     $client_id    = (int)($_POST['client_id'] ?? 0);
     $policy_id    = (int)($_POST['policy_id'] ?? 0);
     $claim_type   = san_enum($_POST['claim_type'] ?? '', array_column(claim_types_active($conn), 'code'));
@@ -55,8 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             return $id;
         });
 
-        header("Location: view_claim.php?id=$new_id&success=" . urlencode('Claim filed successfully.'));
-        exit;
+        idem_redirect("view_claim.php?id=$new_id&success=" . urlencode('Claim filed successfully.'));
     }
 }
 
@@ -164,7 +165,7 @@ require_once '../../includes/topbar.php';
       </style>
 
       <form method="POST" action="">
-        <?= csrf_field() ?>
+        <?= csrf_field() ?><?= idem_field() ?>
         <div class="card" style="margin-bottom:1.25rem;overflow:visible;">
           <div class="card-header">
             <div class="card-icon"><?= icon('user', 16) ?></div>

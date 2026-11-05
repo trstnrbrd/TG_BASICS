@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../includes/lookups.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../includes/transaction.php';
+require_once '../../includes/idempotency.php';
 
 require_role(['admin', 'super_admin', 'mechanic']);
 
@@ -37,6 +38,7 @@ if ($prefill_client_id > 0 && client_in_scope($conn, $prefill_client_id)) {
 // ── HANDLE POST ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
+    idem_replay();   // the same form sent twice (double click, Back + Submit) creates one job, not two
 
     $client_id   = (int)($_POST['client_id']   ?? 0);
     $vehicle_id  = (int)($_POST['vehicle_id']  ?? 0);
@@ -102,8 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($created !== null) {
-            header("Location: repair_list.php?success=" . urlencode('Repair job ' . $created . ' created successfully.'));
-            exit;
+            idem_redirect("repair_list.php?success=" . urlencode('Repair job ' . $created . ' created successfully.'));
         } else {
             $errors[] = 'Database error. Please try again.';
         }
@@ -147,7 +148,7 @@ require_once '../../includes/topbar.php';
     <a href="repair_list.php" class="back-link" onclick="goBack('repair_list.php'); return false;"><?= icon('arrow-left', 14) ?> Back to Repair Jobs</a>
 
     <form method="POST" action="" id="repair-form">
-      <?= csrf_field() ?>
+      <?= csrf_field() ?><?= idem_field() ?>
 
       <!-- ROW 1: Client/Vehicle + Job Details -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;">

@@ -30,24 +30,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_admin) {
     $action = san_str($_POST['action'] ?? '', 30);
 
     // Approve
+    // Each step changes the quotation only from the step this page was showing ($from_status), so the same
+    // button sent twice, or two people at once, does it (and logs it) once.
     if ($action === 'approve' && $qt['status'] === 'pending_approval') {
-        quotation_set_status($conn, $qt_id, 'approved');
-        $d   = ($_SESSION['full_name'] ?? 'Unknown') . ' approved quotation ' . $qt['quotation_number'] . '.';
-        audit_log_add($conn, $_SESSION['user_id'], 'QUOTATION_APPROVED', $d);
+        if (quotation_set_status($conn, $qt_id, 'approved', 'pending_approval')) {
+            $d   = ($_SESSION['full_name'] ?? 'Unknown') . ' approved quotation ' . $qt['quotation_number'] . '.';
+            audit_log_add($conn, $_SESSION['user_id'], 'QUOTATION_APPROVED', $d);
+        }
         header("Location: view_quotation.php?id=$qt_id&success=Quotation+approved.");
         exit;
     }
 
     // Send for approval (from draft)
     if ($action === 'send_approval' && $qt['status'] === 'draft') {
-        quotation_set_status($conn, $qt_id, 'pending_approval');
+        quotation_set_status($conn, $qt_id, 'pending_approval', 'draft');
         header("Location: view_quotation.php?id=$qt_id&success=Sent+for+client+approval.");
         exit;
     }
 
     // Cancel
     if ($action === 'cancel' && in_array($qt['status'], ['draft','pending_approval'])) {
-        quotation_set_status($conn, $qt_id, 'cancelled');
+        quotation_set_status($conn, $qt_id, 'cancelled', $qt['status']);
         header("Location: view_quotation.php?id=$qt_id&success=Quotation+cancelled.");
         exit;
     }
@@ -77,6 +80,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_admin) {
 
         $conn->begin_transaction();
         try {
+            // Approved -> converted first: the row stays locked until the commit, so a second "convert" (the same
+            // form sent twice, or someone else at the same moment) finds it already converted and issues nothing.
+            // (receipts.quotation_id is also UNIQUE, so the database would refuse a second receipt anyway.)
+            if (!quotation_set_status($conn, $qt_id, 'converted', 'approved')) {
+                $conn->rollback();
+                header("Location: view_quotation.php?id=$qt_id&error=" . urlencode('This quotation was already converted to a receipt.'));
+                exit;
+            }
+
             // Billing statement number: BS-YYYYMM-XXXX. Retries on a same-instant collision — see
             // insert_with_sequential_number() — instead of failing the whole conversion for it.
             $rc_num = insert_with_sequential_number($conn, 'receipts', 'receipt_number', record_number_prefix('BS'),
@@ -85,8 +97,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_admin) {
                     return $num;
                 }
             );
-
-            quotation_set_status($conn, $qt_id, 'converted');
 
             $d   = ($_SESSION['full_name'] ?? 'Unknown') . ' converted quotation ' . $qt['quotation_number'] . ' to receipt ' . $rc_num . '.';
             audit_log_add($conn, $_SESSION['user_id'], 'RECEIPT_CREATED', $d);

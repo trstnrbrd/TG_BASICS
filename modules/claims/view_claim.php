@@ -307,12 +307,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
     if (in_array($new_status, $allowed_statuses)) {
         $dr  = $new_status === 'denied' ? $denial_reason : null;
         // The status change and its audit entry are saved together or not at all (includes/transaction.php)
-        db_transaction($conn, function () use ($conn, $claim_id, $new_status, $dr, $notes) {
-            claim_set_status($conn, $claim_id, $new_status, $dr, $notes);
+        // Only from the status this page was showing: the same form sent twice, or two people at once, change it
+        // (and email the client) once.
+        $from_status = $claim['status'];
+        $changed = db_transaction($conn, function () use ($conn, $claim_id, $from_status, $new_status, $dr, $notes) {
+            if (!claim_set_status($conn, $claim_id, $from_status, $new_status, $dr, $notes)) return false;
 
             $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' updated claim #' . $claim_id . ' status to ' . $new_status . '.';
             audit_log_add($conn, $_SESSION['user_id'], 'CLAIM_UPDATED', $desc);
+            return true;
         });
+        if (!$changed) {
+            header("Location: view_claim.php?id=$claim_id&error=" . urlencode('The status was changed by someone else. Please check it and try again.'));
+            exit;
+        }
 
         // Send email notification to client if they have an email on file
         if (!empty($claim['email'])) {

@@ -65,7 +65,7 @@ function realtime_watch_request(mysqli $conn): void
         $redirect_ok = $location !== null && !preg_match('/[?&](error|pay_error)=/i', $location);
         try { $logged = $last_log() > $before; } catch (Throwable $e) { $logged = false; }
         $saved = (($GLOBALS['tg_api_ok'] ?? null) === true) || ($location === null || $redirect_ok) && $logged || $redirect_ok;
-        if (!$saved) return;
+        if (!$saved || !empty($GLOBALS['tg_idem_replay'])) return;   // a repeated form (includes/idempotency.php) saved nothing
         if (function_exists('fastcgi_finish_request')) fastcgi_finish_request();
         // The browser tab that saved ignores its own signal: it already shows the change, and reloading it would
         // drop the "saved" message. A random id per tab (realtime.js) sent with every save, never a person.

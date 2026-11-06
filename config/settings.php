@@ -82,10 +82,12 @@ const COMPANY_DEFAULTS = [
     'company_address' => '49 Villa Tierra St., San Roque, Pandi, Bulacan',
     'company_contact' => '09171453448',
     'company_email'   => 'tgcustomworksbulacan@gmail.com',
+    // the shop's Google Maps place (its reviews tab): the landing page's "Open in Google Maps" and "See all reviews"
+    'company_maps_url' => 'https://www.google.com/maps/place/TG+CustomWorks/@14.8557179,120.9540001,17z/data=!4m8!3m7!1s0x3397ac71057677fb:0x35ddd0d771ab5d8f!8m2!3d14.8557127!4d120.956575!9m1!1b1!16s%2Fg%2F11f2wc709p',
 ];
 
 /**
- * ['name' => …, 'address' => …, 'contact' => …, 'email' => …] from Settings; an empty or missing value
+ * ['name' => …, 'address' => …, 'contact' => …, 'email' => …, 'maps_url' => …] from Settings; an empty or missing value
  * gets its default (a receipt never prints a blank shop name). The phone is saved by Settings as
  * company_contact; the public pages used to read a company_phone key Settings never writes, so an old
  * company_phone row is still used when company_contact has none.

@@ -25,6 +25,7 @@ const MAX_POLICY_NUM  = 60;
 const MAX_MORTGAGEE   = 100;
 const MAX_FACEBOOK    = 100;    // client's Facebook name (optional)
 const MAX_TEXT        = 500;   // descriptions, notes
+const MAX_URL         = 500;   // a web address saved in Settings (Google Maps links are long)
 const MAX_SEARCH      = 100;
 const MAX_TOKEN       = 128;
 
@@ -149,6 +150,18 @@ function san_enum(mixed $value, array $allowed): string {
 /** Full name: letters, spaces, hyphens, apostrophes only. */
 function validate_name(string $v): bool {
     return $v !== '' && mb_strlen($v) <= MAX_NAME && preg_match('/^[\pL\s\'\-\.]+$/u', $v);
+}
+
+/**
+ * A web address made safe to link: only a full http:// or https:// address with a host is kept, so
+ * "javascript:…", a bare "example.com" or one with a space never becomes a link; '' otherwise.
+ */
+function web_url_clean(string $url, int $max = MAX_URL): string {
+    $url = trim($url);
+    if ($url === '' || strlen($url) > $max || preg_match('/\s/', $url)) return '';
+    $parts = parse_url($url);
+    if (!$parts || !in_array(strtolower($parts['scheme'] ?? ''), ['http', 'https'], true) || empty($parts['host'])) return '';
+    return filter_var($url, FILTER_VALIDATE_URL) !== false ? $url : '';
 }
 
 /** Valid email address format. */

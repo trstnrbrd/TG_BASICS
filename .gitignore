@@ -57,5 +57,6 @@ data_gathering (documentation)/FT-CRD-191-00_IT_IS_Capstone_Project_Manuscript_T
 selenium_tests/
 tools/
 tests/
+docs/
 .claude/
 CLAUDE.md

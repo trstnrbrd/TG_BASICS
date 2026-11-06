@@ -31,28 +31,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_admin) {
 
     // Approve
     // Each step changes the quotation only from the step this page was showing ($from_status), so the same
-    // button sent twice, or two people at once, does it (and logs it) once.
-    if ($action === 'approve' && $qt['status'] === 'pending_approval') {
-        if (quotation_set_status($conn, $qt_id, 'approved', 'pending_approval')) {
-            $d   = ($_SESSION['full_name'] ?? 'Unknown') . ' approved quotation ' . $qt['quotation_number'] . '.';
-            audit_log_add($conn, $_SESSION['user_id'], 'QUOTATION_APPROVED', $d);
+    // button sent twice, or two people at once, does it (and logs it) once. Already at the step asked for = done,
+    // not an error; moved somewhere else in the meantime = the user is told.
+    $steps = [
+        'approve'       => ['to' => 'approved',         'from' => ['pending_approval'],          'msg' => 'Quotation approved.'],
+        'send_approval' => ['to' => 'pending_approval', 'from' => ['draft'],                     'msg' => 'Sent for client approval.'],
+        'cancel'        => ['to' => 'cancelled',        'from' => ['draft', 'pending_approval'], 'msg' => 'Quotation cancelled.'],
+    ];
+    if (isset($steps[$action])) {
+        $step = $steps[$action];
+        if ($qt['status'] === $step['to']) {
+            header("Location: view_quotation.php?id=$qt_id&success=" . urlencode($step['msg']));
+            exit;
         }
-        header("Location: view_quotation.php?id=$qt_id&success=Quotation+approved.");
-        exit;
-    }
-
-    // Send for approval (from draft)
-    if ($action === 'send_approval' && $qt['status'] === 'draft') {
-        quotation_set_status($conn, $qt_id, 'pending_approval', 'draft');
-        header("Location: view_quotation.php?id=$qt_id&success=Sent+for+client+approval.");
-        exit;
-    }
-
-    // Cancel
-    if ($action === 'cancel' && in_array($qt['status'], ['draft','pending_approval'])) {
-        quotation_set_status($conn, $qt_id, 'cancelled', $qt['status']);
-        header("Location: view_quotation.php?id=$qt_id&success=Quotation+cancelled.");
-        exit;
+        if (in_array($qt['status'], $step['from'], true)) {
+            if (!quotation_set_status($conn, $qt_id, $step['to'], $qt['status'])) {
+                header("Location: view_quotation.php?id=$qt_id&error=" . urlencode('The quotation was changed by someone else. Please check it and try again.'));
+                exit;
+            }
+            if ($action === 'approve') {
+                $d = ($_SESSION['full_name'] ?? 'Unknown') . ' approved quotation ' . $qt['quotation_number'] . '.';
+                audit_log_add($conn, $_SESSION['user_id'], 'QUOTATION_APPROVED', $d);
+            }
+            header("Location: view_quotation.php?id=$qt_id&success=" . urlencode($step['msg']));
+            exit;
+        }
     }
 
     // Amount paid on a billing statement: a valid amount, never more than the quotation total. A bad value is an
@@ -70,7 +73,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_admin) {
         return [$amt];
     };
 
-    // Convert to receipt
+    // Convert to receipt. Already converted (the same form sent twice): the receipt exists, so answer as the first time.
+    if ($action === 'convert' && $qt['receipt_id']) {
+        header("Location: view_quotation.php?id=$qt_id&success=" . urlencode('Receipt ' . $qt['receipt_number'] . ' issued.'));
+        exit;
+    }
     if ($action === 'convert' && $qt['status'] === 'approved' && !$qt['receipt_id']) {
         [$amount_paid] = $pay_error();
         $pay_method    = san_enum($_POST['payment_method'] ?? 'cash', ['cash','e_wallet','bank_transfer']);

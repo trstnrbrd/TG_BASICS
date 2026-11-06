@@ -25,6 +25,12 @@ RewriteRule ^uploads/(claims|client_docs|receipts|repair_jobs)(/|$) - [F,L]
 # owner's password (modules/admin/backup_database.php)
 RewriteRule ^backups(/|$) - [F,L]
 
+# Developer files (README, release history, Composer / PHPUnit setup) are not part of the app: they describe its
+# version, modules and libraries. The deploy workflow skips them, but FTP never deletes a file it skips, so a copy
+# uploaded before stays on the server: refuse them here too.
+RewriteRule (^|/)[^/]+\.md$ - [F,L]
+RewriteRule ^(composer\.(json|lock)|phpunit\.xml)$ - [F,L]
+
 # Compress pages, CSS and JS on the way out (a 300 KB list page is ~40 KB compressed). Skipped where the module is off.
 <IfModule mod_deflate.c>
   AddOutputFilterByType DEFLATE text/html text/css text/plain application/javascript text/javascript application/json image/svg+xml

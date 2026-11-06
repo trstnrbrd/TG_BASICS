@@ -47,4 +47,9 @@ jobs:
             selenium_tests/**
             tools/**
             tests/**
+            README.md
+            CHANGELOG.md
+            composer.json
+            composer.lock
+            phpunit.xml
             **/*.sql

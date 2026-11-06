@@ -12,6 +12,7 @@ require_role(['admin', 'super_admin']);
 require_once '../../includes/icons.php';
 require_once '../../includes/api.php';
 require_once '../../includes/transaction.php';
+require_once '../../config/transaction_pin.php';
 
 $urg_days = setting_int($conn, 'renewal_urgent_days');
 $exp_days = setting_int($conn, 'renewal_expiring_days');
@@ -54,6 +55,10 @@ if ($payable_amount < 0) $payable_amount = 0;
 // ── HANDLE DELETE ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_policy'])) {
     csrf_verify();
+    if (!pin_consume($conn)) {   // the browser asks for the PIN; this is the check that counts
+        header("Location: view_policy.php?id=" . $policy_id . "&error=" . urlencode(PIN_REQUIRED_MSG));
+        exit;
+    }
     $with_claims = isset($_POST['delete_claims']) && $_POST['delete_claims'] === '1';
 
     // The records and the audit entry are deleted together; the claim files only once that has committed,
@@ -143,6 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_receipt'])) {
 // ── HANDLE RECEIPT DELETE (AJAX) ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_receipt'])) {
     csrf_verify();
+    if (!pin_consume($conn)) api_error(PIN_REQUIRED_MSG, 403);
     $payment_id = isset($_POST['payment_id']) ? (int)$_POST['payment_id'] : 0;
     $chk2_row = policy_payment_find($conn, $payment_id, $policy_id);
     if ($chk2_row && $chk2_row['receipt_file']) {
@@ -156,6 +162,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_receipt'])) {
 // ── UNDO A SAVED PAYMENT (fix a wrong entry) ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['undo_payment'])) {
     csrf_verify();
+    if (!pin_consume($conn)) {
+        header("Location: view_policy.php?id=" . $policy_id . "&error=" . urlencode(PIN_REQUIRED_MSG));
+        exit;
+    }
     $payment_id = (int)($_POST['payment_id'] ?? 0);
     $undo_row   = null;
     foreach ($installments as $inst_row) {
@@ -167,39 +177,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['undo_payment'])) {
         exit;
     }
 
-    $conn->begin_transaction();
     try {
-        // "amount_paid > 0" makes a double-click (or two tabs) undo it only once
-        if (!policy_payment_undo($conn, $payment_id, $policy_id)) {
-            $conn->rollback();
-            header("Location: view_policy.php?id=" . $policy_id . "&error=" . urlencode($nothing_msg));
-            exit;
-        }
+        $undone = db_transaction($conn, function () use ($conn, $payment_id, $policy_id, $payable_amount, $installments, $undo_row, $policy) {
+            // "amount_paid > 0" makes a double-click (or two tabs) undo it only once
+            if (!policy_payment_undo($conn, $payment_id, $policy_id)) return false;   // nothing was written
 
-        // Totals and status from what is stored now — same rules as saving the schedule below
-        [$total_paid, $due_past, $paid_past] = policy_payment_totals($conn, $policy_id);
-        $new_balance = round($payable_amount - $total_paid, 2);
-        $new_status  = policy_payment_status($payable_amount, $total_paid, $due_past > 0 && round($paid_past, 2) < round($due_past, 2));
+            // Totals and status from what is stored now — same rules as saving the schedule below
+            [$total_paid, $due_past, $paid_past] = policy_payment_totals($conn, $policy_id);
+            $new_balance = round($payable_amount - $total_paid, 2);
+            $new_status  = policy_payment_status($payable_amount, $total_paid, $due_past > 0 && round($paid_past, 2) < round($due_past, 2));
 
-        policy_set_totals($conn, $policy_id, $total_paid, $new_balance, $new_status);
+            policy_set_totals($conn, $policy_id, $total_paid, $new_balance, $new_status);
 
-        $ordinals_u = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
-        $undo_label = count($installments) === 1 ? 'Full Payment' : ($ordinals_u[$undo_row['installment_no'] - 1] ?? $undo_row['installment_no'] . 'th') . ' Payment';
-        $undo_what  = 'PHP ' . number_format((float)$undo_row['amount_paid'], 2)
-                    . ' (' . ($undo_row['payment_mode'] ?: 'no mode') . (!empty($undo_row['control_number']) ? ', control no. ' . $undo_row['control_number'] : '') . ')'
-                    . (!empty($undo_row['paid_at']) ? ' recorded ' . date('M d, Y', strtotime($undo_row['paid_at'])) : '');
-        $uid  = $_SESSION['user_id'];
-        $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' undid the ' . $undo_label . ' of policy ' . $policy['policy_number'] . ': ' . $undo_what
-              . '. Total paid now PHP ' . number_format($total_paid, 2) . '. Status: ' . $new_status . '.';
-        audit_log_add($conn, $uid, 'PAYMENT_UNDONE', $desc);
-
-        $conn->commit();
+            $ordinals_u = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
+            $undo_label = count($installments) === 1 ? 'Full Payment' : ($ordinals_u[$undo_row['installment_no'] - 1] ?? $undo_row['installment_no'] . 'th') . ' Payment';
+            $undo_what  = 'PHP ' . number_format((float)$undo_row['amount_paid'], 2)
+                        . ' (' . ($undo_row['payment_mode'] ?: 'no mode') . (!empty($undo_row['control_number']) ? ', control no. ' . $undo_row['control_number'] : '') . ')'
+                        . (!empty($undo_row['paid_at']) ? ' recorded ' . date('M d, Y', strtotime($undo_row['paid_at'])) : '');
+            $uid  = $_SESSION['user_id'];
+            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' undid the ' . $undo_label . ' of policy ' . $policy['policy_number'] . ': ' . $undo_what
+                  . '. Total paid now PHP ' . number_format($total_paid, 2) . '. Status: ' . $new_status . '.';
+            audit_log_add($conn, $uid, 'PAYMENT_UNDONE', $desc);
+            return $undo_label;
+        });
     } catch (Throwable $e) {
-        $conn->rollback();
         error_log('[TG-BASICS] undo_payment failed: ' . $e->getMessage());
         header("Location: view_policy.php?id=" . $policy_id . "&error=" . urlencode('The payment could not be undone. Please try again.'));
         exit;
     }
+    if ($undone === false) {
+        header("Location: view_policy.php?id=" . $policy_id . "&error=" . urlencode($nothing_msg));
+        exit;
+    }
+    $undo_label = $undone;
 
     header("Location: view_policy.php?id=" . $policy_id . "&success=" . urlencode($undo_label . ' (₱' . number_format((float)$undo_row['amount_paid'], 2) . ') was undone. You can enter it again.'));
     exit;

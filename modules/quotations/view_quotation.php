@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../includes/lookups.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../config/mailer.php';
+require_once '../../includes/transaction.php';
 
 require_role(['admin', 'super_admin', 'mechanic']);
 $is_admin = is_staff();
@@ -85,57 +86,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_admin) {
         $balance       = max(0, $qt['total'] - $amount_paid);
         $pay_status    = $amount_paid <= 0 ? 'unpaid' : ($balance > 0 ? 'partial' : 'paid');
 
-        $conn->begin_transaction();
+        // The status change, the receipt and the audit entry are saved together or not at all (includes/transaction.php).
+        // A failure is reported to the user instead of the page silently coming back as if nothing was pressed.
         try {
-            // Approved -> converted first: the row stays locked until the commit, so a second "convert" (the same
-            // form sent twice, or someone else at the same moment) finds it already converted and issues nothing.
-            // (receipts.quotation_id is also UNIQUE, so the database would refuse a second receipt anyway.)
-            if (!quotation_set_status($conn, $qt_id, 'converted', 'approved')) {
-                $conn->rollback();
-                header("Location: view_quotation.php?id=$qt_id&error=" . urlencode('This quotation was already converted to a receipt.'));
-                exit;
-            }
+            $rc_num = db_transaction($conn, function () use ($conn, $qt, $qt_id, $amount_paid, $balance, $pay_method, $pay_status, $receipt_notes) {
+                // Approved -> converted first: the row stays locked until the commit, so a second "convert" (the same
+                // form sent twice, or someone else at the same moment) finds it already converted and issues nothing.
+                // (receipts.quotation_id is also UNIQUE, so the database would refuse a second receipt anyway.)
+                if (!quotation_set_status($conn, $qt_id, 'converted', 'approved')) return null;
 
-            // Billing statement number: BS-YYYYMM-XXXX. Retries on a same-instant collision — see
-            // insert_with_sequential_number() — instead of failing the whole conversion for it.
-            $rc_num = insert_with_sequential_number($conn, 'receipts', 'receipt_number', record_number_prefix('BS'),
-                function (string $num) use ($conn, $qt_id, $amount_paid, $balance, $pay_method, $pay_status, $receipt_notes) {
-                    receipt_create($conn, $num, $qt_id, (float)$amount_paid, (float)$balance, $pay_method, $pay_status, $receipt_notes, (int)$_SESSION['user_id']);
-                    return $num;
-                }
-            );
-
-            $d   = ($_SESSION['full_name'] ?? 'Unknown') . ' converted quotation ' . $qt['quotation_number'] . ' to receipt ' . $rc_num . '.';
-            audit_log_add($conn, $_SESSION['user_id'], 'RECEIPT_CREATED', $d);
-
-            $conn->commit();
-
-            // Send receipt email to client if they have an email address
-            if (!empty($qt['email'])) {
-                $service_labels_map = service_type_labels($conn);   // service_types table (includes/lookups.php)
-                sendReceiptEmail(
-                    $qt['email'],
-                    $qt['full_name'],
-                    $rc_num,
-                    $qt['quotation_number'],
-                    $qt['job_number'],
-                    $qt['plate_number'],
-                    trim($qt['year_model'] . ' ' . $qt['make'] . ' ' . $qt['model']),
-                    $service_labels_map[$qt['service_type']] ?? $qt['service_type'],
-                    (float)$qt['total'],
-                    $amount_paid,
-                    $balance,
-                    $pay_method,
-                    date('F d, Y'),
-                    $items
+                // Billing statement number: BS-YYYYMM-XXXX. Retries on a same-instant collision — see
+                // insert_with_sequential_number() — instead of failing the whole conversion for it.
+                $num = insert_with_sequential_number($conn, 'receipts', 'receipt_number', record_number_prefix('BS'),
+                    function (string $num) use ($conn, $qt_id, $amount_paid, $balance, $pay_method, $pay_status, $receipt_notes) {
+                        receipt_create($conn, $num, $qt_id, (float)$amount_paid, (float)$balance, $pay_method, $pay_status, $receipt_notes, (int)$_SESSION['user_id']);
+                        return $num;
+                    }
                 );
-            }
 
-            header("Location: view_quotation.php?id=$qt_id&success=" . urlencode('Receipt ' . $rc_num . ' issued.'));
+                $d = ($_SESSION['full_name'] ?? 'Unknown') . ' converted quotation ' . $qt['quotation_number'] . ' to receipt ' . $num . '.';
+                audit_log_add($conn, $_SESSION['user_id'], 'RECEIPT_CREATED', $d);
+                return $num;
+            });
+        } catch (Throwable $e) {
+            error_log('[TG-BASICS] convert to receipt failed: ' . $e->getMessage());
+            header("Location: view_quotation.php?id=$qt_id&error=" . urlencode('The receipt could not be issued. Please try again.'));
             exit;
-        } catch (Exception $e) {
-            $conn->rollback();
         }
+        if ($rc_num === null) {
+            header("Location: view_quotation.php?id=$qt_id&error=" . urlencode('This quotation was already converted to a receipt.'));
+            exit;
+        }
+
+        // Send receipt email to client if they have an email address (after the commit: never inside the transaction)
+        if (!empty($qt['email'])) {
+            $service_labels_map = service_type_labels($conn);   // service_types table (includes/lookups.php)
+            sendReceiptEmail(
+                $qt['email'],
+                $qt['full_name'],
+                $rc_num,
+                $qt['quotation_number'],
+                $qt['job_number'],
+                $qt['plate_number'],
+                trim($qt['year_model'] . ' ' . $qt['make'] . ' ' . $qt['model']),
+                $service_labels_map[$qt['service_type']] ?? $qt['service_type'],
+                (float)$qt['total'],
+                $amount_paid,
+                $balance,
+                $pay_method,
+                date('F d, Y'),
+                $items
+            );
+        }
+
+        header("Location: view_quotation.php?id=$qt_id&success=" . urlencode('Receipt ' . $rc_num . ' issued.'));
+        exit;
     }
 
     // Update payment on existing receipt

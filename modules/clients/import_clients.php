@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
+require_once '../../includes/transaction.php';
 
 require_role(['admin', 'super_admin']);
 
@@ -331,21 +332,16 @@ function imp_run(mysqli $conn, array $rows, array $ticked, array $agents): array
             if (!$todo) continue;
 
             try {
-                $conn->begin_transaction();
-                foreach ($todo as $idxs) $save($idxs);
-                $conn->commit();
+                db_transaction($conn, function () use ($todo, $save) { foreach ($todo as $idxs) $save($idxs); });
                 foreach ($todo as $idxs) $saved($idxs);
             } catch (Throwable $e) {
-                // Something in the batch failed: save its clients one by one, so one bad row cannot sink the other 24
-                $conn->rollback();
+                // Something in the batch failed (and was rolled back): save its clients one by one, so one bad row
+                // cannot sink the other 24
                 foreach ($todo as $leader => $idxs) {
                     try {
-                        $conn->begin_transaction();
-                        $save($idxs);
-                        $conn->commit();
+                        db_transaction($conn, fn() => $save($idxs));
                         $saved($idxs);
                     } catch (Throwable $e) {
-                        $conn->rollback();
                         error_log('[TG-BASICS] client import, row ' . $rows[$leader]['line'] . ': ' . $e->getMessage());
                         $skip($idxs, 'Could not be saved (database error).');
                     }

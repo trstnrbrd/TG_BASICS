@@ -6,6 +6,8 @@ require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../includes/insurance_companies.php';
 require_once '../../includes/lookups.php';
+require_once '../../includes/transaction.php';
+require_once '../../config/transaction_pin.php';
 
 require_role(['admin', 'super_admin']);
 
@@ -97,6 +99,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // A new policy number: hold a named lock on it (same as add_policy.php) so a policy being added with that
     // number at the same moment can't slip past the duplicate check; MySQL frees it when this request ends.
     $pn_lock = null;
+    // Changing a peso amount asks for the Transaction PIN in the browser; this is the check that counts
+    if (empty($errors)) {
+        $money_changed = false;
+        foreach (['sum_insured', 'total_premium', 'markup', 'participation_fee'] as $k) {
+            if (abs((float)$policy[$k] - $in[$k]) >= 0.005) $money_changed = true;
+        }
+        if ($money_changed && !pin_consume($conn)) $errors[] = PIN_REQUIRED_MSG;
+    }
     if (empty($errors) && $in['policy_number'] !== $policy['policy_number']) {
         $pn_lock = named_lock_acquire($conn, 'policyno_' . md5(strtoupper($in['policy_number'])));
         if ($pn_lock === null) $errors[] = 'Someone is saving a policy with this same number right now. Please try again in a moment.';
@@ -106,90 +116,86 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (empty($errors)) {
-        $conn->begin_transaction();
         try {
-            // Re-read under a lock: a payment recorded while this form was open still counts
-            policy_lock($conn, $policy_id);
-            $current = $load();
-            if (!$current) throw new DomainException('This policy no longer exists.');
-            $inst    = $load_installments(true);
-            $paid    = array_sum(array_map(fn($r) => (float)$r['amount_paid'], $inst));
-            $locked  = $terms_locked($inst);
-            if ($locked) $in['payment_terms'] = $current['payment_terms'];   // a disabled field can't change it
+            $saved = db_transaction($conn, function () use ($conn, $policy_id, $load, $load_installments, $terms_locked, $terms_map, $money, &$in) {
+                // Re-read under a lock: a payment recorded while this form was open still counts
+                policy_lock($conn, $policy_id);
+                $current = $load();
+                if (!$current) throw new DomainException('This policy no longer exists.');
+                $inst    = $load_installments(true);
+                $paid    = array_sum(array_map(fn($r) => (float)$r['amount_paid'], $inst));
+                $locked  = $terms_locked($inst);
+                if ($locked) $in['payment_terms'] = $current['payment_terms'];   // a disabled field can't change it
 
-            $payable = round($in['total_premium'] - $in['markup'], 2);
-            if ($paid - $payable > 0.005) {
-                throw new DomainException('The client has already paid ' . $money($paid) . ', which is more than the new payable of '
-                    . $money($payable) . ' (Total Premium − Commission). Undo the extra payment first, or check the figures.');
-            }
-
-            // What changed, for the activity log (and to skip a save that changes nothing)
-            $labels = [
-                'insurance_company' => 'Company', 'policy_number' => 'Policy no.', 'coverage_type' => 'Coverage',
-                'policy_start' => 'Starting date', 'policy_end' => 'Inception date', 'sum_insured' => 'Sum insured',
-                'total_premium' => 'Total premium', 'markup' => 'Commission', 'participation_fee' => 'Participation fee',
-                'payment_terms' => 'Payment terms', 'mortgagee' => 'Mortgagee', 'notes' => 'Notes',
-            ];
-            $money_fields = ['sum_insured', 'total_premium', 'markup', 'participation_fee'];
-            $changes = [];
-            foreach ($labels as $k => $label) {
-                if (in_array($k, $money_fields, true)) {
-                    if (abs((float)$current[$k] - $in[$k]) >= 0.005) $changes[] = "$label: " . $money($current[$k]) . ' → ' . $money($in[$k]);
-                } elseif ((string)($current[$k] ?? '') !== $in[$k]) {
-                    $changes[] = $k === 'notes' ? 'Notes updated' : "$label: " . (($current[$k] ?? '') !== '' ? $current[$k] : '(none)') . ' → ' . ($in[$k] !== '' ? $in[$k] : '(none)');
+                $payable = round($in['total_premium'] - $in['markup'], 2);
+                if ($paid - $payable > 0.005) {
+                    throw new DomainException('The client has already paid ' . $money($paid) . ', which is more than the new payable of '
+                        . $money($payable) . ' (Total Premium − Commission). Undo the extra payment first, or check the figures.');
                 }
-            }
-            if (!$changes) {
-                $conn->rollback();
-                header("Location: view_policy.php?id=" . $policy_id . "&success=" . urlencode('No changes to save.'));
-                exit;
-            }
 
-            // Schedule: same split rule as add_policy.php (last installment absorbs the rounding remainder)
-            if ($inst) {
-                $n = $terms_map[$in['payment_terms']] ?? count($inst);
-                if ($in['payment_terms'] !== $current['payment_terms']) {
-                    // Only reachable while nothing is paid and no receipt is attached — rebuild the rows
-                    policy_payments_clear($conn, $policy_id);
-                    $inst = [];
-                    for ($i = 1; $i <= $n; $i++) {
-                        // placeholder date and amount, set by the re-split right below
-                        $inst[] = ['payment_id' => policy_payment_add($conn, $policy_id, $i, '2000-01-01', 0.0), 'installment_no' => $i, 'amount_paid' => 0];
+                // What changed, for the activity log (and to skip a save that changes nothing)
+                $labels = [
+                    'insurance_company' => 'Company', 'policy_number' => 'Policy no.', 'coverage_type' => 'Coverage',
+                    'policy_start' => 'Starting date', 'policy_end' => 'Inception date', 'sum_insured' => 'Sum insured',
+                    'total_premium' => 'Total premium', 'markup' => 'Commission', 'participation_fee' => 'Participation fee',
+                    'payment_terms' => 'Payment terms', 'mortgagee' => 'Mortgagee', 'notes' => 'Notes',
+                ];
+                $money_fields = ['sum_insured', 'total_premium', 'markup', 'participation_fee'];
+                $changes = [];
+                foreach ($labels as $k => $label) {
+                    if (in_array($k, $money_fields, true)) {
+                        if (abs((float)$current[$k] - $in[$k]) >= 0.005) $changes[] = "$label: " . $money($current[$k]) . ' → ' . $money($in[$k]);
+                    } elseif ((string)($current[$k] ?? '') !== $in[$k]) {
+                        $changes[] = $k === 'notes' ? 'Notes updated' : "$label: " . (($current[$k] ?? '') !== '' ? $current[$k] : '(none)') . ' → ' . ($in[$k] !== '' ? $in[$k] : '(none)');
                     }
-                } else {
-                    $n = count($inst);
                 }
-                $per = round($payable / $n, 2);
-                foreach ($inst as $i => $r) {
-                    $due = date('Y-m-d', strtotime($in['policy_start'] . ' +' . $i . ' months'));
-                    $amt = ($i === $n - 1) ? round($payable - $per * ($n - 1), 2) : $per;
-                    policy_payment_set_schedule($conn, (int)$r['payment_id'], $due, $amt);
+                if (!$changes) return false;   // nothing was written
+
+                // Schedule: same split rule as add_policy.php (last installment absorbs the rounding remainder)
+                if ($inst) {
+                    $n = $terms_map[$in['payment_terms']] ?? count($inst);
+                    if ($in['payment_terms'] !== $current['payment_terms']) {
+                        // Only reachable while nothing is paid and no receipt is attached — rebuild the rows
+                        policy_payments_clear($conn, $policy_id);
+                        $inst = [];
+                        for ($i = 1; $i <= $n; $i++) {
+                            // placeholder date and amount, set by the re-split right below
+                            $inst[] = ['payment_id' => policy_payment_add($conn, $policy_id, $i, '2000-01-01', 0.0), 'installment_no' => $i, 'amount_paid' => 0];
+                        }
+                    } else {
+                        $n = count($inst);
+                    }
+                    $per = round($payable / $n, 2);
+                    foreach ($inst as $i => $r) {
+                        $due = date('Y-m-d', strtotime($in['policy_start'] . ' +' . $i . ' months'));
+                        $amt = ($i === $n - 1) ? round($payable - $per * ($n - 1), 2) : $per;
+                        policy_payment_set_schedule($conn, (int)$r['payment_id'], $due, $amt);
+                    }
+                    if (abs((float)$current['total_premium'] - (float)$current['markup'] - $payable) >= 0.005 || $in['payment_terms'] !== $current['payment_terms']) {
+                        $changes[] = 'Schedule re-split: ' . $n . ' x ' . $money($per);
+                    }
                 }
-                if (abs((float)$current['total_premium'] - (float)$current['markup'] - $payable) >= 0.005 || $in['payment_terms'] !== $current['payment_terms']) {
-                    $changes[] = 'Schedule re-split: ' . $n . ' x ' . $money($per);
-                }
-            }
 
-            // Totals and status — same rules as saving payments on view_policy.php
-            [$total_paid, $due_past, $paid_past] = policy_payment_totals($conn, $policy_id);
-            if (!$inst) $total_paid = (float)$current['amount_paid'];   // older policy without a schedule
-            $balance = round($payable - $total_paid, 2);
-            $status  = policy_payment_status($payable, $total_paid, $due_past > 0 && round($paid_past, 2) < round($due_past, 2));
+                // Totals and status — same rules as saving payments on view_policy.php
+                [$total_paid, $due_past, $paid_past] = policy_payment_totals($conn, $policy_id);
+                if (!$inst) $total_paid = (float)$current['amount_paid'];   // older policy without a schedule
+                $balance = round($payable - $total_paid, 2);
+                $status  = policy_payment_status($payable, $total_paid, $due_past > 0 && round($paid_past, 2) < round($due_past, 2));
 
-            policy_update($conn, $policy_id, $in, $total_paid, $balance, $status);
+                policy_update($conn, $policy_id, $in, $total_paid, $balance, $status);
 
-            $uid  = $_SESSION['user_id'];
-            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' edited policy ' . $current['policy_number'] . ' of ' . $current['full_name'] . ' — ' . implode('; ', $changes) . '.';
-            audit_log_add($conn, $uid, 'POLICY_UPDATED', $desc);
+                $uid  = $_SESSION['user_id'];
+                $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' edited policy ' . $current['policy_number'] . ' of ' . $current['full_name'] . ' — ' . implode('; ', $changes) . '.';
+                audit_log_add($conn, $uid, 'POLICY_UPDATED', $desc);
 
-            $conn->commit();
-            header("Location: view_policy.php?id=" . $policy_id . "&success=" . urlencode('Policy ' . $in['policy_number'] . ' updated.'));
+                return true;
+            });
+            $msg = $saved ? 'Policy ' . $in['policy_number'] . ' updated.' : 'No changes to save.';
+            header("Location: view_policy.php?id=" . $policy_id . "&success=" . urlencode($msg));
             exit;
         } catch (DomainException $e) {
-            $conn->rollback();
             $errors[] = $e->getMessage();
         } catch (Throwable $e) {
-            $conn->rollback();
             error_log('[TG-BASICS] edit_policy failed: ' . $e->getMessage());
             $errors[] = 'The policy could not be saved. Please try again.';
         }

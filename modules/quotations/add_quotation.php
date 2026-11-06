@@ -5,6 +5,7 @@ require_once '../../config/db.php';
 require_once __DIR__ . '/../../includes/lookups.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
+require_once __DIR__ . '/../../includes/transaction.php';
 
 require_role(['admin', 'super_admin', 'mechanic']);
 
@@ -101,51 +102,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_mechanic) {
     if (empty($errors)) {
         $total    = round($subtotal - $discount, 2);
 
-        $conn->begin_transaction();
         try {
             if ($edit_mode) {
                 // ── UPDATE existing draft ──
-                quotation_update($conn, $edit_qt_id, $status, $subtotal, (float)$discount, $total, $notes);
-                quotation_items_replace($conn, $edit_qt_id, $items);
-
-                $d    = ($_SESSION['full_name'] ?? 'Unknown') . ' edited quotation ' . $edit_qt['quotation_number'] . '.';
-                audit_log_add($conn, $_SESSION['user_id'], 'QUOTATION_UPDATED', $d);
-
-                $conn->commit();
+                db_transaction($conn, function () use ($conn, $edit_qt_id, $edit_qt, $status, $subtotal, $discount, $total, $notes, $items) {
+                    quotation_update($conn, $edit_qt_id, $status, $subtotal, (float)$discount, $total, $notes);
+                    quotation_items_replace($conn, $edit_qt_id, $items);
+                    $d = ($_SESSION['full_name'] ?? 'Unknown') . ' edited quotation ' . $edit_qt['quotation_number'] . '.';
+                    audit_log_add($conn, $_SESSION['user_id'], 'QUOTATION_UPDATED', $d);
+                });
                 header("Location: view_quotation.php?id=$edit_qt_id&success=" . urlencode('Quotation updated.'));
                 exit;
-            } else {
-                // One quotation per job: the check at the top of this page catches the same person sending the form
-                // twice; this lock + second look catches two people creating one for the same job at the same moment.
+            }
+
+            // One quotation per job: the check at the top of this page catches the same person sending the form
+            // twice; this lock + second look catches two people creating one for the same job at the same moment.
+            // Returns [existing id, null] when another quotation won, or [new id, its number].
+            [$qt_id, $qt_num] = db_transaction($conn, function () use ($conn, $job_id, $job, $status, $subtotal, $discount, $total, $notes, $items) {
                 repair_job_lock($conn, (int)$job_id);
                 $existing_id = quotation_id_for_job($conn, (int)$job_id);
-                if ($existing_id !== null) {
-                    $conn->rollback();
-                    header("Location: view_quotation.php?id={$existing_id}&msg=" . urlencode('Quotation already exists for this job.'));
-                    exit;
-                }
+                if ($existing_id !== null) return [$existing_id, null];   // nothing was written: committing is the same as rolling back
 
                 // ── INSERT new quotation ── (retries on a same-instant quotation_number collision — see
-                // insert_with_sequential_number(); the surrounding try/catch already rolls back on any
-                // other failure, this just avoids that for the common concurrent case)
+                // insert_with_sequential_number(); any other failure rolls the whole save back)
                 [$qt_id, $qt_num] = insert_with_sequential_number($conn, 'quotations', 'quotation_number', record_number_prefix('QT'),
                     function (string $num) use ($conn, $job_id, $status, $subtotal, $discount, $total, $notes) {
                         $id = quotation_create($conn, $num, (int)$job_id, $status, $subtotal, (float)$discount, $total, $notes, (int)$_SESSION['user_id']);
                         return [$id, $num];
                     }
                 );
-
                 quotation_items_replace($conn, $qt_id, $items);   // a new quotation has none yet, so this only adds
 
                 $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' created quotation ' . $qt_num . ' for job ' . $job['job_number'] . '.';
                 audit_log_add($conn, $_SESSION['user_id'], 'QUOTATION_CREATED', $desc);
-
-                $conn->commit();
-                header("Location: view_quotation.php?id=$qt_id&success=" . urlencode('Quotation ' . $qt_num . ' created.'));
+                return [$qt_id, $qt_num];
+            });
+            if ($qt_num === null) {
+                header("Location: view_quotation.php?id={$qt_id}&msg=" . urlencode('Quotation already exists for this job.'));
                 exit;
             }
-        } catch (Exception $e) {
-            $conn->rollback();
+            header("Location: view_quotation.php?id=$qt_id&success=" . urlencode('Quotation ' . $qt_num . ' created.'));
+            exit;
+        } catch (Throwable $e) {
+            error_log('[TG-BASICS] add_quotation failed: ' . $e->getMessage());
             $errors[] = 'Database error. Please try again.';
         }
     }

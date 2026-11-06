@@ -3,6 +3,7 @@ require_once __DIR__ . "/../../config/session.php";
 require_once __DIR__ . '/../../includes/data_access.php';
 require_once '../../config/db.php';
 require_once '../../config/validators.php';
+require_once '../../config/access.php';
 require_once '../../includes/icons.php';
 require_once '../../includes/transaction.php';
 require_once '../../includes/lookups.php';
@@ -45,6 +46,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $errors[] = 'Incident date must be a valid past date.';
     if (text_too_long($_POST['description'] ?? '', MAX_NOTE)) $errors[] = 'Incident description is too long (max ' . MAX_NOTE . ' characters).';
     elseif ($description === '') $errors[] = 'Incident description is required.';
+
+    // The client must be one this user may work with, and the policy must be that client's and not expired: the
+    // form only offers valid pairs (the same list, claim_client_open_policies()), but a changed POST could send any.
+    if (empty($errors)) {
+        if (!client_in_scope($conn, $client_id)) {
+            $errors[] = 'Selected client was not found.';
+        } elseif (!in_array($policy_id, array_map('intval', array_column(claim_client_open_policies($conn, $client_id), 'policy_id')), true)) {
+            $errors[] = 'The selected policy does not belong to this client or has already expired.';
+        }
+    }
 
     if (empty($errors)) {
         // The claim and its audit entry are saved together or not at all (includes/transaction.php)

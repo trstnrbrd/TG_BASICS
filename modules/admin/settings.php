@@ -354,7 +354,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
         case 'system_settings':
             // Company — all checked before anything is saved, so a bad field never leaves half the form saved
             $company = [];
-            foreach (['company_name', 'company_address', 'company_contact', 'company_email'] as $k) {
+            foreach (['company_name', 'company_address', 'company_contact', 'company_email', 'company_maps_url'] as $k) {
                 $company[$k] = is_string($_POST[$k] ?? null) ? trim($_POST[$k]) : '';
             }
             if (mb_strlen($company['company_name']) > MAX_NAME)       api_error('Company name is too long (max ' . MAX_NAME . ' characters).');
@@ -365,6 +365,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['section'])) {
                 api_error('Company contact number must have 7 to ' . PHONE_DIGITS . ' digits, e.g. 09XXXXXXXXX or (044) 123-4567.');
             }
             if ($company['company_email'] !== '' && !validate_email($company['company_email'])) api_error('Please enter a valid company email address.');
+            if ($company['company_maps_url'] !== '' && web_url_clean($company['company_maps_url']) === '') {
+                api_error('Google Maps link must be a full web address starting with https:// (max ' . MAX_URL . ' characters).');
+            }
             // Insurance + Security numbers: limits from SETTING_NUMBERS (config/settings.php), checked here on the server
             [$numbers, $num_error] = setting_numbers_check($_POST);
             if ($num_error !== '') api_error($num_error);
@@ -1152,6 +1155,13 @@ require_once '../../includes/topbar.php';
                 <input type="email" name="company_email" class="field-input" maxlength="<?= MAX_EMAIL ?>"
                   value="<?= htmlspecialchars($settings['company_email']) ?>"
                   placeholder="name@email.com"/>
+              </div>
+              <div class="field span-2">
+                <label class="field-label">Google Maps Link</label>
+                <input type="url" name="company_maps_url" class="field-input" maxlength="<?= MAX_URL ?>"
+                  value="<?= htmlspecialchars($settings['company_maps_url']) ?>"
+                  placeholder="https://www.google.com/maps/place/..."/>
+                <div class="field-hint">The shop on Google Maps. The landing page links it as &ldquo;Open in Google Maps&rdquo; and &ldquo;See all reviews on Google&rdquo;.</div>
               </div>
             </div>
           </div>

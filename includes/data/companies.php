@@ -10,6 +10,16 @@ function insurance_companies_rows(mysqli $conn): array
     return dal_all_or_empty($conn, "SELECT company_id, name, short_name, billing_name, is_active, sort_order FROM insurance_companies ORDER BY sort_order, name");
 }
 
+/**
+ * Each company's website, name => address, for the landing page links. Set in phpMyAdmin
+ * (insurance_companies.website); [] while that column does not exist yet, so nothing else depends on it.
+ */
+function insurance_company_websites(mysqli $conn): array
+{
+    $rows = dal_all_or_empty($conn, "SELECT name, website FROM insurance_companies WHERE website IS NOT NULL AND website <> ''");
+    return array_column($rows, 'website', 'name');
+}
+
 /** The company names that have at least one policy. */
 function insurance_company_names_in_use(mysqli $conn): array
 {

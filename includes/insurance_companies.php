@@ -6,6 +6,7 @@
 // its existing policies still show and can still be tracked.
 require_once __DIR__ . '/transaction.php';
 require_once __DIR__ . '/data_access.php';
+require_once __DIR__ . '/../config/validators.php';
 
 /** Every company, active or not, in display order. Cached for the request. */
 function insurance_companies_all(mysqli $conn): array {
@@ -64,6 +65,21 @@ function insurance_companies_phrase(mysqli $conn, string $field = 'short_name', 
     if (count($names) <= 1) return $names[0] ?? '';
     $last = array_pop($names);
     return implode(', ', $names) . " $joiner " . $last;
+}
+
+/**
+ * A website address typed in phpMyAdmin, made safe to link: only a full http:// or https:// address with a host
+ * is kept (so "javascript:…", a bare "philbritish.com" or a stray space never becomes a link); '' otherwise.
+ */
+function insurance_website_clean(string $url): string {
+    return web_url_clean($url, 255);   // the website column is VARCHAR(255)
+}
+
+/** A company's website for a link (the landing page), or '' when none is set or it is not a valid address. */
+function insurance_company_website(mysqli $conn, string $name): string {
+    static $sites = null;
+    if ($sites === null) $sites = insurance_company_websites($conn);
+    return insurance_website_clean((string)($sites[$name] ?? ''));
 }
 
 // ── MANAGING THE LIST (Settings > Insurance Companies, super admin only) ─────────────

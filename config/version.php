@@ -13,6 +13,6 @@
  * (git tag -a v2.2.0 -m "...") and push the tag.
  */
 if (!defined('APP_VERSION')) {
-    define('APP_VERSION', '2.3.0');
-    define('APP_RELEASE_DATE', '2026-11-04');
+    define('APP_VERSION', '2.4.0');
+    define('APP_RELEASE_DATE', '2026-11-06');
 }

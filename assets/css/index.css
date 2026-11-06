@@ -78,10 +78,11 @@
 /* ── Base ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { font-size: 16px; -webkit-font-smoothing: antialiased; scroll-behavior: smooth; }
-@media (max-width: 1920px) { html { font-size: 0.833333vw; } }
-@media (max-width: 1440px) { html { font-size: 1.111111vw; } }
-@media (max-width: 1024px) { html { font-size: 1.5625vw; } }
-@media (max-width: 640px)  { html { font-size: 4.444444vw; } }
+/* scales with the window like the template's adaptive grid, but never below a readable size (tablets got 12px) */
+@media (max-width: 1920px) { html { font-size: clamp(14px, 0.833333vw, 16px); } }
+@media (max-width: 1440px) { html { font-size: clamp(14px, 1.111111vw, 16px); } }
+@media (max-width: 1024px) { html { font-size: clamp(15px, 1.5625vw, 16px); } }
+@media (max-width: 640px)  { html { font-size: clamp(14px, 4.444444vw, 17px); } }
 body { background: var(--bg); color: var(--fg); font-family: 'Plus Jakarta Sans', system-ui, sans-serif; overflow-x: hidden; transition: background 0.3s, color 0.3s; }
 a { color: inherit; text-decoration: none; }
 button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
@@ -708,3 +709,42 @@ svg { flex-shrink: 0; }
 .lp-tags { margin-top: 0.7rem; }
 .lp-tags span { padding: 0.22rem 0.65rem; font-size: 0.68rem; }
 @media (max-width: 639px) { .lp-viz { height: auto; -webkit-mask-image: none; mask-image: none; } }
+
+
+/* ── Phones and tablets: finger-sized targets, readable small text, nothing cut off ── */
+@media (max-width: 1023px) {
+  .lp-theme-btn { width: 2.4rem; height: 2.4rem; }
+  .lp-signin { min-height: 2.4rem; }
+  .lp-brand { padding-block: 0.3rem; }
+  .lp-hero-card-nav button { width: 2.2rem; height: 2.2rem; }
+  .lp-hero-card-item span { font-size: 0.72rem; }
+  .lp-partners-label { font-size: 0.8rem; }
+  .lp-partners li { font-size: 0.85rem; }
+  .lp-partner-link { padding-block: 0.45rem; }
+  .lp-shop-row small, .lp-contact-item small { font-size: 0.74rem; }
+  .lp-shop-row a { display: inline-block; padding-block: 0.3rem; }
+  .lp-tags span { font-size: 0.74rem; padding: 0.3rem 0.75rem; }
+  .lp-hero-bar { font-size: 0.74rem; }
+  .lp-social { min-height: 2.6rem; }
+  .lp-reviews-link, .lp-shop-directions { min-height: 2.75rem; }
+  .lp-footer ul a, .lp-footer-legal a { display: inline-block; padding-block: 0.55rem; }
+  .lp-footer ul { gap: 0.15rem; }
+  .carousel-arrow { width: 2.9rem; height: 2.9rem; }
+}
+@media (max-width: 639px) {
+  .lp-brand-tag { font-size: 0.55rem; }
+  /* access table: three narrow columns so "Mechanic" is never cut off */
+  .lp-matrix-row { grid-template-columns: 1fr repeat(3, 2.9rem); gap: 0.35rem; padding: 0.8rem 0.9rem; font-size: 0.8rem; }
+  .lp-matrix-head { font-size: 0.58rem; letter-spacing: 0.02em; }
+  .lp-matrix-head > span:not(:first-child) { line-height: 1.15; }
+}
+
+/* menu overlay: the bars take the full width (a flex column with auto margins would shrink them to their content) */
+.lp-menu > .lp-shell { width: 100%; }
+@media (max-width: 639px) {
+  /* the typed line ("Always organized.") stays on one line, so the page never jumps while it types */
+  .lp-h1 { font-size: min(2.6rem, 9.6vw); }
+  .lp-h1 > span:last-child { white-space: nowrap; }
+  .lp-row-title { font-size: 1.25rem; }
+  .lp-rows--big .lp-row { padding-block: 1.1rem; }
+}

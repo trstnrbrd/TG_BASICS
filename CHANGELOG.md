@@ -8,6 +8,28 @@ All notable changes to TG-BASICS. Versions follow [Semantic Versioning](https://
 
 The current version is set in `config/version.php` and shown at the bottom of the sidebar, in the landing-page footer, and in Settings > My Account > About This System. Versions before 1.0.0 were reconstructed from the Git history (first commit 2026-03-17).
 
+## [2.4.0] - 2026-11-06
+
+### Added
+- New landing page: intro, floating glass navigation that follows the page, line-by-line headline with the typewriter, "How it works" steps, the six modules as cards with a miniature of each real screen (red for insurance, yellow for the repair shop), stats, testimonials and a dark footer; light and dark themes; fits phones, tablets and wide screens
+- Landing page: shop card with "Open in Google Maps", "See all reviews on Google", and a contact sheet with call, email and Facebook links
+- Settings > Company Info: Google Maps Link field
+- Insurance companies: optional website (`insurance_companies.website`), shown as a link on the landing page
+- Per-user Design Preferences: theme ("Auto" follows the device), text size, compact sidebar and page width
+- Forms that create a record carry a one-time key, so a double click, a resend or Back + Submit saves it only once
+
+### Changed
+- Every save that writes more than one row goes through one transaction (Add Quotation, Edit Policy, Undo Payment, Import Clients, Convert to Receipt)
+- Status changes (claims, quotations, repair jobs) only apply from the status the page showed, so two people cannot overwrite each other
+
+### Fixed
+- The Transaction PIN is checked on the server for Delete Policy, Undo Payment, deleting a payment receipt and changing a peso amount in Edit Policy (it was only asked in the browser)
+- File New Claim refuses a policy that is not the client's or has expired
+- Convert to Receipt and the client PDF upload say why they failed instead of acting as if they succeeded
+
+### Security
+- README, CHANGELOG, Composer and PHPUnit files are no longer deployed, and the web server refuses them
+
 ## [2.3.0] - 2026-11-04
 
 ### Added

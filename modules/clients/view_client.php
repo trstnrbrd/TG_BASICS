@@ -72,18 +72,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && in_array
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'upload_doc') {
     csrf_verify();
     idem_replay();   // the same upload sent twice (double click) attaches the PDF once
-    if ($can_edit && !empty($_FILES['policy_doc']['tmp_name'])) {
-        $tmp  = $_FILES['policy_doc']['tmp_name'];
-        $orig = basename($_FILES['policy_doc']['name']);
-        $mime = mime_content_type($tmp);
-        if ($mime === 'application/pdf') {
-            $upload_dir = __DIR__ . '/../../uploads/client_docs/' . $client_id . '/';
-            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-            $fname = uniqid('doc_', true) . '.pdf';
-            if (move_uploaded_file($tmp, $upload_dir . $fname)) {
-                client_document_add($conn, $client_id, $fname, $orig, (int)$_SESSION['user_id']);
-            }
-        }
+    // Each way this can fail gets its own message: it used to say "Document uploaded." even when nothing was saved
+    $doc_fail = function (string $msg) use ($client_id): void {
+        header("Location: view_client.php?id=$client_id&error=" . urlencode($msg));
+        exit;
+    };
+    $file = $_FILES['policy_doc'] ?? null;
+    if (!is_array($file) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE || empty($file['tmp_name'])) {
+        $doc_fail('Choose a PDF file to upload.');
+    }
+    if ($file['error'] !== UPLOAD_ERR_OK) {
+        $doc_fail(in_array($file['error'], [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)
+            ? 'The file is too large to upload.' : 'The upload did not finish. Please try again.');
+    }
+    $tmp  = $file['tmp_name'];
+    $orig = basename($file['name']);
+    if (mime_content_type($tmp) !== 'application/pdf') $doc_fail('Only PDF files can be attached.');
+    $upload_dir = __DIR__ . '/../../uploads/client_docs/' . $client_id . '/';
+    if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+    $fname = uniqid('doc_', true) . '.pdf';
+    if (!move_uploaded_file($tmp, $upload_dir . $fname)) $doc_fail('The file could not be saved. Please try again.');
+    try {
+        client_document_add($conn, $client_id, $fname, $orig, (int)$_SESSION['user_id']);
+    } catch (Throwable $e) {
+        @unlink($upload_dir . $fname);   // no record, so no file left behind
+        error_log('[TG-BASICS] client document save failed: ' . $e->getMessage());
+        $doc_fail('The document could not be saved. Please try again.');
     }
     idem_redirect("view_client.php?id=$client_id&success=Document uploaded.");
 }

@@ -43,6 +43,7 @@ jobs:
             uploads/**
             backups/**
             data_gathering (documentation)/**
+            docs/**
             selenium_tests/**
             tools/**
             tests/**

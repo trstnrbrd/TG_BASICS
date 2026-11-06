@@ -284,6 +284,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
         exit;
     }
 
+    // Already at that status (the same form sent twice, or someone else did it first): nothing to change, no second
+    // log entry or email. The user asked for this status and the claim has it, so this is not an error.
+    if ($new_status !== '' && $new_status === $claim['status']) {
+        header("Location: view_claim.php?id=$claim_id&success=" . urlencode('Claim status updated.'));
+        exit;
+    }
+
     // Guard: block all status changes if policy is expired (except deny/resolve by admin)
     if ($policy_expired && !in_array($new_status, ['denied', 'lack_of_requirements', 'resolved'])) {
         header("Location: view_claim.php?id=$claim_id&error=" . urlencode('Policy is expired. Please renew the policy before processing this claim.'));

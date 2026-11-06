@@ -185,6 +185,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     if ($_POST['action'] === 'update_status') {
         $new_status = san_enum($_POST['status'] ?? '', array_keys(repair_statuses()));
+        if ($new_status && $new_status === $job['status']) {
+            // already at that status (sent twice, or someone else did it first): nothing to change, not an error
+            header("Location: view_repair.php?id=$job_id&success=Status updated.");
+            exit;
+        }
         if ($new_status) {
             if (!repair_status_change_allowed($job['status'], $new_status, is_mechanic())) {
                 header("Location: view_repair.php?id=$job_id&error=" . urlencode('This job can no longer go back to that status.'));

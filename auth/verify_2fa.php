@@ -113,6 +113,7 @@ if ($masked_email) {
 <link rel="apple-touch-icon" href="<?= brand_logo('tg', '../') ?>"/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="../assets/css/auth/auth-background.css?v=<?= filemtime(__DIR__.'/../assets/css/auth/auth-background.css') ?>"/>
+<script src="../assets/js/auth/grainient.js?v=<?= filemtime(__DIR__ . '/../assets/js/auth/grainient.js') ?>" defer></script>
 <link rel="stylesheet" href="../assets/css/auth/activate.css?v=<?= filemtime(__DIR__.'/../assets/css/auth/activate.css') ?>"/>
 <style>
   .code-inputs {

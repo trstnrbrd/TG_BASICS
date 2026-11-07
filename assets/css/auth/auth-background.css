@@ -348,3 +348,37 @@ body {
     height: 20px;
   }
 }
+
+/* ── Grainient (assets/js/auth/grainient.js): the animated grainy black-to-gold background. The script adds
+   .has-grainient only once WebGL2 works; without it the CSS aurora above stays. ── */
+.grainient-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 0;
+  pointer-events: none;
+}
+.auth-split.has-grainient .auth-left-img {
+  display: none;
+}
+.auth-split.has-grainient .auth-left {
+  z-index: 1;
+}
+/* a soft shade under the form and along the bottom, so the card and its text stay easy to read */
+.auth-split.has-grainient::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 55% 75% at 78% 50%, rgba(10, 9, 8, 0.38), transparent 70%),
+    linear-gradient(to top, rgba(10, 9, 8, 0.45), transparent 35%);
+}
+@media (max-width: 700px) {
+  .auth-split.has-grainient::after {
+    background: linear-gradient(to top, rgba(10, 9, 8, 0.5), transparent 55%);
+  }
+}

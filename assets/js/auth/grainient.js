@@ -224,6 +224,41 @@
     return { program: prog, uniforms: uniforms };
   }
 
+  /* Adaptive quality (2026-11-07): a full-screen shader 60 times a second is too much for a low-end phone or an
+   * old laptop (measured: ~20 fps with no GPU and a slow CPU, typing on the page lagged). So it watches the real
+   * frame time and steps down: first 30 fps and a lower internal resolution (the soft background hides it), then
+   * lower again, and if even the lowest is slow it stops on a still frame. A device that says it is weak
+   * (<= 2 GB RAM or <= 2 cores) starts lower; "Data Saver" on gets one still frame. canvas.dataset.quality shows
+   * the level ("0" = full, "2@30", "static") for tests. */
+  function makeQuality(canvas) {
+    var dpr = Math.min(window.devicePixelRatio || 1, 2), tiers = [];
+    [dpr, 1, 0.75, 0.5].forEach(function (r) {
+      r = Math.min(r, dpr);
+      if (!tiers.length || r < tiers[tiers.length - 1] - 0.01) tiers.push(r);
+    });
+    var conn = navigator.connection || {};
+    var weak = (navigator.deviceMemory > 0 && navigator.deviceMemory <= 2) || (navigator.hardwareConcurrency > 0 && navigator.hardwareConcurrency <= 2);
+    var q = { tier: weak ? Math.max(0, tiers.length - 2) : 0, cap: weak ? 30 : 0, frozen: !!conn.saveData };
+    var born = performance.now(), sum = 0, count = 0;
+    q.ratio = function () { return tiers[q.tier]; };
+    q.mark = function () { canvas.dataset.quality = q.frozen ? 'static' : q.tier + (q.cap ? '@' + q.cap : ''); };
+    // true = too soon for the next frame under the fps cap (the loop keeps waiting without drawing)
+    q.skip = function (now, last) { return !!(q.cap && last && now - last < 1000 / q.cap - 3); };
+    // one frame gap in ms; returns 'resize' (stepped down) / 'freeze' (stop on a still frame) / null
+    q.sample = function (gap, now) {
+      if (now - born < 1000 || gap > 250) return null;   // warm-up (shader compile, intro) and tab switches don't count
+      sum += gap; count++;
+      if (sum < 1500) return null;
+      var avg = sum / count; sum = 0; count = 0;
+      if (avg <= (q.cap ? 45 : 28)) return null;
+      q.cap = 30;
+      if (q.tier < tiers.length - 1) { q.tier++; q.mark(); return 'resize'; }
+      q.frozen = true; q.mark(); return 'freeze';
+    };
+    q.mark();
+    return q;
+  }
+
   function start(container) {
     var canvas = document.createElement('canvas');
     canvas.className = 'grainient-canvas';
@@ -238,6 +273,7 @@
     var s = OPTIONS, fu = field.uniforms, cu = composite.uniforms;
     var reduce = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
     var speed = s.speed * (reduce ? 0.5 : 1);
+    var quality = makeQuality(canvas);
     var vao = gl.createVertexArray(), target = gl.createTexture(), buffer = gl.createFramebuffer();
     gl.bindTexture(gl.TEXTURE_2D, target);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -252,7 +288,7 @@
     var stirs = new Float32Array(MAX_STIRS * 4), stirWeights = new Float32Array(MAX_STIRS), twirls = new Float32Array(MAX_TWIRLS * 4);
     var trail = [], spins = [];
     var pointer = { x: 0.5, y: 0.5, sx: 0.5, sy: 0.5, vx: 0, inside: false, fresh: true };
-    var time = 0, introClock = s.intro && !reduce ? 0 : 1, frameSeed = 0, grainClock = 0, raf = 0, last = 0, visible = true;
+    var time = 0, introClock = s.intro && !reduce && !quality.frozen ? 0 : 1, frameSeed = 0, grainClock = 0, raf = 0, last = 0, visible = true;
 
     function draw() {
       var aspect = view.width / view.height, rad = s.angle * Math.PI / 180;
@@ -294,10 +330,10 @@
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     }
 
-    function resize() {
+    function resize(noWake) {
       view.width = Math.max(1, container.clientWidth);
       view.height = Math.max(1, container.clientHeight);
-      view.ratio = Math.min(window.devicePixelRatio || 1, 2);
+      view.ratio = quality.ratio();
       canvas.width = Math.max(1, Math.round(view.width * view.ratio));
       canvas.height = Math.max(1, Math.round(view.height * view.ratio));
       var w = Math.max(1, Math.round(canvas.width / 2)), h = Math.max(1, Math.round(canvas.height / 2));
@@ -310,7 +346,7 @@
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       }
       draw();
-      wake();
+      if (noWake !== true) wake();
     }
 
     function updateTouches(dt, aspect) {
@@ -353,7 +389,10 @@
 
     function frame(now) {
       raf = 0;
-      if (!visible || document.hidden) return;
+      if (quality.frozen || !visible || document.hidden) return;
+      if (quality.skip(now, last)) { raf = requestAnimationFrame(frame); return; }
+      var change = last ? quality.sample(now - last, now) : null;
+      if (change === 'freeze') { introClock = 1; draw(); return; }   // keep the last good frame, stop drawing
       var dt = last ? clamp((now - last) / 1000, 0.001, 0.05) : 1 / 60;
       last = now;
       time += dt * speed * 0.16;
@@ -363,8 +402,9 @@
       updateTouches(dt, view.width / view.height);
       draw();
       raf = requestAnimationFrame(frame);   // always flowing (speed > 0); stops while hidden or off screen
+      if (change === 'resize') resize(true);
     }
-    function wake() { if (!raf && visible && !document.hidden) raf = requestAnimationFrame(frame); }
+    function wake() { if (!raf && !quality.frozen && visible && !document.hidden) raf = requestAnimationFrame(frame); }
 
     function locate(e) {
       var r = container.getBoundingClientRect();

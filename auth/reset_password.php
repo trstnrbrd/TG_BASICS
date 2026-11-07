@@ -75,6 +75,7 @@ $invalid = !$record || $record['used'] || strtotime($record['expires_at']) < tim
 <link rel="apple-touch-icon" href="<?= brand_logo('tg', '../') ?>"/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="../assets/css/auth/auth-background.css?v=<?= filemtime(__DIR__.'/../assets/css/auth/auth-background.css') ?>"/>
+<script src="../assets/js/auth/grainient.js?v=<?= filemtime(__DIR__ . '/../assets/js/auth/grainient.js') ?>" defer></script>
 <link rel="stylesheet" href="../assets/css/auth/activate.css?v=<?= filemtime(__DIR__.'/../assets/css/auth/activate.css') ?>"/>
 </head>
 <body>
@@ -206,7 +207,7 @@ $invalid = !$record || $record['used'] || strtotime($record['expires_at']) < tim
     </div>
 
     <div class="card-foot">
-      <span>Need help? Contact <strong>Gerald Peterson Carpio</strong> &mdash; TG Customworks<br/><a href="mailto:tgcustomworks@gmail.com" style="color:var(--gold);font-size:0.75rem;">tgcustomworks@gmail.com</a></span>
+      <?php $help_email = htmlspecialchars(company_info($conn)['email']); /* Settings > Company Info */ ?><span>Need help? Contact <strong>Gerald Peterson Carpio</strong> &mdash; TG Customworks<br/><a href="mailto:<?= $help_email ?>" style="color:var(--gold);font-size:0.75rem;"><?= $help_email ?></a></span>
       <a href="login.php"><?= icon('arrow-left', 12) ?> Back to Login</a>
     </div>
 

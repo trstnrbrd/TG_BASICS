@@ -55,6 +55,7 @@ body{font-family:"Plus Jakarta Sans","Segoe UI",sans-serif;background:linear-gra
   <div class="err-msg">This QR code is no longer valid or the client profile has been removed. The link may have expired or never existed.</div>
   <div class="err-hint">If you believe this is an error, please contact our office directly.</div>
 </div>
+<script src="../../assets/js/public/scanner.js?v=<?= filemtime(__DIR__ . '/../../assets/js/public/scanner.js') ?>" defer></script>
 </body>
 </html>
     <?php
@@ -154,6 +155,7 @@ $initials = strtoupper(substr(implode('', array_map(fn($w) => $w[0], $words)), 0
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Big+Shoulders+Text:wght@800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../../assets/css/public/client.css?v=<?= filemtime(__DIR__ . '/../../assets/css/public/client.css') ?>"/>
+<script src="../../assets/js/public/scanner.js?v=<?= filemtime(__DIR__ . '/../../assets/js/public/scanner.js') ?>" defer></script>
 <style>
 @keyframes loaderSpin { to { transform: rotate(360deg); } }
 @keyframes loaderPulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.7; transform:scale(0.95); } }

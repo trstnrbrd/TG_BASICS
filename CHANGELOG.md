@@ -8,6 +8,13 @@ All notable changes to TG-BASICS. Versions follow [Semantic Versioning](https://
 
 The current version is set in `config/version.php` and shown at the bottom of the sidebar, in the landing-page footer, and in Settings > My Account > About This System. Versions before 1.0.0 were reconstructed from the Git history (first commit 2026-03-17).
 
+## [2.5.0] - 2026-11-11
+
+### Added
+- Sign-in pages (sign in, two-step verification, activation, forgot / reset password): an animated black-to-gold background; devices without WebGL2 keep the previous background
+- Client QR page: an animated gold scanner background, on both the card and the "link not found" page; devices without WebGL2 keep the plain dark background
+- Both backgrounds lower their frame rate and resolution on a weak device, and show a still frame with Data Saver on
+
 ## [2.4.0] - 2026-11-06
 
 ### Added

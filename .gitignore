@@ -9,6 +9,7 @@ config/pusher.php
 .env
 .env.*
 .env.local
+!laravel/.env.example
 
 # ── UPLOADED FILES (user-generated, confidential) ────────────────────────────
 uploads/avatars/*

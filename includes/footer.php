@@ -95,61 +95,90 @@ $footer_extra_scripts  = $footer_extra_scripts  ?? '';
 <?php if (!function_exists('csrf_token')) require_once __DIR__ . '/../config/validators.php'; ?>
 <script>window._csrf = <?= json_encode(csrf_token()) ?>;</script>
 
-<!-- ── EDIT PROFILE MODAL ── -->
-<div id="edit-profile-modal" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,0.55);backdrop-filter:blur(3px);align-items:center;justify-content:center;padding:1rem;" onclick="if(event.target===this)window.closeEditProfileModal()">
-  <div style="background:var(--bg-3);border:1px solid var(--border);border-radius:16px;width:100%;max-width:480px;box-shadow:var(--shadow-lg);overflow:hidden;">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--border);background:var(--bg-2);">
-      <div style="font-weight:700;font-size:0.9rem;color:var(--text-primary);display:flex;align-items:center;gap:0.5rem;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        Edit Profile
+<!-- ── EDIT PROFILE (opened from the user menu on every page): a panel that slides in from the right, like the account
+     drawers of enterprise apps (2026-11-20). Ids and functions are the ones the script below and the Escape /
+     live-update checks use (#edit-profile-modal shown with display:flex). Styles: .ep-* in assets/css/shared/app.css ── -->
+<div id="edit-profile-modal" class="ep-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="ep-title" onclick="if(event.target===this)window.closeEditProfileModal()">
+  <aside class="ep-drawer">
+    <header class="ep-head">
+      <div>
+        <div class="ep-kicker">Your account</div>
+        <h2 class="ep-title" id="ep-title">Edit Profile</h2>
       </div>
-      <button onclick="window.closeEditProfileModal()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0.25rem;border-radius:6px;display:flex;align-items:center;transition:color 0.15s;" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text-muted)'">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      <button type="button" class="ep-close" onclick="window.closeEditProfileModal()" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
-    </div>
-    <div style="padding:1.25rem;display:flex;flex-direction:column;gap:1rem;">
-      <!-- Avatar row -->
-      <div style="display:flex;align-items:center;gap:1rem;">
-        <div id="ep-avatar-preview" style="width:58px;height:58px;border-radius:50%;background:linear-gradient(135deg,var(--gold-bright),var(--gold));display:flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:800;color:#fff;flex-shrink:0;overflow:hidden;border:2px solid var(--border);"></div>
-        <div style="display:flex;flex-direction:column;gap:0.4rem;">
-          <div style="font-size:0.78rem;font-weight:600;color:var(--text-secondary);">Profile Photo</div>
-          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-            <label style="display:inline-flex;align-items:center;gap:0.35rem;cursor:pointer;font-size:0.75rem;font-weight:600;padding:0.35rem 0.75rem;border-radius:7px;background:var(--bg);border:1px solid var(--border);color:var(--text-secondary);transition:all 0.15s;" onmouseover="this.style.borderColor='var(--gold-muted)';this.style.color='var(--gold)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-              Upload Photo
+    </header>
+
+    <div class="ep-body">
+      <!-- who: cover band, photo, name, role -->
+      <section class="ep-identity">
+        <div class="ep-cover" aria-hidden="true"></div>
+        <div class="ep-identity-row">
+          <div class="ep-avatar-wrap">
+            <div id="ep-avatar-preview" class="ep-avatar"></div>
+            <label class="ep-avatar-edit" title="Change photo">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
               <input type="file" id="ep-avatar-input" accept="image/jpeg,image/png,image/webp" hidden/>
             </label>
-            <button type="button" id="ep-avatar-remove-btn" style="display:none;font-size:0.75rem;font-weight:600;padding:0.35rem 0.75rem;border-radius:7px;background:var(--bg);border:1px solid var(--border);color:var(--danger);cursor:pointer;transition:all 0.15s;font-family:'Plus Jakarta Sans',sans-serif;" onmouseover="this.style.borderColor='var(--danger)'" onmouseout="this.style.borderColor='var(--border)'">Remove</button>
           </div>
-          <span style="font-size:0.67rem;color:var(--text-muted);">JPG, PNG, or WebP. Max 2 MB.</span>
+          <div class="ep-who">
+            <div class="ep-who-name" id="ep-who-name"></div>
+            <div class="ep-who-meta"><span class="ep-role" id="ep-who-role"></span><span id="ep-who-user"></span></div>
+          </div>
         </div>
-      </div>
-      <div style="height:1px;background:var(--border);"></div>
-      <div class="form-grid">
-        <div class="field">
-          <label class="field-label">First Name <span class="req">*</span></label>
-          <input type="text" id="ep-first-name" class="field-input" placeholder="e.g. Juan" autocomplete="given-name"/>
+        <div class="ep-photo-actions">
+          <label class="ep-btn-sm" for="ep-avatar-input">Upload new photo</label>
+          <button type="button" id="ep-avatar-remove-btn" class="ep-btn-sm is-danger" style="display:none;">Remove</button>
+          <span class="ep-hint">JPG, PNG or WebP, up to 2 MB.</span>
         </div>
-        <div class="field">
-          <label class="field-label">Last Name <span class="req">*</span></label>
-          <input type="text" id="ep-last-name" class="field-input" placeholder="e.g. dela Cruz" autocomplete="family-name"/>
+      </section>
+
+      <!-- personal information -->
+      <section class="ep-section">
+        <div class="ep-section-head">
+          <h3>Personal information</h3>
+          <p>Your name appears on records you create and in the activity log.</p>
         </div>
-        <div class="field span-2">
-          <label class="field-label">Email Address</label>
-          <input type="email" id="ep-email" class="field-input" placeholder="your@email.com" autocomplete="email"/>
-          <span class="field-hint">Changing your email will require verification.</span>
+        <div class="ep-fields">
+          <div class="ep-field">
+            <label for="ep-first-name">First name <span class="req">*</span></label>
+            <input type="text" id="ep-first-name" class="field-input" placeholder="e.g. Juan" autocomplete="given-name"/>
+          </div>
+          <div class="ep-field">
+            <label for="ep-last-name">Last name <span class="req">*</span></label>
+            <input type="text" id="ep-last-name" class="field-input" placeholder="e.g. dela Cruz" autocomplete="family-name"/>
+          </div>
         </div>
-      </div>
-      <div id="ep-error" style="display:none;color:var(--danger);font-size:0.8rem;background:var(--danger-bg);border:1px solid var(--danger-border);border-radius:8px;padding:0.6rem 0.8rem;"></div>
+      </section>
+
+      <section class="ep-section">
+        <div class="ep-section-head">
+          <h3>Email address</h3>
+          <p>Used for sign-in codes and password resets. A new address is verified before it is used.</p>
+        </div>
+        <div class="ep-field ep-field-icon">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>
+          <input type="email" id="ep-email" class="field-input" placeholder="your@email.com" autocomplete="email" aria-label="Email address"/>
+        </div>
+      </section>
+
+      <div id="ep-error" class="ep-error" style="display:none;"></div>
+
+      <a class="ep-more" id="ep-more-link" href="#">
+        <span><strong>Password, two-factor and PIN</strong><small>Open all account settings</small></span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </a>
     </div>
-    <div style="padding:1rem 1.25rem;border-top:1px solid var(--border);display:flex;gap:0.5rem;justify-content:flex-end;background:var(--bg-2);">
+
+    <footer class="ep-foot">
       <button type="button" class="btn-ghost" onclick="window.closeEditProfileModal()">Cancel</button>
       <button type="button" class="btn-primary" id="ep-save-btn">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
         Save Changes
       </button>
-    </div>
-  </div>
+    </footer>
+  </aside>
 </div>
 
 <script>
@@ -180,12 +209,20 @@ $footer_extra_scripts  = $footer_extra_scripts  ?? '';
     document.getElementById('ep-error').style.display = 'none';
     document.getElementById('ep-avatar-input').value = '';
     renderAvatarPreview();
+    var full = root ? (root.dataset.name || '') : '';
+    document.getElementById('ep-who-name').textContent = full;
+    document.getElementById('ep-who-role').textContent = root ? (root.dataset.role || '') : '';
+    document.getElementById('ep-who-user').textContent = root && root.dataset.username ? '@' + root.dataset.username : '';
+    document.getElementById('ep-more-link').href = (root ? (root.dataset.base || '') : '') + 'modules/admin/settings.php#st-password';
     modal.style.display = 'flex';
+    requestAnimationFrame(function () { modal.classList.add('is-open'); });   // slide in (app.css .ep-overlay.is-open)
     setTimeout(function() { document.getElementById('ep-first-name').focus(); }, 60);
   };
 
   window.closeEditProfileModal = function() {
-    modal.style.display = 'none';
+    if (modal.style.display === 'none') return;
+    modal.classList.remove('is-open');   // slide out, then hide
+    setTimeout(function () { if (!modal.classList.contains('is-open')) modal.style.display = 'none'; }, 220);
   };
 
   // Avatar file preview (local, before upload)
@@ -208,7 +245,6 @@ $footer_extra_scripts  = $footer_extra_scripts  ?? '';
     var initials = root ? root.dataset.initials : '?';
     var preview = document.getElementById('ep-avatar-preview');
     preview.innerHTML = initials;
-    preview.style.background = 'linear-gradient(135deg,var(--gold-bright),var(--gold))';
     document.getElementById('ep-avatar-input').value = '';
     this.style.display = 'none';
   });

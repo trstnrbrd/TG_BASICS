@@ -1,0 +1,91 @@
+/* Manage Users (modules/admin/manage_users.php), restyled 2026-11-20 in the same layout: one System Users card
+   with a search box and filter tabs, a Last Seen column, labelled actions, and a Create New Account modal with
+   the role as two cards. The mobile card list keeps its styles in mobile_tables.css. */
+
+.mu-wrap { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; margin-bottom: 1.25rem; }
+.mu-card-main { margin-bottom: 0; overflow: hidden; }
+.mu-create-btn { margin-left: auto; }
+.mu-online-n { color: var(--success); font-weight: 700; }
+.mu-card-main > .card-header > .mu-create-btn { flex: 0 0 auto; width: auto; margin-left: auto !important; }
+
+/* toolbar: search + tabs */
+.mu-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; padding: 0.85rem 1.25rem; border-bottom: 1px solid var(--border); background: var(--bg-2); }
+.mu-search {
+  display: flex; align-items: center; gap: 0.5rem; flex: 1 1 240px; max-width: 340px; padding: 0 0.75rem; height: 36px;
+  border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text-muted); transition: border-color 0.15s, box-shadow 0.15s;
+}
+.mu-search:focus-within { border-color: var(--gold-muted); box-shadow: 0 0 0 3px var(--gold-pale); }
+.mu-search input { flex: 1; min-width: 0; border: none; outline: none; background: none; font: inherit; font-size: 0.82rem; color: var(--text-primary); }
+.mu-tabs { display: inline-flex; padding: 3px; gap: 2px; border-radius: 10px; background: var(--bg-3); border: 1px solid var(--border); overflow-x: auto; max-width: 100%; }
+.mu-tab {
+  display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.35rem 0.75rem; border-radius: 8px; border: none; cursor: pointer; white-space: nowrap;
+  font: inherit; font-size: 0.76rem; font-weight: 700; color: var(--text-muted); background: none; transition: background 0.15s, color 0.15s;
+}
+.mu-tab span { font-size: 0.66rem; padding: 0.05rem 0.4rem; border-radius: 10px; background: var(--bg); color: var(--text-muted); }
+.mu-tab:hover { color: var(--text-primary); }
+.mu-tab.is-on { background: var(--bg-2); color: var(--gold); box-shadow: var(--shadow); }
+.mu-tab.is-on span { background: var(--gold-pale); color: var(--gold); }
+
+/* table */
+.mu-desktop-table .mu-th-name, .mu-desktop-table .mu-td-name { text-align: left; padding-left: 1.25rem; }
+.mu-row { transition: background 0.15s; }
+.mu-row:hover { background: var(--gold-pale); }
+.mu-row[hidden], .mu-mobile-list .mu-card[hidden] { display: none !important; }
+.mu-row.is-deactivated .mu-person { opacity: 0.55; }
+.mu-person { display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
+.mu-avatar { position: relative; flex-shrink: 0; cursor: pointer; }
+.mu-avatar-pic {
+  width: 38px; height: 38px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center;
+  font-size: 0.68rem; font-weight: 800; color: var(--on-gold); background: linear-gradient(135deg, var(--gold-bright), var(--gold)); border: 2px solid var(--border);
+}
+.mu-avatar-pic img { width: 100%; height: 100%; object-fit: cover; }
+.mu-avatar-dot { position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; border-radius: 50%; background: var(--border); border: 2px solid var(--bg-2); }
+.mu-avatar.is-online .mu-avatar-dot { background: var(--success); animation: mu-online 2.2s ease-out infinite; }
+@keyframes mu-online { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 50%, transparent); } 80%, 100% { box-shadow: 0 0 0 6px transparent; } }
+.mu-person-text { min-width: 0; cursor: pointer; }
+.mu-name { font-weight: 700; color: var(--text-primary); font-size: 0.85rem; line-height: 1.25; display: flex; align-items: center; gap: 0.35rem; }
+.mu-handle { font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 360px; }
+.mu-you { font-size: 0.6rem; font-weight: 700; color: var(--gold); background: var(--gold-pale); border: 1px solid var(--gold-muted); border-radius: 4px; padding: 0.05rem 0.35rem; }
+.mu-seen { font-size: 0.76rem; color: var(--text-muted); white-space: nowrap; }
+.mu-seen.is-online { color: var(--success); font-weight: 700; }
+.mu-protected-tag { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; font-weight: 600; color: var(--text-muted); }
+
+/* actions: icon + word, so "Deactivate" is not just a lock */
+.mu-act-group { justify-content: center; }
+.mu-act-form .btn-sm-gold, .mu-act-form .btn-sm-danger { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.35rem 0.65rem; }
+.mu-act-label { font-size: 0.72rem; font-weight: 700; }
+
+.mu-empty { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; padding: 2rem; color: var(--text-muted); font-size: 0.82rem; }
+.mu-empty[hidden] { display: none; }
+
+/* create account modal */
+.mu-modal { max-width: 620px; max-height: 90vh; overflow-y: auto; }
+.mu-modal-body { padding: 1.25rem; display: flex; flex-direction: column; gap: 0.9rem; }
+.mu-modal-intro { margin: 0; font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; padding: 0.7rem 0.85rem; border-radius: 10px; background: var(--info-bg); border: 1px solid var(--info-border); }
+.mu-form-grid { gap: 0.9rem; }
+.mu-roles { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-top: 0.35rem; }
+.mu-role {
+  position: relative; display: flex; align-items: flex-start; gap: 0.65rem; padding: 0.8rem 0.9rem; cursor: pointer;
+  border: 1.5px solid var(--border); border-radius: 12px; background: var(--bg); transition: border-color 0.15s, background 0.15s;
+}
+.mu-role:hover { border-color: var(--gold-muted); }
+.mu-role input { position: absolute; opacity: 0; pointer-events: none; }
+.mu-role:has(input:checked) { border-color: var(--gold); background: var(--gold-pale); }
+.mu-role:has(input:focus-visible) { box-shadow: 0 0 0 3px var(--gold-pale); }
+.mu-role-icon { width: 2rem; height: 2rem; border-radius: 9px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.mu-role-icon.is-admin { background: var(--success-bg); color: var(--success); }
+.mu-role-icon.is-mechanic { background: var(--info-bg); color: var(--info); }
+.mu-role-text { display: flex; flex-direction: column; gap: 0.15rem; }
+.mu-role-text strong { font-size: 0.85rem; color: var(--text-primary); }
+.mu-role-text small { font-size: 0.7rem; color: var(--text-muted); line-height: 1.35; }
+
+/* mobile card list (the rest is in mobile_tables.css): online dot */
+.mu-card-dot { background: var(--border); }
+.mu-card-dot.is-online { background: var(--success); box-shadow: 0 0 0 2px color-mix(in srgb, var(--success) 25%, transparent); }
+
+@media (max-width: 768px) {
+  .mu-toolbar { padding: 0.75rem 1rem; }
+  .mu-search { max-width: none; flex-basis: 100%; }
+  .mu-roles { grid-template-columns: 1fr; }
+  .mu-act-label { display: none; }
+}

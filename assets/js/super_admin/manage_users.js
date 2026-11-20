@@ -9,8 +9,7 @@
           text: 'Delete the account of "' + name + '"? This cannot be undone.',
           icon: "warning",
           showCancelButton: !0,
-          confirmButtonColor: "#C0392B",
-          cancelButtonColor: "#6c757d",
+          confirmButtonColor: "var(--danger)",
           confirmButtonText: "Yes, delete",
           cancelButtonText: "Cancel",
         })
@@ -32,7 +31,7 @@
           name = (first + " " + last).trim(),
           email = document.querySelector('[name="new_email"]').value.trim(),
           uname = document.querySelector('[name="new_username"]').value.trim(),
-          role = document.querySelector('[name="new_role"]').value;
+          role = (document.querySelector('[name="new_role"]:checked') || {}).value || "";   // Role is two radio cards (2026-11-20)
         first && last && email && uname && role
           ? Swal.fire({
               title: "Create account?",
@@ -47,8 +46,6 @@
                 ".</small>",
               icon: "question",
               showCancelButton: !0,
-              confirmButtonColor: "#B8860B",
-              cancelButtonColor: "#6c757d",
               confirmButtonText: "Yes, create & send",
               cancelButtonText: "Cancel",
             }).then(function (result) {
@@ -82,7 +79,6 @@
               icon: "warning",
               title: "Incomplete Fields",
               text: "Please fill in all required fields before creating an account.",
-              confirmButtonColor: "#B8860B",
             });
       }));
 
@@ -98,8 +94,6 @@ document.querySelectorAll(".js-deactivate-user").forEach(function (btn) {
         " will be signed out and cannot log in until you reactivate the account. Their records and history are kept.",
       icon: "warning",
       showCancelButton: true,
-      confirmButtonColor: "#B8860B",
-      cancelButtonColor: "#6c757d",
       confirmButtonText: "Yes, deactivate",
       cancelButtonText: "Cancel",
     });
@@ -119,8 +113,6 @@ document.querySelectorAll(".js-reactivate-user").forEach(function (btn) {
       text: name + " will be able to sign in again.",
       icon: "question",
       showCancelButton: true,
-      confirmButtonColor: "#B8860B",
-      cancelButtonColor: "#6c757d",
       confirmButtonText: "Yes, reactivate",
       cancelButtonText: "Cancel",
     });

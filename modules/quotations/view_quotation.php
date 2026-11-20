@@ -197,253 +197,315 @@ document.addEventListener('DOMContentLoaded',function(){
 </script>
 <?php endif; ?>
 
-<!-- HEADER ROW -->
-<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
-  <a href="quotation_list.php" class="back-link" onclick="goBack('quotation_list.php'); return false;"><?= icon('arrow-left', 14) ?> Back to Quotations</a>
-  <div class="qt-action-bar">
-    <span class="badge <?= $sc['class'] ?>"><?= htmlspecialchars($sc['label']) ?></span>
-    <?php if ($is_admin && $qt['status'] === 'draft'): ?>
-      <a href="../quotations/add_quotation.php?quotation_id=<?= $qt_id ?>" class="btn-ghost" style="font-size:0.82rem;"><?= icon('pencil', 13) ?> Edit Draft</a>
-      <form method="POST" style="display:inline;" class="js-qt-confirm" data-title="Send for approval?" data-text="The quotation can no longer be edited once it is sent for approval." data-button="Yes, send it">
-        <?= csrf_field() ?><input type="hidden" name="action" value="send_approval"/>
-        <button type="submit" class="btn-primary" style="font-size:0.82rem;"><?= icon('paper-airplane', 13) ?> Send for Approval</button>
-      </form>
-    <?php elseif ($is_admin && $qt['status'] === 'pending_approval'): ?>
-      <form method="POST" style="display:inline;" class="js-qt-confirm" data-title="Mark this quotation as approved?" data-text="Do this once the client has agreed to the quotation." data-button="Yes, mark approved">
-        <?= csrf_field() ?><input type="hidden" name="action" value="approve"/>
-        <button type="submit" class="btn-primary" style="font-size:0.82rem;"><?= icon('check-circle', 13) ?> Mark Approved</button>
-      </form>
-    <?php elseif ($is_admin && $qt['status'] === 'approved' && !$qt['receipt_id']): ?>
-      <button onclick="document.getElementById('convert-modal').style.display='flex'" class="btn-primary" style="font-size:0.82rem;"><?= icon('document-text', 13) ?> Convert to Billing Statement</button>
-    <?php endif; ?>
-    <?php if ($is_admin && in_array($qt['status'], ['draft','pending_approval'])): ?>
-      <form method="POST" style="display:inline;" class="js-qt-confirm" data-danger="1" data-title="Cancel this quotation?" data-text="A cancelled quotation cannot be approved or turned into a billing statement." data-button="Yes, cancel it">
-        <?= csrf_field() ?><input type="hidden" name="action" value="cancel"/>
-        <button type="submit" class="btn-ghost" style="font-size:0.82rem;color:var(--danger);"><?= icon('x-mark', 13) ?> Cancel</button>
-      </form>
-    <?php endif; ?>
-    <?php if ($qt['receipt_id']): ?>
-    <a href="print_receipt.php?id=<?= $qt_id ?>" target="_blank" class="btn-ghost" style="font-size:0.82rem;"><?= icon('printer', 13) ?> Print Statement</a>
-    <?php endif; ?>
-    <a href="../repair/view_repair.php?id=<?= $qt['job_id'] ?>" class="btn-ghost" style="font-size:0.82rem;"><?= icon('wrench', 13) ?> View Job</a>
-  </div>
-</div>
+<?php
+// ── what the page shows, worked out once ──
+$status   = $qt['status'];
+$peso     = fn($n) => '₱' . number_format((float)$n, 2);
+$vehicle  = trim($qt['year_model'] . ' ' . $qt['make'] . ' ' . $qt['model']);
+$initials = implode('', array_map(fn($w) => mb_substr($w, 0, 1), array_slice(preg_split('/\s+/', trim($qt['full_name'])) ?: [], 0, 2)));
+// The steps are fixed buttons on this page (draft → for approval → approved → billed), so the bar is too;
+// Cancelled is a side branch shown after the steps it passed
+$qt_path   = ['draft', 'pending_approval', 'approved', 'converted'];
+$qt_cur    = array_search($status, $qt_path, true);
+$qt_branch = $qt_cur === false ? $status : null;
+$qt_done_before = $qt_branch === null ? $qt_cur : 0;
+if ($qt_branch === 'cancelled') $qt_done_before = 1;   // cancelled from draft or for approval: at least drafted
+$qt_hint = [
+    'draft'            => 'Still a draft. Edit the items, then send it to the client for approval.',
+    'pending_approval' => 'Sent to the client. Mark it approved once they agree to the price.',
+    'approved'         => 'The client agreed. Issue the billing statement when the job is paid or ready to bill.',
+    'converted'        => 'Billed. The billing statement below tracks the payment.',
+    'cancelled'        => 'Cancelled. It can no longer be approved or billed.',
+][$status] ?? '';
+$paid_pct = $qt['receipt_id'] && (float)$qt['total'] > 0 ? max(0, min(100, round((float)$qt['amount_paid'] / (float)$qt['total'] * 100))) : 0;
+$methods  = ['cash' => 'Cash', 'e_wallet' => 'E-Wallet', 'bank_transfer' => 'Bank Transfer'];
+?>
 
-<!-- INFO GRID -->
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;">
-
-  <!-- QUOTATION DETAILS -->
-  <div class="card" style="margin-bottom:0;">
-    <div class="card-header">
-      <div class="card-icon"><?= icon('receipt', 16) ?></div>
-      <div><div class="card-title">Quotation Details</div><div class="card-sub"><?= htmlspecialchars($qt['quotation_number']) ?></div></div>
-    </div>
-    <div style="padding:1rem 1.25rem;display:flex;flex-direction:column;gap:0;">
-      <?php
-      $qt_details = [
-        ['Quotation #',  $qt['quotation_number']],
-        ['Repair ID',    $qt['job_number']],
-        ['Service Type', $svc],
-        ['Repair Date',  date('F d, Y', strtotime($qt['repair_date']))],
-        ['Status',       $sc['label']],
-        ['Created',      date('F d, Y', strtotime($qt['created_at']))],
-      ];
-      foreach ($qt_details as [$lbl, $val]): ?>
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:0.55rem 0;border-bottom:1px solid var(--border);">
-        <span style="font-size:0.78rem;color:var(--text-muted);font-weight:500;"><?= $lbl ?></span>
-        <span style="font-size:0.82rem;color:var(--text-primary);font-weight:600;"><?= htmlspecialchars($val) ?></span>
+<!-- HERO: which quotation, its status and total, and what can be done -->
+<section class="card qv-hero">
+  <div class="qv-hero-top">
+    <a href="quotation_list.php" class="back-link qv-back" onclick="goBack('quotation_list.php'); return false;" aria-label="Back to Quotations"><?= icon('arrow-left', 14) ?></a>
+    <div class="qv-hero-id">
+      <div class="qv-kicker">Quotation</div>
+      <div class="qv-title-row">
+        <h2 class="qv-number"><?= htmlspecialchars($qt['quotation_number']) ?></h2>
+        <span class="badge <?= $sc['class'] ?>"><?= htmlspecialchars($sc['label']) ?></span>
       </div>
-      <?php endforeach; ?>
-    </div>
-  </div>
-
-  <!-- CLIENT & VEHICLE -->
-  <div class="card" style="margin-bottom:0;">
-    <div class="card-header">
-      <div class="card-icon"><?= icon('user', 16) ?></div>
-      <div><div class="card-title">Client &amp; Vehicle</div><div class="card-sub"><?= htmlspecialchars($qt['full_name']) ?></div></div>
-      <a href="../clients/view_client.php?id=<?= $qt['client_id'] ?>" class="btn-sm-gold" style="margin-left:auto;"><?= icon('eye', 13) ?> View</a>
-    </div>
-    <div style="padding:1rem 1.25rem;display:flex;flex-direction:column;gap:0;">
-      <?php
-      $client_details = [
-        ['Client',       $qt['full_name']],
-        ['Contact',      $qt['contact_number'] ?: '—'],
-        ['Plate',        $qt['plate_number']],
-        ['Vehicle',      trim($qt['year_model'] . ' ' . $qt['make'] . ' ' . $qt['model'])],
-        ['Color',        $qt['color'] ?: '—'],
-      ];
-      foreach ($client_details as [$lbl, $val]): ?>
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:0.55rem 0;border-bottom:1px solid var(--border);">
-        <span style="font-size:0.78rem;color:var(--text-muted);font-weight:500;"><?= $lbl ?></span>
-        <span style="font-size:0.82rem;color:var(--text-primary);font-weight:600;"><?= htmlspecialchars($val) ?></span>
+      <div class="qv-meta">
+        <span><?= icon('wrench', 12) ?> <?= htmlspecialchars($svc) ?></span>
+        <span><?= icon('user', 12) ?> <?= htmlspecialchars($qt['full_name']) ?></span>
+        <span><?= icon('truck', 12) ?> <?= htmlspecialchars($qt['plate_number']) ?></span>
+        <span><?= icon('calendar', 12) ?> Created <?= date('M d, Y', strtotime($qt['created_at'])) ?></span>
       </div>
-      <?php endforeach; ?>
+    </div>
+    <div class="qv-hero-total">
+      <div class="qv-kicker">Total</div>
+      <div class="qv-total-amount"><?= $peso($qt['total']) ?></div>
+      <?php if ($qt['discount'] > 0): ?><div class="qv-total-note">after <?= $peso($qt['discount']) ?> discount</div><?php endif; ?>
     </div>
   </div>
 
-</div>
+  <div class="qv-hero-bottom">
+    <?php if ($qt_hint): ?><p class="qv-hint"><?= icon('information-circle', 14) ?> <?= htmlspecialchars($qt_hint) ?></p><?php endif; ?>
+    <div class="qt-action-bar">
+      <?php if ($is_admin && $status === 'draft'): ?>
+        <a href="../quotations/add_quotation.php?quotation_id=<?= $qt_id ?>" class="btn-ghost"><?= icon('pencil', 13) ?> Edit Draft</a>
+        <form method="POST" class="js-qt-confirm" data-title="Send for approval?" data-text="The quotation can no longer be edited once it is sent for approval." data-button="Yes, send it">
+          <?= csrf_field() ?><input type="hidden" name="action" value="send_approval"/>
+          <button type="submit" class="btn-primary"><?= icon('paper-airplane', 13) ?> Send for Approval</button>
+        </form>
+      <?php elseif ($is_admin && $status === 'pending_approval'): ?>
+        <form method="POST" class="js-qt-confirm" data-title="Mark this quotation as approved?" data-text="Do this once the client has agreed to the quotation." data-button="Yes, mark approved">
+          <?= csrf_field() ?><input type="hidden" name="action" value="approve"/>
+          <button type="submit" class="btn-primary"><?= icon('check-circle', 13) ?> Mark Approved</button>
+        </form>
+      <?php elseif ($is_admin && $status === 'approved' && !$qt['receipt_id']): ?>
+        <button type="button" class="btn-primary js-open-convert"><?= icon('document-text', 13) ?> Convert to Billing Statement</button>
+      <?php endif; ?>
+      <?php if ($qt['receipt_id']): ?>
+      <a href="print_receipt.php?id=<?= $qt_id ?>" target="_blank" class="btn-ghost"><?= icon('printer', 13) ?> Print Statement</a>
+      <?php endif; ?>
+      <a href="../repair/view_repair.php?id=<?= $qt['job_id'] ?>" class="btn-ghost"><?= icon('wrench', 13) ?> View Job</a>
+      <?php if ($is_admin && in_array($status, ['draft', 'pending_approval'], true)): ?>
+        <form method="POST" class="js-qt-confirm" data-danger="1" data-title="Cancel this quotation?" data-text="A cancelled quotation cannot be approved or turned into a billing statement." data-button="Yes, cancel it">
+          <?= csrf_field() ?><input type="hidden" name="action" value="cancel"/>
+          <button type="submit" class="btn-ghost qv-btn-danger"><?= icon('x-mark', 13) ?> Cancel Quotation</button>
+        </form>
+      <?php endif; ?>
+    </div>
+  </div>
+</section>
 
-<!-- LINE ITEMS -->
-<div class="card" style="margin-bottom:1.25rem;">
-  <div class="card-header">
-    <div class="card-icon"><?= icon('clipboard-list', 16) ?></div>
-    <div><div class="card-title">Line Items</div><div class="card-sub"><?= count($items) ?> item<?= count($items) !== 1 ? 's' : '' ?></div></div>
-  </div>
-  <div style="overflow-x:auto;">
-    <table class="line-items-table">
-      <thead>
-        <tr>
-          <th style="text-align:left;">#</th>
-          <th style="text-align:left;">Description</th>
-          <th style="text-align:left;">Area</th>
-          <th style="text-align:center;">Qty</th>
-          <th style="text-align:right;">Unit Price</th>
-          <th style="text-align:right;">Subtotal</th>
-        </tr>
-      </thead>
-      <tbody>
-        <?php foreach ($items as $i => $it): ?>
-        <tr>
-          <td style="color:var(--text-muted);font-size:0.75rem;"><?= $i + 1 ?></td>
-          <td style="font-weight:600;font-size:0.82rem;color:var(--text-primary);"><?= htmlspecialchars($it['description']) ?></td>
-          <td style="font-size:0.75rem;color:var(--text-muted);"><?= $it['area'] ? htmlspecialchars($area_labels[$it['area']] ?? $it['area']) : '—' ?></td>
-          <td style="text-align:center;font-size:0.82rem;"><?= number_format($it['qty'], 2) ?></td>
-          <td style="text-align:right;font-size:0.82rem;">PHP <?= number_format($it['unit_price'], 2) ?></td>
-          <td style="text-align:right;font-weight:700;font-size:0.82rem;">PHP <?= number_format($it['subtotal'], 2) ?></td>
-        </tr>
-        <?php endforeach; ?>
-      </tbody>
-    </table>
-  </div>
-  <div style="display:flex;flex-direction:column;align-items:flex-end;padding:1rem 1.25rem;gap:0.35rem;border-top:1px solid var(--border);">
-    <div class="qt-total-row"><span class="qt-total-label">Subtotal</span><span class="qt-total-val">PHP <?= number_format($qt['subtotal'], 2) ?></span></div>
-    <?php if ($qt['discount'] > 0): ?>
-    <div class="qt-total-row"><span class="qt-total-label">Discount</span><span class="qt-total-val" style="color:var(--success);">— PHP <?= number_format($qt['discount'], 2) ?></span></div>
+<!-- STEPS -->
+<ol class="qv-steps" aria-label="Quotation progress">
+  <?php foreach ($qt_path as $i => $code):
+    $state = $qt_branch !== null ? ($i < $qt_done_before ? 'done' : 'todo')
+           : ($i < $qt_cur ? 'done' : ($i === $qt_cur ? ($code === 'converted' ? 'done current' : 'current') : 'todo'));
+  ?>
+  <li class="qv-step <?= $state ?>"<?= str_contains($state, 'current') ? ' aria-current="step"' : '' ?>>
+    <span class="qv-step-dot"><?= str_contains($state, 'done') ? icon('check', 11) : $i + 1 ?></span>
+    <span class="qv-step-label"><?= htmlspecialchars(quotation_status_badge($code)['label']) ?></span>
+  </li>
+  <?php endforeach; ?>
+  <?php if ($qt_branch !== null): ?>
+  <li class="qv-step branch" aria-current="step">
+    <span class="qv-step-dot"><?= icon('x-mark', 11) ?></span>
+    <span class="qv-step-label"><?= htmlspecialchars(quotation_status_badge($qt_branch)['label']) ?></span>
+  </li>
+  <?php endif; ?>
+</ol>
+
+<div class="qv-grid">
+
+  <!-- LEFT: the quotation itself -->
+  <div class="qv-main">
+    <section class="card qv-items">
+      <div class="card-header">
+        <div class="card-icon"><?= icon('clipboard-list', 16) ?></div>
+        <div><div class="card-title">Line Items</div><div class="card-sub"><?= count($items) ?> item<?= count($items) !== 1 ? 's' : '' ?></div></div>
+      </div>
+
+      <?php if (!$items): ?>
+      <div class="qv-empty">No line items on this quotation.</div>
+      <?php else: ?>
+      <table class="qv-table">
+        <thead>
+          <tr><th class="qv-col-num">#</th><th>Description</th><th class="qv-col-r">Qty</th><th class="qv-col-r">Unit Price</th><th class="qv-col-r">Amount</th></tr>
+        </thead>
+        <tbody>
+          <?php foreach ($items as $i => $it): ?>
+          <tr>
+            <td class="qv-col-num"><span class="qv-num"><?= $i + 1 ?></span></td>
+            <td class="qv-desc">
+              <div class="qv-desc-text"><?= htmlspecialchars($it['description']) ?></div>
+              <?php if ($it['area']): ?><span class="qv-area"><?= icon('map-pin', 10) ?> <?= htmlspecialchars($area_labels[$it['area']] ?? $it['area']) ?></span><?php endif; ?>
+            </td>
+            <td class="qv-col-r" data-label="Qty"><?= rtrim(rtrim(number_format((float)$it['qty'], 2), '0'), '.') ?></td>
+            <td class="qv-col-r" data-label="Unit Price"><?= $peso($it['unit_price']) ?></td>
+            <td class="qv-col-r qv-amount" data-label="Amount"><?= $peso($it['subtotal']) ?></td>
+          </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+      <?php endif; ?>
+
+      <div class="qv-totals">
+        <div class="qv-totals-row"><span>Subtotal</span><span><?= $peso($qt['subtotal']) ?></span></div>
+        <?php if ($qt['discount'] > 0): ?>
+        <div class="qv-totals-row is-discount"><span>Discount</span><span>− <?= $peso($qt['discount']) ?></span></div>
+        <?php endif; ?>
+        <div class="qv-totals-row is-grand"><span>Total</span><span><?= $peso($qt['total']) ?></span></div>
+      </div>
+    </section>
+
+    <?php if ($qt['notes']): ?>
+    <section class="card qv-notes">
+      <div class="card-header">
+        <div class="card-icon"><?= icon('document', 16) ?></div>
+        <div><div class="card-title">Notes</div></div>
+      </div>
+      <div class="qv-notes-body"><?= htmlspecialchars($qt['notes']) ?></div>
+    </section>
     <?php endif; ?>
-    <div class="qt-total-row grand"><span class="qt-total-label">TOTAL</span><span class="qt-total-val">PHP <?= number_format($qt['total'], 2) ?></span></div>
   </div>
-</div>
 
-<?php if ($qt['notes']): ?>
-<!-- NOTES -->
-<div class="card" style="margin-bottom:1.25rem;">
-  <div class="card-header">
-    <div class="card-icon"><?= icon('document', 16) ?></div>
-    <div><div class="card-title">Notes</div></div>
-  </div>
-  <div style="padding:1rem 1.25rem;font-size:0.82rem;color:var(--text-secondary);white-space:pre-wrap;"><?= htmlspecialchars($qt['notes']) ?></div>
-</div>
-<?php endif; ?>
+  <!-- RIGHT: who it is for, the job, and the money -->
+  <aside class="qv-side">
 
-<?php if ($qt['receipt_id']): ?>
-<!-- RECEIPT PANEL -->
-<div class="card" style="margin-bottom:1.25rem;">
-  <div class="card-header">
-    <div class="card-icon" style="background:var(--success-bg);color:var(--success);"><?= icon('document-text', 16) ?></div>
-    <div>
-      <div class="card-title">Billing Statement Issued</div>
-      <div class="card-sub"><?= htmlspecialchars($qt['receipt_number']) ?></div>
-    </div>
-    <?php $pc = receipt_status_badge((string)$qt['payment_status']); ?>
-    <span class="badge <?= $pc['class'] ?>" style="margin-left:auto;"><?= htmlspecialchars($pc['label']) ?></span>
-  </div>
-  <div style="padding:1rem 1.25rem;">
-    <div class="receipt-info-grid">
-      <div class="receipt-info-row"><span class="receipt-info-label">Statement #</span><span class="receipt-info-val"><?= htmlspecialchars($qt['receipt_number']) ?></span></div>
-      <div class="receipt-info-row"><span class="receipt-info-label">Issued</span><span class="receipt-info-val"><?= date('F d, Y', strtotime($qt['issued_at'])) ?></span></div>
-      <div class="receipt-info-row"><span class="receipt-info-label">Total</span><span class="receipt-info-val">PHP <?= number_format($qt['total'], 2) ?></span></div>
-      <div class="receipt-info-row"><span class="receipt-info-label">Amount Paid</span><span class="receipt-info-val" style="color:var(--success);">PHP <?= number_format($qt['amount_paid'], 2) ?></span></div>
-      <div class="receipt-info-row"><span class="receipt-info-label">Balance</span><span class="receipt-info-val" style="color:<?= $qt['receipt_balance'] > 0 ? 'var(--warning)' : 'var(--success)' ?>;">PHP <?= number_format($qt['receipt_balance'], 2) ?></span></div>
-      <div class="receipt-info-row"><span class="receipt-info-label">Payment Method</span><span class="receipt-info-val"><?= ucwords(str_replace('_', ' ', $qt['payment_method'])) ?></span></div>
-    </div>
-    <!-- Update payment -->
-    <?php if ($is_admin && $qt['payment_status'] !== 'paid'): ?>
-    <div style="border-top:1px solid var(--border);padding-top:1rem;margin-top:0.5rem;">
-      <div style="font-size:0.78rem;font-weight:700;color:var(--text-muted);margin-bottom:0.75rem;text-transform:uppercase;letter-spacing:0.5px;">Update Payment</div>
-      <form method="POST" style="display:flex;gap:0.6rem;flex-wrap:wrap;align-items:flex-end;">
-        <?= csrf_field() ?><input type="hidden" name="action" value="update_payment"/>
-        <div class="field" style="flex:1;min-width:140px;">
-          <label class="field-label">Amount Paid</label>
-          <input type="number" name="amount_paid" class="field-input" data-money value="<?= $qt['amount_paid'] ?>" min="0" step="0.01" max="<?= $qt['total'] ?>" required/>
+    <section class="card qv-client">
+      <div class="qv-client-top">
+        <div class="qv-avatar" aria-hidden="true"><?= htmlspecialchars(mb_strtoupper($initials)) ?></div>
+        <div style="min-width:0;">
+          <div class="qv-client-name"><?= htmlspecialchars($qt['full_name']) ?></div>
+          <div class="qv-client-sub"><?= htmlspecialchars($qt['contact_number'] ?: 'No contact number') ?></div>
         </div>
-        <div class="field" style="flex:1;min-width:140px;">
-          <label class="field-label">Method</label>
-          <select name="payment_method" class="field-select">
-            <option value="cash"          <?= $qt['payment_method']==='cash'?'selected':'' ?>>Cash</option>
-            <option value="e_wallet"      <?= $qt['payment_method']==='e_wallet'?'selected':'' ?>>E-Wallet</option>
-            <option value="bank_transfer" <?= $qt['payment_method']==='bank_transfer'?'selected':'' ?>>Bank Transfer</option>
-          </select>
+        <a href="../clients/view_client.php?id=<?= $qt['client_id'] ?>" class="btn-sm-gold qv-client-link"><?= icon('eye', 13) ?> View</a>
+      </div>
+      <div class="qv-vehicle">
+        <span class="qv-plate"><?= htmlspecialchars($qt['plate_number']) ?></span>
+        <div>
+          <div class="qv-vehicle-name"><?= htmlspecialchars($vehicle ?: '—') ?></div>
+          <div class="qv-client-sub"><?= htmlspecialchars($qt['color'] ?: 'Color not recorded') ?></div>
         </div>
-        <button type="submit" class="btn-primary" style="margin-bottom:0.05rem;"><?= icon('check', 13) ?> Update</button>
-      </form>
-    </div>
+      </div>
+      <dl class="qv-dl">
+        <div><dt>Repair ID</dt><dd><a href="../repair/view_repair.php?id=<?= $qt['job_id'] ?>"><?= htmlspecialchars($qt['job_number']) ?></a></dd></div>
+        <div><dt>Service</dt><dd><?= htmlspecialchars($svc) ?></dd></div>
+        <div><dt>Repair Date</dt><dd><?= date('M d, Y', strtotime($qt['repair_date'])) ?></dd></div>
+      </dl>
+    </section>
+
+    <?php if ($qt['receipt_id']): $pc = receipt_status_badge((string)$qt['payment_status']); ?>
+    <section class="card qv-pay">
+      <div class="card-header">
+        <div class="card-icon qv-icon-success"><?= icon('document-text', 16) ?></div>
+        <div>
+          <div class="card-title">Billing Statement</div>
+          <div class="card-sub"><?= htmlspecialchars($qt['receipt_number']) ?> · Issued <?= date('M d, Y', strtotime($qt['issued_at'])) ?></div>
+        </div>
+        <span class="badge <?= $pc['class'] ?>" style="margin-left:auto;"><?= htmlspecialchars($pc['label']) ?></span>
+      </div>
+      <div class="qv-pay-body">
+        <div class="qv-pay-figure">
+          <span class="qv-pay-paid"><?= $peso($qt['amount_paid']) ?></span>
+          <span class="qv-pay-of">paid of <?= $peso($qt['total']) ?></span>
+        </div>
+        <div class="qv-bar" role="progressbar" aria-valuenow="<?= $paid_pct ?>" aria-valuemin="0" aria-valuemax="100" aria-label="Paid">
+          <span style="width:<?= $paid_pct ?>%"></span>
+        </div>
+        <dl class="qv-dl">
+          <div><dt>Balance</dt><dd class="<?= $qt['receipt_balance'] > 0 ? 'is-warning' : 'is-success' ?>"><?= $peso($qt['receipt_balance']) ?></dd></div>
+          <div><dt>Payment Method</dt><dd><?= htmlspecialchars($methods[$qt['payment_method']] ?? ucwords(str_replace('_', ' ', (string)$qt['payment_method']))) ?></dd></div>
+        </dl>
+
+        <?php if ($is_admin && $qt['payment_status'] !== 'paid'): ?>
+        <form method="POST" class="qv-pay-form">
+          <?= csrf_field() ?><input type="hidden" name="action" value="update_payment"/>
+          <div class="qv-kicker">Update Payment</div>
+          <div class="qv-pay-fields">
+            <div class="field">
+              <label class="field-label" for="upd-amount">Amount Paid</label>
+              <input type="number" id="upd-amount" name="amount_paid" class="field-input" data-money value="<?= $qt['amount_paid'] ?>" min="0" step="0.01" max="<?= $qt['total'] ?>" required/>
+            </div>
+            <div class="field">
+              <label class="field-label" for="upd-method">Method</label>
+              <select id="upd-method" name="payment_method" class="field-select">
+                <?php foreach ($methods as $mv => $ml): ?>
+                <option value="<?= $mv ?>"<?= $qt['payment_method'] === $mv ? ' selected' : '' ?>><?= $ml ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+          </div>
+          <button type="submit" class="btn-primary qv-full"><?= icon('check', 13) ?> Update Payment</button>
+        </form>
+        <?php endif; ?>
+      </div>
+    </section>
+    <?php elseif ($status !== 'cancelled'): ?>
+    <section class="card qv-pay qv-pay-empty">
+      <div class="qv-pay-empty-icon"><?= icon('document-text', 20) ?></div>
+      <div class="qv-pay-empty-title">No billing statement yet</div>
+      <div class="qv-client-sub">
+        <?= $status === 'approved' ? 'The client approved this quotation. Convert it to a billing statement to record the payment.' : 'A billing statement can be issued once the client approves the quotation.' ?>
+      </div>
+      <?php if ($is_admin && $status === 'approved'): ?>
+      <button type="button" class="btn-primary qv-full js-open-convert"><?= icon('document-text', 13) ?> Convert to Billing Statement</button>
+      <?php endif; ?>
+    </section>
     <?php endif; ?>
-  </div>
+
+  </aside>
 </div>
-<?php endif; ?>
 
 </div>
 </div>
 
 <?php if ($is_admin && $qt['status'] === 'approved' && !$qt['receipt_id']): ?>
 <!-- CONVERT TO RECEIPT MODAL -->
-<div id="convert-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;align-items:center;justify-content:center;padding:1rem;">
-  <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:18px;padding:1.75rem;width:100%;max-width:420px;box-shadow:var(--shadow-lg);">
-    <div style="font-size:1.05rem;font-weight:800;color:var(--text-primary);margin-bottom:0.2rem;"><?= icon('document-text', 18) ?> Convert to Billing Statement</div>
-    <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:1.25rem;">Total: <strong style="color:var(--text-primary);">PHP <?= number_format($qt['total'], 2) ?></strong></div>
+<div id="convert-modal" class="qv-modal" role="dialog" aria-modal="true" aria-labelledby="convert-title" style="display:none;">
+  <div class="qv-modal-box">
+    <div class="qv-modal-title" id="convert-title"><?= icon('document-text', 18) ?> Convert to Billing Statement</div>
+    <div class="qv-modal-sub">Total: <strong>₱<?= number_format((float)$qt['total'], 2) ?></strong></div>
     <form method="POST">
       <?= csrf_field() ?><input type="hidden" name="action" value="convert"/>
-      <div style="display:flex;flex-direction:column;gap:0.85rem;margin-bottom:1.25rem;">
+      <div class="qv-modal-fields">
         <div class="field">
-          <label class="field-label">Amount Paid <span class="req">*</span></label>
-          <input type="number" name="amount_paid" class="field-input" data-money value="<?= $qt['total'] ?>" min="0" step="0.01" max="<?= $qt['total'] ?>" required/>
+          <label class="field-label" for="cv-amount">Amount Paid <span class="req">*</span></label>
+          <input type="number" id="cv-amount" name="amount_paid" class="field-input" data-money value="<?= $qt['total'] ?>" min="0" step="0.01" max="<?= $qt['total'] ?>" required/>
         </div>
         <div class="field">
-          <label class="field-label">Payment Method</label>
-          <select name="payment_method" class="field-select">
+          <label class="field-label" for="cv-method">Payment Method</label>
+          <select id="cv-method" name="payment_method" class="field-select">
             <option value="cash">Cash</option>
             <option value="e_wallet">E-Wallet</option>
             <option value="bank_transfer">Bank Transfer</option>
           </select>
         </div>
         <div class="field">
-          <label class="field-label">Statement Notes</label>
-          <textarea name="receipt_notes" class="field-input" rows="2" maxlength="<?= MAX_NOTE ?>" placeholder="Optional notes on statement..." style="resize:vertical;"></textarea>
+          <label class="field-label" for="cv-notes">Statement Notes</label>
+          <textarea id="cv-notes" name="receipt_notes" class="field-input" rows="2" maxlength="<?= MAX_NOTE ?>" placeholder="Optional notes on statement..." style="resize:vertical;"></textarea>
         </div>
       </div>
-      <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
-        <button type="button" onclick="document.getElementById('convert-modal').style.display='none'" class="btn-ghost">Cancel</button>
+      <div class="qv-modal-actions">
+        <button type="button" class="btn-ghost js-close-convert">Cancel</button>
         <button type="submit" class="btn-primary"><?= icon('document-text', 13) ?> Issue Billing Statement</button>
       </div>
     </form>
   </div>
 </div>
 <script>
-document.getElementById('convert-modal').addEventListener('click', function(e){ if(e.target===this) this.style.display='none'; });
-document.addEventListener('keydown', function(e){ if(e.key==='Escape') document.getElementById('convert-modal').style.display='none'; });
+(function () {
+  var modal = document.getElementById('convert-modal');
+  var open  = function () { modal.style.display = 'flex'; var f = document.getElementById('cv-amount'); f && f.focus(); };
+  var close = function () { modal.style.display = 'none'; };
+  document.querySelectorAll('.js-open-convert').forEach(function (b) { b.addEventListener('click', open); });
+  document.querySelectorAll('.js-close-convert').forEach(function (b) { b.addEventListener('click', close); });
+  modal.addEventListener('click', function (e) { if (e.target === modal) close(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+})();
 </script>
 <?php endif; ?>
 
 <script>
 // Send for Approval / Mark Approved / Cancel: a SweetAlert confirmation before the form is sent
+// (colours come from footer.php's Swal.mixin; a cancel uses the theme's danger colour)
 document.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('form.js-qt-confirm').forEach(function (form) {
     form.addEventListener('submit', function (e) {
       if (form.dataset.confirmed === '1') return;
       e.preventDefault();
       var danger = form.dataset.danger === '1';
-      Swal.fire({
+      var opts = {
         title: form.dataset.title,
         text: form.dataset.text,
         icon: danger ? 'warning' : 'question',
         showCancelButton: true,
         confirmButtonText: form.dataset.button,
         cancelButtonText: danger ? 'Keep it' : 'Not yet',
-        confirmButtonColor: danger ? '#C0392B' : '#D4A017',
-        cancelButtonColor: '#6B7280',
         reverseButtons: true,
-      }).then(function (r) {
+      };
+      if (danger) opts.confirmButtonColor = 'var(--danger)';
+      Swal.fire(opts).then(function (r) {
         if (!r.isConfirmed) return;
         form.dataset.confirmed = '1';
         form.submit();

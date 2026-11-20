@@ -33,6 +33,38 @@ const CLAIM_DOCS_OPEN_STATUSES = ['compiling', 'sent_admin', 'lack_of_requiremen
 const CLAIM_DELETABLE_STATUSES = ['resolved', 'denied', 'lack_of_requirements'];
 const CLAIM_BILLABLE_STATUSES  = ['loa_received', 'pending', 'approved', 'resolved'];
 
+// The steps a claim may still take when its policy has expired, and those that need no requirement uploaded yet
+const CLAIM_EXPIRED_POLICY_STATUSES = ['denied', 'lack_of_requirements', 'resolved'];
+const CLAIM_NO_DOCS_STATUSES        = ['denied', 'lack_of_requirements'];
+
+/**
+ * Why a claim cannot be moved to $new_status right now, or null when it can. One rule for the server's guard and for
+ * View Claim's Next Step (which shows the reason beside a blocked step instead of offering it).
+ * $next = the steps the flow allows from the current status (claim_next_statuses() limited to the active statuses).
+ */
+function claim_status_block_reason(string $new_status, array $next, bool $policy_expired, int $docs_done): ?string
+{
+    if (!in_array($new_status, $next, true)) return 'Invalid status transition.';
+    if ($policy_expired && !in_array($new_status, CLAIM_EXPIRED_POLICY_STATUSES, true)) {
+        return 'Policy is expired. Please renew the policy before processing this claim.';
+    }
+    if ($docs_done === 0 && !in_array($new_status, CLAIM_NO_DOCS_STATUSES, true)) {
+        return 'Upload at least one requirement before updating the status.';
+    }
+    return null;
+}
+
+/**
+ * The claim's main path for the status steps on View Claim: from 'compiling', always the first way forward in
+ * CLAIM_STATUS_FLOW (compiling → sent to admin → … → resolved), so it follows the flow instead of a typed copy.
+ */
+function claim_main_path(): array
+{
+    $path = [];
+    for ($s = 'compiling'; $s !== null && !in_array($s, $path, true); $s = CLAIM_STATUS_FLOW[$s][0] ?? null) $path[] = $s;
+    return $path;
+}
+
 /** Can documents still be uploaded or removed for this claim? */
 function claim_docs_open(string $status): bool
 {

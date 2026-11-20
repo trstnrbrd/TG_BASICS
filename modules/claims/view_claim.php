@@ -37,6 +37,37 @@ $display_num = claim_display_number($conn, $claim_id);
 // Load damage photos
 $damage_photos = claim_damage_photos($conn, $claim_id);
 
+// The steps this claim may take next: the flow in config/access.php, minus a status switched off in the statuses table
+$next_statuses = array_values(array_intersect(claim_next_statuses($claim['status']), array_keys(statuses_active('claim'))));
+
+/**
+ * Moves the claim to $new_status, only from the status this page loaded (the same form sent twice, or two people at
+ * once, change it and email the client once). The change and its audit entry are saved together; the client's
+ * email goes after the commit. False = someone else changed it first. Used by Update Status and by Send to Admin.
+ */
+function claim_move_status(mysqli $conn, array $claim, int $claim_id, string $new_status, ?string $denial_reason, string $notes): bool
+{
+    $from_status = $claim['status'];
+    $changed = db_transaction($conn, function () use ($conn, $claim_id, $from_status, $new_status, $denial_reason, $notes) {
+        if (!claim_set_status($conn, $claim_id, $from_status, $new_status, $denial_reason, $notes)) return false;
+        $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' updated claim #' . $claim_id . ' status to ' . $new_status . '.';
+        audit_log_add($conn, $_SESSION['user_id'], 'CLAIM_UPDATED', $desc);
+        return true;
+    });
+    if ($changed && !empty($claim['email'])) {
+        sendClaimStatusEmail(
+            $claim['email'],
+            $claim['full_name'],
+            claim_type_badge($conn, $claim['claim_type'])['label'],
+            $new_status,
+            $claim['policy_number'],
+            $claim['plate_number'] ?: 'N/A',
+            $denial_reason
+        );
+    }
+    return $changed;
+}
+
 // Helper: re-fetch doc counts
 function fetchDocCounts($conn, $claim_id) {
     $chk = claim_doc_flags($conn, $claim_id);
@@ -177,6 +208,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_send_admin_email
 
     // Reload fresh claim data
     $fresh = claim_row($conn, $claim_id);
+    // the claim notes typed in Next Step (sent with Compiling -> Sent to Admin) go into the email and the change
+    $send_notes = isset($_POST['notes']) && !text_too_long($_POST['notes'], MAX_NOTE) ? san_str($_POST['notes'], MAX_NOTE) : (string)($fresh['notes'] ?? '');
 
     $upload_dir = __DIR__ . '/../../uploads/claims/';
 
@@ -225,12 +258,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_send_admin_email
         claim_type_badge($conn, $fresh['claim_type'])['label'],
         date('F d, Y', strtotime($fresh['incident_date'])),
         $docStatus,
-        $fresh['notes'] ?? null,
+        $send_notes !== '' ? $send_notes : null,
         $attachments
     );
 
     if (!$ok) api_error('Failed to send email. Check SMTP settings.', 500);
-    api_success([], 'Email sent successfully.');
+
+    // Sending the requirements is the "Sent to Admin" step (owner's choice, 2026-11-20): a claim still compiling moves
+    // there too, under the same rules as Update Status. Re-sending later (or from Lack of Requirements) only emails.
+    $moved = false;
+    if ($claim['status'] === 'compiling'
+        && claim_status_block_reason('sent_admin', $next_statuses, $policy_expired, fetchDocCounts($conn, $claim_id)['done']) === null) {
+        $moved = claim_move_status($conn, $claim, $claim_id, 'sent_admin', null, $send_notes);
+    }
+    api_success(['moved' => $moved], $moved ? 'Email sent. The claim is now Sent to Admin.' : 'Email sent successfully.');
 }
 
 // Shared delete routine — cleans up all files then removes DB row
@@ -291,60 +332,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
         exit;
     }
 
-    // Guard: block all status changes if policy is expired (except deny/resolve by admin)
-    if ($policy_expired && !in_array($new_status, ['denied', 'lack_of_requirements', 'resolved'])) {
-        header("Location: view_claim.php?id=$claim_id&error=" . urlencode('Policy is expired. Please renew the policy before processing this claim.'));
+    // One rule for every guard (config/access.php): a valid next step of the flow (a status switched off in the
+    // statuses table is skipped), the policy not expired except for deny / lack of requirements / resolve, and at
+    // least one requirement uploaded except for deny / lack of requirements
+    $block = claim_status_block_reason($new_status, $next_statuses, $policy_expired, $docs_done);
+    if ($block !== null) {
+        header("Location: view_claim.php?id=$claim_id&error=" . urlencode($block));
         exit;
     }
 
-    // Guard: block forward status changes if no documents uploaded yet (deny always allowed)
-    if (!in_array($new_status, ['denied', 'lack_of_requirements']) && $docs_done === 0) {
-        header("Location: view_claim.php?id=$claim_id&error=" . urlencode('Upload at least one requirement before updating the status.'));
+    if (!claim_move_status($conn, $claim, $claim_id, $new_status, $new_status === 'denied' ? $denial_reason : null, $notes)) {
+        header("Location: view_claim.php?id=$claim_id&error=" . urlencode('The status was changed by someone else. Please check it and try again.'));
         exit;
     }
-
-    // Guard: new status must be a valid next step for this claim
-    // the flow lives in config/access.php; a step whose status is switched off in the statuses table is skipped
-    $next_statuses = array_values(array_intersect(claim_next_statuses($claim['status']), array_keys(statuses_active('claim'))));
-    if (!in_array($new_status, $next_statuses)) {
-        header("Location: view_claim.php?id=$claim_id&error=" . urlencode('Invalid status transition.'));
-        exit;
-    }
-
-    if (in_array($new_status, $allowed_statuses)) {
-        $dr  = $new_status === 'denied' ? $denial_reason : null;
-        // The status change and its audit entry are saved together or not at all (includes/transaction.php)
-        // Only from the status this page was showing: the same form sent twice, or two people at once, change it
-        // (and email the client) once.
-        $from_status = $claim['status'];
-        $changed = db_transaction($conn, function () use ($conn, $claim_id, $from_status, $new_status, $dr, $notes) {
-            if (!claim_set_status($conn, $claim_id, $from_status, $new_status, $dr, $notes)) return false;
-
-            $desc = ($_SESSION['full_name'] ?? 'Unknown') . ' updated claim #' . $claim_id . ' status to ' . $new_status . '.';
-            audit_log_add($conn, $_SESSION['user_id'], 'CLAIM_UPDATED', $desc);
-            return true;
-        });
-        if (!$changed) {
-            header("Location: view_claim.php?id=$claim_id&error=" . urlencode('The status was changed by someone else. Please check it and try again.'));
-            exit;
-        }
-
-        // Send email notification to client if they have an email on file
-        if (!empty($claim['email'])) {
-            sendClaimStatusEmail(
-                $claim['email'],
-                $claim['full_name'],
-                claim_type_badge($conn, $claim['claim_type'])['label'],
-                $new_status,
-                $claim['policy_number'],
-                $claim['plate_number'] ?: 'N/A',
-                $new_status === 'denied' ? $denial_reason : null
-            );
-        }
-
-        header("Location: view_claim.php?id=$claim_id&success=" . urlencode('Claim status updated.'));
-        exit;
-    }
+    header("Location: view_claim.php?id=$claim_id&success=" . urlencode('Claim status updated.'));
+    exit;
 }
 
 
@@ -379,180 +381,203 @@ require_once '../../includes/topbar.php';
     <?php if (isset($_GET['error'])): ?>
     <script>
       document.addEventListener('DOMContentLoaded', function() {
-        Swal.fire({ icon:'error', title:'Cannot Submit', text:<?= json_encode($_GET['error']) ?>, confirmButtonColor:'#B8860B', customClass:{confirmButton:'swal-btn'} });
+        Swal.fire({ icon:'error', title:'Cannot Submit', text:<?= json_encode($_GET['error']) ?> });
       });
     </script>
     <?php endif; ?>
 
-    <!-- PAGE HEADER -->
-    <div class="claim-page-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:0.75rem;">
-      <div>
-        <div style="display:flex;align-items:center;gap:0.75rem;">
-          <a href="claims_list.php" class="back-link" onclick="goBack('claims_list.php'); return false;" style="margin-bottom:0;"><?= icon('arrow-left',14) ?> Back to Claims</a>
-          <h2 style="font-size:1.1rem;font-weight:800;color:var(--text-primary);"><?= htmlspecialchars($claim['full_name']) ?></h2>
-          <span class="badge <?= $s['class'] ?>"><?= htmlspecialchars($s['label']) ?></span>
-          <?php $ctb = claim_type_badge($conn, $claim['claim_type']); ?>
-          <span class="badge <?= $ctb['class'] ?>"><?= htmlspecialchars($ctb['label']) ?></span>
-        </div>
-        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.35rem;padding-left:0.2rem;">
-          Filed <?= date('M d, Y', strtotime($claim['created_at'])) ?> by <?= htmlspecialchars($claim['filed_by'] ?? 'Unknown') ?>
+    <?php
+    // ── what the page shows, worked out once ──
+    $status     = $claim['status'];
+    $ctb        = claim_type_badge($conn, $claim['claim_type']);
+    $docs_open  = claim_docs_open($status);
+    $billing_id = claim_is_billable($status) ? billing_id_for_claim($conn, $claim_id) : null;
+
+    // Status steps: the claim's main path from the flow (config/access.php), skipping a status switched off in the
+    // statuses table. Lack of Requirements / Denied are side branches: shown after the steps, the steps before the
+    // earliest one that can lead there count as done.
+    $active_codes = array_keys(statuses_active('claim'));
+    $path   = array_values(array_filter(claim_main_path(), fn($c) => in_array($c, $active_codes, true) || $c === $status));
+    $cur_i  = array_search($status, $path, true);
+    $branch = $cur_i === false ? $status : null;
+    $done_before = $cur_i === false ? 0 : $cur_i;
+    if ($branch !== null) {
+        foreach ($path as $i => $c) {
+            if (in_array($branch, CLAIM_STATUS_FLOW[$c] ?? [], true)) { $done_before = $i; break; }
+        }
+    }
+
+    // One line on what this stage means, in the words the shop uses
+    $stage_hint = [
+        'compiling'            => 'Upload the requirements below, then send them to the admin.',
+        'sent_admin'           => 'The requirements were sent to the admin. They can still be added or replaced until the claim goes to the head office.',
+        'lack_of_requirements' => 'Some requirements are missing. Reopen the claim to keep compiling.',
+        'sent_head_office'     => 'Forwarded to the head office. The requirements are locked from here on.',
+        'waiting_loa'          => 'Waiting for the Letter of Authority (LOA).',
+        'loa_received'         => 'The LOA is in. The billing can be created now.',
+        'pending'              => 'Being processed by the insurer.',
+        'approved'             => 'Approved. Mark it Resolved once it is settled.',
+        'resolved'             => 'This claim is finished.',
+        'denied'               => 'This claim was denied.',
+    ][$status] ?? '';
+    // What each possible next step does, shown under its name
+    $step_hint = [
+        'sent_admin'           => $status === 'compiling' ? 'Emails the requirements to the admin and moves the claim on.' : 'Back to the admin.',
+        'lack_of_requirements' => 'Stop here: requirements are missing.',
+        'compiling'            => 'Reopen to keep collecting requirements.',
+        'sent_head_office'     => 'Forward to the head office. Requirements lock after this.',
+        'waiting_loa'          => 'The head office is preparing the LOA.',
+        'loa_received'         => 'The LOA arrived. Billing opens after this.',
+        'pending'              => 'Now being processed by the insurer.',
+        'approved'             => 'The insurer approved the claim.',
+        'resolved'             => 'Finished. No more changes after this.',
+        'denied'               => 'The insurer denied the claim.',
+    ];
+    $dead_end = ['denied', 'lack_of_requirements'];
+    ?>
+
+    <!-- HEADER: who and what; the status itself is shown once, in the steps below -->
+    <div class="claim-head">
+      <div class="claim-head-main">
+        <a href="claims_list.php" class="back-link" onclick="goBack('claims_list.php'); return false;" aria-label="Back to Claims"><?= icon('arrow-left',14) ?></a>
+        <div style="min-width:0;">
+          <div class="claim-head-title">
+            <h2><?= htmlspecialchars($claim['full_name']) ?></h2>
+            <span class="badge <?= $ctb['class'] ?>"><?= htmlspecialchars($ctb['label']) ?></span>
+          </div>
+          <div class="claim-head-sub">
+            Claim #<?= (int)$display_num ?> · <?= htmlspecialchars($claim['policy_number']) ?> · Filed <?= date('M d, Y', strtotime($claim['created_at'])) ?> by <?= htmlspecialchars($claim['filed_by'] ?? 'Unknown') ?>
+          </div>
         </div>
       </div>
-      <?php
-      // Check if billing already exists for this claim
-      $billing_id_of_claim = billing_id_for_claim($conn, $claim_id);
-      $has_billing = $billing_id_of_claim === null ? null : ['billing_id' => $billing_id_of_claim];
-      ?>
-      <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-        <?php if (claim_is_billable($claim['status'])): ?>
-          <?php if ($has_billing): ?>
-          <a href="../billing/view_billing.php?id=<?= $has_billing['billing_id'] ?>" class="btn-sm-gold">
-            <?= icon('document-text',13) ?> View Billing
-          </a>
-          <?php else: ?>
-          <a href="../billing/add_billing.php?claim_id=<?= $claim_id ?>" class="btn-sm-gold">
-            <?= icon('document-text',13) ?> Create Billing
-          </a>
-          <?php endif; ?>
-        <?php endif; ?>
-        <?php if (claim_is_deletable($claim['status'])): ?>
-        <form method="POST" style="display:inline;">
-          <?= csrf_field() ?>
-          <input type="hidden" name="delete_claim" value="1"/>
-          <button type="button" class="btn-sm-danger js-delete-claim" data-id="<?= $claim_id ?>">
-            <?= icon('trash',13) ?> Delete
-          </button>
-        </form>
-        <?php endif; ?>
-      </div>
+      <?php if (claim_is_deletable($status)): ?>
+      <form method="POST" class="claim-head-actions">
+        <?= csrf_field() ?>
+        <input type="hidden" name="delete_claim" value="1"/>
+        <button type="button" class="btn-sm-danger js-delete-claim" data-id="<?= $claim_id ?>"><?= icon('trash',13) ?> Delete Claim</button>
+      </form>
+      <?php endif; ?>
     </div>
 
-    <!-- POLICY EXPIRED BANNER -->
     <?php if ($policy_expired): ?>
-    <div style="background:rgba(192,57,43,0.08);border:1.5px solid rgba(192,57,43,0.35);border-radius:10px;padding:0.85rem 1.1rem;margin-bottom:1rem;display:flex;align-items:center;gap:0.75rem;">
-      <span style="color:var(--danger);flex-shrink:0;"><?= icon('exclamation-triangle',18) ?></span>
+    <div class="claim-alert danger">
+      <?= icon('exclamation-triangle',18) ?>
       <div>
-        <div style="font-weight:700;color:var(--danger);font-size:0.88rem;">Policy Expired</div>
-        <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:0.1rem;">
-          This claim's policy (<strong><?= htmlspecialchars($claim['policy_number']) ?></strong>) expired on
-          <strong><?= date('M d, Y', strtotime($claim['policy_end'])) ?></strong>.
-          Document uploads and status changes (except Deny / Resolve) are locked until the policy is renewed.
-        </div>
+        <strong>Policy expired</strong>
+        Policy <?= htmlspecialchars($claim['policy_number']) ?> expired on <?= date('M d, Y', strtotime($claim['policy_end'])) ?>.
+        Uploads and most status changes are locked until it is renewed; only Deny, Lack of Requirements and Resolve stay open.
       </div>
     </div>
     <?php endif; ?>
 
-    <!-- STATUS FLOW -->
-    <?php
-    $flow_statuses = ['compiling','sent_admin','sent_head_office','waiting_loa','loa_received','pending','approved','resolved'];
-    $current = $claim['status'];
-    $current_idx = array_search($current, $flow_statuses);
-    $is_denied = $current === 'denied';
-    ?>
-    <div class="status-flow">
-      <?php foreach ($flow_statuses as $i => $step):
-        $step_label = claim_status_badge($step)['label'];
-        if ($is_denied && $step === 'approved') continue;
-        $class = '';
-        if ($is_denied && $step === 'sent_head_office') $class = 'denied-step';
-        elseif ($current_idx !== false && $i < $current_idx) $class = 'done';
-        elseif ($step === $current) $class = 'active';
+    <!-- STATUS STEPS -->
+    <ol class="claim-steps" aria-label="Claim progress">
+      <?php foreach ($path as $i => $code):
+        $state = $branch !== null ? ($i < $done_before ? 'done' : 'todo')
+               : ($i < $cur_i ? 'done' : ($i === $cur_i ? ($code === 'resolved' ? 'done current' : 'current') : 'todo'));
       ?>
-        <?php if ($i > 0 && !($is_denied && $step === 'approved')): ?><span class="status-arrow">&rsaquo;</span><?php endif; ?>
-        <div class="status-step <?= $class ?>">
-          <?php if ($class === 'done'): ?><?= icon('check-circle',11) ?><?php endif; ?>
-          <?= htmlspecialchars($step_label) ?>
-        </div>
+      <li class="claim-step <?= $state ?>"<?= str_contains($state, 'current') ? ' aria-current="step"' : '' ?>>
+        <span class="claim-step-dot"><?= str_contains($state, 'done') ? icon('check', 11) : $i + 1 ?></span>
+        <span class="claim-step-label"><?= htmlspecialchars(claim_status_badge($code)['label']) ?></span>
+      </li>
       <?php endforeach; ?>
-      <?php if ($is_denied): ?>
-        <span class="status-arrow">&rsaquo;</span>
-        <div class="status-step denied-step"><?= icon('x-circle',11) ?> Denied</div>
+      <?php if ($branch !== null): ?>
+      <li class="claim-step branch <?= $branch === 'denied' ? 'is-danger' : 'is-warning' ?>" aria-current="step">
+        <span class="claim-step-dot"><?= icon($branch === 'denied' ? 'x-mark' : 'exclamation-triangle', 11) ?></span>
+        <span class="claim-step-label"><?= htmlspecialchars(claim_status_badge($branch)['label']) ?></span>
+      </li>
       <?php endif; ?>
-    </div>
+    </ol>
 
-    <!-- TOP ROW: Client / Vehicle / Policy -->
-    <div class="claim-top-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1rem;">
-
-      <!-- CLIENT -->
-      <div class="card" style="margin-bottom:0;">
-        <div class="card-header">
-          <div class="card-icon"><?= icon('user',16) ?></div>
-          <div><div class="card-title">Client</div></div>
-        </div>
-        <div class="card-body" style="display:flex;flex-direction:column;gap:0.45rem;">
-          <?php foreach ([
-            ['Name',    $claim['full_name']],
-            ['Contact', $claim['contact_number']],
-          ] as $row): ?>
-          <div style="display:flex;justify-content:space-between;gap:0.75rem;padding:0.35rem 0;border-bottom:1px solid var(--border);font-size:0.8rem;">
-            <span style="color:var(--text-muted);font-weight:600;flex-shrink:0;"><?= $row[0] ?></span>
-            <span style="color:var(--text-primary);text-align:right;"><?= htmlspecialchars($row[1]) ?></span>
-          </div>
-          <?php endforeach; ?>
-        </div>
+    <!-- NEXT STEP: where the claim is and what can be done now, in one place -->
+    <section class="card claim-next" id="next-step">
+      <div class="claim-next-now">
+        <div class="claim-next-kicker">Current status</div>
+        <div class="claim-next-status"><span class="badge <?= $s['class'] ?>"><?= htmlspecialchars($s['label']) ?></span></div>
+        <?php if ($stage_hint): ?><p class="claim-next-hint"><?= htmlspecialchars($stage_hint) ?></p><?php endif; ?>
+        <?php if ($status === 'denied' && $claim['denial_reason']): ?>
+        <p class="claim-next-reason"><?= icon('x-circle', 13) ?> <?= htmlspecialchars($claim['denial_reason']) ?></p>
+        <?php endif; ?>
+        <?php if ($billing_id !== null): ?>
+        <a href="../billing/view_billing.php?id=<?= (int)$billing_id ?>" class="btn-sm-gold claim-next-billing"><?= icon('document-text',13) ?> View Billing</a>
+        <?php elseif (claim_is_billable($status)): ?>
+        <a href="../billing/add_billing.php?claim_id=<?= $claim_id ?>" class="btn-sm-gold claim-next-billing"><?= icon('document-text',13) ?> Create Billing</a>
+        <?php endif; ?>
       </div>
 
-      <!-- VEHICLE -->
-      <div class="card" style="margin-bottom:0;">
-        <div class="card-header">
-          <div class="card-icon"><?= icon('truck',16) ?></div>
-          <div><div class="card-title">Vehicle</div></div>
-        </div>
-        <div class="card-body" style="display:flex;flex-direction:column;gap:0.45rem;">
-          <?php foreach ([
-            ['Plate',   $claim['plate_number'] ?: '—'],
-            ['Vehicle', trim(($claim['make'] ?? '') . ' ' . ($claim['model'] ?? '') . ' ' . ($claim['year_model'] ?? '')) ?: '—'],
-            ['Color',   $claim['color'] ?: '—'],
-          ] as $row): ?>
-          <div style="display:flex;justify-content:space-between;gap:0.75rem;padding:0.35rem 0;border-bottom:1px solid var(--border);font-size:0.8rem;">
-            <span style="color:var(--text-muted);font-weight:600;flex-shrink:0;"><?= $row[0] ?></span>
-            <span style="color:var(--text-primary);text-align:right;"><?= htmlspecialchars($row[1]) ?></span>
+      <div class="claim-next-act">
+        <?php if (!$next_statuses): ?>
+        <div class="claim-next-done"><?= icon('lock-closed', 15) ?> No further steps. This claim is closed.</div>
+        <?php else: ?>
+        <form method="POST" id="status-form" data-sends-email="<?= $status === 'compiling' ? '1' : '0' ?>">
+          <?= csrf_field() ?>
+          <input type="hidden" name="update_status" value="1"/>
+          <div class="claim-next-kicker" id="next-step-label">Move the claim to</div>
+          <div class="next-options" role="radiogroup" aria-labelledby="next-step-label">
+            <?php foreach ($next_statuses as $code):
+              $reason     = claim_status_block_reason($code, $next_statuses, $policy_expired, $docs_done);
+              $needs_docs = $reason !== null && claim_status_block_reason($code, $next_statuses, $policy_expired, 1) === null;
+            ?>
+            <label class="next-option<?= in_array($code, $dead_end, true) ? ' is-danger' : '' ?><?= $reason !== null ? ' is-blocked' : '' ?>">
+              <input type="radio" name="new_status" value="<?= $code ?>"<?= $reason !== null ? ' disabled' : '' ?><?= $needs_docs ? ' data-needs-docs="1"' : '' ?>/>
+              <span class="next-option-body">
+                <span class="next-option-name">
+                  <?= $code === 'sent_admin' && $status === 'compiling' ? icon('envelope', 13) . ' ' : '' ?><?= htmlspecialchars(claim_status_badge($code)['label']) ?>
+                </span>
+                <span class="next-option-hint" data-hint="<?= htmlspecialchars($step_hint[$code] ?? '') ?>"><?= htmlspecialchars($reason ?? ($step_hint[$code] ?? '')) ?></span>
+              </span>
+            </label>
+            <?php endforeach; ?>
           </div>
-          <?php endforeach; ?>
-        </div>
-      </div>
 
-      <!-- POLICY -->
-      <div class="card" style="margin-bottom:0;">
-        <div class="card-header">
-          <div class="card-icon"><?= icon('shield-check',16) ?></div>
-          <div><div class="card-title">Policy</div></div>
-        </div>
-        <div class="card-body" style="display:flex;flex-direction:column;gap:0.45rem;">
-          <?php foreach ([
-            ['Policy No.',  $claim['policy_number']],
-            ['Coverage',    $claim['coverage_type']],
-            ['Expires',     date('M d, Y', strtotime($claim['policy_end']))],
-            ['Payment',     $claim['payment_status']],
-          ] as $row): ?>
-          <div style="display:flex;justify-content:space-between;gap:0.75rem;padding:0.35rem 0;border-bottom:1px solid var(--border);font-size:0.8rem;">
-            <span style="color:var(--text-muted);font-weight:600;flex-shrink:0;"><?= $row[0] ?></span>
-            <span style="color:var(--text-primary);text-align:right;"><?= htmlspecialchars($row[1]) ?></span>
+          <div class="field" id="denial-reason-wrap" hidden>
+            <label class="field-label" for="denial_reason">Denial Reason</label>
+            <select name="denial_reason" id="denial_reason" class="field-input">
+              <option value="">— Select Reason —</option>
+              <option value="Under the influence (DUI)">Under the influence (DUI)</option>
+              <option value="Commercial use — vehicle registered as private">Commercial use (Grab/Uber) — registered as private</option>
+              <option value="Incomplete or late premium payment">Incomplete or late premium payment</option>
+              <option value="Other">Other</option>
+            </select>
           </div>
-          <?php endforeach; ?>
-        </div>
+          <div class="field">
+            <label class="field-label" for="claim-notes">Claim notes <span class="field-optional">(optional, saved with the change)</span></label>
+            <textarea name="notes" id="claim-notes" class="field-input" rows="2" maxlength="<?= MAX_NOTE ?>" placeholder="Add a note..."><?= htmlspecialchars($claim['notes'] ?? '') ?></textarea>
+          </div>
+          <button type="submit" id="btn-update-status" class="btn-primary" disabled><?= icon('check-circle',14) ?> <span>Choose a step first</span></button>
+        </form>
+        <?php endif; ?>
       </div>
+    </section>
 
-    </div>
+    <div class="claim-grid">
 
-    <!-- BOTTOM ROW: Documents left, Incident + Update Status right -->
-    <div class="claim-bottom-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:start;">
-
-      <!-- LEFT: DOCUMENT CHECKLIST -->
-      <div class="card" style="margin-bottom:0;">
+      <!-- REQUIREMENTS -->
+      <section class="card claim-docs">
         <div class="card-header">
           <div class="card-icon"><?= icon('document',16) ?></div>
           <div>
-            <div class="card-title">Insurance Claim Requirements</div>
+            <div class="card-title">Requirements</div>
             <div class="card-sub" id="doc-count-sub"><?= $docs_done ?>/<?= $required_docs ?> documents received</div>
           </div>
           <div style="margin-left:auto;">
+            <?php if (!$docs_open): ?>
+            <span class="badge badge-muted"><?= icon('lock-closed',11) ?> Locked</span>
+            <?php else: ?>
             <span id="doc-badge" class="badge <?= $all_docs_complete ? 'badge-green' : 'badge-yellow' ?>">
               <?= $all_docs_complete ? icon('check-circle',12) . ' Complete' : ($required_docs - $docs_done) . ' remaining' ?>
             </span>
+            <?php endif; ?>
           </div>
         </div>
-        <div style="padding:1rem;display:flex;flex-direction:column;gap:0.6rem;">
+
+        <?php if (!$docs_open): ?>
+        <div class="claim-alert muted"><?= icon('lock-closed',14) ?> <div>The claim has gone past the admin, so these files can no longer be changed.</div></div>
+        <?php elseif ($policy_expired): ?>
+        <div class="claim-alert danger"><?= icon('lock-closed',14) ?> <div>Uploads are locked while the policy is expired.</div></div>
+        <?php endif; ?>
+
+        <div class="doc-list">
           <?php
           $docs = [
             ['doc_insurance_policy', 'Policy',                   'Copy of the insurance policy document'],
@@ -563,57 +588,43 @@ require_once '../../includes/topbar.php';
             ['doc_estimate',         'Estimate',                 'Written cost estimate from the repair shop for the damage'],
             // proof/pictures handled separately below as damage photos
           ];
-          $docs_locked = !claim_docs_open($claim['status']);
+          // the upload buttons follow the same rule as the server's upload handler: open status and policy not expired
+          $docs_locked = !$docs_open || $policy_expired;
           foreach ($docs as $d):
             $checked   = (bool)$claim[$d[0]];
-            $file_col  = $d[0] . '_file';
-            $file_name = $claim[$file_col] ?? '';
+            $file_name = $claim[$d[0] . '_file'] ?? '';
             $file_url  = $file_name ? htmlspecialchars(upload_url('claims', $file_name)) : '';
             $is_pdf    = $file_name && str_ends_with(strtolower($file_name), '.pdf');
           ?>
-          <div class="doc-item <?= $checked ? 'received' : '' ?> <?= $docs_locked ? 'locked' : '' ?>"
-               id="doc-item-<?= $d[0] ?>">
-            <!-- Left: status icon + label -->
-            <div class="doc-checkbox" id="doc-cb-<?= $d[0] ?>">
-              <?php if ($checked): ?><?= icon('check',12) ?><?php endif; ?>
-            </div>
-            <div style="flex:1;min-width:0;">
+          <div class="doc-item <?= $checked ? 'received' : '' ?> <?= $docs_locked ? 'locked' : '' ?>" id="doc-item-<?= $d[0] ?>">
+            <div class="doc-checkbox" id="doc-cb-<?= $d[0] ?>"><?php if ($checked): ?><?= icon('check',12) ?><?php endif; ?></div>
+            <div class="doc-main">
               <div class="doc-label" id="doc-label-<?= $d[0] ?>"><?= $d[1] ?></div>
               <div class="doc-sub"><?= $d[2] ?></div>
+              <?php if ($docs_locked && !$checked): ?><div class="doc-missing">Not submitted</div><?php endif; ?>
 
-              <?php if ($file_url): ?>
-              <!-- File preview -->
-              <div class="doc-preview" id="doc-preview-<?= $d[0] ?>" style="margin-top:0.5rem;">
-                <?php if ($is_pdf): ?>
-                  <a href="<?= $file_url ?>" target="_blank" class="doc-file-link">
-                    <?= icon('document',13) ?> View PDF
-                  </a>
-                <?php else: ?>
-                  <a href="<?= $file_url ?>" target="_blank">
-                    <img src="<?= $file_url ?>" alt="<?= $d[1] ?>" class="doc-thumb" loading="lazy"/>
-                  </a>
-                <?php endif; ?>
-                <?php if (!$docs_locked): ?>
-                <button type="button" class="doc-remove-btn" data-field="<?= $d[0] ?>" title="Remove">
-                  <?= icon('x-mark',11) ?> Remove
-                </button>
+              <div class="doc-preview" id="doc-preview-<?= $d[0] ?>"<?= $file_url ? '' : ' style="display:none;"' ?>>
+                <?php if ($file_url): ?>
+                  <?php if ($is_pdf): ?>
+                  <a href="<?= $file_url ?>" target="_blank" class="doc-file-link"><?= icon('document',13) ?> View PDF</a>
+                  <?php else: ?>
+                  <a href="<?= $file_url ?>" target="_blank"><img src="<?= $file_url ?>" alt="<?= $d[1] ?>" class="doc-thumb" loading="lazy"/></a>
+                  <?php endif; ?>
+                  <?php if (!$docs_locked): ?>
+                  <button type="button" class="doc-remove-btn" data-field="<?= $d[0] ?>" title="Remove"><?= icon('x-mark',11) ?> Remove</button>
+                  <?php endif; ?>
                 <?php endif; ?>
               </div>
-              <?php else: ?>
-              <div class="doc-preview" id="doc-preview-<?= $d[0] ?>" style="margin-top:0.5rem;display:none;"></div>
-              <?php endif; ?>
             </div>
-
-            <!-- Right: camera + gallery buttons (only when unlocked) -->
             <?php if (!$docs_locked): ?>
-            <div style="display:flex;flex-direction:column;gap:0.35rem;flex-shrink:0;margin-left:auto;">
-              <label class="doc-upload-btn" title="Take Photo" style="width:auto;padding:0 0.65rem;gap:0.35rem;font-size:0.7rem;font-weight:600;">
+            <div class="doc-actions">
+              <label class="doc-upload-btn" title="Take Photo">
                 <?= icon('camera', 14) ?> <span class="doc-btn-label">Camera</span>
-                <input type="file" accept="image/*" capture="environment" data-field="<?= $d[0] ?>" class="doc-file-input" style="display:none;"/>
+                <input type="file" accept="image/*" capture="environment" data-field="<?= $d[0] ?>" class="doc-file-input" hidden/>
               </label>
-              <label class="doc-upload-btn" title="Upload from Gallery / Files" style="width:auto;padding:0 0.65rem;gap:0.35rem;font-size:0.7rem;font-weight:600;">
+              <label class="doc-upload-btn" title="Upload from Gallery / Files">
                 <?= icon('arrow-up-tray', 14) ?> <span class="doc-btn-label">Gallery</span>
-                <input type="file" accept="image/*,application/pdf" data-field="<?= $d[0] ?>" class="doc-file-input" style="display:none;"/>
+                <input type="file" accept="image/*,application/pdf" data-field="<?= $d[0] ?>" class="doc-file-input" hidden/>
               </label>
             </div>
             <?php endif; ?>
@@ -621,186 +632,96 @@ require_once '../../includes/topbar.php';
           <?php endforeach; ?>
 
           <!-- DAMAGE PHOTOS — multi-upload -->
-          <?php
-          $dp_checked = (bool)$claim['doc_damage_photos'];
-          ?>
-          <div class="doc-item <?= $dp_checked ? 'received' : '' ?> <?= $docs_locked ? 'locked' : '' ?>"
-               id="doc-item-doc_damage_photos">
-            <div class="doc-checkbox" id="doc-cb-doc_damage_photos">
-              <?php if ($dp_checked): ?><?= icon('check',12) ?><?php endif; ?>
-            </div>
-            <div style="flex:1;min-width:0;">
+          <?php $dp_checked = (bool)$claim['doc_damage_photos']; ?>
+          <div class="doc-item <?= $dp_checked ? 'received' : '' ?> <?= $docs_locked ? 'locked' : '' ?>" id="doc-item-doc_damage_photos">
+            <div class="doc-checkbox" id="doc-cb-doc_damage_photos"><?php if ($dp_checked): ?><?= icon('check',12) ?><?php endif; ?></div>
+            <div class="doc-main">
               <div class="doc-label" id="doc-label-doc_damage_photos">Damage Photos</div>
               <div class="doc-sub">Clear photos showing the vehicle damage — upload as many as needed</div>
-
-              <!-- Photo grid -->
-              <div id="damage-photo-grid" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.6rem;">
-                <?php foreach ($damage_photos as $dp_i => $dp): ?>
-                <div class="dmg-photo-wrap" id="dmg-wrap-<?= $dp['photo_id'] ?>" style="position:relative;">
-                  <?php $dp_url = htmlspecialchars(upload_url('claims', $dp['filename'])); ?>
-                  <a href="<?= $dp_url ?>" target="_blank">
-                    <img src="<?= $dp_url ?>"
-                         alt="Damage evidence photo <?= $dp_i + 1 ?>" loading="lazy"
-                         style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border);display:block;"/>
-                  </a>
+              <?php if ($docs_locked && !$dp_checked): ?><div class="doc-missing">Not submitted</div><?php endif; ?>
+              <div id="damage-photo-grid" class="dmg-grid">
+                <?php foreach ($damage_photos as $dp_i => $dp): $dp_url = htmlspecialchars(upload_url('claims', $dp['filename'])); ?>
+                <div class="dmg-photo-wrap" id="dmg-wrap-<?= $dp['photo_id'] ?>">
+                  <a href="<?= $dp_url ?>" target="_blank"><img src="<?= $dp_url ?>" alt="Damage evidence photo <?= $dp_i + 1 ?>" loading="lazy" class="dmg-thumb"/></a>
                   <?php if (!$docs_locked): ?>
-                  <button type="button" class="dmg-remove-btn" data-id="<?= $dp['photo_id'] ?>" aria-label="Remove photo"
-                    style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--danger);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;line-height:1;">
-                    <?= icon('x-mark',10) ?>
-                  </button>
+                  <button type="button" class="dmg-remove-btn" data-id="<?= $dp['photo_id'] ?>" aria-label="Remove photo"><?= icon('x-mark',10) ?></button>
                   <?php endif; ?>
                 </div>
                 <?php endforeach; ?>
               </div>
-
-              <div id="damage-photo-count" style="font-size:0.7rem;color:var(--text-muted);margin-top:0.4rem;">
-                <?= count($damage_photos) ?> photo<?= count($damage_photos) !== 1 ? 's' : '' ?> uploaded
-              </div>
+              <?php if (!$docs_locked || $damage_photos): ?>
+              <div id="damage-photo-count" class="dmg-count"><?= count($damage_photos) ?> photo<?= count($damage_photos) !== 1 ? 's' : '' ?> uploaded</div>
+              <?php endif; ?>
             </div>
-
             <?php if (!$docs_locked): ?>
-            <div style="display:flex;flex-direction:column;gap:0.35rem;flex-shrink:0;margin-left:auto;">
-              <label class="doc-upload-btn" title="Take Photo" style="width:auto;padding:0 0.65rem;gap:0.35rem;font-size:0.7rem;font-weight:600;">
+            <div class="doc-actions">
+              <label class="doc-upload-btn" title="Take Photo">
                 <?= icon('camera', 14) ?> <span class="doc-btn-label">Camera</span>
-                <input type="file" accept="image/*" capture="environment" class="dmg-file-input" style="display:none;"/>
+                <input type="file" accept="image/*" capture="environment" class="dmg-file-input" hidden/>
               </label>
-              <label class="doc-upload-btn" title="Upload from Gallery" style="width:auto;padding:0 0.65rem;gap:0.35rem;font-size:0.7rem;font-weight:600;">
+              <label class="doc-upload-btn" title="Upload from Gallery">
                 <?= icon('arrow-up-tray', 14) ?> <span class="doc-btn-label">Gallery</span>
-                <input type="file" accept="image/*" multiple class="dmg-file-input" style="display:none;"/>
+                <input type="file" accept="image/*" multiple class="dmg-file-input" hidden/>
               </label>
             </div>
             <?php endif; ?>
           </div>
-
         </div>
 
-        <!-- ACTION BUTTONS — open while compiling/sent_admin/lack_of_requirements, locked after forwarded to head office -->
-        <?php if (claim_docs_open($claim['status']) && !$policy_expired): ?>
-        <div style="padding:0 1rem 1rem;display:flex;flex-direction:column;gap:0.5rem;" id="doc-action-btns">
-          <button type="button" id="btn-send-admin-email" class="btn-primary" style="width:100%;<?= $docs_done === 0 ? 'opacity:0.45;cursor:not-allowed;' : '' ?>" <?= $docs_done === 0 ? 'disabled' : '' ?>>
-            <?= icon('envelope',14) ?> Send Requirements to Admin
-          </button>
-          <div id="send-btn-hint" style="font-size:0.65rem;color:var(--text-muted);text-align:center;padding:0 0.5rem;"><?= $docs_done === 0 ? 'Upload at least one requirement before sending.' : 'Sends the current requirements checklist to the admin email for review and follow-up.' ?></div>
-        </div>
-        <?php elseif ($policy_expired && claim_docs_open($claim['status'])): ?>
-        <div style="padding:0 1rem 1rem;">
-          <button class="btn-primary" style="width:100%;opacity:0.45;cursor:not-allowed;background:var(--danger);border-color:var(--danger);" disabled>
-            <?= icon('lock-closed',14) ?> Policy Expired — Cannot Process
-          </button>
-        </div>
-        <?php elseif ($claim['status'] !== 'compiling'): ?>
-        <div style="padding:0 1rem 1rem;">
-          <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:0.65rem 1rem;font-size:0.75rem;color:var(--text-muted);display:flex;align-items:center;gap:0.5rem;">
-            <?= icon('lock-closed',13) ?> Documents locked — claim already forwarded.
-          </div>
+        <?php if ($docs_open && !$policy_expired && $status !== 'compiling'): ?>
+        <!-- Re-send (the first send is the "Sent to Admin" step above); only emails, the status stays -->
+        <div class="doc-resend">
+          <button type="button" id="btn-send-admin-email" class="btn-ghost"<?= $docs_done === 0 ? ' disabled' : '' ?>><?= icon('envelope',14) ?> Email the requirements to the admin again</button>
+          <div id="send-btn-hint" class="doc-resend-hint"><?= $docs_done === 0 ? 'Upload at least one requirement before sending.' : 'Only sends the email. The status stays the same.' ?></div>
         </div>
         <?php endif; ?>
-      </div>
+      </section>
 
-      <!-- RIGHT: INCIDENT DETAILS + UPDATE STATUS -->
-      <div style="display:flex;flex-direction:column;gap:1rem;">
-
-        <!-- INCIDENT DETAILS -->
-        <div class="card" style="margin-bottom:0;">
-          <div class="card-header">
-            <div class="card-icon"><?= icon('clipboard-list',16) ?></div>
-            <div><div class="card-title">Incident Details</div></div>
-          </div>
-          <div class="card-body">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem 1.5rem;margin-bottom:1rem;">
-              <div>
-                <div style="font-size:0.65rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:0.2rem;">Incident Date</div>
-                <div style="font-size:0.88rem;font-weight:600;color:var(--text-primary);"><?= date('F d, Y', strtotime($claim['incident_date'])) ?></div>
-              </div>
-              <div>
-                <div style="font-size:0.65rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:0.2rem;">Claim Type</div>
-                <div style="font-size:0.88rem;font-weight:600;color:var(--text-primary);"><?= htmlspecialchars(claim_type_badge($conn, $claim['claim_type'])['label']) ?></div>
-              </div>
-            </div>
-            <div>
-              <div style="font-size:0.65rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:0.4rem;">Description</div>
-              <div style="font-size:0.85rem;color:var(--text-secondary);line-height:1.7;"><?= nl2br(htmlspecialchars($claim['description'])) ?></div>
-            </div>
-            <?php if ($claim['denial_reason']): ?>
-            <div style="margin-top:1rem;padding:0.85rem;background:var(--danger-bg);border:1px solid rgba(192,57,43,0.2);border-radius:8px;">
-              <div style="font-size:0.65rem;color:var(--danger);font-weight:700;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:0.25rem;">Denial Reason</div>
-              <div style="font-size:0.85rem;color:var(--danger);"><?= htmlspecialchars($claim['denial_reason']) ?></div>
-            </div>
-            <?php endif; ?>
-            <?php if ($claim['notes']): ?>
-            <div style="margin-top:0.75rem;padding:0.85rem;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;">
-              <div style="font-size:0.65rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:0.25rem;">Notes</div>
-              <div style="font-size:0.82rem;color:var(--text-secondary);line-height:1.6;"><?= nl2br(htmlspecialchars($claim['notes'])) ?></div>
-            </div>
-            <?php endif; ?>
-          </div>
+      <!-- CLAIM DETAILS: incident, notes, client, vehicle, policy in one card -->
+      <aside class="card claim-details">
+        <div class="card-header">
+          <div class="card-icon"><?= icon('clipboard-list',16) ?></div>
+          <div><div class="card-title">Claim Details</div></div>
         </div>
+        <div class="card-body">
+          <div class="detail-group">
+            <div class="detail-group-title">Incident</div>
+            <dl class="detail-list">
+              <div><dt>Date</dt><dd><?= date('F d, Y', strtotime($claim['incident_date'])) ?></dd></div>
+              <div><dt>Type</dt><dd><?= htmlspecialchars($ctb['label']) ?></dd></div>
+            </dl>
+            <?php if (trim((string)$claim['description']) !== ''): ?>
+            <p class="detail-text"><?= nl2br(htmlspecialchars($claim['description'])) ?></p>
+            <?php endif; ?>
+          </div>
 
-        <!-- UPDATE STATUS -->
-        <?php if ($claim['status'] !== 'resolved'): ?>
-        <div class="card" style="margin-bottom:0;">
-          <div class="card-header">
-            <div class="card-icon"><?= icon('cog',16) ?></div>
-            <div><div class="card-title">Update Status</div></div>
+          <?php if ($claim['denial_reason'] && $status !== 'denied'): ?>
+          <div class="detail-note danger"><div class="detail-group-title">Denial Reason</div><?= htmlspecialchars($claim['denial_reason']) ?></div>
+          <?php endif; ?>
+          <?php if ($claim['notes']): ?>
+          <div class="detail-note"><div class="detail-group-title">Notes</div><?= nl2br(htmlspecialchars($claim['notes'])) ?></div>
+          <?php endif; ?>
+
+          <?php foreach ([
+            'Client'  => [['Name', $claim['full_name']], ['Contact', $claim['contact_number'] ?: '—']],
+            'Vehicle' => [['Plate', $claim['plate_number'] ?: '—'],
+                          ['Vehicle', trim(($claim['make'] ?? '') . ' ' . ($claim['model'] ?? '') . ' ' . ($claim['year_model'] ?? '')) ?: '—'],
+                          ['Color', $claim['color'] ?: '—']],
+            'Policy'  => [['Policy No.', $claim['policy_number']], ['Coverage', $claim['coverage_type']],
+                          ['Expires', date('M d, Y', strtotime($claim['policy_end']))], ['Payment', $claim['payment_status']]],
+          ] as $group => $rows): ?>
+          <div class="detail-group">
+            <div class="detail-group-title"><?= $group ?></div>
+            <dl class="detail-list">
+              <?php foreach ($rows as [$k, $v]): ?>
+              <div><dt><?= $k ?></dt><dd<?= $k === 'Expires' && $policy_expired ? ' class="is-danger"' : '' ?>><?= htmlspecialchars((string)$v) ?></dd></div>
+              <?php endforeach; ?>
+            </dl>
           </div>
-          <div class="card-body">
-            <?php
-            $next_statuses = array_values(array_intersect(claim_next_statuses($claim['status']), array_keys(statuses_active('claim'))));
-            // When policy expired, only allow deny or resolve
-            $allowed_next = $policy_expired
-                ? array_values(array_intersect($next_statuses, ['denied', 'resolved']))
-                : $next_statuses;
-            ?>
-            <?php if ($policy_expired && empty($allowed_next)): ?>
-            <div style="text-align:center;padding:1.25rem 0.5rem;">
-              <div style="color:var(--danger);margin-bottom:0.5rem;"><?= icon('lock-closed',24) ?></div>
-              <div style="font-size:0.82rem;font-weight:700;color:var(--danger);">Status Locked</div>
-              <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.3rem;">Policy has expired. Renew the policy to continue processing this claim.</div>
-            </div>
-            <?php else: ?>
-            <?php if ($policy_expired): ?>
-            <div style="background:rgba(192,57,43,0.07);border:1px solid rgba(192,57,43,0.25);border-radius:8px;padding:0.55rem 0.75rem;margin-bottom:0.75rem;font-size:0.75rem;color:var(--danger);">
-              <?= icon('exclamation-triangle',13) ?> Policy expired — only Deny or Resolve is available.
-            </div>
-            <?php endif; ?>
-            <form method="POST" id="status-form">
-              <?= csrf_field() ?>
-              <input type="hidden" name="update_status" value="1"/>
-              <div class="field" style="margin-bottom:0.75rem;">
-                <label class="field-label">New Status</label>
-                <select name="new_status" id="new_status" class="field-input">
-                  <?php foreach ($allowed_next as $val):
-                    $st = claim_status_badge($val);
-                  ?>
-                  <option value="<?= $val ?>"><?= htmlspecialchars($st['label']) ?></option>
-                  <?php endforeach; ?>
-                </select>
-              </div>
-              <div class="field" id="denial-reason-wrap" style="display:none;margin-bottom:0.75rem;">
-                <label class="field-label">Denial Reason</label>
-                <select name="denial_reason" class="field-input">
-                  <option value="">— Select Reason —</option>
-                  <option value="Under the influence (DUI)">Under the influence (DUI)</option>
-                  <option value="Commercial use — vehicle registered as private">Commercial use (Grab/Uber) — registered as private</option>
-                  <option value="Incomplete or late premium payment">Incomplete or late premium payment</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-              <div class="field" style="margin-bottom:0.75rem;">
-                <label class="field-label">Notes <span style="color:var(--text-muted);font-weight:400;">(optional)</span></label>
-                <textarea name="notes" class="field-input" rows="2" maxlength="<?= MAX_NOTE ?>" placeholder="Add a note..."><?= htmlspecialchars($claim['notes'] ?? '') ?></textarea>
-              </div>
-              <button type="submit" id="btn-update-status" class="btn-primary" style="width:100%;<?= $docs_done === 0 ? 'opacity:0.45;cursor:not-allowed;' : '' ?>" <?= $docs_done === 0 ? 'disabled' : '' ?>>
-                <?= icon('check-circle',14) ?> Update Status
-              </button>
-              <div id="status-btn-hint" style="font-size:0.65rem;color:var(--text-muted);text-align:center;margin-top:0.4rem;<?= $docs_done === 0 ? '' : 'display:none;' ?>">Upload at least one requirement first.</div>
-            </form>
-            <?php endif; ?>
-          </div>
+          <?php endforeach; ?>
         </div>
-        <?php endif; ?>
+      </aside>
 
-      </div>
     </div>
 
   </div>
@@ -820,53 +741,4 @@ const xIcon      = `<?= icon('x-mark', 10) ?>`;
 
 <?php require_once '../../includes/footer.php'; ?>
 
-<script>
-(function() {
-  var btn = document.getElementById('btn-send-admin-email');
-  if (!btn) return;
 
-  btn.addEventListener('click', function() {
-    Swal.fire({
-      title: 'Send to Admin?',
-      html: 'This will email the current requirements checklist to the admin for review.',
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, Send Email',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: '#D4A017',
-    }).then(function(result) {
-      if (!result.isConfirmed) return;
-
-      btn.disabled = true;
-      btn.classList.add('btn-sending');
-      btn.innerHTML = '<span class="tg-spinner"></span> Sending...';
-      if (window.TGLoader) window.TGLoader.start();
-
-      var fd = new FormData();
-      fd.append('ajax_send_admin_email', '1');
-      fd.append('csrf_token', CSRF_TOKEN);
-
-      fetch('view_claim.php?id=<?= $claim_id ?>', { method: 'POST', body: fd })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          if (window.TGLoader) window.TGLoader.done();
-          btn.disabled = false;
-          btn.classList.remove('btn-sending');
-          btn.innerHTML = '<?= icon("envelope", 14) ?> Send Requirements to Admin';
-          if (data.ok) {
-            Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Email sent to admin.', showConfirmButton: false, timer: 3000, timerProgressBar: true });
-          } else {
-            Swal.fire({ icon: 'error', title: 'Failed to Send', text: data.message || 'Could not send email. Check SMTP settings.' });
-          }
-        })
-        .catch(function() {
-          if (window.TGLoader) window.TGLoader.done();
-          btn.disabled = false;
-          btn.classList.remove('btn-sending');
-          btn.innerHTML = '<?= icon("envelope", 14) ?> Send Requirements to Admin';
-          Swal.fire({ icon: 'error', title: 'Error', text: 'An unexpected error occurred.' });
-        });
-    });
-  });
-})();
-</script>

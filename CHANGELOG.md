@@ -8,6 +8,23 @@ All notable changes to TG-BASICS. Versions follow [Semantic Versioning](https://
 
 The current version is set in `config/version.php` and shown at the bottom of the sidebar, in the landing-page footer, and in Settings > My Account > About This System. Versions before 1.0.0 were reconstructed from the Git history (first commit 2026-03-17).
 
+## [2.6.0] - 2026-11-20
+
+### Changed
+- New Repair Job > Unit Inspection: one car seen from above (front at the top, driver and passenger sides labelled) instead of five separate views; each part carries a number that matches the list
+- The inspection list is grouped into sectors (Front, Left side, Right side, Rear, Wheels), each with an "OK" / "n damaged" badge, plus a summary of damaged areas at the top
+- Each area's condition is one No Damage / Minor Scratch / Major Damage switch; its notes field appears once the area is marked damaged
+- Hovering a row lights up its part on the car and the other way round; parts can be opened with the keyboard (Enter) and closed with Escape
+- On phones the car sits above the list with no sideways scrolling, and a tapped part opens a sheet at the bottom of the screen with large buttons
+- View Claim reorganised: the status steps, then one Next Step card (the current status, what it means, and the steps allowed now, each explaining what it does or why it is blocked), then the requirements beside one Claim Details card (incident, notes, client, vehicle, policy). The name, status and claim type no longer repeat across the page
+- View Claim: Send to Admin is now the "Sent to Admin" step itself: it emails the requirements and moves the claim from Compiling Requirements to Sent to Admin in one go. While the claim is still with the admin, the requirements can be emailed again without changing the status
+- View Claim: once the requirements are locked, they show a Locked badge and "Not submitted" for the missing ones, instead of a "remaining" count and empty checkboxes
+
+### Fixed
+- View Claim: Lack of Requirements was blocked on screen when nothing had been uploaded, or when the policy had expired, although the server allowed it; the page and the server now follow the same rule
+- View Claim: the progress bar showed every denied claim as denied at Sent to Head Office (even one denied later), and showed no current step at all for a Lack of Requirements claim; both now appear as their own step after the bar
+- Unit Inspection: the fenders and roof could be clicked on the diagram but were never saved; only the areas that are saved can be clicked now
+
 ## [2.5.0] - 2026-11-11
 
 ### Added

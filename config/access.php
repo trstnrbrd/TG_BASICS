@@ -70,6 +70,16 @@ const REPAIR_CHECKLIST_AREAS = [
     'tires_wheels' => 'Tires / Wheels',
 ];
 
+// How New Repair Job groups those areas into sectors (the list beside the diagram, and its numbering).
+// Left = driver side (left-hand drive). An area missing here still shows, under "Other".
+const REPAIR_CHECKLIST_SECTORS = [
+    'front'  => ['label' => 'Front',                'areas' => ['front_bumper', 'hood', 'headlights', 'windshield']],
+    'left'   => ['label' => 'Left side (driver)',   'areas' => ['door_fl', 'door_rl', 'mirror_left']],
+    'right'  => ['label' => 'Right side (passenger)', 'areas' => ['door_fr', 'door_rr', 'mirror_right']],
+    'rear'   => ['label' => 'Rear',                 'areas' => ['trunk', 'rear_bumper', 'taillights']],
+    'wheels' => ['label' => 'Wheels',               'areas' => ['tires_wheels']],
+];
+
 // The condition an area can be marked with (repair_checklist.condition_value): label, text colour, background
 const REPAIR_DAMAGE_LEVELS = [
     'none'  => ['label' => 'No Damage',     'color' => '#6B7280', 'bg' => 'rgba(107,114,128,0.1)'],

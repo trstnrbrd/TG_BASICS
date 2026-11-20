@@ -122,34 +122,64 @@ require_once '../../includes/topbar.php';
     </script>
     <?php endif; ?>
 
-    <!-- PAGE HEADER -->
-    <div class="vb-header">
-      <div class="vb-header-left">
-        <a href="billing_list.php" class="btn-ghost vb-back" onclick="goBack('billing_list.php'); return false;"><?= icon('arrow-left', 14) ?></a>
-        <div>
+    <?php
+    // ── what the page shows, worked out once ──
+    $peso     = fn($n) => '₱' . number_format((float)$n, 2);
+    $vehicle  = trim(($billing['year_model'] ?? '') . ' ' . ($billing['make'] ?? '') . ' ' . ($billing['model'] ?? ''));
+    $initials = implode('', array_map(fn($w) => mb_substr($w, 0, 1), array_slice(preg_split('/\s+/', trim($billing['full_name'])) ?: [], 0, 2)));
+    $docs_pct = $docs ? round($docs_done / count($docs) * 100) : 0;
+    ?>
+
+    <!-- HERO: which statement, its status and amount due, the milestones and the actions -->
+    <section class="card vb-hero">
+      <div class="vb-hero-top">
+        <a href="billing_list.php" class="back-link vb-back" onclick="goBack('billing_list.php'); return false;" aria-label="Back to Billing"><?= icon('arrow-left', 14) ?></a>
+        <div class="vb-hero-id">
+          <div class="vb-kicker">Billing Statement</div>
           <div class="vb-title-row">
-            <span class="vb-title"><?= htmlspecialchars($billing['billing_number']) ?></span>
+            <h2 class="vb-title"><?= htmlspecialchars($billing['billing_number']) ?></h2>
             <span class="badge <?= $sb['class'] ?>"><?= htmlspecialchars($sb['label']) ?></span>
           </div>
-          <div class="vb-subtitle">
-            <?= htmlspecialchars($billing['full_name']) ?> &nbsp;·&nbsp;
-            <?= htmlspecialchars($billing['plate_number'] ?? '—') ?> &nbsp;·&nbsp;
-            Created <?= date('M d, Y', strtotime($billing['created_at'])) ?>
+          <div class="vb-meta">
+            <span><?= icon('building-office', 12) ?> <?= htmlspecialchars($billing['billed_to']) ?></span>
+            <span><?= icon('user', 12) ?> <?= htmlspecialchars($billing['full_name']) ?></span>
+            <span><?= icon('truck', 12) ?> <?= htmlspecialchars($billing['plate_number'] ?? '—') ?></span>
+            <span><?= icon('shield-check', 12) ?> <?= htmlspecialchars($billing['policy_number']) ?></span>
           </div>
         </div>
+        <div class="vb-hero-total">
+          <div class="vb-kicker">Total Amount Due</div>
+          <div class="vb-total-amount"><?= $peso($billing['total_amount_due']) ?></div>
+          <?php if ((float)$billing['deductible'] > 0): ?><div class="vb-total-note">after <?= $peso($billing['deductible']) ?> deductible</div><?php endif; ?>
+        </div>
       </div>
-      <div class="vb-header-right">
-        <button type="button" class="btn-ghost" onclick="document.getElementById('status-modal').classList.add('open')">
-          <?= icon('arrow-path', 14) ?> Update Status
-        </button>
-        <button type="button" class="btn-primary" onclick="window.print()">
-          <?= icon('printer', 14) ?> Print
-        </button>
-        <button type="button" id="delete-billing-btn" data-num="<?= htmlspecialchars($billing['billing_number']) ?>" class="vb-btn-delete">
-          <?= icon('trash', 14) ?> Delete
-        </button>
+
+      <div class="vb-hero-bottom">
+        <ol class="vb-milestones" aria-label="Billing milestones">
+          <li class="done">
+            <span class="vb-ms-dot"><?= icon('check', 10) ?></span>
+            <span><span class="vb-ms-label">Created</span><span class="vb-ms-val"><?= date('M d, Y', strtotime($billing['created_at'])) ?> · <?= htmlspecialchars($billing['created_by_name'] ?? '—') ?></span></span>
+          </li>
+          <li class="<?= $billing['sent_at'] ? 'done' : '' ?>">
+            <span class="vb-ms-dot"><?= $billing['sent_at'] ? icon('check', 10) : icon('paper-airplane', 10) ?></span>
+            <span><span class="vb-ms-label">Sent to insurer</span><span class="vb-ms-val"><?= $billing['sent_at'] ? date('M d, Y g:i A', strtotime($billing['sent_at'])) : 'Not yet' ?></span></span>
+          </li>
+          <li class="<?= $docs && $docs_done === count($docs) ? 'done' : '' ?>">
+            <span class="vb-ms-dot"><?= $docs && $docs_done === count($docs) ? icon('check', 10) : icon('paper-clip', 10) ?></span>
+            <span><span class="vb-ms-label">Documents</span><span class="vb-ms-val"><?= $docs_done ?> of <?= count($docs) ?> received</span></span>
+          </li>
+          <li class="is-muted">
+            <span class="vb-ms-dot"><?= icon('clock', 10) ?></span>
+            <span><span class="vb-ms-label">Last updated</span><span class="vb-ms-val"><?= date('M d, Y g:i A', strtotime($billing['updated_at'])) ?></span></span>
+          </li>
+        </ol>
+        <div class="vb-actions">
+          <button type="button" class="btn-ghost" onclick="document.getElementById('status-modal').classList.add('open')"><?= icon('arrow-path', 14) ?> Update Status</button>
+          <button type="button" class="btn-primary" onclick="window.print()"><?= icon('printer', 14) ?> Print</button>
+          <button type="button" id="delete-billing-btn" data-num="<?= htmlspecialchars($billing['billing_number']) ?>" class="vb-btn-delete"><?= icon('trash', 14) ?> Delete</button>
+        </div>
       </div>
-    </div>
+    </section>
 
     <!-- MAIN GRID -->
     <div class="vb-grid">
@@ -245,73 +275,49 @@ require_once '../../includes/topbar.php';
           </div>
         </div>
 
-        <!-- TIMELINE -->
-        <div class="card">
-          <div class="card-header">
-            <div class="card-icon"><?= icon('clock', 16) ?></div>
-            <div><div class="card-title">Timeline</div></div>
-          </div>
-          <div class="vb-timeline">
-            <?php
-            $tl = [
-                ['Created',      date('M d, Y g:i A', strtotime($billing['created_at']))],
-                ['Last Updated', date('M d, Y g:i A', strtotime($billing['updated_at']))],
-                ['Created By',   htmlspecialchars($billing['created_by_name'] ?? '—')],
-            ];
-            if ($billing['sent_at']) $tl[] = ['Sent to Insurer', date('M d, Y g:i A', strtotime($billing['sent_at']))];
-            foreach ($tl as [$lbl, $val]): ?>
-            <div>
-              <div class="vb-tl-label"><?= $lbl ?></div>
-              <div class="vb-tl-val"><?= $val ?></div>
-            </div>
-            <?php endforeach; ?>
-          </div>
-        </div>
-
       </div>
 
-      <!-- RIGHT: CONTROLS -->
-      <div>
+      <!-- RIGHT: who it is for, the documents, and the edit form -->
+      <div class="vb-side">
 
-        <!-- QUICK INFO -->
-        <div class="card">
-          <div class="card-header">
-            <div class="card-icon"><?= icon('user', 16) ?></div>
+        <!-- CLIENT & POLICY -->
+        <section class="card vb-client">
+          <div class="vb-client-top">
+            <div class="vb-avatar" aria-hidden="true"><?= htmlspecialchars(mb_strtoupper($initials)) ?></div>
+            <div class="vb-client-id">
+              <div class="vb-client-name"><?= htmlspecialchars($billing['full_name']) ?></div>
+              <div class="vb-client-sub"><?= htmlspecialchars($billing['contact_number'] ?: 'No contact number') ?></div>
+            </div>
+          </div>
+          <div class="vb-vehicle">
+            <span class="vb-plate"><?= htmlspecialchars($billing['plate_number'] ?? '—') ?></span>
             <div>
-              <div class="card-title">Client &amp; Policy</div>
-              <div class="card-sub"><?= htmlspecialchars($billing['policy_number']) ?></div>
+              <div class="vb-vehicle-name"><?= htmlspecialchars($vehicle ?: '—') ?></div>
+              <div class="vb-client-sub"><?= htmlspecialchars($billing['coverage_type'] ?? '—') ?> coverage</div>
             </div>
           </div>
-          <div class="vb-info-list">
-            <?php
-            $info_rows = [
-                ['Client',   htmlspecialchars($billing['full_name'])],
-                ['Contact',  htmlspecialchars($billing['contact_number'] ?? '—')],
-                ['Plate',    htmlspecialchars($billing['plate_number'] ?? '—')],
-                ['Coverage', htmlspecialchars($billing['coverage_type'] ?? '—')],
-            ];
-            foreach ($info_rows as [$lbl, $val]): ?>
-            <div class="billing-detail-row">
-              <span class="billing-detail-label"><?= $lbl ?></span>
-              <span class="billing-detail-val"><?= $val ?></span>
-            </div>
-            <?php endforeach; ?>
-            <div class="vb-info-links">
-              <a href="../claims/view_claim.php?id=<?= $billing['claim_id'] ?>" class="btn-sm-gold"><?= icon('clipboard-list', 12) ?> Claim</a>
-              <a href="../clients/view_client.php?id=<?= $billing['client_id'] ?>" class="btn-sm-gold"><?= icon('user', 12) ?> Client</a>
-            </div>
+          <dl class="vb-dl">
+            <div><dt>Policy No.</dt><dd><?= htmlspecialchars($billing['policy_number']) ?></dd></div>
+            <div><dt>Incident Date</dt><dd><?= $billing['incident_date'] ? date('M d, Y', strtotime($billing['incident_date'])) : '—' ?></dd></div>
+            <div><dt>Repair Date</dt><dd><?= $billing['repair_date'] ? date('M d, Y', strtotime($billing['repair_date'])) : '—' ?></dd></div>
+          </dl>
+          <div class="vb-info-links">
+            <a href="../claims/view_claim.php?id=<?= $billing['claim_id'] ?>" class="btn-ghost"><?= icon('clipboard-list', 13) ?> View Claim</a>
+            <a href="../clients/view_client.php?id=<?= $billing['client_id'] ?>" class="btn-ghost"><?= icon('user', 13) ?> View Client</a>
           </div>
-        </div>
+        </section>
 
         <!-- REQUIRED DOCUMENTS -->
-        <div class="card">
+        <section class="card vb-docs">
           <div class="card-header">
             <div class="card-icon vb-icon-soft"><?= icon('paper-clip', 16) ?></div>
             <div>
               <div class="card-title">Required Documents</div>
               <div class="card-sub"><?= $docs_done ?>/<?= count($docs) ?> received</div>
             </div>
+            <span class="badge <?= $docs && $docs_done === count($docs) ? 'badge-green' : 'badge-yellow' ?> vb-docs-badge"><?= $docs && $docs_done === count($docs) ? 'Complete' : (count($docs) - $docs_done) . ' missing' ?></span>
           </div>
+          <div class="vb-bar" role="progressbar" aria-valuenow="<?= $docs_pct ?>" aria-valuemin="0" aria-valuemax="100" aria-label="Documents received"><span class="vb-bar-fill" style="width:<?= $docs_pct ?>%"></span></div>
           <form method="POST" action="" class="vb-docs-form">
             <?= csrf_field() ?>
             <input type="hidden" name="action" value="update_docs"/>
@@ -319,7 +325,7 @@ require_once '../../includes/topbar.php';
               $checked = $d['received']; ?>
             <label class="billing-doc-check <?= $checked ? 'checked' : '' ?>">
               <input type="checkbox" name="doc[]" value="<?= (int)$d['doc_type_id'] ?>" <?= $checked ? 'checked' : '' ?>
-                onchange="this.closest('form').submit()" style="display:none;"/>
+                onchange="this.closest('form').submit()" class="vb-hidden-input"/>
               <div class="billing-doc-tick <?= $checked ? 'done' : '' ?>"><?= $checked ? icon('check', 11) : '' ?></div>
               <div>
                 <div class="billing-doc-name"><?= htmlspecialchars($d['name']) ?></div>
@@ -328,17 +334,18 @@ require_once '../../includes/topbar.php';
             </label>
             <?php endforeach; ?>
           </form>
-        </div>
+        </section>
 
-        <!-- EDIT DETAILS -->
-        <div class="card">
-          <div class="card-header">
+        <!-- EDIT DETAILS (folded: the statement on the left already shows every value) -->
+        <details class="card vb-edit" id="edit-details">
+          <summary class="card-header vb-edit-summary">
             <div class="card-icon"><?= icon('pencil', 16) ?></div>
             <div>
               <div class="card-title">Edit Details</div>
-              <div class="card-sub">Update costs, dates, or insurer</div>
+              <div class="card-sub">Billed to, cashier, dates, amounts and notes</div>
             </div>
-          </div>
+            <span class="vb-edit-chevron"><?= icon('chevron-down', 14) ?></span>
+          </summary>
           <form method="POST" action="" class="vb-edit-form">
             <?= csrf_field() ?>
             <input type="hidden" name="action" value="update_costs"/>
@@ -424,7 +431,7 @@ require_once '../../includes/topbar.php';
               <button type="submit" class="btn-sm-gold"><?= icon('check', 13) ?> Save Changes</button>
             </div>
           </form>
-        </div>
+        </details>
 
 
       </div>

@@ -467,3 +467,5 @@
   .qv-total-amount { font-size: 1.5rem; }
   .qv-pay-fields { grid-template-columns: 1fr; }
 }
+/* the payment badge stays beside the Billing Statement title on a phone (app.css moves it to its own row) */
+.qv-pay > .card-header > .badge { flex: 0 0 auto; margin-left: auto !important; }

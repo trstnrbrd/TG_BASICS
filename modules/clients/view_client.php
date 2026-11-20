@@ -156,6 +156,7 @@ require_once '../../includes/navbar.php';
 ?>
 
 <link rel="stylesheet" href="../../assets/css/shared/clients.css?v=<?= filemtime(__DIR__ . '/../../assets/css/shared/clients.css') ?>"/>
+<link rel="stylesheet" href="../../assets/css/shared/view_client.css?v=<?= filemtime(__DIR__ . '/../../assets/css/shared/view_client.css') ?>"/>
 
 <div class="main">
 
@@ -179,12 +180,7 @@ require_once '../../includes/topbar.php';
     <?php if (!empty($_GET['error'])): ?>
     <script>
       document.addEventListener('DOMContentLoaded', function() {
-        Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: <?= json_encode($_GET['error']) ?>,
-          confirmButtonColor: '#B8860B'
-        });
+        Swal.fire({ icon: 'error', title: 'Error', text: <?= json_encode($_GET['error']) ?> });
       });
     </script>
     <?php endif; ?>
@@ -195,34 +191,30 @@ require_once '../../includes/topbar.php';
         $public_token = client_ensure_public_token($conn, $client_id);
     }
     $public_url = app_url('modules/public/client.php?token=' . urlencode($public_token));
+    $initials   = implode('', array_map(fn($w) => mb_substr($w, 0, 1), array_slice(preg_split('/\s+/', trim($client['full_name'])) ?: [], 0, 2)));
     ?>
 
     <!-- CLIENT HEADER BANNER -->
-    <div style="background:var(--btn-bg);border-radius:12px;padding:1.5rem 1.75rem;margin-bottom:1.25rem;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
-      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--gold-bright),var(--gold-muted),transparent);"></div>
-      <div style="position:absolute;right:2rem;top:50%;transform:translateY(-50%);font-size:5rem;font-weight:800;color:rgba(212,160,23,0.05);pointer-events:none;"><?= icon('user', 28) ?></div>
-      <div style="position:relative;z-index:1;">
-        <div style="font-size:0.7rem;color:rgba(200,192,176,0.45);letter-spacing:1.5px;text-transform:uppercase;font-weight:600;margin-bottom:0.3rem;">Client Profile</div>
-        <div style="font-size:1.4rem;font-weight:800;color:#fff;letter-spacing:-0.3px;margin-bottom:0.2rem;"><?= htmlspecialchars($client['full_name']) ?></div>
-        <div style="font-size:0.78rem;color:rgba(200,192,176,0.5);">
-           <?= htmlspecialchars($client['contact_number'] ?? '') ?>
-          <?php if ($client['email']): ?>
-          &nbsp;&nbsp; <?= htmlspecialchars($client['email']) ?>
-          <?php endif; ?>
+    <div class="vc-banner">
+      <div class="vc-banner-main">
+        <div class="vc-banner-avatar" aria-hidden="true"><?= htmlspecialchars(mb_strtoupper($initials)) ?></div>
+        <div class="vc-banner-id">
+          <div class="vc-banner-kicker">Client Profile<?php if (!empty($client['client_code'])): ?> · <span class="vc-banner-code"><?= htmlspecialchars($client['client_code']) ?></span><?php endif; ?></div>
+          <div class="vc-banner-name"><?= htmlspecialchars($client['full_name']) ?></div>
+          <div class="vc-banner-meta">
+            <?php if ($client['contact_number']): ?><span><?= icon('phone', 12) ?> <?= htmlspecialchars($client['contact_number']) ?></span><?php endif; ?>
+            <?php if ($client['email']): ?><span><?= icon('envelope', 12) ?> <?= htmlspecialchars($client['email']) ?></span><?php endif; ?>
+            <?php if (!$is_mechanic): ?><span><?= icon('user', 12) ?> Agent: <?= htmlspecialchars($client['agent_name'] ?? 'Unassigned') ?></span><?php endif; ?>
+          </div>
         </div>
       </div>
       <?php if ($can_edit): ?>
-      <div style="position:relative;z-index:1;display:flex;gap:0.6rem;flex-shrink:0;">
-        <a href="edit_client.php?id=<?= $client_id ?>" class="btn-ghost" style="background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.1);color:rgba(200,192,176,0.7);">
-          <?= icon('pencil', 14) ?> Edit Client
-        </a>
-        <form method="POST" action="" style="display:inline;">
+      <div class="vc-banner-actions">
+        <a href="edit_client.php?id=<?= $client_id ?>" class="vc-banner-btn"><?= icon('pencil', 14) ?> Edit Client</a>
+        <form method="POST" action="" class="vc-inline-form">
           <?= csrf_field() ?>
           <input type="hidden" name="delete_client_id" value="<?= $client_id ?>"/>
-          <button type="button"
-             class="btn-ghost js-delete-client-profile"
-             style="background:rgba(192,57,43,0.1);border-color:rgba(192,57,43,0.3);color:#E74C3C;"
-             data-name="<?= htmlspecialchars($client['full_name'], ENT_QUOTES) ?>">
+          <button type="button" class="vc-banner-btn is-danger js-delete-client-profile" data-name="<?= htmlspecialchars($client['full_name'], ENT_QUOTES) ?>">
             <?= icon('trash', 14) ?> Delete
           </button>
         </form>
@@ -235,7 +227,7 @@ require_once '../../includes/topbar.php';
     ?>
 
     <!-- CLIENT INFO CARD (with QR embedded on the right) -->
-    <div class="card" style="margin-bottom:1.25rem;">
+    <div class="card vc-card">
       <div class="card-header">
         <div class="card-icon"><?= icon('user', 16) ?></div>
         <div>
@@ -243,50 +235,49 @@ require_once '../../includes/topbar.php';
           <div class="card-sub">Personal details on record</div>
         </div>
       </div>
-      <div style="padding:1rem 1.5rem;display:grid;grid-template-columns:1fr 200px;gap:1.5rem;align-items:center;">
+      <div class="vc-info">
 
         <!-- Info fields -->
-        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:0.65rem 2rem;min-width:0;">
+        <div class="vc-info-grid">
           <?php
           $info_rows = [
-            ['Client ID',  ($client['client_code'] ?? '') ?: '—'],
-            ['Full Name',  $client['full_name']],
-            ['Contact',    $client['contact_number'] ?: 'Not provided'],
-            ['Email',      $client['email'] ?: 'Not provided'],
-            ['Facebook',   ($client['facebook_name'] ?? '') ?: 'Not provided'],
-            ['Address',    $client['address']],
-            ['Date Added', date('F d, Y', strtotime($client['created_at']))],
+            ['Client ID',  ($client['client_code'] ?? '') ?: '—',                 'key'],
+            ['Full Name',  $client['full_name'],                                   'user'],
+            ['Contact',    $client['contact_number'] ?: 'Not provided',            'phone'],
+            ['Email',      $client['email'] ?: 'Not provided',                     'envelope'],
+            ['Facebook',   ($client['facebook_name'] ?? '') ?: 'Not provided',     'at-symbol'],
+            ['Address',    $client['address'],                                     'map-pin'],
+            ['Date Added', date('F d, Y', strtotime($client['created_at'])),       'calendar'],
           ];
           // Whose client this is — insurance staff only. ("Data Privacy Consent" and "Added By" were taken off
           // this card on the owner's request, 2026-09-24; both are still recorded on the client.)
           if (!$is_mechanic) {
-              $info_rows[] = ['Insurance Agent', $client['agent_name'] ?? 'Unassigned'];
+              $info_rows[] = ['Insurance Agent', $client['agent_name'] ?? 'Unassigned', 'shield-check'];
           }
-          foreach ($info_rows as $r): ?>
-          <div style="display:flex;flex-direction:column;gap:0.12rem;min-width:0;">
-            <div style="font-size:0.6rem;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);font-weight:700;"><?= $r[0] ?></div>
-            <div style="font-size:0.83rem;font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?= htmlspecialchars($r[1]) ?></div>
+          foreach ($info_rows as [$label, $val, $ic]): ?>
+          <div class="vc-field">
+            <span class="vc-field-icon"><?= icon($ic, 14) ?></span>
+            <div class="vc-field-text">
+              <div class="vc-field-label"><?= $label ?></div>
+              <div class="vc-field-val<?= str_starts_with((string)$val, 'Not provided') ? ' is-empty' : '' ?>" title="<?= htmlspecialchars((string)$val) ?>"><?= htmlspecialchars((string)$val) ?></div>
+            </div>
           </div>
           <?php endforeach; ?>
         </div>
 
         <!-- QR Code -->
-        <div style="border-left:1px solid var(--border);padding-left:0.75rem;display:flex;align-items:center;gap:0.5rem;">
-          <div style="position:relative;background:#fff;padding:6px;border-radius:8px;border:1px solid var(--border);box-shadow:var(--shadow);flex-shrink:0;line-height:0;">
-            <div id="qr-canvas-wrap" style="width:90px;height:90px;display:block;"></div>
-            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px #fff;">
-              <img src="<?= brand_logo('tg', $base_path) ?>" alt="" style="width:16px;height:16px;object-fit:contain;border-radius:50%;"/>
-            </div>
+        <div class="vc-qr">
+          <div class="vc-qr-code">
+            <div id="qr-canvas-wrap"></div>
+            <div class="vc-qr-logo"><img src="<?= brand_logo('tg', $base_path) ?>" alt=""/></div>
           </div>
-          <div style="display:flex;flex-direction:column;gap:0.35rem;min-width:0;">
-            <div style="font-size:0.6rem;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;font-weight:700;">Digital ID</div>
-            <div style="font-size:0.58rem;color:var(--text-muted);">Scan for profile</div>
-            <a href="<?= htmlspecialchars($public_url) ?>" target="_blank" class="btn-ghost" style="font-size:0.68rem;padding:0.28rem 0.5rem;display:flex;align-items:center;gap:0.25rem;white-space:nowrap;">
-              <?= icon('arrow-top-right-on-square', 11) ?> Preview
-            </a>
-            <button type="button" onclick="downloadQr()" class="btn-ghost" style="font-size:0.68rem;padding:0.28rem 0.5rem;display:flex;align-items:center;gap:0.25rem;white-space:nowrap;">
-              <?= icon('arrow-down-tray', 11) ?> Download
-            </button>
+          <div class="vc-qr-text">
+            <div class="vc-qr-title">Digital ID</div>
+            <div class="vc-qr-sub">The client scans this to see their profile and repair progress.</div>
+            <div class="vc-qr-btns">
+              <a href="<?= htmlspecialchars($public_url) ?>" target="_blank" class="btn-ghost vc-qr-btn"><?= icon('arrow-top-right-on-square', 12) ?> Preview</a>
+              <button type="button" onclick="downloadQr()" class="btn-ghost vc-qr-btn"><?= icon('arrow-down-tray', 12) ?> Download</button>
+            </div>
           </div>
         </div>
 
@@ -294,7 +285,7 @@ require_once '../../includes/topbar.php';
     </div>
 
     <!-- VEHICLES -->
-    <div class="card">
+    <div class="card vc-card">
       <div class="card-header">
         <div class="card-icon"><?= icon('vehicle', 16) ?></div>
         <div>
@@ -302,14 +293,12 @@ require_once '../../includes/topbar.php';
           <div class="card-sub"><?= $vc ?> vehicle<?= $vc !== 1 ? 's' : '' ?> on record</div>
         </div>
         <?php if ($can_edit): ?>
-        <a href="add_vehicle.php?client_id=<?= $client_id ?>" class="btn-primary" style="margin-left:auto;padding:0.5rem 1rem;font-size:0.78rem;">
-          <?= icon('plus', 14) ?> Add Vehicle
-        </a>
+        <a href="add_vehicle.php?client_id=<?= $client_id ?>" class="btn-primary vc-head-btn"><?= icon('plus', 14) ?> Add Vehicle</a>
         <?php endif; ?>
       </div>
 
       <?php if ($vehicles): ?>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem;padding:1.25rem;">
+      <div class="vc-vehicles">
         <?php foreach ($vehicles as $v):
           // Build Imagin Studio URL from vehicle data
           $img_make   = strtolower(trim($v['make']));
@@ -344,87 +333,66 @@ require_once '../../includes/topbar.php';
                        . ($img_paint ? '&paintdescription=' . urlencode($img_paint) : '')
                        . '&zoomType=fullscreen&angle=13';
         ?>
-        <div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--bg-3);box-shadow:var(--shadow);display:flex;flex-direction:column;">
+        <div class="vc-vehicle">
 
           <!-- 3D Car Image — drag to rotate -->
           <?php $vid = 'vcar-' . $v['vehicle_id']; ?>
-          <div class="car3d-wrap" id="<?= $vid ?>"
+          <div class="car3d-wrap vc-car-stage" id="<?= $vid ?>"
                data-make="<?= htmlspecialchars($img_make) ?>"
                data-model="<?= htmlspecialchars($img_model) ?>"
                data-year="<?= $img_year ?>"
-               data-paint="<?= htmlspecialchars($img_paint) ?>"
-               style="background:linear-gradient(135deg,var(--bg-2),var(--bg));padding:1rem;position:relative;min-height:160px;display:flex;align-items:center;justify-content:center;cursor:grab;user-select:none;">
-            <img class="car3d-img"
+               data-paint="<?= htmlspecialchars($img_paint) ?>">
+            <img class="car3d-img vc-car-img"
                  src="<?= htmlspecialchars($img_url) ?>"
                  alt="<?= htmlspecialchars($v['make'] . ' ' . $v['model']) ?>"
                  draggable="false"
-                 style="width:100%;max-height:140px;object-fit:contain;pointer-events:none;transition:opacity 0.1s;"
                  onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
             <!-- Fallback -->
-            <div class="car3d-fallback" style="display:none;flex-direction:column;align-items:center;justify-content:center;gap:0.4rem;color:var(--text-muted);font-size:0.72rem;height:120px;">
+            <div class="car3d-fallback vc-car-fallback">
               <?= icon('vehicle', 36) ?>
               <span>No preview available</span>
             </div>
             <!-- Plate badge overlay -->
-            <div style="position:absolute;bottom:0.6rem;left:0.75rem;">
-              <span class="badge-dark" style="font-size:0.7rem;"><?= htmlspecialchars($v['plate_number']) ?></span>
-            </div>
+            <span class="vc-plate vc-plate-overlay"><?= htmlspecialchars($v['plate_number']) ?></span>
             <!-- Drag hint -->
-            <div class="car3d-hint" style="position:absolute;bottom:0.6rem;right:0.75rem;font-size:0.6rem;color:var(--text-muted);display:flex;align-items:center;gap:0.25rem;opacity:0.7;">
+            <div class="car3d-hint vc-car-hint">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg>
               Drag to rotate
             </div>
           </div>
 
           <!-- Vehicle Details -->
-          <div style="padding:0.85rem 1rem;flex:1;display:flex;flex-direction:column;gap:0.6rem;">
+          <div class="vc-vehicle-body">
             <div>
-              <div style="font-size:0.95rem;font-weight:800;color:var(--text-primary);letter-spacing:-0.2px;">
-                <?= htmlspecialchars($v['make'] . ' ' . $v['model']) ?>
-              </div>
-              <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.1rem;">
+              <div class="vc-vehicle-name"><?= htmlspecialchars($v['make'] . ' ' . $v['model']) ?></div>
+              <div class="vc-vehicle-sub">
                 <?= htmlspecialchars($v['year_model'] ?: 'Year unknown') ?>
                 <?php if ($v['color']): ?> &middot; <?= htmlspecialchars($v['color']) ?><?php endif; ?>
               </div>
             </div>
-
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem 0.75rem;">
-              <?php
-              $vdetails = [
-                ['Engine No.',  $v['motor_number']  ?: 'N/A'],
-                ['Chassis No.', $v['serial_number'] ?: 'N/A'],
-              ];
-              foreach ($vdetails as [$vlabel, $vval]): ?>
-              <div style="min-width:0;">
-                <div style="font-size:0.58rem;letter-spacing:1px;text-transform:uppercase;font-weight:700;color:var(--text-muted);"><?= $vlabel ?></div>
-                <div style="font-size:0.75rem;font-weight:600;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<?= htmlspecialchars($vval) ?>"><?= htmlspecialchars($vval) ?></div>
+            <div class="vc-vehicle-specs">
+              <?php foreach ([['Engine No.', $v['motor_number'] ?: 'N/A'], ['Chassis No.', $v['serial_number'] ?: 'N/A']] as [$vlabel, $vval]): ?>
+              <div>
+                <div class="vc-field-label"><?= $vlabel ?></div>
+                <div class="vc-spec-val" title="<?= htmlspecialchars($vval) ?>"><?= htmlspecialchars($vval) ?></div>
               </div>
               <?php endforeach; ?>
             </div>
           </div>
 
           <!-- Actions -->
-          <div style="padding:0.65rem 1rem;border-top:1px solid var(--border);background:var(--bg-2);display:flex;gap:0.4rem;">
-            <a href="view_vehicle.php?id=<?= $v['vehicle_id'] ?>" class="btn-sm-gold" title="View Vehicle" style="flex:1;justify-content:center;">
-              <?= icon('eye', 13) ?> View
-            </a>
+          <div class="vc-vehicle-actions">
+            <a href="view_vehicle.php?id=<?= $v['vehicle_id'] ?>" class="btn-sm-gold vc-grow" title="View Vehicle"><?= icon('eye', 13) ?> View</a>
             <?php if (!$is_mechanic): ?>
-            <a href="../insurance/eligibility_check.php?vehicle_id=<?= $v['vehicle_id'] ?>" class="btn-sm-gold" title="Check Policy" style="padding:0.35rem 0.55rem;">
-              <?= icon('shield-check', 13) ?>
-            </a>
+            <a href="../insurance/eligibility_check.php?vehicle_id=<?= $v['vehicle_id'] ?>" class="btn-sm-gold vc-icon-btn" title="Check Policy"><?= icon('shield-check', 13) ?></a>
             <?php endif; ?>
             <?php if ($can_edit): ?>
-            <a href="edit_vehicle.php?id=<?= $v['vehicle_id'] ?>" class="btn-sm-gold" title="Edit" style="padding:0.35rem 0.55rem;">
-              <?= icon('pencil', 13) ?>
-            </a>
-            <form method="POST" action="delete_vehicle.php" style="display:inline;"
-                  class="js-delete-vehicle-form"
+            <a href="edit_vehicle.php?id=<?= $v['vehicle_id'] ?>" class="btn-sm-gold vc-icon-btn" title="Edit"><?= icon('pencil', 13) ?></a>
+            <form method="POST" action="delete_vehicle.php" class="vc-inline-form js-delete-vehicle-form"
                   data-plate="<?= htmlspecialchars($v['plate_number'], ENT_QUOTES) ?>">
               <?= csrf_field() ?>
               <input type="hidden" name="vehicle_id" value="<?= $v['vehicle_id'] ?>"/>
-              <button type="submit" class="btn-sm-danger" title="Unregister Vehicle" style="padding:0.35rem 0.55rem;">
-                <?= icon('trash', 13) ?>
-              </button>
+              <button type="submit" class="btn-sm-danger vc-icon-btn" title="Unregister Vehicle"><?= icon('trash', 13) ?></button>
             </form>
             <?php endif; ?>
           </div>
@@ -446,7 +414,7 @@ require_once '../../includes/topbar.php';
 
     <?php if ($has_policies): ?>
     <!-- POLICY DOCUMENTS -->
-    <div class="card">
+    <div class="card vc-card">
       <div class="card-header">
         <div class="card-icon"><?= icon('paper-clip', 16) ?></div>
         <div>
@@ -454,67 +422,62 @@ require_once '../../includes/topbar.php';
           <div class="card-sub"><?= count($documents) ?> file<?= count($documents) !== 1 ? 's' : '' ?> attached</div>
         </div>
         <?php if ($can_edit): ?>
-        <button type="button" onclick="document.getElementById('doc-upload-panel').style.display=document.getElementById('doc-upload-panel').style.display==='none'?'block':'none'" class="btn-sm-gold" style="margin-left:auto;">
-          <?= icon('plus', 13) ?> Attach PDF
-        </button>
+        <button type="button" class="btn-sm-gold vc-head-btn js-toggle-doc-upload"><?= icon('plus', 13) ?> Attach PDF</button>
         <?php endif; ?>
       </div>
 
       <?php if ($can_edit): ?>
-      <div id="doc-upload-panel" style="display:none;padding:1rem 1.25rem;border-bottom:1px solid var(--border);background:var(--bg-2);">
-        <form method="POST" enctype="multipart/form-data" style="display:flex;flex-direction:column;gap:0.75rem;">
+      <div id="doc-upload-panel" class="vc-upload" hidden>
+        <form method="POST" enctype="multipart/form-data" class="vc-upload-form">
           <?= csrf_field() ?><?= idem_field() ?>
           <input type="hidden" name="action" value="upload_doc"/>
-          <label style="font-size:0.78rem;font-weight:600;color:var(--text-muted);">Select PDF file (policy document, LOA, etc.)</label>
-          <input type="file" name="policy_doc" accept="application/pdf" required
-            style="font-size:0.8rem;padding:0.5rem;border:1px dashed var(--gold-muted);border-radius:8px;background:var(--bg-3);color:var(--text-primary);width:100%;"/>
-          <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
-            <button type="button" onclick="document.getElementById('doc-upload-panel').style.display='none'" class="btn-ghost" style="font-size:0.8rem;">Cancel</button>
-            <button type="submit" class="btn-primary" style="font-size:0.8rem;"><?= icon('arrow-up-tray', 13) ?> Upload</button>
+          <label class="vc-upload-drop">
+            <?= icon('arrow-up-tray', 20) ?>
+            <span class="vc-upload-title">Choose a PDF file</span>
+            <span class="vc-upload-sub">Policy document, LOA, and the like</span>
+            <input type="file" name="policy_doc" accept="application/pdf" required class="vc-upload-input"/>
+          </label>
+          <div class="vc-upload-actions">
+            <button type="button" class="btn-ghost js-toggle-doc-upload">Cancel</button>
+            <button type="submit" class="btn-primary"><?= icon('arrow-up-tray', 13) ?> Upload</button>
           </div>
         </form>
       </div>
       <?php endif; ?>
 
-      <div style="padding:1rem 1.25rem;display:flex;flex-direction:column;gap:0.75rem;">
+      <div class="vc-docs">
         <?php if (empty($documents)): ?>
-        <div style="text-align:center;padding:1.5rem;color:var(--text-muted);font-size:0.82rem;">
-          <?= icon('paper-clip', 24) ?><br/>No documents attached yet.
-        </div>
+        <div class="vc-docs-empty"><?= icon('paper-clip', 24) ?><span>No documents attached yet.</span></div>
         <?php else: ?>
         <?php foreach ($documents as $doc):
           $pdf_url = htmlspecialchars(upload_url('client_docs', $doc['file_name'], $client_id));
         ?>
-        <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+        <div class="vc-doc">
           <!-- File header row -->
-          <div style="display:flex;align-items:center;gap:0.75rem;padding:0.65rem 1rem;background:var(--bg-2);">
-            <div style="background:var(--danger-bg);color:var(--danger);border-radius:6px;padding:0.3rem 0.5rem;font-size:0.65rem;font-weight:700;">PDF</div>
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:0.82rem;font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?= htmlspecialchars($doc['original_name']) ?></div>
-              <div style="font-size:0.68rem;color:var(--text-muted);"><?= date('M d, Y g:i A', strtotime($doc['uploaded_at'])) ?></div>
+          <div class="vc-doc-head">
+            <div class="vc-doc-type">PDF</div>
+            <div class="vc-doc-name">
+              <div title="<?= htmlspecialchars($doc['original_name']) ?>"><?= htmlspecialchars($doc['original_name']) ?></div>
+              <span><?= date('M d, Y g:i A', strtotime($doc['uploaded_at'])) ?></span>
             </div>
-            <div style="display:flex;gap:0.4rem;flex-shrink:0;">
-              <a href="<?= $pdf_url ?>" target="_blank" class="btn-sm-gold" style="font-size:0.72rem;padding:0.3rem 0.65rem;" title="Open in new tab">
-                <?= icon('arrow-top-right-on-square', 13) ?>
-              </a>
+            <div class="vc-doc-actions">
+              <a href="<?= $pdf_url ?>" target="_blank" class="btn-sm-gold vc-icon-btn" title="Open in new tab"><?= icon('arrow-top-right-on-square', 13) ?></a>
               <?php if ($can_edit): ?>
-              <form method="POST" style="display:inline;">
+              <form method="POST" class="vc-inline-form">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="delete_doc"/>
                 <input type="hidden" name="doc_id" value="<?= $doc['doc_id'] ?>"/>
                 <?php /* file name passed via a data attribute: inside onclick="...'NAME'..." the browser decodes
                          &#039; back to ' before running the JS, so a crafted file name could break out and run code */ ?>
                 <button type="button" data-name="<?= htmlspecialchars($doc['original_name'], ENT_QUOTES) ?>" onclick="confirmDeleteDoc(this, this.dataset.name)"
-                  class="btn-sm-danger" style="font-size:0.72rem;padding:0.3rem 0.55rem;" title="Remove">
-                  <?= icon('trash', 12) ?>
-                </button>
+                  class="btn-sm-danger vc-icon-btn" title="Remove"><?= icon('trash', 12) ?></button>
               </form>
               <?php endif; ?>
             </div>
           </div>
           <!-- PDF Preview -->
-          <div style="width:100%;height:480px;background:#1a1a1a;">
-            <iframe src="<?= $pdf_url ?>" style="width:100%;height:100%;border:none;" loading="lazy"></iframe>
+          <div class="vc-doc-preview">
+            <iframe src="<?= $pdf_url ?>" loading="lazy" title="<?= htmlspecialchars($doc['original_name']) ?>"></iframe>
           </div>
         </div>
         <?php endforeach; ?>
@@ -524,7 +487,7 @@ require_once '../../includes/topbar.php';
     <?php endif; ?>
 
     <!-- INSURANCE POLICIES -->
-    <div class="card">
+    <div class="card vc-card">
       <div class="card-header">
         <div class="card-icon"><?= icon('document', 16) ?></div>
         <div>
@@ -540,7 +503,7 @@ require_once '../../includes/topbar.php';
                 $_elig_url = '../insurance/eligibility_check.php';
             }
         ?>
-        <a href="<?= $_elig_url ?>" class="btn-primary" style="margin-left:auto;padding:0.5rem 1rem;font-size:0.78rem;"><?= icon('shield-check', 14) ?> Check Eligibility</a>
+        <a href="<?= $_elig_url ?>" class="btn-primary vc-head-btn"><?= icon('shield-check', 14) ?> Check Eligibility</a>
         <?php endif; ?>
       </div>
       <?php if ($policies): ?>
@@ -626,7 +589,7 @@ require_once '../../includes/topbar.php';
     <!-- CLAIMS HISTORY -->
     <?php
     ?>
-    <div class="card">
+    <div class="card vc-card">
       <div class="card-header">
         <div class="card-icon"><?= icon('clipboard-list', 16) ?></div>
         <div>
@@ -634,7 +597,7 @@ require_once '../../includes/topbar.php';
           <div class="card-sub"><?= count($claims) ?> claim<?= count($claims) !== 1 ? 's' : '' ?> on record</div>
         </div>
         <?php if (!$is_mechanic): ?>
-        <a href="../claims/add_claim.php?client_id=<?= $client_id ?>" class="btn-primary" style="margin-left:auto;padding:0.5rem 1rem;font-size:0.78rem;">
+        <a href="../claims/add_claim.php?client_id=<?= $client_id ?>" class="btn-primary vc-head-btn">
           <?= icon('plus', 14) ?> File New Claim
         </a>
         <?php endif; ?>
@@ -697,22 +660,21 @@ require_once '../../includes/topbar.php';
     <?php
     $repair_service_labels = service_type_labels($conn);   // service_types table (includes/lookups.php)
     ?>
-    <div class="card">
-      <div class="card-header" style="justify-content:space-between;">
-        <div style="display:flex;align-items:center;gap:0.75rem;">
-          <div class="card-icon"><?= icon('wrench', 16) ?></div>
-          <div>
-            <div class="card-title">Repair Jobs</div>
-            <div class="card-sub">Repair history for this client</div>
-          </div>
+    <div class="card vc-card">
+      <div class="card-header">
+        <div class="card-icon"><?= icon('wrench', 16) ?></div>
+        <div>
+          <div class="card-title">Repair Jobs</div>
+          <div class="card-sub"><?= count($repair_jobs) ?> repair job<?= count($repair_jobs) !== 1 ? 's' : '' ?> on record</div>
         </div>
         <?php
           $_repair_prefill = '../repair/add_repair.php?prefill_client=' . $client_id;
           if (count($_client_vehicle_ids) === 1) $_repair_prefill .= '&prefill_vehicle=' . $_client_vehicle_ids[0];
         ?>
-        <a href="<?= htmlspecialchars($_repair_prefill) ?>" class="btn-primary" style="margin-left:auto;padding:0.5rem 1rem;font-size:0.78rem;"><?= icon('plus', 14) ?> Add Repair Job</a>
+        <a href="<?= htmlspecialchars($_repair_prefill) ?>" class="btn-primary vc-head-btn"><?= icon('plus', 14) ?> Add Repair Job</a>
       </div>
       <?php if ($repair_jobs): ?>
+      <div class="tg-table-wrap mob-card-wrap">
       <table class="tg-table mob-card mob-client-repairs-table">
         <thead>
           <tr>
@@ -751,6 +713,7 @@ require_once '../../includes/topbar.php';
           <?php endforeach; ?>
         </tbody>
       </table>
+      </div>
       <?php else: ?>
       <div class="empty-state">
         <div class="empty-icon"><?= icon('wrench', 28) ?></div>
@@ -768,6 +731,10 @@ require_once '../../includes/topbar.php';
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 (function(){
+  // Attach PDF / Cancel open and close the upload panel
+  document.querySelectorAll('.js-toggle-doc-upload').forEach(function (b) {
+    b.addEventListener('click', function () { var p = document.getElementById('doc-upload-panel'); if (p) p.hidden = !p.hidden; });
+  });
   var wrap = document.getElementById('qr-canvas-wrap');
   if (wrap && typeof QRCode !== 'undefined') {
     new QRCode(wrap, {

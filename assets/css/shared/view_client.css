@@ -1,0 +1,148 @@
+/* View Client (modules/clients/view_client.php). Same structure as before (banner, Client Information with the QR,
+   Registered Vehicles, Policy Documents, Insurance Policies, Claims History, Repair Jobs), restyled 2026-11-20:
+   initials and contact chips in the banner, fields with icons, a clearer Digital ID panel, plate-style badges,
+   a drop zone for PDFs. Inline styles moved here; the three tables keep their markup. */
+
+.vc-card { margin-bottom: 1.25rem; }
+.vc-inline-form { display: inline; margin: 0; }
+.vc-head-btn { margin-left: auto; padding: 0.5rem 1rem; font-size: 0.78rem; }
+.vc-icon-btn { padding: 0.35rem 0.55rem; }
+.vc-grow { flex: 1; justify-content: center; }
+
+/* banner (dark in every theme, like before) */
+.vc-banner {
+  position: relative; overflow: hidden; margin-bottom: 1.25rem; border-radius: 14px;
+  background: var(--btn-bg); color: #fff; box-shadow: var(--shadow-md);
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+  padding: 1.5rem 1.75rem;
+}
+.vc-banner::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--gold-bright), var(--gold-muted), transparent); }
+.vc-banner::after {
+  content: ""; position: absolute; right: -60px; top: -90px; width: 280px; height: 280px; border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--gold-bright) 20%, transparent), transparent 70%); pointer-events: none;
+}
+.vc-banner-main { position: relative; z-index: 1; display: flex; align-items: center; gap: 1rem; min-width: 0; }
+.vc-banner-avatar {
+  width: 3.4rem; height: 3.4rem; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 1.15rem; font-weight: 800; color: var(--on-gold); background: var(--gold-bright);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.08);
+}
+.vc-banner-id { min-width: 0; }
+.vc-banner-kicker { font-size: 0.68rem; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; color: rgba(200, 192, 176, 0.55); margin-bottom: 0.25rem; }
+.vc-banner-code { color: var(--gold-bright); letter-spacing: 1px; }
+.vc-banner-name { font-size: 1.45rem; font-weight: 800; letter-spacing: -0.3px; color: #fff; overflow-wrap: anywhere; }
+.vc-banner-meta { display: flex; flex-wrap: wrap; gap: 0.35rem 0.5rem; margin-top: 0.55rem; }
+.vc-banner-meta span {
+  display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.74rem; color: rgba(230, 222, 206, 0.85);
+  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; padding: 0.2rem 0.65rem;
+}
+.vc-banner-meta svg { color: var(--gold-bright); }
+.vc-banner-actions { position: relative; z-index: 1; display: flex; gap: 0.6rem; flex-shrink: 0; flex-wrap: wrap; }
+.vc-banner-btn {
+  display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer;
+  font-family: inherit; font-size: 0.8rem; font-weight: 700; text-decoration: none;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.14); color: rgba(240, 232, 216, 0.9);
+  transition: background 0.15s, border-color 0.15s;
+}
+.vc-banner-btn:hover { background: rgba(255, 255, 255, 0.12); border-color: var(--gold-muted); color: #fff; }
+.vc-banner-btn.is-danger { background: color-mix(in srgb, var(--danger) 18%, transparent); border-color: color-mix(in srgb, var(--danger) 45%, transparent); color: #ffb4ab; }
+.vc-banner-btn.is-danger:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+/* client information + QR */
+.vc-info { padding: 1.25rem 1.5rem; display: grid; grid-template-columns: minmax(0, 1fr) 17rem; gap: 1.5rem; align-items: stretch; }
+.vc-info-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem 1rem; min-width: 0; }
+.vc-field { display: flex; align-items: flex-start; gap: 0.65rem; padding: 0.6rem 0.75rem; border-radius: 10px; background: var(--bg); border: 1px solid var(--border); min-width: 0; }
+.vc-field-icon { width: 1.8rem; height: 1.8rem; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--gold-pale); color: var(--gold); }
+.vc-field-text { min-width: 0; }
+.vc-field-label { font-size: 0.6rem; letter-spacing: 1.1px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; }
+.vc-field-val { font-size: 0.84rem; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vc-field-val.is-empty { color: var(--text-muted); font-weight: 400; font-style: italic; }
+.vc-qr {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; text-align: center;
+  padding: 1rem; border-radius: 12px; background: linear-gradient(160deg, var(--gold-pale), var(--bg)); border: 1px dashed var(--gold-muted);
+}
+.vc-qr-code { position: relative; background: #fff; padding: 8px; border-radius: 10px; border: 1px solid var(--border); box-shadow: var(--shadow); line-height: 0; }
+#qr-canvas-wrap { width: 110px; height: 110px; display: block; }
+#qr-canvas-wrap canvas, #qr-canvas-wrap img { width: 110px !important; height: 110px !important; }
+.vc-qr-logo { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 26px; height: 26px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px #fff; display: flex; align-items: center; justify-content: center; }
+.vc-qr-logo img { width: 18px; height: 18px; object-fit: contain; border-radius: 50%; }
+.vc-qr-title { font-size: 0.78rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--gold); }
+.vc-qr-sub { font-size: 0.7rem; color: var(--text-muted); line-height: 1.4; margin-top: 0.15rem; }
+.vc-qr-btns { display: flex; gap: 0.4rem; justify-content: center; margin-top: 0.55rem; flex-wrap: wrap; }
+.vc-qr-btn { font-size: 0.72rem; padding: 0.35rem 0.65rem; display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; }
+
+/* vehicles */
+.vc-vehicles { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; padding: 1.25rem; }
+.vc-vehicle {
+  border: 1px solid var(--border); border-radius: 14px; overflow: hidden; background: var(--bg-3); box-shadow: var(--shadow);
+  display: flex; flex-direction: column; transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+.vc-vehicle:hover { transform: translateY(-2px); border-color: var(--gold-muted); box-shadow: var(--shadow-md); }
+.vc-car-stage {
+  position: relative; min-height: 170px; padding: 1rem; display: flex; align-items: center; justify-content: center;
+  cursor: grab; user-select: none;
+  background: radial-gradient(ellipse at 50% 85%, var(--gold-pale), transparent 65%), linear-gradient(135deg, var(--bg-2), var(--bg));
+}
+.vc-car-img { width: 100%; max-height: 140px; object-fit: contain; pointer-events: none; transition: opacity 0.1s; }
+.vc-car-fallback { display: none; flex-direction: column; align-items: center; justify-content: center; gap: 0.4rem; color: var(--text-muted); font-size: 0.72rem; height: 120px; }
+.vc-plate {
+  font-size: 0.74rem; font-weight: 800; letter-spacing: 1.2px; color: var(--text-primary);
+  background: var(--bg); border: 2px solid var(--text-primary); border-radius: 6px; padding: 0.15rem 0.5rem;
+}
+.vc-plate-overlay { position: absolute; bottom: 0.65rem; left: 0.75rem; }
+.vc-car-hint { position: absolute; bottom: 0.7rem; right: 0.75rem; font-size: 0.6rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.25rem; opacity: 0.75; }
+.vc-vehicle-body { padding: 0.9rem 1rem; flex: 1; display: flex; flex-direction: column; gap: 0.65rem; }
+.vc-vehicle-name { font-size: 0.98rem; font-weight: 800; color: var(--text-primary); letter-spacing: -0.2px; }
+.vc-vehicle-sub { font-size: 0.74rem; color: var(--text-muted); margin-top: 0.1rem; }
+.vc-vehicle-specs { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem 0.75rem; padding-top: 0.6rem; border-top: 1px dashed var(--border); }
+.vc-vehicle-specs > div { min-width: 0; }
+.vc-spec-val { font-size: 0.76rem; font-weight: 600; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vc-vehicle-actions { padding: 0.65rem 1rem; border-top: 1px solid var(--border); background: var(--bg-2); display: flex; gap: 0.4rem; }
+
+/* policy documents */
+.vc-upload { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); background: var(--bg-2); }
+.vc-upload-form { display: flex; flex-direction: column; gap: 0.75rem; }
+.vc-upload-drop {
+  display: flex; flex-direction: column; align-items: center; gap: 0.3rem; padding: 1.25rem; text-align: center; cursor: pointer;
+  border: 2px dashed var(--gold-muted); border-radius: 12px; background: var(--bg-3); color: var(--gold);
+}
+.vc-upload-drop:hover { background: var(--gold-pale); }
+.vc-upload-title { font-size: 0.85rem; font-weight: 700; color: var(--text-primary); }
+.vc-upload-sub { font-size: 0.72rem; color: var(--text-muted); }
+.vc-upload-input { margin-top: 0.4rem; font-size: 0.78rem; color: var(--text-secondary); max-width: 100%; }
+.vc-upload-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
+.vc-docs { padding: 1rem 1.25rem; display: flex; flex-direction: column; gap: 0.75rem; }
+.vc-docs-empty { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; padding: 1.5rem; color: var(--text-muted); font-size: 0.82rem; }
+.vc-doc { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.vc-doc-head { display: flex; align-items: center; gap: 0.75rem; padding: 0.7rem 1rem; background: var(--bg-2); }
+.vc-doc-type { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-border); border-radius: 6px; padding: 0.3rem 0.5rem; font-size: 0.65rem; font-weight: 800; }
+.vc-doc-name { flex: 1; min-width: 0; }
+.vc-doc-name div { font-size: 0.84rem; font-weight: 700; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vc-doc-name span { font-size: 0.7rem; color: var(--text-muted); }
+.vc-doc-actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
+.vc-doc-preview { width: 100%; height: 480px; background: var(--bg-3); }
+.vc-doc-preview iframe { width: 100%; height: 100%; border: none; display: block; }
+
+/* a phone puts everything after a card title on its own row (app.css); the header button stays beside it */
+.vc-card > .card-header > .vc-head-btn { flex: 0 0 auto; width: auto; margin-left: auto !important; }
+
+/* tablet / phone */
+@media (max-width: 1000px) {
+  .vc-info { grid-template-columns: 1fr; }
+  .vc-qr { flex-direction: row; text-align: left; justify-content: flex-start; }
+  .vc-qr-btns { justify-content: flex-start; }
+}
+@media (max-width: 640px) {
+  .vc-banner { padding: 1.25rem 1.1rem; }
+  .vc-banner-name { font-size: 1.2rem; }
+  .vc-banner-avatar { width: 2.8rem; height: 2.8rem; font-size: 0.95rem; }
+  .vc-banner-actions { width: 100%; }
+  .vc-banner-actions > * { flex: 1 1 auto; }
+  .vc-banner-actions .vc-banner-btn { width: 100%; justify-content: center; }
+  .vc-info { padding: 1rem; }
+  .vc-info-grid { grid-template-columns: 1fr; }
+  .vc-qr { flex-direction: column; text-align: center; }
+  .vc-qr-btns { justify-content: center; }
+  .vc-vehicles { grid-template-columns: 1fr; padding: 1rem; }
+  .vc-doc-preview { height: 360px; }
+}

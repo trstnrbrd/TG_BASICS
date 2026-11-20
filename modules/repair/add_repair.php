@@ -120,6 +120,47 @@ require_once '../../includes/navbar.php';
 
 // Exact areas from the physical Unit Inspection form (config/access.php)
 $checklist_areas = REPAIR_CHECKLIST_AREAS;
+
+// The inspection list in sectors (REPAIR_CHECKLIST_SECTORS), numbered 1..n in that order; the same number marks
+// the part on the diagram. An area no sector names still shows, under "Other".
+$checklist_sectors = [];
+$area_num          = [];
+foreach (REPAIR_CHECKLIST_SECTORS as $sector_key => $sector) {
+    $keys = array_values(array_filter($sector['areas'], fn($k) => isset($checklist_areas[$k])));
+    if ($keys) $checklist_sectors[$sector_key] = ['label' => $sector['label'], 'areas' => $keys];
+}
+$unsorted = array_diff($checklist_area_keys, array_merge(...array_column($checklist_sectors, 'areas')));
+if ($unsorted) $checklist_sectors['other'] = ['label' => 'Other', 'areas' => array_values($unsorted)];
+foreach ($checklist_sectors as $sector) foreach ($sector['areas'] as $k) $area_num[$k] = count($area_num) + 1;
+$area_sector = [];
+foreach ($checklist_sectors as $sector_key => $sector) foreach ($sector['areas'] as $k) $area_sector[$k] = $sector_key;
+
+// Attributes for a clickable part of the car: only its first shape is a tab stop (the four tires are one area)
+$part_seen = [];
+$part = function (string $key, string $extra = '') use ($checklist_areas, $area_sector, &$part_seen): string {
+    $first = !isset($part_seen[$key]);
+    $part_seen[$key] = true;
+    $label = htmlspecialchars($checklist_areas[$key] ?? $key, ENT_QUOTES);
+    return 'class="panel ' . $extra . '" data-panel="' . $key . '" data-sector="' . ($area_sector[$key] ?? '') . '"'
+         . ($first ? ' tabindex="0" role="button" aria-label="' . $label . '"' : ' aria-hidden="true"');
+};
+// Where each part's number sits on the top view (car coordinates, before the translate)
+$car_pins = [
+    'front_bumper' => [[120, 37]],
+    'hood'         => [[120, 100]],
+    'headlights'   => [[66, 66], [174, 66]],
+    'windshield'   => [[120, 170]],
+    'door_fl'      => [[61, 231]],
+    'door_rl'      => [[61, 299]],
+    'mirror_left'  => [[12, 187]],
+    'door_fr'      => [[179, 231]],
+    'door_rr'      => [[179, 299]],
+    'mirror_right' => [[228, 187]],
+    'trunk'        => [[120, 378]],
+    'rear_bumper'  => [[120, 449]],
+    'taillights'   => [[66, 419], [174, 419]],
+    'tires_wheels' => [[38, 117], [202, 117], [38, 381], [202, 381]],
+];
 ?>
 
 <div class="main">
@@ -258,263 +299,112 @@ require_once '../../includes/topbar.php';
 
       </div>
 
-      <!-- EXTERNAL CAR CONDITION CHECKLIST -->
+      <!-- UNIT INSPECTION: top view of the car + the areas in sectors (both mark the same radio inputs) -->
       <div class="card" style="margin-bottom:1.25rem;">
         <div class="card-header">
           <div class="card-icon"><?= icon('clipboard-list', 16) ?></div>
           <div>
             <div class="card-title">Unit Inspection</div>
-            <div class="card-sub">Unit Inspection — click a panel on the diagram to mark damage</div>
+            <div class="card-sub">Tap a part of the car, or pick its condition in the list. The numbers match.</div>
           </div>
         </div>
 
-        <div style="padding:0 1.25rem 1.25rem;">
+        <div class="insp-wrap">
 
-          <!-- CAR DIAGRAM -->
-          <div class="car-diagram-wrap">
+          <!-- CAR (top view, front at the top) -->
+          <div class="insp-car-col">
+            <div class="insp-car">
+              <svg viewBox="0 0 300 524" class="car-svg" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="Car seen from above, front at the top">
+                <!-- sector names around the car -->
+                <text x="150" y="13" class="sector-lbl">&#9650; FRONT</text>
+                <text x="150" y="519" class="sector-lbl">REAR</text>
+                <text x="10" y="262" class="sector-lbl" transform="rotate(-90 10 262)">LEFT &middot; DRIVER</text>
+                <text x="290" y="262" class="sector-lbl" transform="rotate(90 290 262)">RIGHT &middot; PASSENGER</text>
 
-            <!-- LEFT COLUMN: Right Side + Left Side stacked -->
-            <div class="car-sides-col">
+                <g transform="translate(30 30)">
+                  <!-- tires sit under the body edge -->
+                  <rect x="28"  y="92"  width="20" height="50" rx="6" <?= $part('tires_wheels', 'tire') ?>/>
+                  <rect x="192" y="92"  width="20" height="50" rx="6" <?= $part('tires_wheels', 'tire') ?>/>
+                  <rect x="28"  y="356" width="20" height="50" rx="6" <?= $part('tires_wheels', 'tire') ?>/>
+                  <rect x="192" y="356" width="20" height="50" rx="6" <?= $part('tires_wheels', 'tire') ?>/>
 
-              <!-- RIGHT SIDE -->
-              <div class="car-view-block">
-                <div class="car-view-label">Right Side</div>
-                <svg viewBox="0 0 420 160" class="car-svg" xmlns="http://www.w3.org/2000/svg">
-                  <!-- Body -->
-                  <rect x="40" y="80" width="340" height="52" rx="10" fill="var(--bg-3)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Cabin/roof shape -->
-                  <path d="M110 80 Q130 35 175 28 L270 28 Q315 32 330 80 Z" fill="var(--bg-3)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Rear bumper (left) -->
-                  <rect x="28" y="82" width="28" height="44" rx="6" class="panel" data-panel="rear_bumper" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Front bumper (right) -->
-                  <rect x="364" y="82" width="28" height="44" rx="6" class="panel" data-panel="front_bumper" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Trunk (rear quarter) -->
-                  <path d="M56 80 L88 78 L88 110 L56 106 Z" class="panel" data-panel="trunk" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Hood (front quarter) -->
-                  <path d="M332 80 L364 82 L364 106 L332 110 Z" class="panel" data-panel="hood" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Right rear door -->
-                  <rect x="96"  y="78" width="105" height="52" rx="3" class="panel" data-panel="door_rr" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Right front door -->
-                  <rect x="210" y="78" width="105" height="52" rx="3" class="panel" data-panel="door_fr" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Right rear fender -->
-                  <path d="M88 78 L96 78 L96 130 L88 130 Z" class="panel" data-panel="rear_right" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Right front fender -->
-                  <path d="M315 78 L323 78 L323 130 L315 130 Z" class="panel" data-panel="front_right" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Right mirror -->
-                  <rect x="300" y="65" width="26" height="12" rx="4" class="panel" data-panel="mirror_right" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Windshield -->
-                  <path d="M195 30 L265 30 Q308 34 320 78 L175 78 Q168 46 195 30Z" class="panel" data-panel="windshield" fill="rgba(100,180,255,0.1)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Headlight -->
-                  <ellipse cx="374" cy="93" rx="8" ry="6" class="panel" data-panel="headlights" fill="rgba(255,220,100,0.18)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Taillight -->
-                  <ellipse cx="44" cy="93" rx="8" ry="6" class="panel" data-panel="taillights" fill="rgba(255,80,80,0.18)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Wheels (clickable) -->
-                  <circle cx="100" cy="136" r="18" class="panel" data-panel="tires_wheels" fill="var(--bg)" stroke="var(--border)" stroke-width="2"/>
-                  <circle cx="100" cy="136" r="9"  fill="var(--border)" style="pointer-events:none;"/>
-                  <circle cx="316" cy="136" r="18" class="panel" data-panel="tires_wheels" fill="var(--bg)" stroke="var(--border)" stroke-width="2"/>
-                  <circle cx="316" cy="136" r="9"  fill="var(--border)" style="pointer-events:none;"/>
-                  <!-- Labels -->
-                  <text x="143" y="108" class="panel-lbl">RRD</text>
-                  <text x="257" y="108" class="panel-lbl">RFD</text>
-                </svg>
-              </div>
+                  <!-- body (not an area) -->
+                  <path class="car-body" d="M70 40 C88 26 152 26 170 40 C186 50 194 70 194 100 L196 380 C196 420 186 446 166 454 C148 461 92 461 74 454 C54 446 44 420 44 380 L46 100 C46 70 54 50 70 40 Z"/>
 
-              <!-- LEFT SIDE (mirrored: front on left, rear on right) -->
-              <div class="car-view-block">
-                <div class="car-view-label">Left Side</div>
-                <svg viewBox="0 0 420 160" class="car-svg" xmlns="http://www.w3.org/2000/svg">
-                  <!-- Body (same as right side) -->
-                  <rect x="40" y="80" width="340" height="52" rx="10" fill="var(--bg-3)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Cabin/roof shape — exact mirror of Right Side -->
-                  <path d="M310 80 Q290 35 245 28 L150 28 Q105 32 90 80 Z" fill="var(--bg-3)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Front bumper (LEFT — front is on the left) -->
-                  <rect x="28" y="82" width="28" height="44" rx="6" class="panel" data-panel="front_bumper" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Rear bumper (RIGHT) -->
-                  <rect x="364" y="82" width="28" height="44" rx="6" class="panel" data-panel="rear_bumper" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Hood (front quarter — left side) -->
-                  <path d="M56 80 L88 78 L88 110 L56 106 Z" class="panel" data-panel="hood" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Trunk (rear quarter — right side) -->
-                  <path d="M332 80 L364 82 L364 106 L332 110 Z" class="panel" data-panel="trunk" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Left front door (front half of body) -->
-                  <rect x="96"  y="78" width="105" height="52" rx="3" class="panel" data-panel="door_fl" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Left rear door (rear half of body) -->
-                  <rect x="210" y="78" width="105" height="52" rx="3" class="panel" data-panel="door_rl" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Front-left fender strip -->
-                  <path d="M88 78 L96 78 L96 130 L88 130 Z" class="panel" data-panel="front_left" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Rear-left fender strip -->
-                  <path d="M315 78 L323 78 L323 130 L315 130 Z" class="panel" data-panel="rear_left" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Left mirror (front side, above front door) -->
-                  <rect x="94" y="65" width="26" height="12" rx="4" class="panel" data-panel="mirror_left" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Windshield — exact mirror of Right Side windshield -->
-                  <path d="M225 30 L155 30 Q112 34 100 78 L245 78 Q252 46 225 30 Z" class="panel" data-panel="windshield" fill="rgba(100,180,255,0.1)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Headlight (front/left) -->
-                  <ellipse cx="46" cy="93" rx="8" ry="6" class="panel" data-panel="headlights" fill="rgba(255,220,100,0.18)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Taillight (rear/right) -->
-                  <ellipse cx="376" cy="93" rx="8" ry="6" class="panel" data-panel="taillights" fill="rgba(255,80,80,0.18)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Wheels (clickable) -->
-                  <circle cx="100" cy="136" r="18" class="panel" data-panel="tires_wheels" fill="var(--bg)" stroke="var(--border)" stroke-width="2"/>
-                  <circle cx="100" cy="136" r="9"  fill="var(--border)" style="pointer-events:none;"/>
-                  <circle cx="316" cy="136" r="18" class="panel" data-panel="tires_wheels" fill="var(--bg)" stroke="var(--border)" stroke-width="2"/>
-                  <circle cx="316" cy="136" r="9"  fill="var(--border)" style="pointer-events:none;"/>
-                  <!-- Labels -->
-                  <text x="143" y="108" class="panel-lbl">LFD</text>
-                  <text x="257" y="108" class="panel-lbl">LRD</text>
-                </svg>
-              </div>
+                  <!-- mirrors -->
+                  <path d="M46 182 L24 177 C19 177 17 182 19 187 L25 196 L46 196 Z" <?= $part('mirror_left') ?>/>
+                  <path d="M194 182 L216 177 C221 177 223 182 221 187 L215 196 L194 196 Z" <?= $part('mirror_right') ?>/>
 
+                  <!-- front -->
+                  <path d="M64 44 C86 28 154 28 176 44 L170 56 C148 44 92 44 70 56 Z" <?= $part('front_bumper') ?>/>
+                  <path d="M86 58 C108 54 132 54 154 58 L178 80 L176 140 C150 133 90 133 64 140 L62 80 Z" <?= $part('hood') ?>/>
+                  <path d="M52 72 C56 59 66 53 80 51 L84 61 C72 63 63 69 57 80 Z" <?= $part('headlights', 'lamp-front') ?>/>
+                  <path d="M188 72 C184 59 174 53 160 51 L156 61 C168 63 177 69 183 80 Z" <?= $part('headlights', 'lamp-front') ?>/>
+                  <path d="M68 148 C98 138 142 138 172 148 L160 196 C136 190 104 190 80 196 Z" <?= $part('windshield', 'glass') ?>/>
+
+                  <!-- cabin: roof and rear glass are not areas -->
+                  <path class="car-roof" d="M80 200 C104 195 136 195 160 200 L160 298 C136 302 104 302 80 298 Z"/>
+                  <path class="car-glass" d="M80 302 C104 306 136 306 160 302 L170 336 C140 344 100 344 70 336 Z"/>
+
+                  <!-- doors -->
+                  <path d="M46 200 L76 198 L76 263 L46 263 Z" <?= $part('door_fl') ?>/>
+                  <path d="M46 267 L76 267 L76 331 L46 336 Z" <?= $part('door_rl') ?>/>
+                  <path d="M194 200 L164 198 L164 263 L194 263 Z" <?= $part('door_fr') ?>/>
+                  <path d="M194 267 L164 267 L164 331 L194 336 Z" <?= $part('door_rr') ?>/>
+
+                  <!-- rear -->
+                  <path d="M68 344 C100 352 140 352 172 344 L178 400 C150 410 90 410 62 400 Z" <?= $part('trunk') ?>/>
+                  <path d="M52 404 L80 412 L78 428 C64 424 56 416 52 404 Z" <?= $part('taillights', 'lamp-rear') ?>/>
+                  <path d="M188 404 L160 412 L162 428 C176 424 184 416 188 404 Z" <?= $part('taillights', 'lamp-rear') ?>/>
+                  <path d="M64 434 C90 447 150 447 176 434 L180 442 C170 455 150 461 120 461 C90 461 70 455 60 442 Z" <?= $part('rear_bumper') ?>/>
+
+                  <!-- numbers (match the list) -->
+                  <?php foreach ($car_pins as $key => $spots): if (!isset($area_num[$key])) continue; foreach ($spots as [$px, $py]): ?>
+                  <g class="pin" data-pin="<?= $key ?>" transform="translate(<?= $px ?> <?= $py ?>)" aria-hidden="true">
+                    <circle r="8.5"/><text y="3.2"><?= $area_num[$key] ?></text>
+                  </g>
+                  <?php endforeach; endforeach; ?>
+                </g>
+              </svg>
             </div>
 
-            <!-- RIGHT COLUMN: Front + Rear side by side, Top view below -->
-            <div class="car-end-col">
-
-              <!-- FRONT + REAR row -->
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
-
-                <!-- FRONT -->
-                <div class="car-view-block">
-                  <div class="car-view-label">Front</div>
-                  <svg viewBox="0 0 180 150" class="car-svg" xmlns="http://www.w3.org/2000/svg">
-                    <!-- Body -->
-                    <rect x="22" y="40" width="136" height="72" rx="10" fill="var(--bg-3)" stroke="var(--border)" stroke-width="1.5"/>
-                    <!-- Roofline -->
-                    <path d="M38 40 Q44 14 90 10 Q136 14 142 40 Z" fill="var(--bg-3)" stroke="var(--border)" stroke-width="1.5"/>
-                    <!-- Front bumper -->
-                    <rect x="22" y="106" width="136" height="18" rx="6" class="panel" data-panel="front_bumper" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                    <!-- Hood -->
-                    <rect x="40" y="37" width="100" height="24" rx="4" class="panel" data-panel="hood" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                    <!-- Windshield -->
-                    <rect x="44" y="13" width="92" height="26" rx="4" class="panel" data-panel="windshield" fill="rgba(100,180,255,0.12)" stroke="var(--border)" stroke-width="1.5"/>
-                    <!-- Left fender -->
-                    <rect x="22" y="40" width="20" height="66" rx="4" class="panel" data-panel="front_left" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                    <!-- Right fender -->
-                    <rect x="138" y="40" width="20" height="66" rx="4" class="panel" data-panel="front_right" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                    <!-- Headlights -->
-                    <rect x="25" y="60" width="30" height="18" rx="4" class="panel" data-panel="headlights" fill="rgba(255,220,100,0.18)" stroke="var(--border)" stroke-width="1.5"/>
-                    <rect x="125" y="60" width="30" height="18" rx="4" class="panel" data-panel="headlights" fill="rgba(255,220,100,0.18)" stroke="var(--border)" stroke-width="1.5"/>
-                    <!-- Mirrors -->
-                    <rect x="4"   y="50" width="18" height="11" rx="3" class="panel" data-panel="mirror_left"  fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                    <rect x="158" y="50" width="18" height="11" rx="3" class="panel" data-panel="mirror_right" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                    <!-- Wheels (clickable) -->
-                    <circle cx="32"  cy="132" r="12" class="panel" data-panel="tires_wheels" fill="var(--bg)" stroke="var(--border)" stroke-width="2"/>
-                    <circle cx="32"  cy="132" r="6"  fill="var(--border)" style="pointer-events:none;"/>
-                    <circle cx="148" cy="132" r="12" class="panel" data-panel="tires_wheels" fill="var(--bg)" stroke="var(--border)" stroke-width="2"/>
-                    <circle cx="148" cy="132" r="6"  fill="var(--border)" style="pointer-events:none;"/>
-                  </svg>
-                </div>
-
-                <!-- REAR -->
-                <div class="car-view-block">
-                  <div class="car-view-label">Rear</div>
-                  <svg viewBox="0 0 180 150" class="car-svg" xmlns="http://www.w3.org/2000/svg">
-                    <rect x="22" y="40" width="136" height="72" rx="10" fill="var(--bg-3)" stroke="var(--border)" stroke-width="1.5"/>
-                    <path d="M38 40 Q44 14 90 10 Q136 14 142 40 Z" fill="var(--bg-3)" stroke="var(--border)" stroke-width="1.5"/>
-                    <!-- Rear bumper -->
-                    <rect x="22" y="106" width="136" height="18" rx="6" class="panel" data-panel="rear_bumper" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                    <!-- Trunk -->
-                    <rect x="40" y="37" width="100" height="24" rx="4" class="panel" data-panel="trunk" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                    <!-- Left rear fender -->
-                    <rect x="22" y="40" width="20" height="66" rx="4" class="panel" data-panel="rear_left" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                    <!-- Right rear fender -->
-                    <rect x="138" y="40" width="20" height="66" rx="4" class="panel" data-panel="rear_right" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                    <!-- Taillights -->
-                    <rect x="25"  y="60" width="30" height="18" rx="4" class="panel" data-panel="taillights" fill="rgba(255,80,80,0.18)" stroke="var(--border)" stroke-width="1.5"/>
-                    <rect x="125" y="60" width="30" height="18" rx="4" class="panel" data-panel="taillights" fill="rgba(255,80,80,0.18)" stroke="var(--border)" stroke-width="1.5"/>
-                    <!-- Wheels (clickable) -->
-                    <circle cx="32"  cy="132" r="12" class="panel" data-panel="tires_wheels" fill="var(--bg)" stroke="var(--border)" stroke-width="2"/>
-                    <circle cx="32"  cy="132" r="6"  fill="var(--border)" style="pointer-events:none;"/>
-                    <circle cx="148" cy="132" r="12" class="panel" data-panel="tires_wheels" fill="var(--bg)" stroke="var(--border)" stroke-width="2"/>
-                    <circle cx="148" cy="132" r="6"  fill="var(--border)" style="pointer-events:none;"/>
-                  </svg>
-                </div>
-
-              </div>
-
-              <!-- TOP VIEW -->
-              <div class="car-view-block" style="align-items:center;">
-                <div class="car-view-label">Top</div>
-                <svg viewBox="0 0 160 310" class="car-svg" style="max-width:130px;margin:0 auto;" xmlns="http://www.w3.org/2000/svg">
-                  <!-- Body outline -->
-                  <rect x="18" y="35" width="124" height="240" rx="24" fill="var(--bg-3)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Front bumper (top) -->
-                  <rect x="30" y="16" width="100" height="20" rx="6" class="panel" data-panel="front_bumper" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Hood -->
-                  <rect x="24" y="35" width="112" height="60" rx="12" class="panel" data-panel="hood" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Windshield -->
-                  <rect x="28" y="96" width="104" height="20" rx="4" class="panel" data-panel="windshield" fill="rgba(100,180,255,0.12)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Roof -->
-                  <rect x="28" y="118" width="104" height="90" rx="6" class="panel" data-panel="roof" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Trunk -->
-                  <rect x="24" y="215" width="112" height="60" rx="12" class="panel" data-panel="trunk" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Rear bumper (bottom) -->
-                  <rect x="30" y="274" width="100" height="20" rx="6" class="panel" data-panel="rear_bumper" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Left front door -->
-                  <rect x="4"  y="118" width="16" height="42" rx="3" class="panel" data-panel="door_fl" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Left rear door -->
-                  <rect x="4"  y="166" width="16" height="42" rx="3" class="panel" data-panel="door_rl" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Right front door -->
-                  <rect x="140" y="118" width="16" height="42" rx="3" class="panel" data-panel="door_fr" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Right rear door -->
-                  <rect x="140" y="166" width="16" height="42" rx="3" class="panel" data-panel="door_rr" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Left fenders -->
-                  <path d="M18 35 Q4 42 4 65 L4 118 L18 118 Z"    class="panel" data-panel="front_left" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <path d="M18 210 L4 210 L4 248 Q4 268 18 275 Z" class="panel" data-panel="rear_left"  fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Right fenders -->
-                  <path d="M142 35 Q156 42 156 65 L156 118 L142 118 Z"    class="panel" data-panel="front_right" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <path d="M142 210 L156 210 L156 248 Q156 268 142 275 Z" class="panel" data-panel="rear_right"  fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Mirrors -->
-                  <rect x="-4"  y="90" width="16" height="10" rx="3" class="panel" data-panel="mirror_left"  fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <rect x="148" y="90" width="16" height="10" rx="3" class="panel" data-panel="mirror_right" fill="var(--bg-2)" stroke="var(--border)" stroke-width="1.5"/>
-                  <!-- Tires (clickable) -->
-                  <rect x="2"   y="58"  width="16" height="34" rx="5" class="panel" data-panel="tires_wheels" fill="var(--bg)" stroke="var(--border)" stroke-width="1.5"/>
-                  <rect x="142" y="58"  width="16" height="34" rx="5" class="panel" data-panel="tires_wheels" fill="var(--bg)" stroke="var(--border)" stroke-width="1.5"/>
-                  <rect x="2"   y="218" width="16" height="34" rx="5" class="panel" data-panel="tires_wheels" fill="var(--bg)" stroke="var(--border)" stroke-width="1.5"/>
-                  <rect x="142" y="218" width="16" height="34" rx="5" class="panel" data-panel="tires_wheels" fill="var(--bg)" stroke="var(--border)" stroke-width="1.5"/>
-                  <text x="80" y="168" text-anchor="middle" font-size="9" fill="var(--text-muted)" font-weight="600">ROOF</text>
-                </svg>
-              </div>
-
+            <div class="insp-legend">
+              <span class="legend-chip none"><?= htmlspecialchars(REPAIR_DAMAGE_LEVELS['none']['label']) ?></span>
+              <span class="legend-chip minor"><?= htmlspecialchars(REPAIR_DAMAGE_LEVELS['minor']['label']) ?></span>
+              <span class="legend-chip major"><?= htmlspecialchars(REPAIR_DAMAGE_LEVELS['major']['label']) ?></span>
             </div>
-
           </div>
 
-          <!-- LEGEND -->
-          <div style="display:flex;gap:1.25rem;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap;">
-            <span style="font-size:0.72rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Legend:</span>
-            <span class="legend-dot" style="background:var(--bg-2);border:1.5px solid var(--border);"><?= REPAIR_DAMAGE_LEVELS['none']['label'] ?></span>
-            <span class="legend-dot" style="background:rgba(217,119,6,0.18);border:1.5px solid #D97706;"><?= REPAIR_DAMAGE_LEVELS['minor']['label'] ?></span>
-            <span class="legend-dot" style="background:rgba(220,38,38,0.18);border:1.5px solid #DC2626;"><?= REPAIR_DAMAGE_LEVELS['major']['label'] ?></span>
-          </div>
+          <!-- AREAS BY SECTOR -->
+          <div class="insp-list-col">
+            <div class="insp-summary" id="insp-summary" aria-live="polite">No damage marked</div>
 
-          <!-- HIDDEN INPUTS (submitted with form) -->
-          <?php foreach ($checklist_area_keys as $key): ?>
-          <input type="hidden" name="area_<?= $key ?>" id="inp_area_<?= $key ?>" value="none"/>
-          <input type="hidden" name="note_<?= $key ?>" id="inp_note_<?= $key ?>" value=""/>
-          <?php endforeach; ?>
+            <?php foreach ($checklist_sectors as $sector_key => $sector): ?>
+            <section class="insp-sector" data-sector="<?= $sector_key ?>">
+              <header class="insp-sector-head">
+                <span class="insp-sector-name"><?= htmlspecialchars($sector['label']) ?></span>
+                <span class="insp-sector-count" data-count="<?= $sector_key ?>"></span>
+              </header>
 
-          <!-- CHECKLIST TABLE (synced with diagram) -->
-          <table class="tg-table checklist-table" style="margin-bottom:0;">
-            <thead>
-              <tr>
-                <th style="text-align:left;">Exterior Area</th>
-                <th style="width:13%;text-align:center;"><?= REPAIR_DAMAGE_LEVELS['none']['label'] ?></th>
-                <th style="width:13%;text-align:center;"><?= REPAIR_DAMAGE_LEVELS['minor']['label'] ?></th>
-                <th style="width:13%;text-align:center;"><?= REPAIR_DAMAGE_LEVELS['major']['label'] ?></th>
-                <th style="text-align:left;">Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php foreach ($checklist_areas as $key => $label): ?>
-              <tr class="checklist-row" id="row_<?= $key ?>" data-key="<?= $key ?>">
-                <td class="area-name" style="font-weight:500;font-size:0.82rem;"><?= $label ?></td>
-                <td style="text-align:center;"><span class="radio-dot active" data-val="none"  data-key="<?= $key ?>"><span></span></span></td>
-                <td style="text-align:center;"><span class="radio-dot"        data-val="minor" data-key="<?= $key ?>"><span></span></span></td>
-                <td style="text-align:center;"><span class="radio-dot"        data-val="major" data-key="<?= $key ?>"><span></span></span></td>
-                <td><input type="text" class="field-input note-input" data-key="<?= $key ?>"
-                  placeholder="—" style="font-size:0.78rem;padding:0.35rem 0.6rem;"/></td>
-              </tr>
+              <?php foreach ($sector['areas'] as $key): $label = htmlspecialchars($checklist_areas[$key]); ?>
+              <div class="insp-row" id="row_<?= $key ?>" data-key="<?= $key ?>" data-sector="<?= $sector_key ?>">
+                <span class="insp-num"><?= $area_num[$key] ?></span>
+                <span class="insp-name area-name"><?= $label ?></span>
+                <div class="insp-seg" role="radiogroup" aria-label="<?= $label ?> condition">
+                  <?php foreach (REPAIR_DAMAGE_LEVELS as $lvl => $d): ?>
+                  <label class="seg seg-<?= $lvl ?>">
+                    <input type="radio" name="area_<?= $key ?>" value="<?= $lvl ?>"<?= $lvl === 'none' ? ' checked' : '' ?>/>
+                    <span><?= htmlspecialchars($d['label']) ?></span>
+                  </label>
+                  <?php endforeach; ?>
+                </div>
+                <input type="text" class="field-input insp-note note-input" name="note_<?= $key ?>" data-key="<?= $key ?>"
+                       maxlength="255" placeholder="Notes for <?= $label ?> (optional)" aria-label="<?= $label ?> notes"/>
+              </div>
               <?php endforeach; ?>
-            </tbody>
-          </table>
+            </section>
+            <?php endforeach; ?>
+          </div>
 
         </div>
       </div>
@@ -531,7 +421,7 @@ require_once '../../includes/topbar.php';
 </div>
 
 <!-- Panel popup element -->
-<div id="panel-popup"></div>
+<div id="panel-popup" role="dialog" aria-label="Part condition"></div>
 
 <script>
 window.areaLabels   = <?= json_encode($checklist_areas) ?>;

@@ -570,3 +570,86 @@
     padding: 0.75rem 1rem;
   }
 }
+
+/* ══ Settings layout (2026-11-20): enterprise-style page — header, sticky menu on the left, one column of
+   sections on the right, a sticky save bar that says when something is unsaved. The old tab bar's buttons are
+   now the menu's group headings (.st-nav-head). ══ */
+.st-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; padding-bottom: 1.25rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
+.st-title { margin: 0; font-size: 1.6rem; font-weight: 800; letter-spacing: -0.6px; color: var(--text-primary); }
+.st-desc { margin: 0.3rem 0 0; font-size: 0.85rem; color: var(--text-muted); }
+.st-head-user { display: flex; align-items: center; gap: 0.65rem; padding: 0.45rem 0.85rem 0.45rem 0.45rem; border: 1px solid var(--border); border-radius: 100px; background: var(--bg-2); }
+.st-head-avatar { width: 34px; height: 34px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 800; color: var(--on-gold); background: linear-gradient(135deg, var(--gold-bright), var(--gold)); }
+.st-head-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.st-head-name { font-size: 0.82rem; font-weight: 700; color: var(--text-primary); line-height: 1.2; }
+.st-head-role { font-size: 0.68rem; color: var(--text-muted); }
+
+.st-layout { display: grid; grid-template-columns: 232px minmax(0, 1fr); gap: 2.25rem; align-items: start; }
+.st-main { min-width: 0; }   /* full width (owner's choice, 2026-11-20); "Centered" page width in Layout & Text still narrows the whole page */
+
+/* menu */
+.st-nav { position: sticky; top: 5.75rem; display: flex; flex-direction: column; gap: 1.1rem; max-height: calc(100vh - 7rem); overflow-y: auto; scrollbar-width: thin; padding-right: 0.25rem; }
+.st-nav-group { display: flex; flex-direction: column; gap: 0.15rem; }
+.settings-tab-btn.st-nav-head {
+  flex: none; justify-content: flex-start; gap: 0.5rem; width: 100%; padding: 0.35rem 0.6rem; margin-bottom: 0.15rem;
+  font-size: 0.68rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted);
+  background: none; border-radius: 8px; box-shadow: none;
+}
+.settings-tab-btn.st-nav-head:hover { background: var(--bg-2); color: var(--text-primary); }
+.settings-tab-btn.st-nav-head.active { background: none; color: var(--gold); box-shadow: none; }
+.settings-tab-btn.st-nav-head .tab-owner { margin-left: auto; letter-spacing: 0.5px; }
+.st-nav-links { display: flex; flex-direction: column; gap: 1px; }
+.st-link {
+  position: relative; display: block; padding: 0.45rem 0.75rem 0.45rem 1.85rem; border-radius: 8px;
+  font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); text-decoration: none; transition: background 0.15s, color 0.15s;
+}
+.st-link:hover { background: var(--bg-2); color: var(--text-primary); }
+.st-link.is-current { background: var(--gold-pale); color: var(--text-primary); }
+.st-link.is-current::before { content: ""; position: absolute; left: 0.75rem; top: 50%; width: 3px; height: 1rem; transform: translateY(-50%); border-radius: 3px; background: var(--gold); }
+.st-nav-head:not(.active) + .st-nav-links .st-link { color: var(--text-muted); }
+
+/* the right column */
+.st-panel-head { margin-bottom: 1.25rem; }
+.st-panel-head h2 { margin: 0; font-size: 1.15rem; font-weight: 800; letter-spacing: -0.3px; color: var(--text-primary); }
+.st-panel-head p { margin: 0.25rem 0 0; font-size: 0.8rem; color: var(--text-muted); }
+.st-group-title { display: flex; align-items: center; gap: 0.75rem; margin: 2rem 0 1rem; font-size: 0.66rem; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-muted); }
+.st-group-title::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+/* sections: flat, quiet cards with a plain icon */
+.card.st-section { margin: 0 0 1.25rem; border-radius: 12px; box-shadow: none; scroll-margin-top: 6rem; overflow: visible; }
+.card.st-section > .card-header { background: none; padding: 1.1rem 1.4rem; }
+.card.st-section > .card-header .card-icon { background: var(--bg-3); color: var(--text-secondary); border: 1px solid var(--border); }
+.card.st-section > .card-header .card-title { font-size: 0.95rem; }
+.card.st-section > .card-body { padding: 1.25rem 1.4rem 1.4rem; }
+.card.st-section > .form-actions { background: var(--bg-3); border-top: 1px solid var(--border); padding: 0.85rem 1.4rem; border-radius: 0 0 12px 12px; }
+.card.st-section:target, .card.st-section.st-flash { animation: st-flash 1.4s ease; }
+@keyframes st-flash { 0% { box-shadow: 0 0 0 3px var(--gold-muted); } 100% { box-shadow: 0 0 0 0 transparent; } }
+
+/* the save bar stays at the bottom of the screen; it says when something is unsaved */
+.st-main .panel-save-bar {
+  position: sticky; bottom: 0; z-index: 20; margin-top: 0.5rem; padding: 0.8rem 1rem; align-items: center; gap: 1rem;
+  border: 1px solid var(--border); border-radius: 12px; background: color-mix(in srgb, var(--bg-2) 88%, transparent);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.st-dirty-note { display: none; align-items: center; gap: 0.5rem; margin-right: auto; font-size: 0.8rem; font-weight: 600; color: var(--warning); }
+.st-dirty-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warning); animation: st-pulse 1.6s ease-out infinite; }
+@keyframes st-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--warning) 55%, transparent); } 80%, 100% { box-shadow: 0 0 0 7px transparent; } }
+.panel-save-bar.is-dirty { border-color: var(--warning-border); box-shadow: var(--shadow-md); }
+.panel-save-bar.is-dirty .st-dirty-note { display: inline-flex; }
+
+/* tablet / phone: the menu becomes a row of group tabs above the sections */
+@media (max-width: 960px) {
+  .st-layout { grid-template-columns: 1fr; gap: 1rem; }
+  .st-nav { position: static; flex-direction: row; gap: 0.25rem; max-height: none; overflow-x: auto; padding: 0.3rem; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-3); }
+  .st-nav-group { flex: 1 0 auto; }
+  .st-nav-links { display: none; }
+  .settings-tab-btn.st-nav-head { justify-content: center; margin: 0; padding: 0.6rem 0.8rem; font-size: 0.72rem; letter-spacing: 0.4px; }
+  .settings-tab-btn.st-nav-head.active { background: var(--btn-bg); color: var(--btn-text); }
+  .st-main { max-width: none; }
+}
+@media (max-width: 640px) {
+  .st-head-user { display: none; }
+  .st-title { font-size: 1.3rem; }
+  .settings-tab-btn.st-nav-head .tab-owner { display: none; }
+  .card.st-section > .card-header, .card.st-section > .card-body { padding-left: 1rem; padding-right: 1rem; }
+}
+@media (prefers-reduced-motion: reduce) { .st-dirty-dot { animation: none; } }

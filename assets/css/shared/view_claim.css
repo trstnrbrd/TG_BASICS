@@ -47,7 +47,7 @@
 .doc-item.received .doc-checkbox {
   background: var(--success);
   border-color: var(--success);
-  color: #fff;
+  color: var(--bg);
 }
 .doc-label {
   font-size: 0.85rem;
@@ -148,90 +148,215 @@
   cursor: not-allowed !important;
   pointer-events: none;
 }
-@media (max-width: 768px) {
-  .claim-top-grid {
-    grid-template-columns: 1fr !important;
-  }
-  .claim-bottom-grid {
-    grid-template-columns: 1fr !important;
-  }
-  .status-flow {
-    gap: 0.25rem;
-  }
-  .status-step {
-    font-size: 0.62rem;
-    padding: 0.3rem 0.55rem;
-  }
-  .claim-page-header {
-    flex-direction: column !important;
-    align-items: flex-start !important;
-  }
-  .doc-label {
-    font-size: 0.82rem;
-  }
-  .doc-btn-label {
-    display: none;
-  }
-  .doc-upload-btn {
-    width: 44px;
-    height: 44px;
-    padding: 0 !important;
-    justify-content: center;
-  }
-  .doc-thumb {
-    max-width: 100%;
-    height: 160px;
-  }
-  .card-body {
-    padding: 0.85rem !important;
-  }
-}
-@media (max-width: 480px) {
-  .status-step {
-    font-size: 0.58rem;
-    padding: 0.25rem 0.45rem;
-  }
-  .doc-item {
-    padding: 0.75rem 0.85rem;
-  }
-}
-.status-flow {
+/* ── header ── */
+.claim-head {
   display: flex;
-  align-items: center;
-  gap: 0;
-  margin-bottom: 1.5rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
   flex-wrap: wrap;
-  gap: 0.35rem;
+  margin-bottom: 1rem;
 }
-.status-step {
+.claim-head-main { display: flex; align-items: flex-start; gap: 0.75rem; min-width: 0; }
+.claim-head-main .back-link { margin-bottom: 0; flex-shrink: 0; }
+.claim-head-title { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.claim-head-title h2 { font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin: 0; overflow-wrap: anywhere; }
+.claim-head-sub { font-size: 0.74rem; color: var(--text-muted); margin-top: 0.25rem; }
+.claim-head-actions { margin: 0; }
+
+.claim-alert {
   display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+.claim-alert strong { display: block; font-size: 0.85rem; }
+.claim-alert.danger { background: var(--danger-bg); border: 1px solid var(--danger-border); color: var(--danger); }
+.claim-alert.muted { background: var(--bg-3); border: 1px solid var(--border); color: var(--text-muted); }
+.claim-docs .claim-alert { margin: 1rem 1rem 0; }
+
+/* ── status steps ── */
+.claim-steps {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  display: flex;
+  align-items: flex-start;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.claim-step {
+  flex: 1 0 5.6rem;
+  position: relative;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.35rem 0.75rem;
-  border-radius: 100px;
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  background: var(--bg-2);
+  text-align: center;
 }
-.status-step.active {
-  background: var(--gold-light);
-  border-color: var(--gold-muted);
-  color: var(--gold);
+/* the line to the previous step */
+.claim-step + .claim-step::before {
+  content: "";
+  position: absolute;
+  top: 0.8rem;
+  right: calc(50% + 1rem);
+  left: calc(-50% + 1rem);
+  height: 2px;
+  background: var(--border);
 }
-.status-step.done {
-  background: var(--success-bg);
-  border-color: var(--success-border);
-  color: var(--success);
-}
-.status-step.denied-step {
-  background: var(--danger-bg);
-  border-color: rgba(192, 57, 43, 0.3);
-  color: var(--danger);
-}
-.status-arrow {
-  color: var(--text-muted);
+.claim-step.done + .claim-step::before { background: var(--success); }
+.claim-step-dot {
+  position: relative;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 2px solid var(--border);
 }
+.claim-step-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--text-muted);
+  padding: 0 0.2rem;
+}
+.claim-step.done .claim-step-dot { background: var(--success); border-color: var(--success); color: var(--bg); }
+.claim-step.done .claim-step-label { color: var(--success); }
+.claim-step.current .claim-step-dot { background: var(--gold); border-color: var(--gold); color: var(--on-gold); box-shadow: 0 0 0 4px var(--gold-pale); }
+.claim-step.current .claim-step-label { color: var(--gold); font-weight: 800; }
+.claim-step.done.current .claim-step-dot { background: var(--success); border-color: var(--success); color: var(--bg); box-shadow: 0 0 0 4px var(--success-bg); }
+.claim-step.done.current .claim-step-label { color: var(--success); }
+.claim-step.branch::before { background: none !important; height: 0; border-top: 2px dashed var(--border); }
+.claim-step.branch.is-warning .claim-step-dot { background: var(--warning); border-color: var(--warning); color: var(--bg); box-shadow: 0 0 0 4px var(--warning-bg); }
+.claim-step.branch.is-warning .claim-step-label { color: var(--warning); font-weight: 800; }
+.claim-step.branch.is-danger .claim-step-dot { background: var(--danger); border-color: var(--danger); color: var(--bg); box-shadow: 0 0 0 4px var(--danger-bg); }
+.claim-step.branch.is-danger .claim-step-label { color: var(--danger); font-weight: 800; }
+
+/* ── next step ── */
+.claim-next {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr);
+  margin-bottom: 1rem;
+  border-left: 4px solid var(--gold);
+}
+.claim-next-now { padding: 1.1rem 1.25rem; border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: flex-start; gap: 0.45rem; }
+.claim-next-act { padding: 1.1rem 1.25rem; }
+.claim-next-kicker { font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 0.15rem; }
+.claim-next-status .badge { font-size: 0.8rem; padding: 0.3rem 0.75rem; }
+.claim-next-hint { font-size: 0.82rem; color: var(--text-secondary); line-height: 1.55; margin: 0; }
+.claim-next-reason { font-size: 0.8rem; color: var(--danger); margin: 0; display: flex; gap: 0.35rem; align-items: center; }
+.claim-next-billing { margin-top: 0.35rem; }
+.claim-next-done { display: flex; align-items: center; gap: 0.5rem; height: 100%; font-size: 0.82rem; color: var(--text-muted); }
+
+.next-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 0.5rem; margin: 0.35rem 0 0.85rem; }
+.next-option {
+  position: relative;
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  padding: 0.7rem 0.8rem;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-2);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.next-option:hover { border-color: var(--gold-muted); }
+.next-option input { margin: 0.15rem 0 0; accent-color: var(--gold); flex-shrink: 0; }
+.next-option-body { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.next-option-name { font-size: 0.84rem; font-weight: 700; color: var(--text-primary); display: inline-flex; align-items: center; gap: 0.3rem; }
+.next-option-hint { font-size: 0.72rem; color: var(--text-muted); line-height: 1.4; }
+.next-option.is-picked { border-color: var(--gold); background: var(--gold-pale); }
+.next-option.is-danger .next-option-name { color: var(--danger); }
+.next-option.is-danger input { accent-color: var(--danger); }
+.next-option.is-danger.is-picked { border-color: var(--danger); background: var(--danger-bg); }
+.next-option.is-blocked { cursor: not-allowed; opacity: 0.6; }
+.next-option.is-blocked .next-option-hint { color: var(--danger); }
+.claim-next-act .field { margin-bottom: 0.75rem; }
+.field-optional { color: var(--text-muted); font-weight: 400; }
+#btn-update-status { width: 100%; justify-content: center; }
+#btn-update-status:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ── requirements + details ── */
+.claim-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(18rem, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+.claim-grid > .card { margin-bottom: 0; }
+.doc-list { padding: 1rem; display: flex; flex-direction: column; gap: 0.6rem; }
+.doc-main { flex: 1; min-width: 0; }
+.doc-actions { display: flex; flex-direction: column; gap: 0.35rem; flex-shrink: 0; margin-left: auto; }
+.doc-upload-btn { padding: 0 0.65rem; gap: 0.35rem; font-size: 0.7rem; font-weight: 600; }
+.doc-preview { margin-top: 0.5rem; }
+.doc-missing { display: inline-block; margin-top: 0.35rem; font-size: 0.68rem; font-weight: 700; color: var(--text-muted); background: var(--bg-3); border: 1px dashed var(--border); border-radius: 20px; padding: 0.1rem 0.55rem; }
+.doc-item.locked:not(.received) { background: var(--bg); }
+.doc-item.locked:not(.received) .doc-checkbox { border-style: dashed; }
+.dmg-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.6rem; }
+.dmg-grid:empty { display: none; }
+.dmg-photo-wrap { position: relative; }
+.dmg-thumb { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); display: block; }
+.dmg-remove-btn {
+  position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--danger); color: var(--bg); border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.dmg-count { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.4rem; }
+.doc-resend { padding: 0 1rem 1rem; display: flex; flex-direction: column; align-items: stretch; gap: 0.35rem; }
+.doc-resend .btn-ghost { justify-content: center; }
+.doc-resend .btn-ghost:disabled { opacity: 0.45; cursor: not-allowed; }
+.doc-resend-hint { font-size: 0.68rem; color: var(--text-muted); text-align: center; }
+
+.claim-details { position: sticky; top: 5.5rem; }
+.claim-details .card-body { display: flex; flex-direction: column; gap: 1rem; }
+.detail-group-title { font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 0.35rem; }
+.detail-list { margin: 0; display: flex; flex-direction: column; }
+.detail-list > div { display: flex; justify-content: space-between; gap: 0.75rem; padding: 0.35rem 0; border-bottom: 1px solid var(--border); font-size: 0.8rem; }
+.detail-list > div:last-child { border-bottom: none; }
+.detail-list dt { color: var(--text-muted); font-weight: 600; flex-shrink: 0; }
+.detail-list dd { margin: 0; color: var(--text-primary); text-align: right; overflow-wrap: anywhere; }
+.detail-list dd.is-danger { color: var(--danger); font-weight: 700; }
+.detail-text { font-size: 0.82rem; color: var(--text-secondary); line-height: 1.65; margin: 0.5rem 0 0; }
+.detail-note { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.6; padding: 0.75rem 0.85rem; background: var(--bg-3); border: 1px solid var(--border); border-radius: 8px; }
+.detail-note.danger { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger); }
+.detail-note.danger .detail-group-title { color: var(--danger); }
+
+/* ── tablet / phone ── */
+@media (max-width: 1100px) {
+  .claim-grid { grid-template-columns: 1fr; }
+  .claim-details { position: static; }
+}
+@media (max-width: 860px) {
+  .claim-next { grid-template-columns: 1fr; }
+  .claim-next-now { border-right: none; border-bottom: 1px solid var(--border); }
+}
+@media (max-width: 768px) {
+  .claim-steps { padding: 0.75rem 0.5rem; }
+  .claim-step { flex-basis: 4.8rem; }
+  .claim-step-label { font-size: 0.62rem; }
+  .doc-btn-label { display: none; }
+  .doc-upload-btn { width: 44px; height: 44px; padding: 0; justify-content: center; }
+  .doc-thumb { max-width: 100%; height: 160px; }
+  .doc-label { font-size: 0.82rem; }
+  .claim-next-now, .claim-next-act { padding: 1rem; }
+}
+@media (max-width: 480px) {
+  .doc-item { padding: 0.75rem 0.85rem; }
+  .next-options { grid-template-columns: 1fr; }
+}
+/* .field sets its own display, which would beat the hidden attribute (the denial reason, shown only for Denied) */
+.claim-next [hidden] { display: none !important; }

@@ -5,10 +5,10 @@
 /* The four series colours: table columns AND the two bar charts (the page's JS reads these variables),
    so a colour is changed here once. */
 :root {
-  --mr-insurance: #2E7D52;
-  --mr-walkin:    #B8860B;
-  --mr-policies:  #1A6B9A;
-  --mr-repairs:   #7B3FA0;
+  --mr-insurance: var(--success);   /* theme colours (2026-11-20), so every theme and dark mode get their own */
+  --mr-walkin:    var(--gold);
+  --mr-policies:  var(--info);
+  --mr-repairs:   #7B3FA0;          /* no theme purple: one fixed colour */
 }
 
 /* ── Print-only header (logos, company, title) ── */
@@ -177,4 +177,71 @@
   /* Current month — subtle highlight, no "Current" badge on paper */
   .mr-table tr.is-current td { background: #fdf8ea !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   .mr-current-badge { display: none; }
+}
+
+/* ══ 2026-11-20 polish (same layout): year pills, a sparkline + best month in each card, a clickable legend,
+   stacked / bar+line charts that stop at the current month, and table rows tied to the charts ══ */
+.mr-kicker { font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; color: var(--gold); }
+.mr-year-filter-row { align-items: flex-end; gap: 0.75rem 1rem; flex-wrap: wrap; }
+.mr-heading { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.5px; margin-top: 0.1rem; }
+.mr-years { display: inline-flex; padding: 3px; gap: 2px; border-radius: 10px; background: var(--bg-3); border: 1px solid var(--border); }
+.mr-year-pill {
+  padding: 0.35rem 0.8rem; border-radius: 8px; font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+.mr-year-pill:hover { color: var(--text-primary); background: var(--bg-2); }
+.mr-year-pill.is-current { background: var(--bg-2); color: var(--gold); box-shadow: var(--shadow); }
+
+/* stat cards: sparkline + best month (classes from dashboard.css) */
+.mr-stat-grid .dash-stat { cursor: default; }
+
+/* chart legend chips (click = hide / show a series) */
+.mr-legend { margin-left: auto; display: flex; gap: 0.35rem; flex-wrap: wrap; flex-shrink: 0; }
+.mr-legend-item {
+  display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.65rem; border-radius: 100px; cursor: pointer;
+  font: inherit; font-size: 0.72rem; font-weight: 700; color: var(--text-secondary);
+  background: var(--bg); border: 1px solid var(--border); transition: opacity 0.15s, border-color 0.15s;
+}
+.mr-legend-item:hover { border-color: var(--gold-muted); }
+.mr-legend-item.is-off { opacity: 0.45; text-decoration: line-through; }
+.mr-dot { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
+.mr-bg-insurance { background: var(--mr-insurance); }
+.mr-bg-walkin    { background: var(--mr-walkin); }
+.mr-bg-policies  { background: var(--mr-policies); }
+.mr-bg-repairs   { background: var(--mr-repairs); }
+.mr-charts-row .card-header { flex-wrap: wrap; }
+.mr-charts-row > .card > .card-header > .mr-legend { flex: 0 0 auto; width: auto; margin-left: auto !important; }
+
+/* table: little bars, quiet zeros, hover / flash tied to the charts */
+.mr-table tbody tr { transition: background 0.15s; cursor: default; }
+.mr-table tbody tr:not(.is-future):hover, .mr-table tbody tr.is-hot { background: var(--gold-pale); }
+.mr-table tbody tr.is-future { opacity: 0.55; }
+.mr-cell { display: inline-flex; flex-direction: column; align-items: center; gap: 0.25rem; min-width: 3rem; }
+.mr-cellbar { width: 3rem; height: 4px; border-radius: 10px; background: var(--bg-3); overflow: hidden; }
+.mr-cellbar > span { display: block; height: 100%; border-radius: 10px; background: currentColor; opacity: 0.75; }
+.mr-table td.is-zero { color: var(--text-muted); font-weight: 400; }
+.mr-table td.is-zero .mr-cellbar { visibility: hidden; }
+.mr-table tbody td:nth-child(2) .mr-cellbar > span { background: var(--text-secondary); }
+@keyframes mr-flash { 0% { background: color-mix(in srgb, var(--gold) 28%, transparent); } 100% { background: transparent; } }
+.mr-table tbody tr.is-flash { animation: mr-flash 1.2s ease; }
+
+@media (max-width: 900px) {
+  .mr-charts-row { grid-template-columns: 1fr; }
+  .mr-stat-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .mr-heading { font-size: 1.2rem; }
+  .mr-actions { width: 100%; justify-content: space-between; flex-wrap: wrap; }
+  .mr-years { overflow-x: auto; max-width: 100%; }
+  .mr-legend { margin-left: 0; }
+  .mr-cellbar { display: none; }
+  .mr-cell { min-width: 0; }
+}
+
+@media print {
+  .dash-stat-micro, .mr-cellbar, .mr-years { display: none !important; }
+  .mr-legend { margin-left: auto; }
+  .mr-legend-item { border: none !important; padding: 0 0.3rem !important; font-size: 0.55rem !important; background: none !important; }
+  .mr-dot { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .mr-table tbody tr.is-future { opacity: 1; }
 }

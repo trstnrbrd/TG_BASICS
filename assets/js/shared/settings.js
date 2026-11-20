@@ -527,3 +527,92 @@ document.querySelectorAll(".field-eye-toggle").forEach((btn) => {
       (btn.innerHTML = showing ? EYE_ICON : EYE_SLASH_ICON));
   });
 });
+
+// ── Settings menu (2026-11-20): the left menu opens a group (its .settings-tab-btn, handled above) and scrolls to a
+// section; the link of the section in view is lit; #section in the address opens it; an "Unsaved changes" note
+// shows on the save bar of Appearance / Organization once something there is edited ──
+(function () {
+  var links = [].slice.call(document.querySelectorAll(".st-link"));
+  if (!links.length) return;
+  var heads = [].slice.call(document.querySelectorAll(".st-nav-head"));
+  var topOffset = function () { var t = document.querySelector(".topbar"); return (t ? t.getBoundingClientRect().height : 0) + 16; };
+
+  function openGroup(tab) {
+    var head = document.querySelector('.st-nav-head[data-tab="' + tab + '"]');
+    if (head && !head.classList.contains("active")) head.click();
+  }
+  function goTo(id, smooth) {
+    var el = document.getElementById(id); if (!el) return;
+    var y = el.getBoundingClientRect().top + window.scrollY - topOffset();
+    window.scrollTo({ top: Math.max(0, y), behavior: smooth ? "smooth" : "auto" });
+    mark(id);
+  }
+  function mark(id) {
+    links.forEach(function (l) { l.classList.toggle("is-current", l.dataset.target === id); });
+  }
+  links.forEach(function (l) {
+    l.addEventListener("click", function (e) {
+      e.preventDefault();
+      openGroup(l.dataset.tab);
+      history.replaceState(null, "", "#" + l.dataset.target);
+      requestAnimationFrame(function () { goTo(l.dataset.target, true); });
+    });
+  });
+  heads.forEach(function (h) {
+    h.addEventListener("click", function () {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      var first = links.find(function (l) { return l.dataset.tab === h.dataset.tab; });
+      if (first) mark(first.dataset.target);
+      history.replaceState(null, "", location.pathname + location.search);
+    });
+  });
+
+  // the section in view (in the open group) lights its link
+  var ticking = false;
+  window.addEventListener("scroll", function () {
+    if (ticking) return; ticking = true;
+    requestAnimationFrame(function () {
+      ticking = false;
+      var panel = document.querySelector(".settings-panel.active"); if (!panel) return;
+      var line = topOffset() + 40, current = null;
+      panel.querySelectorAll(".st-section").forEach(function (s) { if (s.getBoundingClientRect().top <= line) current = s.id; });
+      if (!current) { var f = panel.querySelector(".st-section"); current = f && f.id; }
+      // at the very bottom the last sections can never reach the top: light the last one
+      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) {
+        var all = panel.querySelectorAll(".st-section"); if (all.length) current = all[all.length - 1].id;
+      }
+      if (current) mark(current);
+    });
+  }, { passive: true });
+
+  // #section in the address (a bookmark, or the dashboard's settings.php#db-backup) opens it
+  function fromHash(smooth) {
+    var hash = location.hash.slice(1);
+    var target = hash && links.find(function (l) { return l.dataset.target === hash; });
+    if (!target) return false;
+    openGroup(target.dataset.tab);
+    setTimeout(function () { goTo(hash, smooth); }, 60);
+    return true;
+  }
+  if (!fromHash(false)) mark(links[0].dataset.target);
+  window.addEventListener("hashchange", function () { fromHash(true); });   // a #section link typed or followed while here
+
+  // "Unsaved changes" on the save bars (Appearance and Organization save with one button)
+  [["panel-design", "#save-design-btn"], ["panel-system_settings", ".js-settings-save"]].forEach(function (pair) {
+    var panel = document.getElementById(pair[0]); if (!panel) return;
+    var bar = panel.querySelector(".panel-save-bar"); if (!bar) return;
+    var note = document.createElement("span");
+    note.className = "st-dirty-note";
+    note.innerHTML = '<span class="st-dirty-dot"></span>You have unsaved changes';
+    bar.insertBefore(note, bar.firstChild);
+    var dirty = function (e) {
+      // the insurance company editor saves on its own (data-f fields), so it does not count
+      if (e.target.closest("#ins-co-form") || e.target.closest("#ins-co-table")) return;
+      bar.classList.add("is-dirty");
+    };
+    panel.addEventListener("input", dirty);
+    panel.addEventListener("change", dirty);
+    var btn = panel.querySelector(pair[1]);
+    if (btn) btn.addEventListener("click", function () { setTimeout(function () { bar.classList.remove("is-dirty"); }, 1200); });
+  });
+})();

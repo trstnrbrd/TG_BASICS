@@ -556,35 +556,67 @@ require_once '../../includes/topbar.php';
     <script>document.addEventListener('DOMContentLoaded', function () { var c = document.getElementById('totp-card'); if (c) c.scrollIntoView({ block: 'center' }); });</script>
     <?php endif; ?>
 
-    <!-- ═══ HORIZONTAL TABS ═══ -->
-    <div class="settings-tabs-bar">
-      <button class="settings-tab-btn active" data-tab="account">
-        <?= icon('user', 16) ?>
-        <span class="tab-label">My Account</span>
-      </button>
-      <button class="settings-tab-btn" data-tab="design">
-        <?= icon('swatch', 16) ?>
-        <span class="tab-label">Design Preferences</span>
-      </button>
-      <?php if ($is_super): ?>
-      <button class="settings-tab-btn" data-tab="system_settings">
-        <?= icon('cog', 16) ?>
-        <span class="tab-label">System Settings</span>
-        <span class="tab-owner">Owner</span>
-      </button>
-      <?php endif; ?>
+    <!-- ═══ SETTINGS LAYOUT (2026-11-20): page header, a sticky menu on the left, one column of sections on the right.
+         The group headings are the old tab buttons (.settings-tab-btn[data-tab], assets/js/shared/settings.js);
+         each link opens its group and scrolls to its section (#id); the link of the section in view is lit. ═══ -->
+    <div class="st-head">
+      <div>
+        <h1 class="st-title">Settings</h1>
+        <p class="st-desc">Manage your account, how the system looks for you<?= $is_super ? ', and the shop’s system settings' : '' ?>.</p>
+      </div>
+      <div class="st-head-user">
+        <div class="st-head-avatar"><?php if ($has_photo): ?><img src="<?= $photo_url ?>" alt=""/><?php else: ?><?= htmlspecialchars($initials) ?><?php endif; ?></div>
+        <div class="st-head-who">
+          <div class="st-head-name"><?= htmlspecialchars($current_user['full_name']) ?></div>
+          <div class="st-head-role"><?= is_developer() ? 'Developer · Maintenance' : ($is_super ? 'Owner · Super Admin' : (is_mechanic() ? 'Mechanic' : 'Admin')) ?></div>
+        </div>
+      </div>
     </div>
+
+    <div class="st-layout">
+      <nav class="st-nav" aria-label="Settings sections">
+        <?php
+        $st_groups = [
+          ['account', 'user', 'Account', '', [
+            ['st-profile', 'Profile'], ['st-username', 'Username'], ['st-password', 'Password'],
+            ['st-2fa', 'Two-Factor (Email)'], ['totp-card', 'Authenticator App'], ['st-pin', 'Transaction PIN'], ['about', 'About'],
+          ]],
+          ['design', 'swatch', 'Appearance', '', [['st-theme', 'Theme'], ['st-layout-text', 'Layout & Text']]],
+        ];
+        if ($is_super) {
+          $st_groups[] = ['system_settings', 'cog', 'Organization', 'Owner', [
+            ['db-backup', 'Backup'], ['st-company', 'Company Profile'], ['st-email', 'Email'], ['st-insurance', 'Insurance'], ['st-security', 'Login Security'],
+          ]];
+        }
+        foreach ($st_groups as $gi => [$tab, $ico, $label, $tag, $links]): ?>
+        <div class="st-nav-group">
+          <button type="button" class="settings-tab-btn st-nav-head<?= $gi === 0 ? ' active' : '' ?>" data-tab="<?= $tab ?>">
+            <?= icon($ico, 15) ?>
+            <span class="tab-label"><?= $label ?></span>
+            <?php if ($tag): ?><span class="tab-owner"><?= $tag ?></span><?php endif; ?>
+          </button>
+          <div class="st-nav-links">
+            <?php foreach ($links as [$id, $text]): ?>
+            <a href="#<?= $id ?>" class="st-link" data-tab="<?= $tab ?>" data-target="<?= $id ?>"><?= htmlspecialchars($text) ?></a>
+            <?php endforeach; ?>
+          </div>
+        </div>
+        <?php endforeach; ?>
+      </nav>
+
+      <div class="st-main">
 
     <!-- ═══ PANELS ═══ -->
 
     <!-- ── MY ACCOUNT ── -->
     <div class="settings-panel active" id="panel-account">
+      <div class="st-panel-head"><h2>Account</h2><p>Your profile, sign-in details and security.</p></div>
 
       <form class="settings-form" data-section="account">
         <input type="hidden" name="section" value="account"/>
         <?= csrf_field() ?>
 
-        <div class="card" style="margin-bottom:1.5rem;">
+        <div class="card st-section" id="st-profile">
           <div class="card-header">
             <div class="card-icon"><?= icon('user', 16) ?></div>
             <div>
@@ -664,7 +696,7 @@ require_once '../../includes/topbar.php';
             $next_change_date   = date('M d, Y', strtotime($username_changed_at . ' +60 days'));
         }
         ?>
-        <div class="card" style="margin-top:1.5rem;">
+        <div class="card st-section" id="st-username">
           <div class="card-header">
             <div class="card-icon"><?= icon('at-symbol', 16) ?></div>
             <div>
@@ -699,7 +731,7 @@ require_once '../../includes/topbar.php';
           </div>
         </div>
 
-        <div class="card" style="margin-top:1.5rem;">
+        <div class="card st-section" id="st-password">
           <div class="card-header">
             <div class="card-icon"><?= icon('lock-closed', 16) ?></div>
             <div>
@@ -734,13 +766,10 @@ require_once '../../includes/topbar.php';
       </form>
 
       <!-- ── SECURITY SECTION ── -->
-      <div style="margin-bottom:0.5rem;">
-        <div style="font-size:0.7rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);padding:0 0.25rem;">Security</div>
-        <div style="height:1px;background:var(--border);margin-top:0.5rem;"></div>
-      </div>
+      <div class="st-group-title">Security</div>
 
         <!-- 2FA Card -->
-        <div class="card" style="margin-top:1.5rem;">
+        <div class="card st-section" id="st-2fa">
           <div class="card-header">
             <div class="card-icon"><?= icon('shield-check', 16) ?></div>
             <div>
@@ -782,7 +811,7 @@ require_once '../../includes/topbar.php';
         </div>
 
         <!-- Authenticator App 2FA Card -->
-        <div class="card" id="totp-card" style="margin-top:1.5rem;">
+        <div class="card st-section" id="totp-card">
           <div class="card-header">
             <div class="card-icon"><?= icon('device-phone-mobile', 16) ?></div>
             <div>
@@ -888,7 +917,7 @@ require_once '../../includes/topbar.php';
 
         <!-- Transaction PIN Card -->
         <?php $has_pin = !empty($current_user['transaction_pin']); ?>
-        <div class="card" style="margin-top:1.5rem;">
+        <div class="card st-section" id="st-pin">
           <div class="card-header">
             <div class="card-icon"><?= icon('key', 16) ?></div>
             <div>
@@ -919,7 +948,7 @@ require_once '../../includes/topbar.php';
         </div>
 
       <!-- About This System: the release number (config/version.php, history in CHANGELOG.md) -->
-      <div class="card" id="about">
+      <div class="card st-section" id="about">
         <div class="card-header">
           <div class="card-icon"><?= icon('information-circle', 16) ?></div>
           <div>
@@ -940,7 +969,8 @@ require_once '../../includes/topbar.php';
 
     <!-- ── DESIGN PREFERENCES ── -->
     <div class="settings-panel" id="panel-design">
-      <div class="card">
+      <div class="st-panel-head"><h2>Appearance</h2><p>How TG-BASICS looks for you, on every device you sign in to.</p></div>
+      <div class="card st-section" id="st-theme">
         <div class="card-header">
           <div class="card-icon"><?= icon('swatch', 16) ?></div>
           <div>
@@ -994,7 +1024,7 @@ require_once '../../includes/topbar.php';
 
       <!-- Layout & Text: each user's own (UI_PREFS in includes/themes.php, saved in users.ui_prefs). Picking an
            option shows it right away; Save Changes keeps it. -->
-      <div class="card">
+      <div class="card st-section" id="st-layout-text">
         <div class="card-header">
           <div class="card-icon"><?= icon('dashboard', 16) ?></div>
           <div>
@@ -1057,13 +1087,14 @@ require_once '../../includes/topbar.php';
 
     <!-- ── SYSTEM SETTINGS (Owner) ── -->
     <div class="settings-panel" id="panel-system_settings">
+      <div class="st-panel-head"><h2>Organization</h2><p>Settings for the whole shop. Only the owner can see and change these.</p></div>
 
       <!-- Database Backup (owner's request 2026-09-25): outside the settings form, it saves nothing -->
       <?php
       $bk      = db_backup_status($conn);
       $bk_when = $bk['days'] === null ? '' : ($bk['days'] === 0 ? 'today' : ($bk['days'] === 1 ? 'yesterday' : $bk['days'] . ' days ago'));
       ?>
-      <div class="card" id="db-backup" style="margin-bottom:1.5rem;">
+      <div class="card st-section" id="db-backup">
         <div class="card-header">
           <div class="card-icon"><?= icon('arrow-down-tray', 16) ?></div>
           <div>
@@ -1124,7 +1155,7 @@ require_once '../../includes/topbar.php';
         <?= csrf_field() ?>
 
         <!-- Company Profile -->
-        <div class="card" style="margin-bottom:1.5rem;">
+        <div class="card st-section" id="st-company">
           <div class="card-header">
             <div class="card-icon"><?= icon('building-office', 16) ?></div>
             <div>
@@ -1168,7 +1199,7 @@ require_once '../../includes/topbar.php';
         </div>
 
         <!-- Email Configuration (simplified) -->
-        <div class="card" style="margin-bottom:1.5rem;">
+        <div class="card st-section" id="st-email">
           <div class="card-header">
             <div class="card-icon"><?= icon('envelope', 16) ?></div>
             <div>
@@ -1244,7 +1275,7 @@ require_once '../../includes/topbar.php';
         </div>
 
         <!-- Insurance Settings -->
-        <div class="card" style="margin-bottom:1.5rem;">
+        <div class="card st-section" id="st-insurance">
           <div class="card-header">
             <div class="card-icon"><?= icon('shield-check', 16) ?></div>
             <div>
@@ -1338,7 +1369,7 @@ require_once '../../includes/topbar.php';
         </div>
 
         <!-- Security Settings -->
-        <div class="card" style="margin-bottom:1.5rem;">
+        <div class="card st-section" id="st-security">
           <div class="card-header">
             <div class="card-icon"><?= icon('lock-closed', 16) ?></div>
             <div>
@@ -1390,6 +1421,9 @@ require_once '../../includes/topbar.php';
     </div>
 
     <?php endif; ?>
+
+      </div><!-- /st-main -->
+    </div><!-- /st-layout -->
 
   </div>
 </div>
@@ -1554,7 +1588,7 @@ async function handlePinRemove() {
     if (removeBtn) removeBtn.remove();
     Swal.fire({ toast:true, position:'top-end', icon:'success', title:'PIN removed.', showConfirmButton:false, timer:2500, timerProgressBar:true });
   } else {
-    Swal.fire({ icon:'error', title:'Error', text: data?.error || 'Something went wrong.', confirmButtonColor:'#B8860B' });
+    Swal.fire({ icon:'error', title:'Error', text: data?.error || 'Something went wrong.' });
   }
 }
 
@@ -1614,7 +1648,7 @@ function totpPost(data) {
 
 window.totpStartSetup = async function() {
     const res = await totpPost({ section:'totp_generate' });
-    if (!res.ok) { Swal.fire({ icon:'error', title:'Error', text:res.error, confirmButtonColor:'#B8860B' }); return; }
+    if (!res.ok) { Swal.fire({ icon:'error', title:'Error', text:res.error }); return; }
     document.getElementById('totp-setup-intro').style.display = 'none';
     document.getElementById('totp-setup-flow').style.display  = 'block';
     const btn = document.getElementById('totp-setup-btn');
@@ -1673,9 +1707,9 @@ window.totpDisable = async function() {
     if (!result.isConfirmed) return;
     const res = await totpPost({ section:'totp_disable', password:result.value });
     if (res.ok) {
-        Swal.fire({ icon:'success', title:'2FA Disabled', confirmButtonColor:'#B8860B' }).then(() => location.reload());
+        Swal.fire({ icon:'success', title:'2FA Disabled' }).then(() => location.reload());
     } else {
-        Swal.fire({ icon:'error', title:'Error', text:res.error, confirmButtonColor:'#B8860B' });
+        Swal.fire({ icon:'error', title:'Error', text:res.error });
     }
 };
 
@@ -1693,7 +1727,7 @@ window.totpRegenRecovery = async function() {
         _recoveryCodes = res.recovery_codes;
         showRecoveryModal(_recoveryCodes);
     } else {
-        Swal.fire({ icon:'error', title:'Error', text:res.error, confirmButtonColor:'#B8860B' });
+        Swal.fire({ icon:'error', title:'Error', text:res.error });
     }
 };
 

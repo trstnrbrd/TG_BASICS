@@ -159,7 +159,7 @@ function mu_action_forms(array $u, ?array $history): void {
                   <?= csrf_field() ?>
                   <input type="hidden" name="action" value="<?= $action ?>"/>
                   <input type="hidden" name="user_id" value="<?= (int)$u['user_id'] ?>"/>
-                  <button type="button" class="<?= $cls ?> <?= $js ?>" data-name="<?= htmlspecialchars($u['full_name'], ENT_QUOTES) ?>" title="<?= $title ?>" aria-label="<?= $title ?> <?= htmlspecialchars($u['full_name'], ENT_QUOTES) ?>"><?= icon($icon_name, 14) ?></button>
+                  <button type="button" class="<?= $cls ?> <?= $js ?>" data-name="<?= htmlspecialchars($u['full_name'], ENT_QUOTES) ?>" title="<?= $title ?>" aria-label="<?= $title ?> <?= htmlspecialchars($u['full_name'], ENT_QUOTES) ?>"><?= icon($icon_name, 13) ?><span class="mu-act-label"><?= $title ?></span></button>
                 </form>
 <?php }
 }
@@ -169,6 +169,18 @@ function mu_action_forms(array $u, ?array $history): void {
 function mu_dev_row(array $u): array {
     if (empty($u['is_hidden'])) return $u;
     return array_merge($u, ['full_name' => 'Developer', 'username' => '', 'profile_photo' => '', 'role' => 'developer']);
+}
+
+// When the account was last used: "Online now", "12m ago", "Yesterday", "Nov 3, 2026", or never
+function mu_last_seen(array $u): string {
+    if (!empty($u['is_online'])) return 'Online now';
+    if (empty($u['last_active'])) return $u['acct_status'] === 'pending' ? 'Not activated yet' : 'Never signed in';
+    $d = time() - strtotime($u['last_active']);
+    if ($d < 3600)   return max(1, (int)floor($d / 60)) . 'm ago';
+    if ($d < 86400)  return (int)floor($d / 3600) . 'h ago';
+    if ($d < 172800) return 'Yesterday';
+    if ($d < 604800) return (int)floor($d / 86400) . ' days ago';
+    return date('M j, Y', strtotime($u['last_active']));
 }
 
 // Status badge: Active / Pending (invited, not yet activated) / Deactivated (switched off by an admin)
@@ -183,6 +195,7 @@ function mu_status_badge(string $status): string {
 $page_title  = 'Manage Users';
 $active_page = 'manage_users';
 $base_path   = '../../';
+$extra_css   = '<link rel="stylesheet" href="../../assets/css/shared/manage_users.css?v=' . filemtime(__DIR__ . '/../../assets/css/shared/manage_users.css') . '"/>';
 require_once '../../includes/header.php';
 require_once '../../includes/navbar.php';
 ?>
@@ -212,46 +225,75 @@ require_once '../../includes/topbar.php';
       Swal.fire({
         icon: 'error',
         title: 'Something went wrong',
-        html: <?= json_encode('<ul style="text-align:left;margin:0;padding-left:1.2rem;">' . implode('', array_map(fn($e) => '<li>' . htmlspecialchars($e) . '</li>', $errors)) . '</ul>') ?>,
-        confirmButtonColor: '#B8860B'
+        html: <?= json_encode('<ul style="text-align:left;margin:0;padding-left:1.2rem;">' . implode('', array_map(fn($e) => '<li>' . htmlspecialchars($e) . '</li>', $errors)) . '</ul>') ?>
       });
     });
     </script>
     <?php endif; ?>
 
-    <div style="display:grid;grid-template-columns:minmax(0,1fr);gap:1.25rem;margin-bottom:1.25rem;">
+    <div class="mu-wrap">
+
+      <?php
+      // Store users for both desktop table and mobile cards
+      $users_list = [];
+      foreach ($users as $u) $users_list[] = mu_dev_row($u);
+      $role_labels = [
+        'super_admin' => ['Super Admin', 'badge-gold'],
+        'admin'       => ['Admin',       'badge-green'],
+        'mechanic'    => ['Mechanic',    'badge-blue'],
+        'developer'   => ['Developer',   'badge-gray'],
+      ];
+      // counts for the filter tabs
+      $n_all     = count($users_list);
+      $n_online  = count(array_filter($users_list, fn($u) => !empty($u['is_online'])));
+      $n_admin   = count(array_filter($users_list, fn($u) => in_array($u['role'], ['super_admin', 'admin'], true)));
+      $n_mech    = count(array_filter($users_list, fn($u) => $u['role'] === 'mechanic'));
+      $n_pending = count(array_filter($users_list, fn($u) => $u['acct_status'] === 'pending'));
+      $n_off     = count(array_filter($users_list, fn($u) => $u['acct_status'] === 'deactivated'));
+      // which tab a user falls under (data-groups on each row / card)
+      $groups = function (array $u): string {
+          $g = ['all', in_array($u['role'], ['super_admin', 'admin'], true) ? 'admins' : ($u['role'] === 'mechanic' ? 'mechanics' : '')];
+          if ($u['acct_status'] === 'pending') $g[] = 'pending';
+          if ($u['acct_status'] === 'deactivated') $g[] = 'deactivated';
+          return implode(' ', array_filter($g));
+      };
+      ?>
 
       <!-- USER LIST -->
-      <div class="card" style="margin-bottom:0;">
+      <div class="card mu-card-main">
         <div class="card-header">
           <div class="card-icon"><?= icon('users', 16) ?></div>
           <div>
             <div class="card-title">System Users</div>
-            <div class="card-sub">All staff accounts</div>
+            <div class="card-sub">All staff accounts · <?= $n_all ?> account<?= $n_all !== 1 ? 's' : '' ?> · <span class="mu-online-n"><?= $n_online ?> online now</span></div>
           </div>
-          <button type="button" class="btn-primary" id="js-open-create-modal" style="margin-left:auto;">
+          <button type="button" class="btn-primary mu-create-btn" id="js-open-create-modal">
             <?= icon('plus', 14) ?> Create New Account
           </button>
         </div>
-        <?php
-        // Store users for both desktop table and mobile cards
-        $users_list = [];
-        foreach ($users as $u) $users_list[] = mu_dev_row($u);
-        $role_labels = [
-          'super_admin' => ['Super Admin', 'badge-gold'],
-          'admin'       => ['Admin',       'badge-green'],
-          'mechanic'    => ['Mechanic',    'badge-blue'],
-          'developer'   => ['Developer',   'badge-gray'],
-        ];
-        ?>
+
+        <!-- SEARCH + FILTER TABS (filtering happens in the browser; the list is short) -->
+        <div class="mu-toolbar">
+          <label class="mu-search">
+            <?= icon('magnifying-glass', 14) ?>
+            <input type="search" id="mu-search" placeholder="Search name, username or email" autocomplete="off" aria-label="Search users"/>
+          </label>
+          <div class="mu-tabs" role="tablist" aria-label="Show">
+            <?php foreach ([['all', 'All', $n_all], ['admins', 'Admins', $n_admin], ['mechanics', 'Mechanics', $n_mech], ['pending', 'Pending', $n_pending], ['deactivated', 'Deactivated', $n_off]] as [$key, $lbl, $n]):
+              if ($n === 0 && !in_array($key, ['all', 'admins', 'mechanics'], true)) continue; ?>
+            <button type="button" class="mu-tab<?= $key === 'all' ? ' is-on' : '' ?>" role="tab" aria-selected="<?= $key === 'all' ? 'true' : 'false' ?>" data-group="<?= $key ?>"><?= $lbl ?> <span><?= $n ?></span></button>
+            <?php endforeach; ?>
+          </div>
+        </div>
 
         <!-- DESKTOP TABLE -->
         <table class="tg-table mu-desktop-table">
           <thead>
             <tr>
-              <th style="text-align:left;padding-left:1.25rem;">Name</th>
+              <th class="mu-th-name">Name</th>
               <th>Role</th>
               <th>Status</th>
+              <th>Last Seen</th>
               <th>Action</th>
             </tr>
           </thead>
@@ -261,29 +303,30 @@ require_once '../../includes/topbar.php';
               $is_online  = !empty($u['is_online']);
               $u_initials = substr(implode('', array_map(fn($w) => strtoupper($w[0] ?? ''), array_filter(explode(' ', $u['full_name'])))), 0, 2);
               $u_photo    = !empty($u['profile_photo']) ? '../../uploads/avatars/' . htmlspecialchars($u['profile_photo']) : '';
+              $profile    = $u['role'] === 'developer' ? '' : ' data-user-id="' . (int)$u['user_id'] . '" title="View profile"';
+              $search     = mb_strtolower($u['full_name'] . ' ' . $u['username'] . ' ' . ($u['email'] ?? ''));
             ?>
-            <tr>
-              <td style="text-align:left;padding-left:1.25rem;">
-                <div style="display:flex;align-items:center;gap:0.65rem;">
-                  <div <?= $u['role'] === 'developer' ? '' : 'data-user-id="' . (int)$u['user_id'] . '" title="View profile"' ?> style="position:relative;flex-shrink:0;cursor:pointer;">
-                    <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--gold-bright),var(--gold));display:flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:800;color:#fff;overflow:hidden;border:2px solid var(--border);">
-                      <?php if ($u_photo): ?><img src="<?= $u_photo ?>" style="width:100%;height:100%;object-fit:cover;" alt="" loading="lazy"/><?php else: ?><?= $u_initials ?><?php endif; ?>
-                    </div>
-                    <span style="position:absolute;bottom:0;right:0;width:9px;height:9px;border-radius:50%;background:<?= $is_online ? '#22c55e' : 'var(--border)' ?>;border:2px solid var(--bg-3);<?= $is_online ? 'box-shadow:0 0 0 2px rgba(34,197,94,0.25);' : '' ?>"></span>
+            <tr class="mu-row is-<?= $u['acct_status'] ?>" data-groups="<?= $groups($u) ?>" data-search="<?= htmlspecialchars($search) ?>">
+              <td class="mu-td-name">
+                <div class="mu-person">
+                  <div class="mu-avatar<?= $is_online ? ' is-online' : '' ?>"<?= $profile ?>>
+                    <div class="mu-avatar-pic"><?php if ($u_photo): ?><img src="<?= $u_photo ?>" alt="" loading="lazy"/><?php else: ?><?= $u_initials ?><?php endif; ?></div>
+                    <span class="mu-avatar-dot"></span>
                   </div>
-                  <div <?= $u['role'] === 'developer' ? '' : 'data-user-id="' . (int)$u['user_id'] . '" title="View profile"' ?> style="cursor:pointer;">
-                    <div style="font-weight:700;color:var(--text-primary);font-size:0.82rem;line-height:1.2;"><?= htmlspecialchars($u['full_name']) ?></div>
-                    <div style="font-size:0.7rem;color:var(--text-muted);"><?= $u['username'] !== '' ? '@' . htmlspecialchars($u['username']) : 'System maintenance' ?></div>
+                  <div class="mu-person-text"<?= $profile ?>>
+                    <div class="mu-name"><?= htmlspecialchars($u['full_name']) ?><?php if ((int)$u['user_id'] === (int)$_SESSION['user_id']): ?> <span class="mu-you">You</span><?php endif; ?></div>
+                    <div class="mu-handle"><?= $u['username'] !== '' ? '@' . htmlspecialchars($u['username']) : 'System maintenance' ?><?php if (!empty($u['email']) && $u['role'] !== 'developer'): ?> · <?= htmlspecialchars($u['email']) ?><?php endif; ?></div>
                   </div>
                 </div>
               </td>
               <td><span class="badge <?= $rl[1] ?>"><?= $rl[0] ?></span></td>
               <td><?= mu_status_badge($u['acct_status']) ?></td>
+              <td class="mu-seen<?= $is_online ? ' is-online' : '' ?>"><?= htmlspecialchars(mu_last_seen($u)) ?></td>
               <td>
                 <?php if (!in_array($u['role'], ['super_admin', 'developer'], true)): ?>
                 <div class="mu-act-group"><?php mu_action_forms($u, $users_with_history); ?></div>
                 <?php else: ?>
-                <span style="font-size:0.7rem;color:var(--text-muted);">Protected</span>
+                <span class="mu-protected-tag"><?= icon('shield-check', 12) ?> Protected</span>
                 <?php endif; ?>
               </td>
             </tr>
@@ -298,19 +341,20 @@ require_once '../../includes/topbar.php';
             $is_online  = !empty($u['is_online']);
             $u_initials = substr(implode('', array_map(fn($w) => strtoupper($w[0] ?? ''), array_filter(explode(' ', $u['full_name'])))), 0, 2);
             $u_photo    = !empty($u['profile_photo']) ? '../../uploads/avatars/' . htmlspecialchars($u['profile_photo']) : '';
+            $search     = mb_strtolower($u['full_name'] . ' ' . $u['username'] . ' ' . ($u['email'] ?? ''));
           ?>
-          <div class="mu-card">
+          <div class="mu-card" data-groups="<?= $groups($u) ?>" data-search="<?= htmlspecialchars($search) ?>">
             <!-- Avatar -->
             <div class="mu-card-avatar" <?= $u['role'] === 'developer' ? '' : 'data-user-id="' . (int)$u['user_id'] . '"' ?>>
               <div class="mu-card-avatar-inner">
                 <?php if ($u_photo): ?><img src="<?= $u_photo ?>" alt="" loading="lazy"/><?php else: ?><?= $u_initials ?><?php endif; ?>
               </div>
-              <span class="mu-card-dot" style="background:<?= $is_online ? '#22c55e' : 'var(--border)' ?>;<?= $is_online ? 'box-shadow:0 0 0 2px rgba(34,197,94,0.25);' : '' ?>"></span>
+              <span class="mu-card-dot<?= $is_online ? ' is-online' : '' ?>"></span>
             </div>
             <!-- Name -->
             <div class="mu-card-body" <?= $u['role'] === 'developer' ? '' : 'data-user-id="' . (int)$u['user_id'] . '"' ?>>
               <div class="mu-card-name"><?= htmlspecialchars($u['full_name']) ?></div>
-              <div class="mu-card-username"><?= $u['username'] !== '' ? '@' . htmlspecialchars($u['username']) : 'System maintenance' ?></div>
+              <div class="mu-card-username"><?= $u['username'] !== '' ? '@' . htmlspecialchars($u['username']) : 'System maintenance' ?> · <?= htmlspecialchars(mu_last_seen($u)) ?></div>
             </div>
             <!-- Badges -->
             <div class="mu-card-badges">
@@ -328,21 +372,24 @@ require_once '../../includes/topbar.php';
           </div>
           <?php endforeach; ?>
         </div>
+
+        <div class="mu-empty" id="mu-empty" hidden><?= icon('magnifying-glass', 22) ?><span>No account matches.</span></div>
       </div>
 
       <!-- CREATE ACCOUNT MODAL -->
       <div class="modal-overlay" id="create-account-modal" onclick="if(event.target===this)closeCreateAccountModal()">
-        <div class="modal-box" style="max-width:620px;max-height:90vh;overflow-y:auto;">
+        <div class="modal-box mu-modal">
           <div class="modal-header">
-            <div class="modal-title"><?= icon('plus', 16) ?> <span>Create New Account</span></div>
+            <div class="modal-title"><?= icon('user-plus', 16) ?> <span>Create New Account</span></div>
             <button type="button" class="modal-close" onclick="closeCreateAccountModal()" aria-label="Close"><?= icon('x-mark', 14) ?></button>
           </div>
         <form method="POST" action="">
           <?= csrf_field() ?>
           <input type="hidden" name="action" value="create"/>
-          <div style="padding:1.25rem;display:flex;flex-direction:column;gap:0.9rem;">
+          <div class="mu-modal-body">
+            <p class="mu-modal-intro">They get an email with a link to set their own password. The account stays <strong>Pending</strong> until they do.</p>
 
-            <div class="form-grid" style="gap:0.9rem;">
+            <div class="form-grid mu-form-grid">
               <div class="field">
                 <label class="field-label">First Name <span class="req">*</span></label>
                 <input type="text" name="new_first_name" class="field-input"
@@ -357,32 +404,42 @@ require_once '../../includes/topbar.php';
               </div>
             </div>
 
-            <div class="field">
-              <label class="field-label">Email Address <span class="req">*</span></label>
-              <input type="email" name="new_email" class="field-input"
-                placeholder="name@email.com"
-                value="<?= old('new_email') ?>"/>
-              <span class="field-hint">Activation link will be sent here.</span>
+            <div class="form-grid mu-form-grid">
+              <div class="field">
+                <label class="field-label">Email Address <span class="req">*</span></label>
+                <input type="email" name="new_email" class="field-input"
+                  placeholder="name@email.com"
+                  value="<?= old('new_email') ?>"/>
+                <span class="field-hint">Activation link will be sent here.</span>
+              </div>
+              <div class="field">
+                <label class="field-label">Username <span class="req">*</span></label>
+                <input type="text" name="new_username" class="field-input"
+                  placeholder="Letters, numbers, underscores"
+                  value="<?= old('new_username') ?>"/>
+              </div>
             </div>
 
             <div class="field">
-              <label class="field-label">Username <span class="req">*</span></label>
-              <input type="text" name="new_username" class="field-input"
-                placeholder="Letters, numbers, underscores"
-                value="<?= old('new_username') ?>"/>
-            </div>
-
-            <div class="field">
-              <label class="field-label">Role <span class="req">*</span></label>
-              <select name="new_role" class="field-select">
-                <option value="" disabled <?= empty($_POST['new_role']) ? 'selected' : '' ?>>Select role</option>
-                <option value="admin"    <?= (($_POST['new_role'] ?? '') === 'admin')    ? 'selected' : '' ?>>Admin</option>
-                <option value="mechanic" <?= (($_POST['new_role'] ?? '') === 'mechanic') ? 'selected' : '' ?>>Mechanic</option>
-              </select>
+              <span class="field-label">Role <span class="req">*</span></span>
+              <?php $picked_role = is_string($_POST['new_role'] ?? null) ? $_POST['new_role'] : ''; ?>
+              <div class="mu-roles" role="radiogroup" aria-label="Role">
+                <label class="mu-role">
+                  <input type="radio" name="new_role" value="admin"<?= $picked_role === 'admin' ? ' checked' : '' ?>/>
+                  <span class="mu-role-icon is-admin"><?= icon('shield-check', 16) ?></span>
+                  <span class="mu-role-text"><strong>Admin</strong><small>Clients, insurance policies, claims, billing and repairs</small></span>
+                </label>
+                <label class="mu-role">
+                  <input type="radio" name="new_role" value="mechanic"<?= $picked_role === 'mechanic' ? ' checked' : '' ?>/>
+                  <span class="mu-role-icon is-mechanic"><?= icon('wrench', 16) ?></span>
+                  <span class="mu-role-text"><strong>Mechanic</strong><small>Repair jobs, inspection, photos and quotations</small></span>
+                </label>
+              </div>
             </div>
 
           </div>
           <div class="form-actions">
+            <button type="button" class="btn-ghost" onclick="closeCreateAccountModal()">Cancel</button>
             <button type="button" class="btn-primary" id="js-create-btn"><?= icon('envelope', 14) ?> Create &amp; Send Activation</button>
           </div>
         </form>
@@ -410,6 +467,32 @@ document.getElementById('js-open-create-modal').addEventListener('click', openCr
 document.addEventListener('keydown', function (event) {
   if (event.key === 'Escape') closeCreateAccountModal();
 });
+
+// Search + tabs: show only the rows / cards that match both
+(function () {
+  var search = document.getElementById('mu-search');
+  var tabs   = Array.prototype.slice.call(document.querySelectorAll('.mu-tab'));
+  var items  = Array.prototype.slice.call(document.querySelectorAll('.mu-row, .mu-mobile-list .mu-card'));
+  var empty  = document.getElementById('mu-empty');
+  var group  = 'all';
+  function apply() {
+    var q = (search.value || '').trim().toLowerCase(), shownRows = 0;
+    items.forEach(function (el) {
+      var ok = (' ' + el.dataset.groups + ' ').indexOf(' ' + group + ' ') !== -1 && (!q || el.dataset.search.indexOf(q) !== -1);
+      el.hidden = !ok;
+      if (ok && el.classList.contains('mu-row')) shownRows++;
+    });
+    empty.hidden = shownRows > 0;
+  }
+  tabs.forEach(function (t) {
+    t.addEventListener('click', function () {
+      group = t.dataset.group;
+      tabs.forEach(function (x) { var on = x === t; x.classList.toggle('is-on', on); x.setAttribute('aria-selected', on ? 'true' : 'false'); });
+      apply();
+    });
+  });
+  search.addEventListener('input', apply);
+})();
 <?php if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors): ?>
 openCreateAccountModal();
 <?php endif; ?>

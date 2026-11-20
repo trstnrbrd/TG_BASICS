@@ -5,9 +5,9 @@ function updateDocUI(data) {
   const badgeEl = document.getElementById("doc-badge");
   badgeEl &&
     (data.all_done
-      ? ((badgeEl.className = "badge badge-success"),
+      ? ((badgeEl.className = "badge badge-green"),
         (badgeEl.innerHTML = checkIcon + " Complete"))
-      : ((badgeEl.className = "badge badge-warning"),
+      : ((badgeEl.className = "badge badge-yellow"),
         (badgeEl.textContent = data.req - data.done + " remaining")));
   const btnWrap = document.getElementById("submit-btn-wrap"),
     btn = document.getElementById("submit-btn"),
@@ -21,21 +21,21 @@ function updateDocUI(data) {
   const hasDocs = data.done > 0,
     sendBtn = document.getElementById("btn-send-admin-email"),
     sendHint = document.getElementById("send-btn-hint");
-  (sendBtn &&
-    ((sendBtn.disabled = !hasDocs),
-    (sendBtn.style.opacity = hasDocs ? "1" : "0.45"),
-    (sendBtn.style.cursor = hasDocs ? "" : "not-allowed")),
-    sendHint &&
-      (sendHint.textContent = hasDocs
-        ? "Sends the current requirements checklist to the admin email for review and follow-up."
-        : "Upload at least one requirement before sending."));
-  const statusBtn = document.getElementById("btn-update-status"),
-    statusHint = document.getElementById("status-btn-hint");
-  (statusBtn &&
-    ((statusBtn.disabled = !hasDocs),
-    (statusBtn.style.opacity = hasDocs ? "1" : "0.45"),
-    (statusBtn.style.cursor = hasDocs ? "" : "not-allowed")),
-    statusHint && (statusHint.style.display = hasDocs ? "none" : ""));
+  sendBtn && (sendBtn.disabled = !hasDocs);
+  sendHint &&
+    (sendHint.textContent = hasDocs
+      ? "Only sends the email. The status stays the same."
+      : "Upload at least one requirement before sending.");
+  // Next Step: a step that only waited for a first requirement opens (or closes again) with the uploads
+  document.querySelectorAll('#status-form input[data-needs-docs="1"]').forEach((r) => {
+    r.disabled = !hasDocs;
+    if (!hasDocs) r.checked = false;
+    const opt = r.closest(".next-option"),
+      hint = opt && opt.querySelector(".next-option-hint");
+    opt && opt.classList.toggle("is-blocked", !hasDocs);
+    hint && (hint.textContent = hasDocs ? hint.dataset.hint : "Upload at least one requirement before updating the status.");
+  });
+  syncNextStep();
 }
 function attachRemoveBtn(btn) {
   btn &&
@@ -120,7 +120,6 @@ function attachDmgRemoveBtn(btn) {
               icon: "error",
               title: "Upload Failed",
               text: data.message || "Could not upload file.",
-              confirmButtonColor: "#B8860B",
             });
           item.classList.add("received");
           const cb = document.getElementById("doc-cb-" + field);
@@ -140,7 +139,6 @@ function attachDmgRemoveBtn(btn) {
               icon: "error",
               title: "Upload Failed",
               text: "Network error. Please try again.",
-              confirmButtonColor: "#B8860B",
             }));
         }),
       (this.value = ""));
@@ -168,15 +166,13 @@ function attachDmgRemoveBtn(btn) {
                     icon: "error",
                     title: "Upload Failed",
                     text: data.message || "Could not upload.",
-                    confirmButtonColor: "#B8860B",
                   });
                 const grid = document.getElementById("damage-photo-grid");
                 if (grid) {
                   const wrap = document.createElement("div");
                   ((wrap.className = "dmg-photo-wrap"),
                     (wrap.id = "dmg-wrap-" + data.photo_id),
-                    (wrap.style.position = "relative"),
-                    (wrap.innerHTML = `<a href="${data.url}" target="_blank">\n              <img src="${data.url}" alt="Damage evidence photo" loading="lazy" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border);display:block;"/>\n            </a>\n            <button type="button" class="dmg-remove-btn" data-id="${data.photo_id}" aria-label="Remove photo"\n              style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--danger);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;line-height:1;">\n              ${xIcon}\n            </button>`),
+                    (wrap.innerHTML = `<a href="${data.url}" target="_blank"><img src="${data.url}" alt="Damage evidence photo" loading="lazy" class="dmg-thumb"/></a><button type="button" class="dmg-remove-btn" data-id="${data.photo_id}" aria-label="Remove photo">${xIcon}</button>`),
                     grid.appendChild(wrap),
                     attachDmgRemoveBtn(wrap.querySelector(".dmg-remove-btn")));
                 }
@@ -202,7 +198,6 @@ function attachDmgRemoveBtn(btn) {
                   icon: "error",
                   title: "Upload Failed",
                   text: "Network error. Try again.",
-                  confirmButtonColor: "#B8860B",
                 });
               }));
         }),
@@ -210,12 +205,7 @@ function attachDmgRemoveBtn(btn) {
     });
   }),
   document.querySelectorAll(".dmg-remove-btn").forEach(attachDmgRemoveBtn));
-const newStatusSel = document.getElementById("new_status"),
-  denialWrap = document.getElementById("denial-reason-wrap");
-(newStatusSel &&
-  newStatusSel.addEventListener("change", function () {
-    denialWrap.style.display = "denied" === this.value ? "" : "none";
-  }),
+(
   document.querySelectorAll(".js-delete-claim").forEach(function (btn) {
     btn.addEventListener("click", async function () {
       const form = this.closest("form");
@@ -228,8 +218,7 @@ const newStatusSel = document.getElementById("new_status"),
             showCancelButton: !0,
             confirmButtonText: "Yes, delete it",
             cancelButtonText: "Cancel",
-            confirmButtonColor: "#c0392b",
-            cancelButtonColor: "#6c757d",
+            confirmButtonColor: "var(--danger)",
           })
         ).isConfirmed
       )
@@ -238,3 +227,79 @@ const newStatusSel = document.getElementById("new_status"),
         (form.requestSubmit ? form.requestSubmit() : form.submit());
     });
   }));
+
+// ── Next Step: pick where the claim goes, then one button ──
+const statusForm = document.getElementById("status-form");
+function syncNextStep() {
+  if (!statusForm) return;
+  const picked = statusForm.querySelector('input[name="new_status"]:checked'),
+    btn = document.getElementById("btn-update-status"),
+    label = btn && btn.querySelector("span"),
+    denial = document.getElementById("denial-reason-wrap"),
+    emails = picked && picked.value === "sent_admin" && statusForm.dataset.sendsEmail === "1";
+  statusForm.querySelectorAll(".next-option").forEach((o) =>
+    o.classList.toggle("is-picked", !!picked && o.contains(picked)),
+  );
+  denial && (denial.hidden = !picked || picked.value !== "denied");
+  if (!btn) return;
+  btn.disabled = !picked;
+  label &&
+    (label.textContent = !picked
+      ? "Choose a step first"
+      : emails
+        ? "Send to Admin by email"
+        : "Move to " + picked.closest(".next-option").querySelector(".next-option-name").textContent.trim());
+}
+if (statusForm) {
+  statusForm.addEventListener("change", syncNextStep);
+  statusForm.addEventListener("submit", async function (e) {
+    const picked = statusForm.querySelector('input[name="new_status"]:checked');
+    if (!picked) return void e.preventDefault();
+    // Compiling -> Sent to Admin is the email to the admin: the server sends it and moves the claim (owner's choice)
+    if (picked.value !== "sent_admin" || statusForm.dataset.sendsEmail !== "1") return;
+    e.preventDefault();
+    const ok = await sendRequirements(true, document.getElementById("claim-notes")?.value);
+    ok && (location.href = CLAIM_URL + "&success=" + encodeURIComponent(ok));
+  });
+  syncNextStep();
+}
+
+// Emails the requirements checklist (with the files) to the admin. A compiling claim also moves to Sent to Admin.
+// Returns the server's message, or null when cancelled / failed (the error is shown here).
+async function sendRequirements(moves, notes) {
+  const res = await Swal.fire({
+    title: moves ? "Send to Admin?" : "Email the requirements again?",
+    html: moves
+      ? "This emails the requirements checklist and files to the admin, and moves the claim to <b>Sent to Admin</b>."
+      : "This emails the current requirements checklist and files to the admin. The status stays the same.",
+    icon: "question",
+    showCancelButton: true,
+    confirmButtonText: "Yes, send",
+    cancelButtonText: "Cancel",
+  });
+  if (!res.isConfirmed) return null;
+  window.TGLoader && window.TGLoader.start();
+  const fd = new FormData();
+  fd.append("ajax_send_admin_email", "1");
+  fd.append("csrf_token", CSRF_TOKEN);
+  notes != null && fd.append("notes", notes);
+  try {
+    const data = await (await fetch(CLAIM_URL, { method: "POST", body: fd })).json();
+    window.TGLoader && window.TGLoader.done();
+    if (!data.ok) {
+      Swal.fire({ icon: "error", title: "Failed to Send", text: data.message || "Could not send email. Check SMTP settings." });
+      return null;
+    }
+    return data.message || "Email sent.";
+  } catch (err) {
+    window.TGLoader && window.TGLoader.done();
+    Swal.fire({ icon: "error", title: "Error", text: "An unexpected error occurred." });
+    return null;
+  }
+}
+const resendBtn = document.getElementById("btn-send-admin-email");
+resendBtn &&
+  resendBtn.addEventListener("click", async () => {
+    const msg = await sendRequirements(false);
+    msg && Swal.fire({ toast: true, position: "top-end", icon: "success", title: msg, showConfirmButton: false, timer: 3000, timerProgressBar: true });
+  });

@@ -408,21 +408,11 @@ $status_icon = icon($status_icon_name, 16);
 $page_title  = 'View Policy';
 $active_page = 'renewal';
 $base_path   = '../../';
+$extra_css   = '<link rel="stylesheet" href="../../assets/css/shared/view_policy.css?v=' . filemtime(__DIR__ . '/../../assets/css/shared/view_policy.css') . '"/>';
 require_once '../../includes/header.php';
 require_once '../../includes/navbar.php';
 ?>
 
-<style>
-/* "Undo" under a saved payment — quiet until hovered, since it reverses a payment */
-.vp-undo-btn {
-  margin-top: 0.3rem; display: inline-flex; align-items: center; gap: 0.25rem;
-  padding: 0.15rem 0.5rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-3);
-  font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.66rem; font-weight: 600; color: var(--text-muted);
-  cursor: pointer; transition: color 0.12s, border-color 0.12s, background 0.12s;
-}
-.vp-undo-btn:hover, .vp-undo-btn:focus-visible { color: var(--danger); border-color: var(--danger-border); background: var(--danger-bg); outline: none; }
-.vp-undo-btn:disabled { opacity: 0.5; cursor: default; }
-</style>
 
 <div class="main">
 
@@ -434,89 +424,109 @@ require_once '../../includes/topbar.php';
 
   <div class="content">
 
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
-      <a href="renewal_list.php" class="back-link" style="margin-bottom:0;" onclick="goBack('renewal_list.php'); return false;"><?= icon('arrow-left', 14) ?> Back to Renewal Tracking</a>
-      <div style="display:flex;gap:0.5rem;align-items:center;">
-        <?php if ($can_edit_policy): ?>
-        <a href="edit_policy.php?id=<?= $policy_id ?>"
-          style="display:inline-flex;align-items:center;gap:0.4rem;background:var(--bg-3);color:var(--text-primary);border:1px solid var(--border);padding:0.45rem 1rem;border-radius:8px;font-size:0.78rem;font-weight:700;cursor:pointer;text-decoration:none;">
-          <?= icon('pencil', 14) ?> Edit Policy
-        </a>
+    <?php
+    // ── what the page shows, worked out once ──
+    $peso      = fn($n) => '₱' . number_format((float)$n, 2);
+    $vehicle   = trim($policy['make'] . ' ' . $policy['model'] . ' ' . $policy['year_model']);
+    $initials  = implode('', array_map(fn($w) => mb_substr($w, 0, 1), array_slice(preg_split('/\s+/', trim($policy['full_name'])) ?: [], 0, 2)));
+    $insurer   = insurance_company_label($conn, (string)$policy['insurance_company']);
+    // how far into the coverage period today is (0–100), for the bar in the banner
+    $p_start   = strtotime($policy['policy_start']);
+    $p_end     = strtotime($policy['policy_end']);
+    $cover_pct = $p_end > $p_start ? (int)max(0, min(100, round((time() - $p_start) / ($p_end - $p_start) * 100))) : 100;
+    $paid_pct  = $payable_amount > 0 ? (int)max(0, min(100, round((float)$policy['amount_paid'] / $payable_amount * 100))) : 0;
+    $ps        = (string)$policy['payment_status'];
+    $ps_class  = ['Paid' => 'badge-green', 'Partial' => 'badge-yellow', 'Overdue' => 'badge-orange'][$ps] ?? 'badge-red';
+    ?>
+
+    <!-- TOP BAR: back + actions -->
+    <div class="vp-topbar">
+      <a href="renewal_list.php" class="back-link vp-back" onclick="goBack('renewal_list.php'); return false;"><?= icon('arrow-left', 14) ?> Back to Renewal Tracking</a>
+      <?php if ($can_edit_policy): ?>
+      <div class="vp-actions">
+        <a href="edit_policy.php?id=<?= $policy_id ?>" class="vp-btn"><?= icon('pencil', 14) ?> Edit Policy</a>
         <?php if ($expired || $days <= $exp_days): ?>
-        <a href="../insurance/add_policy.php?renew_from=<?= $policy_id ?>"
-          style="display:inline-flex;align-items:center;gap:0.4rem;background:var(--gold-pale);color:var(--gold-bright);border:1px solid var(--gold-bright);padding:0.45rem 1rem;border-radius:8px;font-size:0.78rem;font-weight:700;cursor:pointer;text-decoration:none;">
-          <?= icon('arrow-path', 14) ?> Renew Policy
-        </a>
+        <a href="../insurance/add_policy.php?renew_from=<?= $policy_id ?>" class="vp-btn vp-btn-gold"><?= icon('arrow-path', 14) ?> Renew Policy</a>
         <?php endif; ?>
-        <button type="button" id="delete-policy-btn"
-          style="display:inline-flex;align-items:center;gap:0.4rem;background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border);padding:0.45rem 1rem;border-radius:8px;font-size:0.78rem;font-weight:700;cursor:pointer;">
-          <?= icon('trash', 14) ?> Delete Policy
-        </button>
-        <?php endif; ?>
+        <button type="button" id="delete-policy-btn" class="vp-btn vp-btn-danger"><?= icon('trash', 14) ?> Delete Policy</button>
       </div>
+      <?php endif; ?>
     </div>
 
     <?php if (isset($_GET['success'])): ?>
     <script>document.addEventListener('DOMContentLoaded',function(){ Swal.fire({ toast:true, position:'top-end', icon:'success', titleText:<?= json_encode($_GET['success']) ?>, showConfirmButton:false, timer:3000, timerProgressBar:true }); });</script>
     <?php endif; ?>
     <?php if (!empty($_GET['error'])): ?>
-    <script>document.addEventListener('DOMContentLoaded',function(){ Swal.fire({ icon:'error', title:'Not allowed', text:<?= json_encode(san_str($_GET['error'], 300)) ?>, confirmButtonColor:'#B8860B' }); });</script>
+    <script>document.addEventListener('DOMContentLoaded',function(){ Swal.fire({ icon:'error', title:'Not allowed', text:<?= json_encode(san_str($_GET['error'], 300)) ?> }); });</script>
     <?php endif; ?>
 
     <?php if (!$can_edit_policy): ?>
-    <div class="info-box" style="margin-bottom:1.25rem;">
+    <div class="info-box vp-view-only">
       <?= icon('lock-closed', 14) ?>
       <span><strong>View only.</strong> <?= htmlspecialchars($view_only_msg) ?></span>
     </div>
     <?php endif; ?>
 
     <!-- POLICY STATUS BANNER -->
-    <div style="background:var(--btn-bg);border-radius:12px;padding:1.5rem 1.75rem;margin-bottom:1.25rem;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
-      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--gold-bright),var(--gold-muted),transparent);"></div>
-      <div style="position:relative;z-index:1;">
-        <div style="font-size:0.68rem;color:rgba(200,192,176,0.45);letter-spacing:1.5px;text-transform:uppercase;font-weight:600;margin-bottom:0.3rem;">Policy Number</div>
-        <div style="font-size:1.3rem;font-weight:800;color:#fff;letter-spacing:-0.3px;margin-bottom:0.2rem;"><?= htmlspecialchars($policy['policy_number']) ?></div>
-        <div style="font-size:0.78rem;color:rgba(200,192,176,0.5);"><?= htmlspecialchars($policy['coverage_type']) ?></div>
+    <div class="vp-banner">
+      <div class="vp-banner-top">
+        <div class="vp-banner-id">
+          <div class="vp-banner-kicker">Policy Number</div>
+          <div class="vp-banner-number"><?= htmlspecialchars($policy['policy_number']) ?></div>
+          <div class="vp-banner-meta">
+            <span><?= icon('shield-check', 12) ?> <?= htmlspecialchars($insurer) ?> · <?= htmlspecialchars($policy['coverage_type']) ?></span>
+            <span><?= icon('user', 12) ?> <?= htmlspecialchars($policy['full_name']) ?></span>
+            <span><?= icon('truck', 12) ?> <?= htmlspecialchars($policy['plate_number']) ?></span>
+          </div>
+        </div>
+        <div class="vp-banner-side">
+          <div class="vp-pill vp-pill-<?= $renewal_status ?>"><?= icon($status_icon_name, 15) ?> <?= htmlspecialchars($status_label) ?></div>
+          <div class="vp-banner-premium"><span>Total Premium</span><?= $peso($policy['total_premium']) ?></div>
+        </div>
       </div>
-      <div style="position:relative;z-index:1;display:flex;align-items:center;gap:0.6rem;background:<?= $status_bg ?>;border:1px solid <?= $status_border ?>;color:<?= $status_color ?>;padding:0.6rem 1.1rem;border-radius:100px;font-size:0.8rem;font-weight:700;">
-        <?= $status_icon ?> <?= $status_label ?>
+      <div class="vp-banner-cover">
+        <div class="vp-cover-dates">
+          <span><?= date('M d, Y', $p_start) ?></span>
+          <span class="vp-cover-left <?= $expired ? 'is-expired' : '' ?>"><?= $expired ? 'Expired' : $days . ' day' . ($days !== 1 ? 's' : '') . ' left' ?></span>
+          <span><?= date('M d, Y', $p_end) ?></span>
+        </div>
+        <div class="vp-cover-bar vp-cover-<?= $renewal_status ?>" role="progressbar" aria-valuenow="<?= $cover_pct ?>" aria-valuemin="0" aria-valuemax="100" aria-label="Coverage period used">
+          <span style="width:<?= $cover_pct ?>%"></span>
+        </div>
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;">
+    <div class="vp-two-col">
 
       <!-- CLIENT INFO -->
-      <div class="card" style="margin-bottom:0;">
+      <div class="card vp-card">
         <div class="card-header">
           <div class="card-icon"><?= icon('user', 16) ?></div>
           <div>
             <div class="card-title">Client Information</div>
             <div class="card-sub">Policyholder details</div>
           </div>
-          <a href="../clients/view_client.php?id=<?= $policy['client_id'] ?>" class="btn-sm-gold" style="margin-left:auto;">
-            <?= icon('eye', 12) ?> View Profile
-          </a>
+          <a href="../clients/view_client.php?id=<?= $policy['client_id'] ?>" class="btn-sm-gold vp-head-link"><?= icon('eye', 12) ?> View Profile</a>
         </div>
-        <div style="padding:1.25rem 1.5rem;display:flex;flex-direction:column;gap:0.85rem;">
-          <?php
-          $client_info = [
-            ['Full Name',       $policy['full_name']],
-            ['Insurance Agent', $policy['agent_name'] ?? 'Unassigned'],
-            ['Contact',         $policy['contact_number'] ?: 'Not provided'],
-            ['Email',           $policy['email'] ?: 'Not provided'],
-            ['Address',         $policy['address']],
-          ];
-          foreach ($client_info as [$label, $val]): ?>
-          <div>
-            <div style="font-size:0.62rem;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);font-weight:700;margin-bottom:0.2rem;"><?= $label ?></div>
-            <div style="font-size:0.85rem;font-weight:600;color:var(--text-primary);"><?= htmlspecialchars($val) ?></div>
+        <div class="vp-card-body">
+          <div class="vp-identity">
+            <div class="vp-avatar" aria-hidden="true"><?= htmlspecialchars(mb_strtoupper($initials)) ?></div>
+            <div style="min-width:0;">
+              <div class="vp-identity-name"><?= htmlspecialchars($policy['full_name']) ?></div>
+              <div class="vp-identity-sub">Policyholder</div>
+            </div>
           </div>
-          <?php endforeach; ?>
+          <dl class="vp-dl">
+            <div><dt>Insurance Agent</dt><dd><?= htmlspecialchars($policy['agent_name'] ?? 'Unassigned') ?></dd></div>
+            <div><dt>Contact</dt><dd><?= htmlspecialchars($policy['contact_number'] ?: 'Not provided') ?></dd></div>
+            <div><dt>Email</dt><dd><?= htmlspecialchars($policy['email'] ?: 'Not provided') ?></dd></div>
+            <div><dt>Address</dt><dd><?= htmlspecialchars($policy['address'] ?: '—') ?></dd></div>
+          </dl>
         </div>
       </div>
 
       <!-- VEHICLE INFO -->
-      <div class="card" style="margin-bottom:0;">
+      <div class="card vp-card">
         <div class="card-header">
           <div class="card-icon"><?= icon('vehicle', 16) ?></div>
           <div>
@@ -524,34 +534,27 @@ require_once '../../includes/topbar.php';
             <div class="card-sub">Insured vehicle details</div>
           </div>
         </div>
-        <div style="padding:1.25rem 1.5rem;display:flex;flex-direction:column;gap:0.85rem;">
-          <?php
-          $vehicle_info = [
-            ['Plate Number',   $policy['plate_number']],
-            ['Make & Model',   $policy['make'] . ' ' . $policy['model'] . ' ' . $policy['year_model']],
-            ['Color',          $policy['color'] ?: 'N/A'],
-            ['Engine Number',  $policy['motor_number'] ?: 'N/A'],
-            ['Chassis Number', $policy['serial_number'] ?: 'N/A'],
-          ];
-          foreach ($vehicle_info as [$label, $val]): ?>
-          <div>
-            <div style="font-size:0.62rem;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);font-weight:700;margin-bottom:0.2rem;"><?= $label ?></div>
-            <div style="font-size:0.85rem;font-weight:600;color:var(--text-primary);">
-              <?php if ($label === 'Plate Number'): ?>
-                <span class="badge-dark"><?= htmlspecialchars($val) ?></span>
-              <?php else: ?>
-                <?= htmlspecialchars($val) ?>
-              <?php endif; ?>
+        <div class="vp-card-body">
+          <div class="vp-identity">
+            <span class="vp-plate"><?= htmlspecialchars($policy['plate_number']) ?></span>
+            <div style="min-width:0;">
+              <div class="vp-identity-name"><?= htmlspecialchars($vehicle ?: '—') ?></div>
+              <div class="vp-identity-sub"><?= htmlspecialchars($policy['color'] ?: 'Color not recorded') ?></div>
             </div>
           </div>
-          <?php endforeach; ?>
+          <dl class="vp-dl">
+            <div><dt>Make &amp; Model</dt><dd><?= htmlspecialchars($vehicle ?: 'N/A') ?></dd></div>
+            <div><dt>Color</dt><dd><?= htmlspecialchars($policy['color'] ?: 'N/A') ?></dd></div>
+            <div><dt>Engine Number</dt><dd><?= htmlspecialchars($policy['motor_number'] ?: 'N/A') ?></dd></div>
+            <div><dt>Chassis Number</dt><dd><?= htmlspecialchars($policy['serial_number'] ?: 'N/A') ?></dd></div>
+          </dl>
         </div>
       </div>
 
     </div>
 
     <!-- POLICY DETAILS -->
-    <div class="card" style="margin-bottom:1.25rem;">
+    <div class="card vp-card">
       <div class="card-header">
         <div class="card-icon"><?= icon('document', 16) ?></div>
         <div>
@@ -559,50 +562,42 @@ require_once '../../includes/topbar.php';
           <div class="card-sub">Coverage period and premium breakdown</div>
         </div>
       </div>
-      <div style="padding:1.5rem;">
+      <div class="vp-card-body vp-details">
 
         <!-- COVERAGE PERIOD + PAYMENT INFO -->
-        <div class="field-section">Coverage Period</div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem 1.5rem;margin-bottom:1.5rem;">
-          <?php
-          $mortgagee_val = $policy['mortgagee'] ?? '';
-          $period_info = [
-            ['Starting Date',        date('F d, Y', strtotime($policy['policy_start']))],
-            ['Inception Date',       date('F d, Y', strtotime($policy['policy_end']))],
-            ['Days Remaining',       $expired ? 'Expired' : $days . ' day' . ($days !== 1 ? 's' : '')],
-            ['Payment Terms',        $policy['payment_terms'] ?? '1 time'],
-            ['Mortgagee / Financed By', $mortgagee_val ?: null],
-          ];
-          foreach ($period_info as [$label, $val]): ?>
-          <div>
-            <div style="font-size:0.62rem;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);font-weight:700;margin-bottom:0.2rem;"><?= $label ?></div>
-            <div style="font-size:0.9rem;font-weight:700;color:var(--text-primary);">
-              <?= $val ? htmlspecialchars($val) : '<span style="color:var(--text-muted);font-weight:400;">None / Cash</span>' ?>
+        <div>
+          <div class="field-section">Coverage Period</div>
+          <div class="vp-tiles">
+            <?php
+            $mortgagee_val = $policy['mortgagee'] ?? '';
+            $period_info = [
+              ['Starting Date',           date('F d, Y', $p_start),                                   'calendar'],
+              ['Inception Date',          date('F d, Y', $p_end),                                     'calendar'],
+              ['Days Remaining',          $expired ? 'Expired' : $days . ' day' . ($days !== 1 ? 's' : ''), 'clock'],
+              ['Payment Terms',           $policy['payment_terms'] ?? '1 time',                       'banknotes'],
+              ['Mortgagee / Financed By', $mortgagee_val ?: null,                                     'building-office'],
+            ];
+            foreach ($period_info as [$label, $val, $ic]): ?>
+            <div class="vp-tile<?= $label === 'Days Remaining' && $expired ? ' is-danger' : '' ?>">
+              <span class="vp-tile-icon"><?= icon($ic, 14) ?></span>
+              <div>
+                <div class="vp-tile-label"><?= $label ?></div>
+                <div class="vp-tile-val"><?= $val ? htmlspecialchars($val) : '<span class="vp-muted">None / Cash</span>' ?></div>
+              </div>
             </div>
+            <?php endforeach; ?>
           </div>
-          <?php endforeach; ?>
         </div>
 
         <!-- PREMIUM BREAKDOWN -->
-        <div class="field-section">Premium Breakdown</div>
-        <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
-          <?php
-          $breakdown = [
-            ['Sum Insured',       $policy['sum_insured']],
-            ['Commission',        $policy['markup']],
-            ['Participation Fee', $policy['participation_fee']],
-          ];
-          foreach ($breakdown as [$label, $amount]):
-            if ((float)$amount == 0) continue; ?>
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:0.65rem 1rem;border-bottom:1px solid var(--border);">
-            <span style="font-size:0.78rem;color:var(--text-secondary);"><?= $label ?></span>
-            <span style="font-size:0.82rem;font-weight:600;color:var(--text-primary);">&#8369;<?= number_format((float)$amount, 2) ?></span>
-          </div>
-          <?php endforeach; ?>
-          <!-- TOTAL -->
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;background:var(--gold-pale);border-top:1px solid var(--gold-muted);">
-            <span style="font-size:0.82rem;font-weight:700;color:var(--gold);">Total Premium</span>
-            <span style="font-size:1rem;font-weight:800;color:var(--gold);">&#8369;<?= number_format($policy['total_premium'], 2) ?></span>
+        <div>
+          <div class="field-section">Premium Breakdown</div>
+          <div class="vp-breakdown">
+            <?php foreach ([['Sum Insured', $policy['sum_insured']], ['Commission', $policy['markup']], ['Participation Fee', $policy['participation_fee']]] as [$label, $amount]):
+              if ((float)$amount == 0) continue; ?>
+            <div class="vp-breakdown-row"><span><?= $label ?></span><span><?= $peso($amount) ?></span></div>
+            <?php endforeach; ?>
+            <div class="vp-breakdown-row is-total"><span>Total Premium</span><span><?= $peso($policy['total_premium']) ?></span></div>
           </div>
         </div>
 
@@ -610,46 +605,34 @@ require_once '../../includes/topbar.php';
     </div>
 
     <!-- PAYMENT STATUS -->
-    <div class="card">
-      <div class="card-header" style="justify-content:space-between;">
-        <div style="display:flex;align-items:center;gap:0.75rem;">
-          <div class="card-icon"><?= icon('receipt', 16) ?></div>
-          <div>
-            <div class="card-title">Payment Status</div>
-            <div class="card-sub">Balance and payment tracking</div>
-          </div>
+    <div class="card vp-card">
+      <div class="card-header">
+        <div class="card-icon"><?= icon('receipt', 16) ?></div>
+        <div>
+          <div class="card-title">Payment Status</div>
+          <div class="card-sub">Balance and payment tracking</div>
         </div>
-        <?php
-        $ps = $policy['payment_status'];
-        $ps_bg    = $ps === 'Paid' ? 'var(--success-bg)'  : ($ps === 'Partial' ? 'var(--warning-bg)'  : ($ps === 'Overdue' ? 'rgba(230,126,34,0.15)' : 'var(--danger-bg)'));
-        $ps_color = $ps === 'Paid' ? 'var(--success)'     : ($ps === 'Partial' ? 'var(--warning)'     : ($ps === 'Overdue' ? '#e67e22'               : 'var(--danger)'));
-        ?>
-        <span class="badge" style="background:<?= $ps_bg ?>;color:<?= $ps_color ?>;font-weight:700;font-size:0.72rem;padding:0.3rem 0.75rem;border-radius:100px;">
-          <?= $policy['payment_status'] ?>
-        </span>
+        <span class="badge <?= $ps_class ?> vp-head-badge"><?= htmlspecialchars($ps) ?></span>
       </div>
-      <div style="padding:1.5rem;">
-        <!-- Top row: Total Payable + Amount Paid -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
-          <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1rem;text-align:center;">
-            <div style="font-size:0.62rem;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);font-weight:700;margin-bottom:0.35rem;">Total Payable</div>
-            <div style="font-size:1.2rem;font-weight:800;color:var(--text-primary);">&#8369;<?= number_format($payable_amount, 2) ?></div>
+      <div class="vp-card-body">
+        <!-- Paid of total, then the three figures -->
+        <div class="vp-pay-summary">
+          <div class="vp-pay-figure">
+            <span class="vp-pay-paid"><?= $peso($policy['amount_paid']) ?></span>
+            <span class="vp-pay-of">paid of <?= $peso($payable_amount) ?> (<?= $paid_pct ?>%)</span>
           </div>
-          <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1rem;text-align:center;">
-            <div style="font-size:0.62rem;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);font-weight:700;margin-bottom:0.35rem;">Amount Paid</div>
-            <div style="font-size:1.2rem;font-weight:800;color:var(--success);">&#8369;<?= number_format($policy['amount_paid'], 2) ?></div>
+          <div class="vp-pay-bar" role="progressbar" aria-valuenow="<?= $paid_pct ?>" aria-valuemin="0" aria-valuemax="100" aria-label="Paid">
+            <span style="width:<?= $paid_pct ?>%"></span>
           </div>
-        </div>
-        <!-- Balance — full width -->
-        <div style="background:var(--bg);border:2px solid <?= $policy['balance'] > 0 ? 'var(--warning-border)' : 'var(--success-border)' ?>;border-radius:10px;padding:1.25rem 1.5rem;display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
-          <div style="font-size:0.62rem;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-muted);font-weight:700;">Balance Remaining</div>
-          <div style="font-size:1.6rem;font-weight:800;color:<?= $policy['balance'] > 0 ? 'var(--warning)' : 'var(--success)' ?>;">
-            <?= $policy['balance'] > 0 ? '&#8369;' . number_format($policy['balance'], 2) : icon('check-circle', 20) . ' Cleared' ?>
+          <div class="vp-pay-stats">
+            <div><span>Total Payable</span><strong><?= $peso($payable_amount) ?></strong></div>
+            <div><span>Amount Paid</span><strong class="is-success"><?= $peso($policy['amount_paid']) ?></strong></div>
+            <div class="<?= $policy['balance'] > 0 ? 'is-owing' : 'is-cleared' ?>"><span>Balance Remaining</span><strong><?= $policy['balance'] > 0 ? $peso($policy['balance']) : icon('check-circle', 15) . ' Cleared' ?></strong></div>
           </div>
         </div>
 
         <?php if ($policy['notes']): ?>
-        <div class="info-box" style="margin-bottom:1.25rem;">
+        <div class="info-box vp-notes">
           <?= icon('information-circle', 14) ?>
           <span><strong>Notes:</strong> <?= nl2br(htmlspecialchars($policy['notes'])) ?></span>
         </div>
@@ -672,7 +655,7 @@ require_once '../../includes/topbar.php';
           <?php endif; ?>
 
           <?php if (!empty($pay_errors)): ?>
-          <script>document.addEventListener('DOMContentLoaded',function(){ Swal.fire({ icon:'error', title:'Payment Error', html:<?= json_encode('<ul style="text-align:left;margin:0;padding-left:1.2rem;">' . implode('', array_map(fn($e) => '<li>' . htmlspecialchars($e) . '</li>', $pay_errors)) . '</ul>') ?>, confirmButtonColor:'#B8860B' }); });</script>
+          <script>document.addEventListener('DOMContentLoaded',function(){ Swal.fire({ icon:'error', title:'Payment Error', html:<?= json_encode('<ul style="text-align:left;margin:0;padding-left:1.2rem;">' . implode('', array_map(fn($e) => '<li>' . htmlspecialchars($e) . '</li>', $pay_errors)) . '</ul>') ?> }); });</script>
           <?php endif; ?>
 
           <form method="POST" action="">
@@ -1006,8 +989,8 @@ require_once '../../includes/footer.php';
         confirmButtonText: "Delete policy & claims",
         denyButtonText: "Delete policy, keep claims",
         cancelButtonText: "Cancel",
-        confirmButtonColor: "#c0392b",
-        denyButtonColor: "#B8860B",
+        confirmButtonColor: "var(--danger)",
+        denyButtonColor: "var(--gold)",
         cancelButtonColor: "#6b7280"
       }).then(async function (result) {
         if (result.isConfirmed) {
@@ -1026,7 +1009,7 @@ require_once '../../includes/footer.php';
         showCancelButton: true,
         confirmButtonText: "Yes, delete it",
         cancelButtonText: "Cancel",
-        confirmButtonColor: "#c0392b",
+        confirmButtonColor: "var(--danger)",
         cancelButtonColor: "#6b7280"
       }).then(async function (result) {
         if (result.isConfirmed) {
@@ -1061,7 +1044,7 @@ require_once '../../includes/footer.php';
         showCancelButton: true,
         confirmButtonText: "Yes, undo it",
         cancelButtonText: "Cancel",
-        confirmButtonColor: "#c0392b",
+        confirmButtonColor: "var(--danger)",
         cancelButtonColor: "#6b7280",
         reverseButtons: true
       });
@@ -1104,8 +1087,7 @@ require_once '../../includes/footer.php';
         Swal.fire({
           icon: 'warning',
           title: 'Mode of Payment Required',
-          text: 'Please select a mode of payment for every installment that has an amount entered.',
-          confirmButtonColor: '#B8860B'
+          text: 'Please select a mode of payment for every installment that has an amount entered.'
         });
         modeSelect.focus();
         return;
@@ -1197,7 +1179,7 @@ require_once '../../includes/footer.php';
         text: 'This will permanently delete the attached receipt image.',
         showCancelButton: true,
         confirmButtonText: 'Yes, remove',
-        confirmButtonColor: '#c0392b',
+        confirmButtonColor: 'var(--danger)',
         cancelButtonText: 'Cancel',
         cancelButtonColor: '#6b7280'
       }).then(async function(result){

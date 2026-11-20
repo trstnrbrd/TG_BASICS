@@ -1,0 +1,146 @@
+/* View Policy (modules/renewal/view_policy.php). Same structure as before (top bar, dark banner, client | vehicle,
+   Policy Details, Payment Status), restyled 2026-11-20: a coverage bar and the premium in the banner, an identity
+   row on the client / vehicle cards, coverage tiles, and a paid-of-total bar. The payment schedule table keeps its
+   own markup (and the inline styles it had). */
+
+/* top bar */
+.vp-topbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+.vp-back { margin-bottom: 0; }
+.vp-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.vp-btn {
+  display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem; border-radius: 8px;
+  font-family: inherit; font-size: 0.8rem; font-weight: 700; text-decoration: none; cursor: pointer;
+  background: var(--bg-2); color: var(--text-primary); border: 1px solid var(--border);
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.vp-btn:hover { border-color: var(--gold-muted); color: var(--gold); }
+.vp-btn-gold { background: var(--gold-pale); color: var(--gold); border-color: var(--gold-muted); }
+.vp-btn-danger { background: var(--danger-bg); color: var(--danger); border-color: var(--danger-border); }
+.vp-btn-danger:hover { color: var(--danger); border-color: var(--danger); }
+.vp-view-only { margin-bottom: 1.25rem; }
+
+/* banner (dark in every theme, like before) */
+.vp-banner {
+  position: relative; overflow: hidden; margin-bottom: 1.25rem; border-radius: 14px;
+  background: var(--btn-bg); color: #fff;
+  box-shadow: var(--shadow-md);
+}
+.vp-banner::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--gold-bright), var(--gold-muted), transparent); }
+.vp-banner::after {
+  content: ""; position: absolute; right: -60px; top: -80px; width: 260px; height: 260px; border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--gold-bright) 22%, transparent), transparent 70%); pointer-events: none;
+}
+.vp-banner-top { position: relative; z-index: 1; display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; padding: 1.5rem 1.75rem 1.1rem; }
+.vp-banner-kicker { font-size: 0.68rem; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; color: rgba(200, 192, 176, 0.55); margin-bottom: 0.3rem; }
+.vp-banner-number { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.3px; color: #fff; overflow-wrap: anywhere; }
+.vp-banner-meta { display: flex; flex-wrap: wrap; gap: 0.3rem 1.1rem; margin-top: 0.5rem; font-size: 0.78rem; color: rgba(220, 212, 196, 0.75); }
+.vp-banner-meta span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.vp-banner-meta svg { color: var(--gold-bright); }
+.vp-banner-side { display: flex; flex-direction: column; align-items: flex-end; gap: 0.6rem; }
+.vp-banner-premium { text-align: right; font-size: 1.45rem; font-weight: 800; color: var(--gold-bright); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.vp-banner-premium span { display: block; font-size: 0.62rem; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: rgba(200, 192, 176, 0.55); margin-bottom: 0.2rem; }
+.vp-banner-cover { position: relative; z-index: 1; padding: 0.9rem 1.75rem 1.2rem; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+.vp-cover-dates { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; font-size: 0.76rem; font-weight: 600; color: rgba(220, 212, 196, 0.8); margin-bottom: 0.5rem; }
+.vp-cover-left { font-size: 0.72rem; font-weight: 700; color: #fff; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 20px; padding: 0.12rem 0.6rem; }
+.vp-cover-left.is-expired { color: #fff; background: var(--danger); border-color: var(--danger); }
+.vp-cover-bar { height: 6px; border-radius: 20px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
+.vp-cover-bar > span { display: block; height: 100%; border-radius: 20px; background: var(--success); }
+.vp-cover-expiring > span { background: var(--warning); }
+.vp-cover-urgent > span, .vp-cover-expired > span { background: var(--danger); }
+.vp-cover-renewed > span { background: var(--info); }
+
+/* renewal status pill (policy_renewal_status(): stable / expiring / urgent / expired, plus renewed) */
+.vp-pill {
+  display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.55rem 1.05rem; border-radius: 100px;
+  font-size: 0.8rem; font-weight: 700; border: 1px solid var(--border); background: var(--bg-2); color: var(--text-muted);
+}
+.vp-pill-stable   { color: var(--success); background: var(--success-bg); border-color: var(--success-border); }
+.vp-pill-expiring { color: var(--warning); background: var(--warning-bg); border-color: var(--warning-border); }
+.vp-pill-urgent   { color: var(--danger);  background: var(--danger-bg);  border-color: var(--danger-border); }
+.vp-pill-renewed  { color: var(--info);    background: var(--info-bg);    border-color: var(--info-border); }
+
+/* cards */
+.vp-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.25rem; }
+.vp-two-col .card { margin-bottom: 0; }
+.vp-card { margin-bottom: 1.25rem; }
+.vp-card-body { padding: 1.25rem 1.5rem 1.5rem; }
+.vp-head-link, .vp-head-badge { margin-left: auto; }
+.vp-identity { display: flex; align-items: center; gap: 0.85rem; padding: 0.85rem 1rem; margin-bottom: 0.85rem; border-radius: 12px; background: var(--bg-3); border: 1px solid var(--border); }
+.vp-avatar {
+  width: 2.75rem; height: 2.75rem; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 0.9rem; font-weight: 800; color: var(--on-gold); background: var(--gold);
+}
+.vp-plate {
+  flex-shrink: 0; font-size: 0.9rem; font-weight: 800; letter-spacing: 1.5px; color: var(--text-primary);
+  background: var(--bg); border: 2px solid var(--text-primary); border-radius: 6px; padding: 0.35rem 0.7rem;
+}
+.vp-identity-name { font-size: 0.95rem; font-weight: 800; color: var(--text-primary); overflow-wrap: anywhere; }
+.vp-identity-sub { font-size: 0.75rem; color: var(--text-muted); }
+.vp-dl { margin: 0; display: flex; flex-direction: column; }
+.vp-dl > div { display: flex; justify-content: space-between; gap: 1rem; padding: 0.55rem 0.15rem; border-bottom: 1px solid var(--border); font-size: 0.82rem; }
+.vp-dl > div:last-child { border-bottom: none; }
+.vp-dl dt { color: var(--text-muted); font-weight: 600; flex-shrink: 0; }
+.vp-dl dd { margin: 0; color: var(--text-primary); font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+
+/* policy details */
+.vp-details { display: flex; flex-direction: column; gap: 1.5rem; }
+.vp-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 0.75rem; }
+.vp-tile { display: flex; align-items: flex-start; gap: 0.65rem; padding: 0.8rem 0.9rem; border-radius: 10px; background: var(--bg); border: 1px solid var(--border); }
+.vp-tile-icon { width: 1.9rem; height: 1.9rem; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--gold-pale); color: var(--gold); }
+.vp-tile-label { font-size: 0.62rem; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; margin-bottom: 0.15rem; }
+.vp-tile-val { font-size: 0.88rem; font-weight: 700; color: var(--text-primary); }
+.vp-tile.is-danger .vp-tile-icon { background: var(--danger-bg); color: var(--danger); }
+.vp-tile.is-danger .vp-tile-val { color: var(--danger); }
+.vp-muted { color: var(--text-muted); font-weight: 400; }
+.vp-breakdown { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.vp-breakdown-row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.7rem 1rem; border-bottom: 1px solid var(--border); font-size: 0.8rem; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.vp-breakdown-row span:last-child { font-weight: 600; color: var(--text-primary); }
+.vp-breakdown-row.is-total { border-bottom: none; background: var(--gold-pale); border-top: 1px solid var(--gold-muted); font-size: 0.85rem; font-weight: 700; color: var(--gold); }
+.vp-breakdown-row.is-total span:last-child { font-size: 1.05rem; font-weight: 800; color: var(--gold); }
+
+/* payment status */
+.vp-pay-summary { padding: 1.1rem 1.2rem; margin-bottom: 1.25rem; border-radius: 12px; background: var(--bg); border: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.75rem; }
+.vp-pay-figure { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+.vp-pay-paid { font-size: 1.5rem; font-weight: 800; color: var(--success); font-variant-numeric: tabular-nums; }
+.vp-pay-of { font-size: 0.8rem; color: var(--text-muted); }
+.vp-pay-bar { height: 8px; border-radius: 20px; background: var(--bg-3); border: 1px solid var(--border); overflow: hidden; }
+.vp-pay-bar > span { display: block; height: 100%; border-radius: 20px; background: var(--success); }
+.vp-pay-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+.vp-pay-stats > div { padding: 0.7rem 0.85rem; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--border); }
+.vp-pay-stats span { display: block; font-size: 0.62rem; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; }
+.vp-pay-stats strong { display: flex; align-items: center; gap: 0.3rem; margin-top: 0.2rem; font-size: 1.05rem; font-weight: 800; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.vp-pay-stats strong.is-success { color: var(--success); }
+.vp-pay-stats .is-owing { border: 2px solid var(--warning-border); }
+.vp-pay-stats .is-owing strong { color: var(--warning); }
+.vp-pay-stats .is-cleared { border: 2px solid var(--success-border); }
+.vp-pay-stats .is-cleared strong { color: var(--success); }
+.vp-notes { margin-bottom: 1.25rem; }
+
+/* "Undo" under a saved payment — quiet until hovered, since it reverses a payment (was an inline <style>) */
+.vp-undo-btn {
+  margin-top: 0.3rem; display: inline-flex; align-items: center; gap: 0.25rem;
+  padding: 0.15rem 0.5rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-3);
+  font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.66rem; font-weight: 600; color: var(--text-muted);
+  cursor: pointer; transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.vp-undo-btn:hover, .vp-undo-btn:focus-visible { color: var(--danger); border-color: var(--danger-border); background: var(--danger-bg); outline: none; }
+.vp-undo-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* a phone puts everything after a card title on its own row (app.css); the small link / badge stays beside it */
+.vp-card > .card-header > .vp-head-link,
+.vp-card > .card-header > .badge.vp-head-badge { flex: 0 0 auto; width: auto; margin-left: auto !important; }
+
+/* tablet / phone */
+@media (max-width: 900px) {
+  .vp-two-col { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .vp-banner-top { padding: 1.25rem 1.1rem 1rem; }
+  .vp-banner-cover { padding: 0.85rem 1.1rem 1.1rem; }
+  .vp-banner-side { align-items: flex-start; width: 100%; flex-direction: row; justify-content: space-between; align-items: center; }
+  .vp-banner-premium { font-size: 1.25rem; }
+  .vp-card-body { padding: 1rem; }
+  .vp-pay-stats { grid-template-columns: 1fr; }
+  .vp-actions { width: 100%; }
+  .vp-actions > * { flex: 1 1 auto; justify-content: center; }
+}

@@ -1,0 +1,155 @@
+/* ── Renewal Tracking: company switch + status strip (2026-11-21 restyle; same items, same order) ──
+   Every colour is a theme variable, so all themes and dark mode get their own. */
+
+/* Company quick switch — one option per company (Settings > Insurance Companies), so no sidebar trip is needed */
+.rnl-company-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.rnl-company-switch {
+  display: inline-flex;
+  padding: 4px;
+  gap: 2px;
+  border-radius: 12px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+}
+.rnl-company-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 1rem;
+  border-radius: 9px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  transition: color 0.15s, background 0.15s;
+}
+.rnl-company-opt svg { opacity: 0.7; }
+.rnl-company-opt:hover { color: var(--text-primary); }
+/* the active company: a raised white tab with gold text (also the look without JavaScript) */
+.rnl-company-opt.is-active {
+  color: var(--gold);
+  background: var(--bg-2);
+  border-color: var(--border);
+  font-weight: 700;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--text-primary) 10%, transparent);
+}
+.rnl-company-opt.is-active svg { opacity: 1; }
+/* Sliding pill (assets/js/shared/company_switch.js): once the script is ready the active look moves from
+   the option onto one pill behind the options, which slides to the clicked company before the page opens */
+.rnl-company-switch.has-pill { position: relative; }
+.rnl-company-pill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 9px;
+  pointer-events: none;
+  z-index: 0;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--text-primary) 10%, transparent);
+}
+.rnl-company-switch.has-pill .rnl-company-opt { position: relative; z-index: 1; }
+.rnl-company-switch.has-pill .rnl-company-opt.is-active { background: transparent; border-color: transparent; box-shadow: none; }
+.rnl-company-note { font-size: 0.72rem; color: var(--text-muted); display: inline-flex; align-items: center; gap: 0.3rem; }
+
+/* ── status strip: the six counts in one card, each a filter link ── */
+.rnl-stats {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  margin-bottom: 1.25rem;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.rnl-stat {
+  --tone: var(--gold);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.85rem 1.1rem 0.8rem;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s;
+}
+.rnl-stat + .rnl-stat { border-left: 1px solid var(--border); }
+.rnl-stat.t-urgent   { --tone: var(--danger); }
+.rnl-stat.t-expiring { --tone: var(--warning); }
+.rnl-stat.t-stable   { --tone: var(--success); }
+.rnl-stat.t-expired  { --tone: var(--text-muted); }
+.rnl-stat.t-renewed  { --tone: var(--info); }
+.rnl-stat:hover { background: var(--bg-3); }
+.rnl-stat:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--gold); }
+.rnl-stat-label {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rnl-stat-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--tone);
+  flex-shrink: 0;
+}
+.rnl-stat-num {
+  font-size: 1.55rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.8px;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.rnl-stat.is-zero .rnl-stat-num { color: var(--text-muted); }
+/* share of all policies, as a hairline bar */
+.rnl-stat-bar {
+  height: 3px;
+  border-radius: 99px;
+  background: var(--bg-3);
+  overflow: hidden;
+}
+.rnl-stat-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--tone);
+  opacity: 0.85;
+}
+/* the chosen filter: tinted, with a bar in its colour along the top */
+.rnl-stat.is-active { background: color-mix(in srgb, var(--tone) 8%, var(--bg-2)); }
+.rnl-stat.is-active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 3px;
+  background: var(--tone);
+}
+.rnl-stat.is-active .rnl-stat-label { color: var(--tone); }
+
+/* tablet: two rows of three */
+@media (max-width: 1100px) {
+  .rnl-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .rnl-stat:nth-child(4) { border-left: 0; }
+  .rnl-stat:nth-child(n + 4) { border-top: 1px solid var(--border); }
+}
+
+/* Phones: the switch spans the width (equal parts, scrolling sideways if there are many); the status strip
+   is hidden there (mobile_tables.css: .rnl-stat-grid) and the toolbar's Status pill takes its place */
+@media (max-width: 768px) {
+  .rnl-company-switch { display: flex; width: 100%; overflow-x: auto; }
+  .rnl-company-opt { flex: 1; justify-content: center; }
+}

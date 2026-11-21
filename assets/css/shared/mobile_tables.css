@@ -661,51 +661,6 @@
   .rnl-stat-grid {
     display: none !important;
   }
-  .rnl-filter-select {
-    display: block !important;
-  }
-  .rnl-filter-hidden {
-    display: none !important;
-  }
-  .rnl-filter-form {
-    margin-bottom: 0.75rem !important;
-  }
-  .rnl-filter-inner {
-    display: grid !important;
-    grid-template-columns: 1fr auto !important;
-    gap: 0.4rem !important;
-    align-items: center !important;
-    flex-wrap: unset !important;
-  }
-  .rnl-filter-select {
-    grid-column: 1/-1 !important;
-    width: 100% !important;
-    font-size: 0.78rem !important;
-    padding-top: 0.38rem !important;
-    padding-bottom: 0.38rem !important;
-  }
-  .rnl-filter-search {
-    flex: unset !important;
-    min-width: 0 !important;
-    max-width: none !important;
-  }
-  .rnl-filter-search .filter-input {
-    font-size: 0.78rem !important;
-    padding-top: 0.38rem !important;
-    padding-bottom: 0.38rem !important;
-  }
-  .rnl-filter-btn {
-    font-size: 0.78rem !important;
-    padding: 0.38rem 0.75rem !important;
-    white-space: nowrap;
-  }
-  .rnl-filter-clear {
-    grid-column: 1/-1 !important;
-    justify-content: center !important;
-    text-align: center !important;
-    font-size: 0.78rem !important;
-    padding: 0.35rem !important;
-  }
 }
 @media (max-width: 768px) {
   .al-filter-form {
@@ -915,10 +870,6 @@
    28-30px, which is too small for a thumb. Same layout, just a 42px floor on the fields and the Search / Filter
    / Clear buttons. min-height is not set by any of the rules above, so no specificity fight. */
 @media (max-width: 768px) {
-  .rnl-filter-select,
-  .rnl-filter-search .filter-input,
-  .rnl-filter-btn,
-  .rnl-filter-clear,
   .rl-filter-search .filter-input,
   .rl-filter-status,
   .rl-filter-sort,

@@ -5,6 +5,7 @@ require_once '../../config/db.php';
 require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../includes/agent_filter.php';
+require_once '../../includes/list_toolbar.php';
 require_once '../../includes/pagination.php';
 
 require_role(['admin', 'super_admin', 'mechanic']);
@@ -61,7 +62,7 @@ require_once '../../includes/navbar.php';
 
 <link rel="stylesheet" href="../../assets/css/shared/clients.css?v=<?= filemtime(__DIR__ . '/../../assets/css/shared/clients.css') ?>"/>
 <link rel="stylesheet" href="../../assets/css/shared/agent_filter.css?v=<?= filemtime(__DIR__ . '/../../assets/css/shared/agent_filter.css') ?>"/>
-<link rel="stylesheet" href="../../assets/css/shared/list_toolbar.css?v=<?= filemtime(__DIR__ . '/../../assets/css/shared/list_toolbar.css') ?>"/>
+<?= lt_css() ?>
 <style>
 @media (max-width: 768px) {
   /* Phone: the three numbers in one strip. The toolbar below has its own phone layout (list_toolbar.css).
@@ -163,39 +164,26 @@ require_once '../../includes/topbar.php';
     </div>
 
     <!-- TOOLBAR (shared look: assets/css/shared/list_toolbar.css) -->
-    <?php
-    $pill = function (string $name, string $label, array $opts, string $cur, string $default) {
-        echo '<label class="lt-pill' . ($cur !== $default ? ' is-set' : '') . '"><span>' . $label . '</span><select name="' . $name . '" aria-label="' . $label . '">';
-        foreach ($opts as $v => $t) echo '<option value="' . $v . '"' . ($cur === $v ? ' selected' : '') . '>' . htmlspecialchars($t) . '</option>';
-        echo '</select></label>';
-    };
-    ?>
     <form method="GET" action="" class="list-toolbar client-toolbar">
 
       <!-- INSURANCE AGENT (opens on the signed-in agent's own clients; changing it applies right away) -->
       <?php render_agent_filter($af, $base_path); ?>
 
       <!-- SEARCH (with autocomplete); Enter or the arrow searches -->
-      <div class="lt-search">
-        <span class="lt-search-icon"><?= icon('magnifying-glass', 14) ?></span>
-        <input type="text" name="search" id="client-search-input"
-          placeholder="Search by client ID, name, plate..."
-          value="<?= htmlspecialchars($search) ?>" autocomplete="off" aria-label="Search clients"/>
-        <button type="submit" class="lt-go" title="Search" aria-label="Search"><?= icon('arrow-right', 14) ?></button>
-        <div id="client-ac-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:200;background:var(--bg-3);border:1px solid var(--gold-bright);border-radius:9px;box-shadow:var(--shadow-md);max-height:220px;overflow-y:auto;margin-top:2px;"></div>
-      </div>
+      <?= lt_search($search, 'Search by client ID, name, plate...', 'Search clients', 'client-search-input',
+            '<div id="client-ac-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:200;background:var(--bg-3);border:1px solid var(--gold-bright);border-radius:9px;box-shadow:var(--shadow-md);max-height:220px;overflow-y:auto;margin-top:2px;"></div>') ?>
 
       <!-- FILTERS (apply on change). Mechanics are locked to Walk-in, so they get no Type pill. -->
       <div class="lt-filters">
         <?php
-        $pill('filter_by', 'Field', ['all' => 'All', 'code' => 'Client ID', 'name' => 'Name', 'plate' => 'Plate Number', 'contact' => 'Contact', 'email' => 'Email'], $filter_by, 'all');
-        if (!$is_mechanic) $pill('client_type', 'Type', ['all' => 'All', 'insurance' => 'Insurance', 'walkin' => 'Walk-in'], $filter_type, 'all');
-        $pill('sort', 'Sort', ['newest' => 'Newest', 'oldest' => 'Oldest', 'name_asc' => 'Name A–Z', 'name_desc' => 'Name Z–A', 'vehicles' => 'Most vehicles'], is_string($sort_by) ? $sort_by : 'newest', 'newest');
+        echo lt_pill('filter_by', 'Field', ['all' => 'All', 'code' => 'Client ID', 'name' => 'Name', 'plate' => 'Plate Number', 'contact' => 'Contact', 'email' => 'Email'], $filter_by, 'all');
+        if (!$is_mechanic) echo lt_pill('client_type', 'Type', ['all' => 'All', 'insurance' => 'Insurance', 'walkin' => 'Walk-in'], $filter_type, 'all');
+        echo lt_pill('sort', 'Sort', ['newest' => 'Newest', 'oldest' => 'Oldest', 'name_asc' => 'Name A–Z', 'name_desc' => 'Name Z–A', 'vehicles' => 'Most vehicles'], is_string($sort_by) ? $sort_by : 'newest', 'newest');
         ?>
       </div>
 
       <?php if ($search || $filter_by !== 'all' || $sort_by !== 'newest' || $filter_type !== 'all' || $agent_filter !== $agent_default): ?>
-      <a href="client_list.php" class="lt-clear"><?= icon('x-mark', 13) ?> Clear</a>
+      <?= lt_clear('client_list.php') ?>
       <?php endif; ?>
 
       <?php if (!is_mechanic()): ?>
@@ -393,7 +381,7 @@ require_once '../../includes/topbar.php';
 </div>
 
 <script src="../../assets/js/shared/agent_filter.js?v=<?= filemtime(__DIR__.'/../../assets/js/shared/agent_filter.js') ?>"></script>
-<script src="../../assets/js/shared/list_toolbar.js?v=<?= filemtime(__DIR__.'/../../assets/js/shared/list_toolbar.js') ?>"></script>
+<?= lt_js() ?>
 <script>
 
 (function() {

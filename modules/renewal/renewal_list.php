@@ -6,6 +6,7 @@ require_once '../../config/validators.php';
 require_once '../../config/settings.php';
 require_once '../../config/access.php';
 require_once '../../includes/agent_filter.php';
+require_once '../../includes/list_toolbar.php';
 require_once '../../includes/pagination.php';
 require_once '../../includes/insurance_companies.php';
 
@@ -21,8 +22,6 @@ $is_super = is_super_admin();
 // Client Records — other agents' policies open view-only (view_policy.php). The dashboard alerts and the
 // sidebar badge still count only the user's own policies (renewal_scope_sql).
 $af        = agent_filter_state($conn);
-// Keeps the chosen agent on the stat-card and Clear links
-$agent_qs  = '&agent=' . urlencode($af['value']);
 
 // ── FILTERS ──
 $tracked_cos  = insurance_companies_tracked($conn);
@@ -47,38 +46,9 @@ require_once '../../includes/navbar.php';
 
 <link rel="stylesheet" href="../../assets/css/shared/clients.css?v=<?= filemtime(__DIR__ . '/../../assets/css/shared/clients.css') ?>"/>
 <link rel="stylesheet" href="../../assets/css/shared/agent_filter.css?v=<?= filemtime(__DIR__ . '/../../assets/css/shared/agent_filter.css') ?>"/>
+<?= lt_css() ?>
+<link rel="stylesheet" href="../../assets/css/shared/renewal_list.css?v=<?= filemtime(__DIR__ . '/../../assets/css/shared/renewal_list.css') ?>"/>
 <style>
-/* Company quick switch — one option per company (Settings > Insurance Companies), so no sidebar trip is needed */
-.rnl-company-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
-.rnl-company-switch {
-  display: inline-flex; padding: 3px; gap: 3px; border-radius: 100px;
-  background: var(--bg-3); border: 1px solid var(--border); box-shadow: var(--shadow);
-}
-.rnl-company-opt {
-  display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.95rem; border-radius: 100px;
-  font-size: 0.74rem; font-weight: 600; color: var(--text-muted); text-decoration: none; white-space: nowrap;
-  border: 1px solid transparent; transition: background 0.12s, color 0.12s, border-color 0.12s;
-}
-.rnl-company-opt:hover { color: var(--gold); background: var(--gold-pale); }
-.rnl-company-opt.is-active { color: var(--gold); background: var(--gold-pale); border-color: var(--gold-bright); font-weight: 700; }
-/* Sliding pill (assets/js/shared/company_switch.js): once the script is ready the active look moves from
-   the option onto one pill behind the options, which slides to the clicked company before the page opens */
-.rnl-company-switch.has-pill { position: relative; }
-.rnl-company-pill {
-  position: absolute; left: 0; top: 0; border-radius: 100px; pointer-events: none; z-index: 0;
-  background: var(--gold-pale); border: 1px solid var(--gold-bright); box-shadow: 0 2px 10px rgba(184,134,11,0.18);
-}
-.rnl-company-switch.has-pill .rnl-company-opt { position: relative; z-index: 1; }
-.rnl-company-switch.has-pill .rnl-company-opt.is-active { background: transparent; border-color: transparent; }
-.rnl-company-switch.has-pill .rnl-company-opt.is-active:hover { background: transparent; }
-
-/* Phones: the switch spans the width (equal parts, scrolling sideways if there are many); the agent filter takes its own full row in the
-   toolbar grid (mobile_tables.css) */
-@media (max-width: 768px) {
-  .rnl-company-switch { display: flex; width: 100%; overflow-x: auto; }
-  .rnl-company-opt { flex: 1; justify-content: center; }
-  .rnl-filter-inner > .cl-agent-wrap { grid-column: 1 / -1; }
-}
 /* Row details open on hover — desktop only. Touch screens have no real
    :hover, so mobile/tablet (<=768px) keeps the original tap-to-expand
    behavior from the global click handler in footer.php instead. */
@@ -122,64 +92,47 @@ require_once '../../includes/topbar.php';
         <?php endforeach; ?>
       </nav>
       <?php if (!$is_super && !agent_filter_is_mine($af)): ?>
-      <span style="font-size:0.72rem;color:var(--text-muted);display:inline-flex;align-items:center;gap:0.3rem;"><?= icon('information-circle', 13) ?> Other agents' policies are view-only — only their agent or the Owner can update them.</span>
+      <span class="rnl-company-note"><?= icon('information-circle', 13) ?> Other agents' policies are view-only — only their agent or the Owner can update them.</span>
       <?php endif; ?>
     </div>
 
-    <!-- SUMMARY CARDS (desktop) -->
-    <div class="rnl-stat-grid" style="display:grid;grid-template-columns:repeat(6,1fr);gap:0.6rem;margin-bottom:1.25rem;">
-      <?php
-      $summary = [
-        ['all',      'Total Policies',    $counts['total'],    'badge-gold',  'document'],
-        ['urgent',   'Urgent (' . $urg_days . 'd)',  $counts['urgent'],   'badge-red',   'exclamation-triangle'],
-        ['expiring', 'Expiring (' . $exp_days . 'd)',$counts['expiring'],'badge-yellow','clock'],
-        ['stable',   'Stable',            $counts['stable'],   'badge-green', 'check-circle'],
-        ['expired',  'Expired',           $counts['expired'],  'badge-gray',  'x-mark'],
-        ['renewed',  'Renewed',           $counts['renewed'],  'badge-info',  'arrow-path'],
-      ];
-      foreach ($summary as [$key, $label, $count, $badge, $ico]):
-        $active_card = ($filter === $key) ? 'border-color:var(--gold-bright);background:var(--gold-pale);' : '';
-      ?>
-      <a href="?company=<?= urlencode($company) ?>&filter=<?= $key ?><?= $search ? '&search='.urlencode($search) : '' ?><?= htmlspecialchars($agent_qs) ?>"
-         style="text-decoration:none;">
-        <div class="card" style="margin-bottom:0;padding:0.65rem 0.85rem;display:flex;align-items:center;gap:0.55rem;transition:all 0.15s;<?= $active_card ?>">
-          <div class="card-icon" style="width:28px;height:28px;border-radius:7px;flex-shrink:0;">
-            <?= icon($ico, 13) ?>
-          </div>
-          <div>
-            <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);line-height:1;letter-spacing:-0.5px;"><?= (int)$count ?></div>
-            <div style="font-size:0.56rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-top:0.1rem;"><?= $label ?></div>
-          </div>
-        </div>
+    <!-- STATUS STRIP (desktop/tablet): each count is a filter link; phones use the toolbar's Status pill -->
+    <?php
+    $summary = [
+      ['all',      'Total Policies',                $counts['total']],
+      ['urgent',   'Urgent (' . $urg_days . 'd)',   $counts['urgent']],
+      ['expiring', 'Expiring (' . $exp_days . 'd)', $counts['expiring']],
+      ['stable',   'Stable',                        $counts['stable']],
+      ['expired',  'Expired',                       $counts['expired']],
+      ['renewed',  'Renewed',                       $counts['renewed']],
+    ];
+    $stat_total = max(1, (int)$counts['total']);
+    ?>
+    <nav class="rnl-stats rnl-stat-grid" aria-label="Filter by renewal status">
+      <?php foreach ($summary as [$key, $label, $count]):
+        $count = (int)$count;
+        $share = $key === 'all' ? 100 : min(100, round($count / $stat_total * 100)); ?>
+      <a href="?<?= htmlspecialchars(http_build_query(array_filter(['company' => $company, 'filter' => $key, 'search' => $search, 'agent' => $af['value']], 'strlen'))) ?>"
+         class="rnl-stat t-<?= $key ?><?= $filter === $key ? ' is-active' : '' ?><?= $count === 0 ? ' is-zero' : '' ?>"<?= $filter === $key ? ' aria-current="true"' : '' ?>>
+        <span class="rnl-stat-label"><span class="rnl-stat-dot"></span><?= htmlspecialchars($label) ?></span>
+        <span class="rnl-stat-num"><?= number_format($count) ?></span>
+        <span class="rnl-stat-bar" aria-hidden="true"><span style="width:<?= $share ?>%;"></span></span>
       </a>
       <?php endforeach; ?>
-    </div>
+    </nav>
 
-    <!-- TOOLBAR -->
-    <form method="GET" action="" class="rnl-filter-form" style="margin-bottom:1rem;">
-      <div class="rnl-filter-inner" style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
-        <!-- Mobile-only filter dropdown (replaces stat cards) -->
-        <select name="filter" class="filter-input rnl-filter-select" onchange="this.form.submit()" style="display:none;">
-          <?php foreach ($summary as [$key, $label, $count, $badge, $ico]): ?>
-          <option value="<?= $key ?>" <?= $filter === $key ? 'selected' : '' ?>><?= $label ?> (<?= (int)$count ?>)</option>
-          <?php endforeach; ?>
-        </select>
-        <!-- Desktop hidden filter passthrough -->
-        <input type="hidden" name="filter" value="<?= htmlspecialchars($filter) ?>" class="rnl-filter-hidden"/>
-        <input type="hidden" name="company" value="<?= htmlspecialchars($company) ?>"/>
-        <?php render_agent_filter($af, $base_path, 'Show the policies of an insurance agent\'s clients'); ?>
-        <div class="rnl-filter-search" style="position:relative;flex:1;min-width:200px;max-width:420px;">
-          <span style="position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;"><?= icon('magnifying-glass', 14) ?></span>
-          <input type="text" name="search" class="filter-input"
-            placeholder="Search by client ID, client, contact number, plate number, or policy number..."
-            value="<?= htmlspecialchars($search) ?>"
-            style="padding-left:2.4rem;width:100%;"/>
-        </div>
-        <button type="submit" class="btn-primary rnl-filter-btn"><?= icon('magnifying-glass', 14) ?> Search</button>
-        <?php if ($search): ?>
-        <a href="?company=<?= urlencode($company) ?>&filter=<?= $filter ?><?= htmlspecialchars($agent_qs) ?>" class="btn-ghost rnl-filter-clear"><?= icon('x-mark', 14) ?> Clear</a>
-        <?php endif; ?>
+    <!-- TOOLBAR (shared look: assets/css/shared/list_toolbar.css). The stat cards above are the status filter;
+         phones hide them, so there the Status pill does it (always sent, so a search keeps the chosen status). -->
+    <form method="GET" action="" class="list-toolbar rnl-toolbar">
+      <input type="hidden" name="company" value="<?= htmlspecialchars($company) ?>"/>
+      <?php render_agent_filter($af, $base_path, "Show the policies of an insurance agent's clients"); ?>
+      <?= lt_search($search, 'Search client, plate or policy no...', 'Search policies') ?>
+      <div class="lt-filters">
+        <?= lt_pill('filter', 'Status', array_combine(array_column($summary, 0), array_map(fn($r) => $r[1] . ' (' . (int)$r[2] . ')', $summary)), $filter, 'all', 'lt-phone-only') ?>
       </div>
+      <?php if ($search): ?>
+      <?= lt_clear('?' . http_build_query(['company' => $company, 'filter' => $filter, 'agent' => $af['value']])) ?>
+      <?php endif; ?>
     </form>
 
     <!-- TABLE -->
@@ -366,6 +319,7 @@ var rnlTable = document.querySelector(".renewal-list-table");
 if (rnlTable) rnlTable.addEventListener("click", function(e) { if (window.innerWidth > 768) e.stopPropagation(); });
 ';
 $footer_extra_scripts = '<script src="../../assets/js/shared/agent_filter.js?v=' . filemtime(__DIR__ . '/../../assets/js/shared/agent_filter.js') . '"></script>'
+    . lt_js()
     // Company switch: the pill slides to the chosen company (Motion, same build as the dashboard)
     . '<script src="https://cdn.jsdelivr.net/npm/motion@13.4.3/dist/motion.min.js"></script>'
     . '<script src="../../assets/js/shared/company_switch.js?v=' . filemtime(__DIR__ . '/../../assets/js/shared/company_switch.js') . '"></script>';

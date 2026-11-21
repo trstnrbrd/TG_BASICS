@@ -104,6 +104,8 @@
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+  max-width: 11rem;           /* a long choice (some claim statuses) shortens instead of stretching the row */
+  text-overflow: ellipsis;
 }
 .lt-pill::after {
   content: "";
@@ -121,6 +123,12 @@
 /* a filter moved off its default reads as "on" */
 .lt-pill.is-set { border-color: var(--gold); background: var(--gold-pale); }
 .lt-pill.is-set > span { color: var(--gold); }
+/* a pill only phones need (e.g. Renewal's Status, which the stat cards handle on wider screens). Hidden by CSS
+   only, so its select still sends the current value with every search */
+.lt-pill.lt-phone-only { display: none; }
+@media (max-width: 768px) { .lt-pill.lt-phone-only { display: inline-flex; } }
+/* wider screens: a filters box holding only phone pills takes no room (no stray gap) */
+@media (min-width: 769px) { .lt-filters:not(:has(> .lt-pill:not(.lt-phone-only))) { display: none; } }
 
 .lt-clear {
   display: inline-flex;

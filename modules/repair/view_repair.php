@@ -10,6 +10,7 @@ require_once '../../config/uploads.php';
 require_once '../../config/access.php';
 require_once '../../config/transaction_pin.php';
 require_once '../../includes/idempotency.php';
+require_once '../../includes/repair_inspection.php';
 
 require_role(['admin', 'super_admin', 'mechanic']);
 
@@ -255,18 +256,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 // ── LABEL MAPS ──
 $service_labels = service_type_labels($conn);   // service_types table (includes/lookups.php)
 
-
-$area_labels = REPAIR_CHECKLIST_AREAS;   // config/access.php
-
-$cond_map = array_map(fn($d) => [$d['label'], $d['color'], $d['bg']], REPAIR_DAMAGE_LEVELS);
+// Unit Inspection: numbering + each area's condition (includes/repair_inspection.php)
+$insp_layout = repair_inspection_layout();
+$insp_cond   = repair_inspection_conditions($checklist);
+$damaged     = array_filter($insp_cond, fn($c) => $c !== 'none');
+$damage_word = count($damaged) === 1 ? 'area' : 'areas';
 
 $sb      = repair_status_badge($job['status']);   // statuses table (includes/statuses.php)
 $svc_lbl = $service_labels[$job['service_type']] ?? $job['service_type'];
 
+// statuses this user may pick next; a mechanic on a completed / cancelled job has none, so no button
+$next_statuses  = array_filter(array_keys(repair_statuses()), fn($s) => repair_status_change_allowed($job['status'], $s, is_mechanic()));
+$existing_qt_id = quotation_id_for_job($conn, $job_id);
+
+$css = fn(string $path) => '<link rel="stylesheet" href="../../assets/css/' . $path . '?v=' . filemtime(__DIR__ . '/../../assets/css/' . $path) . '"/>';
 $page_title  = 'Repair Job — ' . $job['job_number'];
 $active_page = 'repair';
 $base_path   = '../../';
-$extra_css   = '<link rel="stylesheet" href="../../assets/css/mechanic/repair_list.css?v=' . filemtime(__DIR__ . '/../../assets/css/mechanic/repair_list.css') . '"/>';
+$extra_css   = $css('mechanic/repair_list.css') . $css('shared/repair_car.css') . $css('mechanic/view_repair.css');
 require_once '../../includes/header.php';
 require_once '../../includes/navbar.php';
 ?>
@@ -296,36 +303,28 @@ document.addEventListener('DOMContentLoaded', function() {
 <?php endif; ?>
 
   <!-- BACK + HEADER ROW -->
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:0.75rem;">
-    <a href="repair_list.php" class="back-link" onclick="goBack('repair_list.php'); return false;" style="margin-bottom:0;"><?= icon('arrow-left', 14) ?></a>
-    <div style="display:flex;align-items:center;gap:0.5rem;">
+  <div class="rv-head">
+    <a href="repair_list.php" class="back-link" onclick="goBack('repair_list.php'); return false;" aria-label="Back to Repair Jobs"><?= icon('arrow-left', 14) ?></a>
+    <div class="rv-head-actions">
       <span class="badge <?= $sb['class'] ?>"><?= htmlspecialchars($sb['label']) ?></span>
-      <?php
-        // statuses this user may pick next; a mechanic on a completed / cancelled job has none, so no button
-        $next_statuses = array_filter(array_keys(repair_statuses()), fn($s) => repair_status_change_allowed($job['status'], $s, is_mechanic()));
-      ?>
       <?php if ($next_statuses): ?>
-      <button onclick="document.getElementById('status-modal').style.display='flex'" class="btn-primary" style="padding:0.45rem 1rem;font-size:0.8rem;">
+      <button type="button" onclick="document.getElementById('status-modal').style.display='flex'" class="btn-primary">
         <?= icon('arrow-right', 13) ?> Update Status
       </button>
       <?php endif; ?>
-      <?php
-        $existing_qt_id = quotation_id_for_job($conn, $job_id);
-        $existing_qt    = $existing_qt_id === null ? null : ['quotation_id' => $existing_qt_id];
-      ?>
-      <?php if ($existing_qt): ?>
-        <a href="../quotations/view_quotation.php?id=<?= $existing_qt['quotation_id'] ?>" class="btn-primary" style="padding:0.45rem 1rem;font-size:0.8rem;"><?= icon('receipt', 13) ?> View Quotation</a>
+      <?php if ($existing_qt_id !== null): ?>
+        <a href="../quotations/view_quotation.php?id=<?= $existing_qt_id ?>" class="btn-primary"><?= icon('receipt', 13) ?> View Quotation</a>
       <?php else: ?>
-        <a href="../quotations/add_quotation.php?job_id=<?= $job_id ?>" class="btn-primary" style="padding:0.45rem 1rem;font-size:0.8rem;"><?= icon('receipt', 13) ?> Generate Quotation</a>
+        <a href="../quotations/add_quotation.php?job_id=<?= $job_id ?>" class="btn-primary"><?= icon('receipt', 13) ?> Generate Quotation</a>
       <?php endif; ?>
     </div>
   </div>
 
   <!-- TOP GRID: Job Info + Client/Vehicle -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;">
+  <div class="rv-grid">
 
     <!-- JOB DETAILS -->
-    <div class="card" style="margin-bottom:0;">
+    <div class="card">
       <div class="card-header">
         <div class="card-icon"><?= icon('wrench', 16) ?></div>
         <div>
@@ -333,37 +332,36 @@ document.addEventListener('DOMContentLoaded', function() {
           <div class="card-sub"><?= htmlspecialchars($job['job_number']) ?></div>
         </div>
       </div>
-      <div style="padding:1rem 1.25rem;display:flex;flex-direction:column;gap:0.75rem;">
-        <?php
-        $details = [
-          ['Service Type',   $svc_lbl],
-          ['Repair Date',    date('F d, Y', strtotime($job['repair_date']))],
-          ['Est. Release',   $job['release_date'] ? date('F d, Y', strtotime($job['release_date'])) : '—'],
-          ['Status',         $sb['label']],
-          ['Date Created',   date('F d, Y g:i A', strtotime($job['created_at']))],
-        ];
-        foreach ($details as [$lbl, $val]): ?>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0;border-bottom:1px solid var(--border);">
-          <span style="font-size:0.78rem;color:var(--text-muted);font-weight:500;"><?= $lbl ?></span>
-          <span style="font-size:0.82rem;color:var(--text-primary);font-weight:600;"><?= htmlspecialchars($val) ?></span>
+      <div class="rv-body">
+        <div class="rv-dl">
+          <div class="rv-row"><span class="rv-lbl"><?= icon('wrench', 13) ?> Service Type</span><span class="rv-val"><?= htmlspecialchars($svc_lbl) ?></span></div>
+          <div class="rv-row"><span class="rv-lbl"><?= icon('calendar', 13) ?> Repair Date</span><span class="rv-val"><?= date('F d, Y', strtotime($job['repair_date'])) ?></span></div>
+          <div class="rv-row"><span class="rv-lbl"><?= icon('calendar', 13) ?> Est. Release</span>
+            <span class="rv-val<?= $job['release_date'] ? '' : ' muted' ?>"><?= $job['release_date'] ? date('F d, Y', strtotime($job['release_date'])) : 'Not set' ?></span></div>
+          <div class="rv-row"><span class="rv-lbl"><?= icon('arrow-path', 13) ?> Status</span><span class="rv-val"><span class="badge <?= $sb['class'] ?>"><?= htmlspecialchars($sb['label']) ?></span></span></div>
+          <div class="rv-row"><span class="rv-lbl"><?= icon('clock', 13) ?> Date Created</span><span class="rv-val"><?= date('F d, Y g:i A', strtotime($job['created_at'])) ?></span></div>
         </div>
-        <?php endforeach; ?>
+
+        <?php if ($sb['progress'] > 0): ?>
+        <div class="rv-progress" aria-label="Repair progress <?= $sb['progress'] ?>%">
+          <div class="rv-progress-top"><span>Repair progress</span><span><?= $sb['progress'] ?>%</span></div>
+          <div class="rv-progress-bar"><span style="width:<?= $sb['progress'] ?>%;"></span></div>
+        </div>
+        <?php endif; ?>
 
         <!-- Quick release date update -->
-        <?php if (in_array($role, ['admin','super_admin','mechanic'])): ?>
-        <form method="POST" style="display:flex;gap:0.5rem;align-items:center;margin-top:0.25rem;">
+        <form method="POST" class="rv-release">
           <?= csrf_field() ?>
           <input type="hidden" name="action" value="update_release"/>
-          <input type="date" name="release_date" value="<?= htmlspecialchars($job['release_date'] ?? '') ?>"
-                 style="flex:1;padding:0.4rem 0.65rem;border:1px solid var(--border);border-radius:8px;background:var(--bg-2);color:var(--text-primary);font-size:0.8rem;"/>
-          <button type="submit" class="btn-sm-gold" style="white-space:nowrap;"><?= icon('check', 13) ?> Set Release</button>
+          <label for="rv-release-date">Est. release</label>
+          <input type="date" id="rv-release-date" name="release_date" value="<?= htmlspecialchars($job['release_date'] ?? '') ?>"/>
+          <button type="submit" class="btn-sm-gold"><?= icon('check', 13) ?> Set Release</button>
         </form>
-        <?php endif; ?>
       </div>
     </div>
 
     <!-- CLIENT & VEHICLE -->
-    <div class="card" style="margin-bottom:0;">
+    <div class="card">
       <div class="card-header">
         <div class="card-icon"><?= icon('user', 16) ?></div>
         <div>
@@ -372,75 +370,82 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
         <a href="../clients/view_client.php?id=<?= $job['client_id'] ?>" class="btn-sm-gold" style="margin-left:auto;"><?= icon('eye', 13) ?> View Client</a>
       </div>
-      <div style="padding:1rem 1.25rem;display:flex;flex-direction:column;gap:0.75rem;">
-        <?php
-        $client_info = [
-          ['Client',       $job['full_name']],
-          ['Contact',      $job['contact_number'] ?: '—'],
-          ['Email',        $job['email'] ?: '—'],
-        ];
-        $vehicle_info = [
-          ['Plate Number', $job['plate_number']],
-          ['Make & Model', trim($job['year_model'] . ' ' . $job['make'] . ' ' . $job['model'])],
-          ['Color',        $job['color'] ?: '—'],
-        ];
-        foreach (array_merge($client_info, $vehicle_info) as [$lbl, $val]): ?>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0;border-bottom:1px solid var(--border);">
-          <span style="font-size:0.78rem;color:var(--text-muted);font-weight:500;"><?= $lbl ?></span>
-          <span style="font-size:0.82rem;color:var(--text-primary);font-weight:600;"><?= htmlspecialchars($val) ?></span>
+      <div class="rv-body">
+        <div class="rv-dl">
+          <div class="rv-group">Client</div>
+          <div class="rv-row"><span class="rv-lbl"><?= icon('user', 13) ?> Client</span><span class="rv-val"><?= htmlspecialchars($job['full_name']) ?></span></div>
+          <div class="rv-row"><span class="rv-lbl"><?= icon('phone', 13) ?> Contact</span><span class="rv-val<?= $job['contact_number'] ? '' : ' muted' ?>"><?= htmlspecialchars($job['contact_number'] ?: '—') ?></span></div>
+          <div class="rv-row"><span class="rv-lbl"><?= icon('envelope', 13) ?> Email</span><span class="rv-val<?= $job['email'] ? '' : ' muted' ?>"><?= htmlspecialchars($job['email'] ?: '—') ?></span></div>
+          <div class="rv-group">Vehicle</div>
+          <div class="rv-row"><span class="rv-lbl"><?= icon('truck', 13) ?> Plate Number</span><span class="rv-val"><span class="badge-dark"><?= htmlspecialchars($job['plate_number']) ?></span></span></div>
+          <div class="rv-row"><span class="rv-lbl"><?= icon('truck', 13) ?> Make &amp; Model</span><span class="rv-val"><?= htmlspecialchars(trim($job['year_model'] . ' ' . $job['make'] . ' ' . $job['model'])) ?></span></div>
+          <div class="rv-row"><span class="rv-lbl"><?= icon('swatch', 13) ?> Color</span><span class="rv-val<?= $job['color'] ? '' : ' muted' ?>"><?= htmlspecialchars($job['color'] ?: '—') ?></span></div>
         </div>
-        <?php endforeach; ?>
       </div>
     </div>
 
   </div>
 
-  <!-- INSPECTION CHECKLIST -->
-  <div class="card" style="margin-bottom:1.25rem;">
+  <!-- INSPECTION CHECKLIST: a small copy of the car from New Repair Job, for reference -->
+  <div class="card rv-card" id="inspection-card">
     <div class="card-header">
       <div class="card-icon"><?= icon('clipboard-list', 16) ?></div>
       <div>
         <div class="card-title">Unit Inspection Checklist</div>
         <div class="card-sub">Damage assessment at intake</div>
       </div>
-    </div>
-    <div style="padding:1rem 1.25rem;">
-      <?php
-      $has_damage = false;
-      foreach ($checklist as $row) {
-          if ($row['condition_value'] !== 'none') { $has_damage = true; break; }
-      }
-      if (empty($checklist) || !$has_damage): ?>
-      <div style="text-align:center;padding:1.5rem;color:var(--text-muted);font-size:0.82rem;">
-        <?= icon('check-circle', 24) ?><br/>No damage recorded on intake.
+      <div class="rv-head-right">
+        <?php if ($damaged): ?>
+        <span class="badge badge-red"><?= count($damaged) ?> <?= $damage_word ?> damaged</span>
+        <?php else: ?>
+        <span class="badge badge-green"><?= icon('check', 11) ?> No damage</span>
+        <?php endif; ?>
+        <a href="print_inspection.php?id=<?= $job_id ?>" class="btn-sm-gold" id="print-inspection" target="_blank" rel="noopener"><?= icon('printer', 13) ?> <span>Print</span></a>
       </div>
-      <?php else: ?>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.65rem;">
-        <?php foreach ($area_labels as $key => $label):
-          $entry = $checklist[$key] ?? ['condition_value'=>'none','notes'=>''];
-          $cond  = $entry['condition_value'];
-          if ($cond === 'none') continue;
-          [$cond_lbl, $cond_color, $cond_bg] = $cond_map[$cond];
-        ?>
-        <div style="background:<?= $cond_bg ?>;border:1px solid <?= $cond_color ?>33;border-radius:10px;padding:0.75rem 1rem;">
-          <div style="font-size:0.75rem;font-weight:700;color:var(--text-primary);margin-bottom:0.2rem;"><?= $label ?></div>
-          <div style="font-size:0.7rem;font-weight:600;color:<?= $cond_color ?>;"><?= $cond_lbl ?></div>
-          <?php if ($entry['notes']): ?>
-          <div style="font-size:0.68rem;color:var(--text-muted);margin-top:0.3rem;"><?= htmlspecialchars($entry['notes']) ?></div>
+    </div>
+    <div class="rv-body">
+      <div class="rv-insp">
+        <div class="rv-insp-car">
+          <?= repair_car_svg($insp_cond) ?>
+          <div class="insp-legend">
+            <span class="legend-chip none"><?= htmlspecialchars(REPAIR_DAMAGE_LEVELS['none']['label']) ?></span>
+            <span class="legend-chip minor"><?= htmlspecialchars(REPAIR_DAMAGE_LEVELS['minor']['label']) ?></span>
+            <span class="legend-chip major"><?= htmlspecialchars(REPAIR_DAMAGE_LEVELS['major']['label']) ?></span>
+          </div>
+        </div>
+
+        <div class="rv-insp-list">
+          <?php if (!$damaged): ?>
+          <div class="rv-clean"><?= icon('check-circle', 22) ?>
+            <div>No damage recorded on intake.<small>All <?= count($insp_cond) ?> areas were checked as No Damage.</small></div>
+          </div>
+          <?php else: ?>
+          <div class="rv-insp-title">Damage found</div>
+          <div class="rv-dmg-list">
+            <?php foreach ($insp_layout['num'] as $key => $n):
+              $cond = $insp_cond[$key] ?? 'none';
+              if ($cond === 'none') continue;
+              $note = trim((string)($checklist[$key]['notes'] ?? '')); ?>
+            <div class="rv-dmg <?= $cond ?>" data-key="<?= $key ?>">
+              <span class="rv-num"><?= $n ?></span>
+              <span class="rv-dmg-name"><?= htmlspecialchars(REPAIR_CHECKLIST_AREAS[$key]) ?></span>
+              <span class="rv-cond <?= $cond ?>"><?= htmlspecialchars(REPAIR_DAMAGE_LEVELS[$cond]['label']) ?></span>
+              <?php if ($note !== ''): ?><div class="rv-dmg-note"><?= htmlspecialchars($note) ?></div><?php endif; ?>
+            </div>
+            <?php endforeach; ?>
+          </div>
+          <?php endif; ?>
+
+          <?php if ($damaged && count($damaged) < count($insp_cond)): ?>
+          <div class="rv-insp-title">No damage</div>
+          <div class="rv-ok-list">
+            <?php foreach ($insp_layout['num'] as $key => $n): if (($insp_cond[$key] ?? 'none') !== 'none') continue; ?>
+            <span class="rv-ok" data-key="<?= $key ?>"><span class="rv-num"><?= $n ?></span><?= htmlspecialchars(REPAIR_CHECKLIST_AREAS[$key]) ?></span>
+            <?php endforeach; ?>
+          </div>
           <?php endif; ?>
         </div>
-        <?php endforeach; ?>
       </div>
-      <!-- Also show no-damage areas in a compact list -->
-      <div style="margin-top:0.75rem;display:flex;flex-wrap:wrap;gap:0.4rem;">
-        <?php foreach ($area_labels as $key => $label):
-          $entry = $checklist[$key] ?? ['condition_value'=>'none'];
-          if ($entry['condition_value'] !== 'none') continue;
-        ?>
-        <span style="font-size:0.68rem;background:var(--bg-2);border:1px solid var(--border);border-radius:6px;padding:0.2rem 0.55rem;color:var(--text-muted);"><?= $label ?></span>
-        <?php endforeach; ?>
-      </div>
-      <?php endif; ?>
     </div>
   </div>
 
@@ -452,14 +457,14 @@ document.addEventListener('DOMContentLoaded', function() {
       'staff'  => ['Shop Representative', 'Inspected and recorded by', $_SESSION['full_name'] ?? ''],
   ];
   ?>
-  <div class="card" style="margin-bottom:1.25rem;" id="signoff-card">
+  <div class="card rv-card" id="signoff-card">
     <div class="card-header">
       <div class="card-icon"><?= icon('pencil', 16) ?></div>
       <div>
         <div class="card-title">Inspection Sign-off</div>
         <div class="card-sub">Client and shop signatures on the intake checklist</div>
       </div>
-      <div style="margin-left:auto;" id="signoff-status">
+      <div class="rv-head-right" id="signoff-status">
         <?php if ($signed_count === 2): ?>
         <span class="badge badge-green"><?= icon('check', 11) ?> Fully signed</span>
         <?php else: ?>
@@ -467,30 +472,30 @@ document.addEventListener('DOMContentLoaded', function() {
         <?php endif; ?>
       </div>
     </div>
-    <div style="padding:1rem 1.25rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;">
+    <div class="rv-body rv-sig-grid">
       <?php foreach ($sig_sides as $side => [$side_label, $side_hint, $default_name]):
         $sig = $signatures[$side] ?? null; ?>
-      <div class="sig-slot" data-side="<?= $side ?>" style="border:1px solid var(--border);border-radius:12px;overflow:hidden;">
-        <div style="padding:0.6rem 0.9rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
-          <span style="font-size:0.72rem;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;color:var(--gold);"><?= $side_label ?></span>
-          <span style="font-size:0.68rem;color:var(--text-muted);"><?= $side_hint ?></span>
+      <div class="sig-slot<?= $sig ? ' is-signed' : '' ?>" data-side="<?= $side ?>">
+        <div class="sig-slot-head">
+          <span class="sig-slot-role"><?= $side_label ?></span>
+          <span class="sig-slot-hint"><?= $side_hint ?></span>
         </div>
         <?php if ($sig): ?>
-        <div class="sig-body" style="background:#fff;height:120px;display:flex;align-items:center;justify-content:center;padding:0.5rem;">
-          <img src="<?= htmlspecialchars(upload_url('repair_jobs', $sig['file_name'], $job_id)) ?>" alt="<?= $side_label ?> signature" style="max-height:100%;max-width:100%;object-fit:contain;"/>
+        <div class="sig-body signed">
+          <img src="<?= htmlspecialchars(upload_url('repair_jobs', $sig['file_name'], $job_id)) ?>" alt="<?= $side_label ?> signature"/>
         </div>
-        <div style="padding:0.6rem 0.9rem;border-top:1px solid var(--border);">
-          <div style="font-size:0.8rem;font-weight:700;color:var(--text-primary);"><?= htmlspecialchars($sig['signer_name']) ?></div>
-          <div style="font-size:0.68rem;color:var(--text-muted);">Signed <?= date('M d, Y · g:i A', strtotime($sig['signed_at'])) ?></div>
+        <div class="sig-slot-foot">
+          <strong><?= htmlspecialchars($sig['signer_name']) ?></strong>
+          Signed <?= date('M d, Y · g:i A', strtotime($sig['signed_at'])) ?>
         </div>
         <?php else: ?>
-        <div class="sig-body" style="height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.5rem;background:var(--bg-2);">
-          <span style="font-size:0.75rem;color:var(--text-muted);">Not signed yet</span>
+        <div class="sig-body empty">
+          <span>Not signed yet</span>
           <button type="button" class="btn-sm-gold" onclick="openSignModal('<?= $side ?>', <?= htmlspecialchars(json_encode($default_name), ENT_QUOTES) ?>)">
             <?= icon('pencil', 12) ?> Sign
           </button>
         </div>
-        <div style="padding:0.6rem 0.9rem;border-top:1px solid var(--border);font-size:0.68rem;color:var(--text-muted);">
+        <div class="sig-slot-foot">
           <?= $side === 'client' ? 'Hand the device to the client to sign' : 'Signs as ' . htmlspecialchars($default_name) ?>
         </div>
         <?php endif; ?>
@@ -500,73 +505,64 @@ document.addEventListener('DOMContentLoaded', function() {
   </div>
 
   <!-- VEHICLE PHOTOS -->
-  <div class="card" style="margin-bottom:1.25rem;">
+  <div class="card rv-card">
     <div class="card-header">
       <div class="card-icon"><?= icon('camera', 16) ?></div>
       <div>
         <div class="card-title">Vehicle Photos</div>
         <div class="card-sub"><?= count($images) ?> photo<?= count($images) !== 1 ? 's' : '' ?> attached</div>
       </div>
-      <div style="margin-left:auto;">
-        <button type="button" onclick="document.getElementById('upload-panel').style.display=document.getElementById('upload-panel').style.display==='none'?'block':'none'" class="btn-sm-gold">
+      <div class="rv-head-right">
+        <button type="button" onclick="document.getElementById('upload-panel').classList.toggle('open')" class="btn-sm-gold">
           <?= icon('plus', 13) ?> Add Photos
         </button>
       </div>
     </div>
 
     <!-- UPLOAD FORM -->
-    <div id="upload-panel" style="display:none;padding:1rem 1.25rem;border-bottom:1px solid var(--border);background:var(--bg-2);">
-      <form method="POST" enctype="multipart/form-data" style="display:flex;flex-direction:column;gap:0.75rem;">
+    <div id="upload-panel" class="rv-upload">
+      <form method="POST" enctype="multipart/form-data">
         <?= csrf_field() ?><?= idem_field() ?>
         <input type="hidden" name="action" value="upload_image"/>
-        <label style="font-size:0.78rem;font-weight:600;color:var(--text-muted);">Select images (JPG, PNG, WEBP — multiple allowed, up to <?= REPAIR_PHOTO_MAX_BYTES >> 20 ?> MB each)</label>
-        <input type="file" name="job_images[]" multiple accept="image/jpeg,image/png,image/webp,image/gif" data-compress="photo"
-          style="font-size:0.8rem;padding:0.5rem;border:1px dashed var(--gold-muted);border-radius:8px;background:var(--bg-3);color:var(--text-primary);width:100%;"/>
+        <label class="rv-upload-lbl">Select images (JPG, PNG, WEBP — multiple allowed, up to <?= REPAIR_PHOTO_MAX_BYTES >> 20 ?> MB each)</label>
+        <input type="file" name="job_images[]" multiple accept="image/jpeg,image/png,image/webp,image/gif" data-compress="photo"/>
         <?php if (repair_job_is_open($job['status'])): ?>
-        <label style="display:flex;align-items:flex-start;gap:0.55rem;font-size:0.8rem;color:var(--text-primary);cursor:pointer;">
-          <input type="checkbox" name="show_client" value="1" id="photo-show-client" style="margin-top:0.15rem;accent-color:var(--gold);"/>
+        <label class="rv-upload-check">
+          <input type="checkbox" name="show_client" value="1" id="photo-show-client"/>
           <span><strong>Show these photos to the client</strong> on their QR page while the job is open.
-            <span style="display:block;font-size:0.72rem;color:var(--text-muted);margin-top:0.15rem;">Photograph the vehicle only: no faces, no other cars' plates, no documents left inside. Location and phone details are removed from the photos automatically.</span></span>
+            <small>Photograph the vehicle only: no faces, no other cars' plates, no documents left inside. Location and phone details are removed from the photos automatically.</small></span>
         </label>
         <input type="text" name="caption" class="field-input" maxlength="<?= MAX_NOTE ?>" placeholder="Caption for the client (optional), e.g. Primer applied, Ready for pickup"/>
         <?php endif; ?>
-        <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
-          <button type="button" onclick="document.getElementById('upload-panel').style.display='none'" class="btn-ghost" style="font-size:0.8rem;">Cancel</button>
+        <div class="rv-upload-actions">
+          <button type="button" onclick="document.getElementById('upload-panel').classList.remove('open')" class="btn-ghost" style="font-size:0.8rem;">Cancel</button>
           <button type="submit" class="btn-primary" style="font-size:0.8rem;"><?= icon('arrow-up-tray', 13) ?> Upload</button>
         </div>
       </form>
     </div>
 
     <!-- GALLERY -->
-    <div style="padding:1rem 1.25rem;">
+    <div class="rv-body">
       <?php if (empty($images)): ?>
-      <div style="text-align:center;padding:1.5rem;color:var(--text-muted);font-size:0.82rem;">
-        <?= icon('camera', 24) ?><br/>No photos yet. Add photos of the vehicle for reference.
-      </div>
+      <div class="rv-empty"><?= icon('camera', 24) ?>No photos yet. Add photos of the vehicle for reference.</div>
       <?php else: ?>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:0.75rem;">
+      <div class="rv-gallery">
         <?php foreach ($images as $img):
           $img_url  = htmlspecialchars(upload_url('repair_jobs', $img['file_name'], $job_id));
           $can_edit = repair_photo_editable((int)$img['uploaded_by'], $job['status']);
           $shown    = (int)$img['show_client'] === 1;
         ?>
-        <div class="rp-photo" data-image-id="<?= (int)$img['image_id'] ?>" style="position:relative;border-radius:10px;overflow:hidden;border:1px solid <?= $shown ? 'var(--gold-muted)' : 'var(--border)' ?>;aspect-ratio:4/3;background:var(--bg-2);">
-          <img src="<?= $img_url ?>" alt="Vehicle photo" loading="lazy"
-            style="width:100%;height:100%;object-fit:cover;cursor:pointer;transition:opacity 0.15s;"
-            onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'"
-            onclick="openLightbox('<?= $img_url ?>')"/>
-          <span class="rp-badge" style="position:absolute;top:0.35rem;left:0.35rem;display:inline-flex;align-items:center;gap:0.25rem;padding:0.15rem 0.45rem;border-radius:6px;font-size:0.62rem;font-weight:700;<?= $shown ? 'background:rgba(212,160,23,0.92);color:#1C1A17;' : 'background:rgba(0,0,0,0.55);color:#fff;' ?>">
-            <?= icon($shown ? 'eye' : 'lock-closed', 10) ?> <?= $shown ? 'Shown to client' : 'Private' ?>
-          </span>
+        <div class="rp-photo<?= $shown ? ' is-shown' : '' ?>" data-image-id="<?= (int)$img['image_id'] ?>">
+          <img src="<?= $img_url ?>" alt="Vehicle photo" loading="lazy" onclick="openLightbox('<?= $img_url ?>')"/>
+          <span class="rp-badge"><?= icon($shown ? 'eye' : 'lock-closed', 10) ?> <?= $shown ? 'Shown to client' : 'Private' ?></span>
           <?php if ($can_edit): ?>
-          <div style="position:absolute;top:0.35rem;right:0.35rem;display:flex;gap:0.3rem;">
+          <div class="rp-tools">
             <form method="POST">
               <?= csrf_field() ?>
               <input type="hidden" name="action" value="toggle_photo"/>
               <input type="hidden" name="image_id" value="<?= (int)$img['image_id'] ?>"/>
               <input type="hidden" name="show" value="<?= $shown ? '0' : '1' ?>"/>
-              <button type="submit" class="rp-toggle" title="<?= $shown ? 'Hide from the client' : 'Show to the client' ?>" aria-label="<?= $shown ? 'Hide from the client' : 'Show to the client' ?>"
-                style="background:rgba(0,0,0,0.6);border:none;border-radius:6px;padding:0.25rem 0.4rem;cursor:pointer;color:#fff;display:flex;align-items:center;">
+              <button type="submit" class="rp-tool rp-toggle" title="<?= $shown ? 'Hide from the client' : 'Show to the client' ?>" aria-label="<?= $shown ? 'Hide from the client' : 'Show to the client' ?>">
                 <?= icon($shown ? 'lock-closed' : 'eye', 12) ?>
               </button>
             </form>
@@ -574,15 +570,14 @@ document.addEventListener('DOMContentLoaded', function() {
               <?= csrf_field() ?>
               <input type="hidden" name="action" value="delete_image"/>
               <input type="hidden" name="image_id" value="<?= (int)$img['image_id'] ?>"/>
-              <button type="button" onclick="confirmDeleteImg(this)" aria-label="Delete photo"
-                style="background:rgba(192,57,43,0.85);border:none;border-radius:6px;padding:0.25rem 0.4rem;cursor:pointer;color:#fff;display:flex;align-items:center;">
+              <button type="button" class="rp-tool danger" onclick="confirmDeleteImg(this)" aria-label="Delete photo">
                 <?= icon('trash', 12) ?>
               </button>
             </form>
           </div>
           <?php endif; ?>
-          <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.55);padding:0.25rem 0.5rem;font-size:0.65rem;color:rgba(255,255,255,0.9);">
-            <?php if ($img['caption'] !== null && $img['caption'] !== ''): ?><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><?= htmlspecialchars($img['caption']) ?></div><?php endif; ?>
+          <div class="rp-cap">
+            <?php if ($img['caption'] !== null && $img['caption'] !== ''): ?><div><?= htmlspecialchars($img['caption']) ?></div><?php endif; ?>
             <?= date('M d, Y', strtotime($img['uploaded_at'])) ?>
           </div>
         </div>
@@ -593,7 +588,7 @@ document.addEventListener('DOMContentLoaded', function() {
   </div>
 
   <!-- ADDITIONAL REMARKS -->
-  <div class="card" style="margin-bottom:0;">
+  <div class="card rv-card">
     <div class="card-header">
       <div class="card-icon"><?= icon('document', 16) ?></div>
       <div>
@@ -601,21 +596,16 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="card-sub">Notes added upon inspection</div>
       </div>
     </div>
-    <div style="padding:1rem 1.25rem;">
-      <?php if (in_array($role, ['admin','super_admin','mechanic'])): ?>
-      <form method="POST" style="display:flex;flex-direction:column;gap:0.75rem;">
+    <div class="rv-body">
+      <form method="POST">
         <?= csrf_field() ?>
         <input type="hidden" name="action" value="update_notes"/>
-        <textarea name="additional_damages" rows="4" maxlength="<?= MAX_NOTE ?>"
-          style="width:100%;padding:0.65rem 0.85rem;border:1px solid var(--border);border-radius:10px;background:var(--bg-2);color:var(--text-primary);font-size:0.82rem;resize:vertical;font-family:inherit;"
+        <textarea name="additional_damages" rows="4" maxlength="<?= MAX_NOTE ?>" class="rv-notes"
           placeholder="Additional damages upon inspection..."><?= htmlspecialchars($job['additional_damages'] ?? '') ?></textarea>
-        <div style="display:flex;justify-content:flex-end;">
+        <div class="rv-notes-actions">
           <button type="submit" class="btn-sm-gold"><?= icon('check', 13) ?> Save Notes</button>
         </div>
       </form>
-      <?php else: ?>
-      <p style="font-size:0.82rem;color:var(--text-secondary);white-space:pre-wrap;"><?= $job['additional_damages'] ? htmlspecialchars($job['additional_damages']) : '<span style="color:var(--text-muted);">No remarks.</span>' ?></p>
-      <?php endif; ?>
     </div>
   </div>
 
@@ -623,9 +613,8 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 <!-- LIGHTBOX -->
-<div id="img-lightbox" onclick="closeLightbox()"
-  style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:2000;align-items:center;justify-content:center;cursor:zoom-out;">
-  <img src="" alt="Vehicle photo" style="max-width:92vw;max-height:88vh;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.6);"/>
+<div id="img-lightbox" onclick="closeLightbox()">
+  <img src="" alt="Vehicle photo"/>
 </div>
 
 <!-- STATUS UPDATE MODAL -->
@@ -762,6 +751,19 @@ async function saveSignature() {
   }
 }
 
+// ── Inspection: pointing at a part on the car lights up its entry in the list, and the other way round ──
+document.querySelectorAll('#inspection-card [data-key]').forEach(function (item) {
+  var key = item.dataset.key;
+  var parts = document.querySelectorAll('#inspection-card [data-panel="' + key + '"]');
+  var set = function (on) { item.classList.toggle('hot', on); parts.forEach(function (p) { p.classList.toggle('hot', on); }); };
+  item.addEventListener('mouseenter', function () { set(true); });
+  item.addEventListener('mouseleave', function () { set(false); });
+  parts.forEach(function (p) {
+    p.addEventListener('mouseenter', function () { set(true); });
+    p.addEventListener('mouseleave', function () { set(false); });
+  });
+});
+
 // ── Lightbox ──
 function openLightbox(src) {
   let lb = document.getElementById('img-lightbox');
@@ -781,8 +783,7 @@ function confirmDeleteImg(btn) {
     text: 'This photo will be permanently deleted.',
     icon: 'warning',
     showCancelButton: true,
-    confirmButtonColor: '#C0392B',
-    cancelButtonColor: '#6B7280',
+    confirmButtonColor: 'var(--danger)',
     confirmButtonText: 'Yes, remove',
   }).then(async r => { if (r.isConfirmed) { const ok = await requirePin(); if (ok) form.submit(); } });
 }

@@ -7,6 +7,7 @@ require_once '../../config/access.php';
 require_once '../../includes/icons.php';
 require_once '../../includes/pagination.php';
 require_once '../../includes/lookups.php';
+require_once '../../includes/list_toolbar.php';
 
 require_role(['admin', 'super_admin']);
 
@@ -28,6 +29,7 @@ require_once '../../includes/navbar.php';
 ?>
 
 <link rel="stylesheet" href="../../assets/css/shared/claims_list.css?v=<?= filemtime(__DIR__ . '/../../assets/css/shared/claims_list.css') ?>"/>
+<?= lt_css() ?>
 <style>
 /* Row details open on hover — desktop only (same as Client Records / Renewal Tracking). Touch screens have
    no real :hover, so phones/tablets (<=768px) keep tap-to-expand from the global handler in footer.php. */
@@ -66,34 +68,25 @@ require_once '../../includes/topbar.php';
     </script>
     <?php endif; ?>
 
-    <!-- TOOLBAR -->
-    <form method="GET" action="" style="margin-bottom:1rem;">
-      <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
-        <div style="position:relative;flex:1;min-width:200px;max-width:360px;">
-          <span style="position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;"><?= icon('magnifying-glass',14) ?></span>
-          <input type="text" name="search" placeholder="Search by client ID, name, plate, policy, vehicle..."
-            value="<?= htmlspecialchars($search) ?>" class="filter-input" style="padding-left:2.4rem;width:100%;"/>
-        </div>
-        <select name="status" class="filter-input" style="min-width:210px;">
-          <option value="all" <?= $filter_status === 'all' ? 'selected' : '' ?>>All Statuses</option>
-          <?php foreach (claim_statuses() as $key => $st): ?>
-          <option value="<?= $key ?>" <?= $filter_status === $key ? 'selected' : '' ?>><?= htmlspecialchars($st['label']) ?></option>
-          <?php endforeach; ?>
-        </select>
-        <select name="type" class="filter-input" style="min-width:160px;">
-          <option value="all"   <?= $filter_type==='all'?'selected':'' ?>>All Types</option>
-          <?php foreach (claim_types_all($conn) as $ct): ?>
-          <option value="<?= htmlspecialchars($ct['code']) ?>" <?= $filter_type === $ct['code'] ? 'selected' : '' ?>><?= htmlspecialchars($ct['label']) ?></option>
-          <?php endforeach; ?>
-        </select>
-        <select name="sort" class="filter-input" style="min-width:140px;">
-          <option value="newest" <?= $sort_by==='newest'?'selected':'' ?>>Newest First</option>
-          <option value="oldest" <?= $sort_by==='oldest'?'selected':'' ?>>Oldest First</option>
-        </select>
-        <button type="submit" class="btn-primary"><?= icon('magnifying-glass',14) ?> Search</button>
-        <?php if ($search || $filter_status !== 'all' || $filter_type !== 'all' || $sort_by !== 'newest'): ?>
-        <a href="claims_list.php" class="btn-ghost"><?= icon('x-mark',14) ?> Clear</a>
-        <?php endif; ?>
+    <!-- TOOLBAR (shared look: assets/css/shared/list_toolbar.css) -->
+    <form method="GET" action="" class="list-toolbar claims-toolbar">
+      <?= lt_search($search, 'Search by client ID, name, plate, policy, vehicle...', 'Search claims') ?>
+      <div class="lt-filters">
+        <?php
+        $status_opts = ['all' => 'All'];
+        foreach (claim_statuses() as $key => $st) $status_opts[$key] = $st['label'];
+        $type_opts = ['all' => 'All'];
+        foreach (claim_types_all($conn) as $ct) $type_opts[$ct['code']] = $ct['label'];
+        echo lt_pill('status', 'Status', $status_opts, $filter_status, 'all');
+        echo lt_pill('type', 'Type', $type_opts, $filter_type, 'all');
+        echo lt_pill('sort', 'Sort', ['newest' => 'Newest', 'oldest' => 'Oldest'], $sort_by, 'newest');
+        ?>
+      </div>
+      <?php if ($search || $filter_status !== 'all' || $filter_type !== 'all' || $sort_by !== 'newest'): ?>
+      <?= lt_clear('claims_list.php') ?>
+      <?php endif; ?>
+      <div class="lt-actions">
+        <a href="add_claim.php" class="btn-primary"><?= icon('plus', 14) ?> File New Claim</a>
       </div>
     </form>
 
@@ -104,9 +97,6 @@ require_once '../../includes/topbar.php';
         <div>
           <div class="card-title">All Claims</div>
           <div class="card-sub"><?= paginate_summary($pg) ?></div>
-        </div>
-        <div style="margin-left:auto;">
-          <a href="add_claim.php" class="btn-primary"><?= icon('plus',14) ?> File New Claim</a>
         </div>
       </div>
 
@@ -240,6 +230,7 @@ require_once '../../includes/topbar.php';
   <input type="hidden" name="delete_claim" value="1"/>
 </form>
 <script src="../../assets/js/shared/claims_list.js?v=<?= filemtime(__DIR__.'/../../assets/js/shared/claims_list.js') ?>"></script>
+<?= lt_js() ?>
 <script>
 document.querySelectorAll('form[method="GET"] select[name="status"], form[method="GET"] select[name="type"], form[method="GET"] select[name="sort"]').forEach(function (select) {
   select.addEventListener('change', function () {

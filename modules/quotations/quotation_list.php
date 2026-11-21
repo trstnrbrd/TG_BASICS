@@ -8,6 +8,7 @@ require_once '../../config/access.php';
 require_once '../../config/transaction_pin.php';
 require_once '../../includes/pagination.php';
 require_once '../../includes/transaction.php';
+require_once '../../includes/list_toolbar.php';
 
 require_role(['admin', 'super_admin', 'mechanic']);
 $is_admin = is_staff();
@@ -35,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     exit;
 }
 
-// ── FILTERS ── (same layout as the repair list: search, status dropdown, newest / oldest)
+// ── FILTERS ── (search, status, newest / oldest; the shared list toolbar)
 $filter  = san_enum($_GET['status'] ?? 'all', array_merge(['all'], array_keys(quotation_statuses())));
 $search  = validate_search(san_str($_GET['search'] ?? '', MAX_SEARCH));
 $sort_by = san_enum($_GET['sort'] ?? 'newest', ['newest', 'oldest']);
@@ -48,7 +49,7 @@ $service_labels = service_type_labels($conn);   // service_types table (includes
 $page_title  = 'Quotations & Receipts';
 $active_page = 'quotations';
 $base_path   = '../../';
-$extra_css   = '<link rel="stylesheet" href="../../assets/css/shared/quotations.css?v=' . filemtime(__DIR__ . '/../../assets/css/shared/quotations.css') . '"/>';
+$extra_css   = '<link rel="stylesheet" href="../../assets/css/shared/quotations.css?v=' . filemtime(__DIR__ . '/../../assets/css/shared/quotations.css') . '"/>' . lt_css();
 require_once '../../includes/header.php';
 require_once '../../includes/navbar.php';
 ?>
@@ -77,43 +78,34 @@ document.addEventListener('DOMContentLoaded',function(){
 </script>
 <?php endif; ?>
 
-<!-- FILTERS (same layout as the repair list) -->
-<form method="GET" action="" class="rl-filter-form" style="margin-bottom:1rem;">
-  <div class="rl-filter-inner" style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
-    <div class="rl-filter-search" style="position:relative;flex:1;min-width:200px;max-width:360px;">
-      <span style="position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;"><?= icon('magnifying-glass', 14) ?></span>
-      <input type="text" name="search" class="filter-input"
-        placeholder="Search client ID, client, plate, quotation #..."
-        value="<?= htmlspecialchars($search) ?>" style="padding-left:2.4rem;width:100%;"/>
-    </div>
-    <select name="status" class="filter-input rl-filter-status" style="width:170px;">
-      <option value="all" <?= $filter === 'all' ? 'selected' : '' ?>>All Statuses</option>
-      <?php foreach (quotation_statuses() as $key => $st): ?>
-      <option value="<?= htmlspecialchars($key) ?>" <?= $filter === $key ? 'selected' : '' ?>><?= htmlspecialchars($st['label']) ?></option>
-      <?php endforeach; ?>
-    </select>
-    <select name="sort" class="filter-input rl-filter-sort" style="width:140px;">
-      <option value="newest" <?= $sort_by === 'newest' ? 'selected' : '' ?>>Newest First</option>
-      <option value="oldest" <?= $sort_by === 'oldest' ? 'selected' : '' ?>>Oldest First</option>
-    </select>
-    <button type="submit" class="btn-primary rl-filter-btn"><?= icon('magnifying-glass', 14) ?> Search</button>
-    <?php if ($search !== '' || $filter !== 'all' || $sort_by !== 'newest'): ?>
-    <a href="quotation_list.php" class="btn-ghost rl-filter-clear"><?= icon('x-mark', 14) ?> Clear</a>
-    <?php endif; ?>
+<!-- TOOLBAR (shared look: assets/css/shared/list_toolbar.css). Quotations are made from a repair job, so the
+     right side links there instead of an "add" button. -->
+<form method="GET" action="" class="list-toolbar quotation-toolbar">
+  <?= lt_search($search, 'Search client ID, client, plate, quotation #...', 'Search quotations') ?>
+  <div class="lt-filters">
+    <?php
+    $status_opts = ['all' => 'All'];
+    foreach (quotation_statuses() as $key => $st) $status_opts[$key] = $st['label'];
+    echo lt_pill('status', 'Status', $status_opts, $filter, 'all');
+    echo lt_pill('sort', 'Sort', ['newest' => 'Newest', 'oldest' => 'Oldest'], $sort_by, 'newest');
+    ?>
+  </div>
+  <?php if ($search !== '' || $filter !== 'all' || $sort_by !== 'newest'): ?>
+  <?= lt_clear('quotation_list.php') ?>
+  <?php endif; ?>
+  <div class="lt-actions">
+    <a href="../repair/repair_list.php" class="btn-ghost"><?= icon('wrench', 14) ?> Repair Jobs</a>
   </div>
 </form>
 
 <!-- TABLE -->
 <div class="card">
-  <div class="card-header" style="justify-content:space-between;">
-    <div style="display:flex;align-items:center;gap:0.75rem;">
-      <div class="card-icon"><?= icon('receipt', 16) ?></div>
-      <div>
-        <div class="card-title">Quotations</div>
-        <div class="card-sub"><?= paginate_summary($pg) ?></div>
-      </div>
+  <div class="card-header">
+    <div class="card-icon"><?= icon('receipt', 16) ?></div>
+    <div>
+      <div class="card-title">Quotations</div>
+      <div class="card-sub"><?= paginate_summary($pg) ?></div>
     </div>
-    <a href="../repair/repair_list.php" class="btn-sm-gold"><?= icon('wrench', 12) ?> Repair Jobs</a>
   </div>
 
   <?php if ($rows): ?>
@@ -197,11 +189,6 @@ document.addEventListener('DOMContentLoaded',function(){
   <input type="hidden" name="quotation_id" id="delete-qt-id"/>
 </form>
 <script>
-document.querySelectorAll('.rl-filter-form select[name="status"], .rl-filter-form select[name="sort"]').forEach(function (select) {
-  select.addEventListener('change', function () {
-    this.form.submit();
-  });
-});
 document.querySelectorAll('.btn-delete-qt').forEach(btn => {
   btn.addEventListener('click', function () {
     const id  = this.dataset.id;
@@ -227,9 +214,7 @@ document.querySelectorAll('.btn-delete-qt').forEach(btn => {
 });
 </script>
 <?php
-$footer_scripts = '';
-if (!empty($_GET['success'])) {
-    $footer_scripts = 'Swal.fire({toast:true,position:"top-end",icon:"success",titleText:' . json_encode($_GET['success']) . ',showConfirmButton:false,timer:3000,timerProgressBar:true});';
-}
+// (the success toast is shown once, near the top of the page)
+$footer_extra_scripts = ($footer_extra_scripts ?? '') . lt_js();
 require_once '../../includes/footer.php';
 ?>

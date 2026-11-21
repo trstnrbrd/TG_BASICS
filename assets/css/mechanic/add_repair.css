@@ -1,14 +1,8 @@
 /* ── New Repair Job: Unit Inspection ──
    Car (top view) on the left, areas by sector on the right; one column below 960px.
+   The car itself (shapes, colours, legend) is shared with View Repair Job: assets/css/shared/repair_car.css.
    Every colour goes through a theme variable so all themes (and dark mode) get their own. */
 .insp-wrap {
-  --glass: color-mix(in srgb, var(--info) 22%, var(--bg-2));
-  --lamp-front: color-mix(in srgb, var(--warning) 30%, var(--bg-2));
-  --lamp-rear: color-mix(in srgb, var(--danger) 30%, var(--bg-2));
-  --tire: color-mix(in srgb, var(--text-primary) 62%, var(--bg-2));
-  --minor-fill: color-mix(in srgb, var(--warning) 38%, var(--bg-2));
-  --major-fill: color-mix(in srgb, var(--danger) 40%, var(--bg-2));
-  --hot-fill: color-mix(in srgb, var(--gold) 22%, var(--bg-2));
   display: grid;
   grid-template-columns: minmax(250px, 340px) minmax(0, 1fr);
   gap: 1.5rem;
@@ -30,105 +24,6 @@
   border-radius: 14px;
   padding: 0.75rem 0.5rem;
 }
-.car-svg {
-  display: block;
-  width: 100%;
-  max-width: 320px;
-  height: auto;
-  margin: 0 auto;
-  overflow: visible;
-}
-.sector-lbl {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 1.2px;
-  fill: var(--text-muted);
-  text-anchor: middle;
-}
-.car-body {
-  fill: var(--bg-3);
-  stroke: var(--text-muted);
-  stroke-width: 1.6;
-}
-.car-roof {
-  fill: var(--bg-2);
-  stroke: var(--border);
-  stroke-width: 1.2;
-}
-.car-glass {
-  fill: var(--glass);
-  stroke: var(--border);
-  stroke-width: 1.2;
-  opacity: 0.75;
-}
-.panel {
-  fill: var(--bg-2);
-  stroke: var(--text-muted);
-  stroke-width: 1.4;
-  cursor: pointer;
-  outline: none;
-  transition: fill 0.15s, stroke 0.15s, stroke-width 0.15s;
-}
-.panel.glass { fill: var(--glass); }
-.panel.lamp-front { fill: var(--lamp-front); }
-.panel.lamp-rear { fill: var(--lamp-rear); }
-.panel.tire { fill: var(--tire); stroke: var(--tire); }
-.panel:hover,
-.panel.hot,
-.panel.open {
-  fill: var(--hot-fill);
-  stroke: var(--gold);
-  stroke-width: 2.4;
-}
-.panel:focus-visible {
-  stroke: var(--gold);
-  stroke-width: 3;
-}
-.panel.minor { fill: var(--minor-fill); stroke: var(--warning); stroke-width: 2.2; }
-.panel.major { fill: var(--major-fill); stroke: var(--danger); stroke-width: 2.4; }
-.panel.minor:hover, .panel.minor.hot, .panel.minor.open,
-.panel.major:hover, .panel.major.hot, .panel.major.open { stroke: var(--gold); stroke-width: 3; }
-.panel title { display: none; }
-
-.pin { pointer-events: none; }
-.pin circle {
-  fill: var(--bg);
-  stroke: var(--text-muted);
-  stroke-width: 1.2;
-}
-.pin text {
-  font-size: 9.5px;
-  font-weight: 700;
-  fill: var(--text-secondary);
-  text-anchor: middle;
-}
-.pin.minor circle { fill: var(--warning); stroke: var(--warning); }
-.pin.major circle { fill: var(--danger); stroke: var(--danger); }
-.pin.minor text, .pin.major text { fill: var(--bg); }
-
-.insp-legend {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.5rem;
-}
-.legend-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.74rem;
-  color: var(--text-secondary);
-}
-.legend-chip::before {
-  content: "";
-  width: 0.8rem;
-  height: 0.8rem;
-  border-radius: 4px;
-  border: 1.5px solid var(--text-muted);
-  background: var(--bg-2);
-}
-.legend-chip.minor::before { background: var(--minor-fill); border-color: var(--warning); }
-.legend-chip.major::before { background: var(--major-fill); border-color: var(--danger); }
 
 /* ── list by sector ── */
 .insp-list-col {

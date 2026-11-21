@@ -6,6 +6,7 @@ require_once '../../config/validators.php';
 require_once '../../config/access.php';
 require_once '../../includes/pagination.php';
 require_once '../../includes/billing.php';
+require_once '../../includes/list_toolbar.php';
 
 require_role(['admin', 'super_admin']);
 
@@ -25,7 +26,7 @@ $docs_got = billing_docs_received($conn, array_column($rows, 'billing_id'));
 $page_title  = 'Billing';
 $active_page = 'billing';
 $base_path   = '../../';
-$extra_css   = '<link rel="stylesheet" href="../../assets/css/shared/billing.css?v=' . @filemtime(__DIR__ . '/../../assets/css/shared/billing.css') . '"/>';
+$extra_css   = '<link rel="stylesheet" href="../../assets/css/shared/billing.css?v=' . @filemtime(__DIR__ . '/../../assets/css/shared/billing.css') . '"/>' . lt_css();
 require_once '../../includes/header.php';
 require_once '../../includes/navbar.php';
 ?>
@@ -48,39 +49,24 @@ require_once '../../includes/topbar.php';
     </script>
     <?php endif; ?>
 
-    <!-- FILTERS -->
-    <form method="GET" action="" style="margin-bottom:1rem;">
-      <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
-        <div style="position:relative;flex:1;width:100%;min-width:200px;max-width:360px;">
-          <span style="position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;"><?= icon('magnifying-glass', 14) ?></span>
-          <input type="text" name="search" class="filter-input"
-            placeholder="Search by billing #, client ID, client, plate, or insurer..."
-            value="<?= htmlspecialchars($search) ?>" style="padding-left:2.4rem;width:100%;"/>
-        </div>
-        <select name="status" class="filter-input" style="width:150px;">
-          <option value="all" <?= $filter_status === 'all' ? 'selected' : '' ?>>All Statuses</option>
-          <?php foreach (billing_statuses_all($conn) as $st): ?>
-          <option value="<?= htmlspecialchars($st['code']) ?>" <?= $filter_status === $st['code'] ? 'selected' : '' ?>><?= htmlspecialchars($st['label']) ?></option>
-          <?php endforeach; ?>
-        </select>
-        <select name="sort" class="filter-input" style="width:145px;">
-          <option value="newest" <?= $sort_by==='newest'?'selected':'' ?>>Newest First</option>
-          <option value="oldest" <?= $sort_by==='oldest'?'selected':'' ?>>Oldest First</option>
-        </select>
-        <button type="submit" class="btn-primary"><?= icon('magnifying-glass', 14) ?> Search</button>
-        <?php if ($search !== '' || $filter_status !== 'all'): ?>
-        <a href="billing_list.php" class="btn-ghost"><?= icon('x-mark', 14) ?> Clear</a>
-        <?php endif; ?>
+    <!-- TOOLBAR (shared look: assets/css/shared/list_toolbar.css) -->
+    <form method="GET" action="" class="list-toolbar billing-toolbar">
+      <?= lt_search($search, 'Search by billing #, client ID, client, plate or insurer...', 'Search billing records') ?>
+      <div class="lt-filters">
+        <?php
+        $status_opts = ['all' => 'All'];
+        foreach (billing_statuses_all($conn) as $st) $status_opts[$st['code']] = $st['label'];
+        echo lt_pill('status', 'Status', $status_opts, $filter_status, 'all');
+        echo lt_pill('sort', 'Sort', ['newest' => 'Newest', 'oldest' => 'Oldest'], $sort_by, 'newest');
+        ?>
+      </div>
+      <?php if ($search !== '' || $filter_status !== 'all' || $sort_by !== 'newest'): ?>
+      <?= lt_clear('billing_list.php') ?>
+      <?php endif; ?>
+      <div class="lt-actions">
+        <a href="add_billing.php" class="btn-primary"><?= icon('plus', 14) ?> New Billing</a>
       </div>
     </form>
-
-    <script>
-    document.querySelectorAll('form[method="GET"] select[name="status"], form[method="GET"] select[name="sort"]').forEach(function (select) {
-      select.addEventListener('change', function () {
-        this.form.submit();
-      });
-    });
-    </script>
 
     <!-- TABLE -->
     <div class="card">
@@ -89,9 +75,6 @@ require_once '../../includes/topbar.php';
         <div>
           <div class="card-title">Billing Records</div>
           <div class="card-sub"><?= paginate_summary($pg) ?></div>
-        </div>
-        <div style="margin-left:auto;">
-          <a href="add_billing.php" class="btn-primary"><?= icon('plus', 14) ?> New Billing</a>
         </div>
       </div>
 
@@ -172,4 +155,4 @@ require_once '../../includes/topbar.php';
   </div>
 </div>
 
-<?php require_once '../../includes/footer.php'; ?>
+<?php $footer_extra_scripts = ($footer_extra_scripts ?? '') . lt_js(); require_once '../../includes/footer.php'; ?>

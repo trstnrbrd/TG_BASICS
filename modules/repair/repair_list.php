@@ -8,6 +8,7 @@ require_once '../../config/access.php';
 require_once '../../includes/pagination.php';
 require_once '../../includes/transaction.php';
 require_once '../../config/transaction_pin.php';
+require_once '../../includes/list_toolbar.php';
 
 require_role(['admin', 'super_admin', 'mechanic']);
 
@@ -48,7 +49,7 @@ $service_labels = service_type_labels($conn);   // service_types table (includes
 $page_title  = 'Repair Jobs';
 $active_page = 'repair';
 $base_path   = '../../';
-$extra_css   = '<link rel="stylesheet" href="../../assets/css/mechanic/repair_list.css?v=' . filemtime(__DIR__ . '/../../assets/css/mechanic/repair_list.css') . '"/>';
+$extra_css   = '<link rel="stylesheet" href="../../assets/css/mechanic/repair_list.css?v=' . filemtime(__DIR__ . '/../../assets/css/mechanic/repair_list.css') . '"/>' . lt_css();
 require_once '../../includes/header.php';
 require_once '../../includes/navbar.php';
 ?>
@@ -79,29 +80,22 @@ require_once '../../includes/topbar.php';
     </script>
     <?php endif; ?>
 
-    <!-- FILTERS -->
-    <form method="GET" action="" class="rl-filter-form" style="margin-bottom:1rem;">
-      <div class="rl-filter-inner" style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
-        <div class="rl-filter-search" style="position:relative;flex:1;min-width:200px;max-width:360px;">
-          <span style="position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;"><?= icon('magnifying-glass', 14) ?></span>
-          <input type="text" name="search" class="filter-input"
-            placeholder="Search by client ID, client, plate, or Repair ID..."
-            value="<?= htmlspecialchars($search) ?>" style="padding-left:2.4rem;width:100%;"/>
-        </div>
-        <select name="status" class="filter-input rl-filter-status" style="width:160px;">
-          <option value="all" <?= $filter_status === 'all' ? 'selected' : '' ?>>All Statuses</option>
-          <?php foreach (repair_statuses() as $key => $st): ?>
-          <option value="<?= $key ?>" <?= $filter_status === $key ? 'selected' : '' ?>><?= htmlspecialchars($st['label']) ?></option>
-          <?php endforeach; ?>
-        </select>
-        <select name="sort" class="filter-input rl-filter-sort" style="width:140px;">
-          <option value="newest" <?= $sort_by === 'newest' ? 'selected' : '' ?>>Newest First</option>
-          <option value="oldest" <?= $sort_by === 'oldest' ? 'selected' : '' ?>>Oldest First</option>
-        </select>
-        <button type="submit" class="btn-primary rl-filter-btn"><?= icon('magnifying-glass', 14) ?> Search</button>
-        <?php if ($search !== '' || $filter_status !== 'all'): ?>
-        <a href="repair_list.php" class="btn-ghost rl-filter-clear"><?= icon('x-mark', 14) ?> Clear</a>
-        <?php endif; ?>
+    <!-- TOOLBAR (shared look: assets/css/shared/list_toolbar.css) -->
+    <form method="GET" action="" class="list-toolbar repair-toolbar">
+      <?= lt_search($search, 'Search by client ID, client, plate or Repair ID...', 'Search repair jobs') ?>
+      <div class="lt-filters">
+        <?php
+        $status_opts = ['all' => 'All'];
+        foreach (repair_statuses() as $key => $st) $status_opts[$key] = $st['label'];
+        echo lt_pill('status', 'Status', $status_opts, $filter_status, 'all');
+        echo lt_pill('sort', 'Sort', ['newest' => 'Newest', 'oldest' => 'Oldest'], $sort_by, 'newest');
+        ?>
+      </div>
+      <?php if ($search !== '' || $filter_status !== 'all' || $sort_by !== 'newest'): ?>
+      <?= lt_clear('repair_list.php') ?>
+      <?php endif; ?>
+      <div class="lt-actions">
+        <a href="add_repair.php" class="btn-primary"><?= icon('plus', 14) ?> New Repair Job</a>
       </div>
     </form>
 
@@ -112,9 +106,6 @@ require_once '../../includes/topbar.php';
         <div>
           <div class="card-title">Repair Jobs</div>
           <div class="card-sub"><?= paginate_summary($pg, 'job') ?></div>
-        </div>
-        <div style="margin-left:auto;">
-          <a href="add_repair.php" class="btn-primary"><?= icon('plus', 14) ?> New Repair Job</a>
         </div>
       </div>
 
@@ -223,4 +214,4 @@ document.querySelectorAll('.rl-filter-form select[name="status"], .rl-filter-for
   });
 });
 </script>
-<?php require_once '../../includes/footer.php'; ?>
+<?php $footer_extra_scripts = ($footer_extra_scripts ?? '') . lt_js(); require_once '../../includes/footer.php'; ?>

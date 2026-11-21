@@ -1,0 +1,217 @@
+/* ── List toolbar: the one search / filter / actions row every list page uses (2026-11-21) ──
+   One row: [main filter] [search with its own go button] [filter pills] [Clear] ··· [primary action] [⋯ More]
+   Pills submit on change (list_toolbar.js); secondary actions live in the ⋯ menu so the row stays calm.
+   Markup: <form class="list-toolbar"> … see modules/clients/client_list.php. Every colour is a theme variable. */
+.list-toolbar {
+  --lt-h: 2.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.list-toolbar .cl-agent-btn { height: var(--lt-h); padding-top: 0; padding-bottom: 0; }
+.list-toolbar .btn-primary,
+.list-toolbar .btn-ghost { height: var(--lt-h); white-space: nowrap; }
+
+/* search: the go button sits inside the box */
+.lt-search {
+  position: relative;
+  flex: 1 1 16rem;
+  max-width: 26rem;
+  min-width: 0;
+}
+.lt-search-icon {
+  position: absolute;
+  left: 0.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  color: var(--text-muted);
+  pointer-events: none;
+  z-index: 1;
+}
+.lt-search input {
+  width: 100%;
+  height: var(--lt-h);
+  padding: 0 2.9rem 0 2.4rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-3);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.82rem;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.lt-search input::placeholder { color: var(--text-muted); }
+.lt-search input:focus {
+  border-color: var(--gold-bright);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 14%, transparent);
+}
+.lt-go {
+  position: absolute;
+  right: 0.3rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1.95rem;
+  height: 1.95rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 7px;
+  background: var(--text-primary);
+  color: var(--bg);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.lt-go:hover,
+.lt-go:focus-visible { background: var(--gold); color: var(--on-gold); outline: none; }
+
+/* filter pills: a label + a real <select> */
+.lt-filters {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.lt-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: var(--lt-h);
+  padding-left: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  background: var(--bg-3);
+  font-size: 0.78rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.lt-pill:hover { border-color: var(--gold-muted, var(--gold)); }
+.lt-pill:focus-within { border-color: var(--gold-bright); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 14%, transparent); }
+.lt-pill > span { color: var(--text-muted); font-weight: 500; }
+.lt-pill select {
+  appearance: none;
+  border: 0;
+  outline: none;
+  height: 100%;
+  padding: 0 1.75rem 0 0.35rem;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.lt-pill::after {
+  content: "";
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  width: 0.38rem;
+  height: 0.38rem;
+  border-right: 1.5px solid var(--text-muted);
+  border-bottom: 1.5px solid var(--text-muted);
+  transform: translateY(-70%) rotate(45deg);
+  pointer-events: none;
+}
+.lt-pill select option { color: var(--text-primary); background: var(--bg-2); }
+/* a filter moved off its default reads as "on" */
+.lt-pill.is-set { border-color: var(--gold); background: var(--gold-pale); }
+.lt-pill.is-set > span { color: var(--gold); }
+
+.lt-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0 0.35rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.lt-clear:hover { color: var(--danger); }
+
+/* actions, pushed right */
+.lt-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.lt-more { position: relative; }
+.lt-more-btn {
+  width: var(--lt-h);
+  height: var(--lt-h);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-3);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.lt-more-btn:hover,
+.lt-more.open .lt-more-btn { border-color: var(--gold); color: var(--gold); }
+.lt-more-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 25%, transparent); }
+.lt-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 15.5rem;
+  padding: 0.35rem;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  z-index: 150;
+  animation: dropdownIn 0.18s ease forwards;
+}
+.lt-menu[hidden] { display: none; }
+.lt-menu a {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  color: var(--text-primary);
+  text-decoration: none;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.lt-menu a:hover,
+.lt-menu a:focus-visible { background: var(--gold-pale); outline: none; }
+.lt-menu a svg { color: var(--gold); flex-shrink: 0; margin-top: 0.1rem; }
+.lt-menu a small { display: block; font-size: 0.68rem; font-weight: 500; color: var(--text-muted); margin-top: 0.1rem; }
+
+/* ── laptop: filters drop to their own line before anything squeezes ── */
+@media (max-width: 1280px) {
+  .lt-search { max-width: none; }
+  .lt-filters { order: 3; }
+  .lt-clear { order: 4; }
+}
+
+/* ── phone: main filter + actions on top, full-width search, the pills sharing one row ── */
+@media (max-width: 768px) {
+  .list-toolbar { gap: 0.5rem; margin-bottom: 0.85rem; }
+  /* app.css stacks every "form > div" and stretches every form button on phones; not this row */
+  .content form.list-toolbar > div { flex-direction: row; }
+  .content form.list-toolbar .btn-primary,
+  .content form.list-toolbar .btn-ghost { width: auto; }
+  .list-toolbar .cl-agent-wrap { flex: 1 1 0; width: auto; min-width: 0; }
+  .lt-actions { order: 1; margin-left: 0; flex: 0 0 auto; }
+  .list-toolbar:not(:has(.cl-agent-wrap)) .lt-actions { flex: 1 1 100%; }
+  .list-toolbar:not(:has(.cl-agent-wrap)) .lt-actions .btn-primary { flex: 1; justify-content: center; }
+  .lt-search { order: 2; flex: 1 1 100%; }
+  /* the pills share one row evenly; a long choice shortens with an ellipsis */
+  .lt-filters { order: 3; flex: 1 1 100%; }
+  .lt-pill { flex: 1 1 0; min-width: 0; padding-left: 0.65rem; font-size: 0.74rem; }
+  .lt-pill select { flex: 1; min-width: 0; padding-right: 1.4rem; text-overflow: ellipsis; }
+  .lt-pill::after { right: 0.6rem; }
+  .lt-clear { order: 4; }
+}

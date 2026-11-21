@@ -61,14 +61,11 @@ require_once '../../includes/navbar.php';
 
 <link rel="stylesheet" href="../../assets/css/shared/clients.css?v=<?= filemtime(__DIR__ . '/../../assets/css/shared/clients.css') ?>"/>
 <link rel="stylesheet" href="../../assets/css/shared/agent_filter.css?v=<?= filemtime(__DIR__ . '/../../assets/css/shared/agent_filter.css') ?>"/>
+<link rel="stylesheet" href="../../assets/css/shared/list_toolbar.css?v=<?= filemtime(__DIR__ . '/../../assets/css/shared/list_toolbar.css') ?>"/>
 <style>
 @media (max-width: 768px) {
-  /* Phone layout, in the order a person uses it:
-       1. three numbers in one strip      2. whose clients      3. search (+ go)
-       4. three filters in one row        5. Add Client (+ Import)
-     The selectors are deliberately more specific than app.css's "stack every inline grid" rule and the old
-     clients.css block, which used to fight over this area (stat cards stacked full width, the toolbar wrapped
-     into an uneven pile). */
+  /* Phone: the three numbers in one strip. The toolbar below has its own phone layout (list_toolbar.css).
+     The selectors are deliberately more specific than app.css's "stack every inline grid" rule. */
   .content .client-stats-grid[style] {
     grid-template-columns: repeat(3, 1fr) !important;
     gap: 0.45rem !important;
@@ -90,36 +87,6 @@ require_once '../../includes/navbar.php';
     line-height: 1.25;
   }
 
-  .client-toolbar { margin-bottom: 0.85rem !important; }
-  .client-toolbar > div {
-    display: grid !important;
-    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
-    gap: 0.5rem !important;
-    align-items: stretch !important;
-  }
-  .client-toolbar > div > .cl-agent-wrap       { grid-column: 1 / -1; }
-  .client-toolbar > div > div:not(.cl-agent-wrap) { grid-column: span 5; max-width: none !important; min-width: 0 !important; }
-  .client-toolbar > div > button[type="submit"]   { grid-column: span 1; padding-left: 0; padding-right: 0; font-size: 0; gap: 0; }
-  .client-toolbar > div > button[type="submit"] svg { width: 18px; height: 18px; }
-  .client-toolbar > div > select                  { grid-column: span 2; font-size: 0.74rem; padding-left: 0.55rem; padding-right: 1.5rem; background-position: right 0.4rem center; text-overflow: ellipsis; }
-  .client-toolbar > div:not(:has(select[name="client_type"])) > select { grid-column: span 3; }  /* mechanics: two filters */
-  /* Clear: a slim text action, not a second full-size button */
-  .client-toolbar > div > a[href*="client_list"]  { grid-column: 1 / -1; min-height: 0; padding: 0.15rem 0; border: 0; background: none; box-shadow: none; color: var(--text-muted); font-size: 0.74rem; }
-  .client-toolbar-actions { display: contents; }
-  .client-toolbar > div > .client-toolbar-actions > a[href*="add_client"]    { grid-column: span 4; }
-  .client-toolbar > div > .client-toolbar-actions > a[href*="import_clients"] { grid-column: span 2; }
-  .client-toolbar > div > .client-toolbar-actions > a[href*="recently_deleted"] { grid-column: span 6; white-space: nowrap; }
-  .client-toolbar a, .client-toolbar button { justify-content: center; }
-}
-
-@media (min-width: 769px) {
-  .client-toolbar > div { gap: 0.6rem; }
-  .client-toolbar-actions {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.6rem;
-    margin-left: auto;
-  }
 }
 
 /* Row details open on hover, not click — no dead zone between the two <tr>s
@@ -195,66 +162,54 @@ require_once '../../includes/topbar.php';
       <?php endforeach; ?>
     </div>
 
-    <!-- TOOLBAR -->
-    <form method="GET" action="" class="client-toolbar" style="margin-bottom:1rem;">
-      <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
+    <!-- TOOLBAR (shared look: assets/css/shared/list_toolbar.css) -->
+    <?php
+    $pill = function (string $name, string $label, array $opts, string $cur, string $default) {
+        echo '<label class="lt-pill' . ($cur !== $default ? ' is-set' : '') . '"><span>' . $label . '</span><select name="' . $name . '" aria-label="' . $label . '">';
+        foreach ($opts as $v => $t) echo '<option value="' . $v . '"' . ($cur === $v ? ' selected' : '') . '>' . htmlspecialchars($t) . '</option>';
+        echo '</select></label>';
+    };
+    ?>
+    <form method="GET" action="" class="list-toolbar client-toolbar">
 
-        <!-- INSURANCE AGENT (opens on the signed-in agent's own clients; changing it applies right away) -->
-        <?php render_agent_filter($af, $base_path); ?>
+      <!-- INSURANCE AGENT (opens on the signed-in agent's own clients; changing it applies right away) -->
+      <?php render_agent_filter($af, $base_path); ?>
 
-        <!-- SEARCH INPUT with autocomplete -->
-        <div style="position:relative;flex:1;min-width:150px;max-width:400px;">
-          <span style="position:absolute;left:0.85rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;z-index:1;"><?= icon('magnifying-glass', 14) ?></span>
-          <input type="text" name="search" id="client-search-input"
-            placeholder="Search by client ID, name, plate..."
-            value="<?= htmlspecialchars($search) ?>"
-            class="filter-input" style="padding-left:2.4rem;width:100%;"
-            autocomplete="off"/>
-          <div id="client-ac-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:200;background:var(--bg-3);border:1px solid var(--gold-bright);border-radius:9px;box-shadow:var(--shadow-md);max-height:220px;overflow-y:auto;margin-top:2px;"></div>
-        </div>
-
-        <button type="submit" class="btn-primary"><?= icon('magnifying-glass', 14) ?> Search</button>
-
-        <!-- FILTER BY -->
-        <select name="filter_by" class="filter-input" style="min-width:120px;">
-          <option value="all"     <?= $filter_by === 'all' ? 'selected' : '' ?>>All Fields</option>
-          <option value="code"    <?= $filter_by === 'code' ? 'selected' : '' ?>>Client ID</option>
-          <option value="name"    <?= $filter_by === 'name' ? 'selected' : '' ?>>Name</option>
-          <option value="plate"   <?= $filter_by === 'plate' ? 'selected' : '' ?>>Plate Number</option>
-          <option value="contact" <?= $filter_by === 'contact' ? 'selected' : '' ?>>Contact</option>
-          <option value="email"   <?= $filter_by === 'email' ? 'selected' : '' ?>>Email</option>
-        </select>
-
-        <!-- CLIENT TYPE (mechanics are locked to Walk-in, so there's nothing to switch) -->
-        <?php if (!$is_mechanic): ?>
-        <select name="client_type" class="filter-input" style="min-width:125px;">
-          <option value="all"       <?= $filter_type === 'all'       ? 'selected' : '' ?>>All Types</option>
-          <option value="insurance" <?= $filter_type === 'insurance' ? 'selected' : '' ?>>Insurance</option>
-          <option value="walkin"    <?= $filter_type === 'walkin'    ? 'selected' : '' ?>>Walk-in</option>
-        </select>
-        <?php endif; ?>
-
-        <!-- SORT BY -->
-        <select name="sort" class="filter-input" style="min-width:135px;">
-          <option value="newest"   <?= $sort_by === 'newest' ? 'selected' : '' ?>>Newest First</option>
-          <option value="oldest"   <?= $sort_by === 'oldest' ? 'selected' : '' ?>>Oldest First</option>
-          <option value="name_asc" <?= $sort_by === 'name_asc' ? 'selected' : '' ?>>Name A–Z</option>
-          <option value="name_desc"<?= $sort_by === 'name_desc' ? 'selected' : '' ?>>Name Z–A</option>
-          <option value="vehicles" <?= $sort_by === 'vehicles' ? 'selected' : '' ?>>Most Vehicles</option>
-        </select>
-
-        <?php if ($search || $filter_by !== 'all' || $sort_by !== 'newest' || $filter_type !== 'all' || $agent_filter !== $agent_default): ?>
-        <a href="client_list.php" class="btn-ghost"><?= icon('x-mark', 14) ?> Clear</a>
-        <?php endif; ?>
-
-        <?php if (!is_mechanic()): ?>
-        <span class="client-toolbar-actions">
-        <a href="add_client.php" class="btn-primary"><?= icon('plus', 14) ?> Add Client</a>
-        <a href="import_clients.php" class="btn-ghost" title="Add many clients at once from a CSV file"><?= icon('arrow-up-tray', 14) ?> Import</a>
-        <a href="recently_deleted.php" class="btn-ghost" title="Deleted clients you can still restore"><?= icon('trash', 14) ?> Recently Deleted</a>
-        </span>
-        <?php endif; ?>
+      <!-- SEARCH (with autocomplete); Enter or the arrow searches -->
+      <div class="lt-search">
+        <span class="lt-search-icon"><?= icon('magnifying-glass', 14) ?></span>
+        <input type="text" name="search" id="client-search-input"
+          placeholder="Search by client ID, name, plate..."
+          value="<?= htmlspecialchars($search) ?>" autocomplete="off" aria-label="Search clients"/>
+        <button type="submit" class="lt-go" title="Search" aria-label="Search"><?= icon('arrow-right', 14) ?></button>
+        <div id="client-ac-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:200;background:var(--bg-3);border:1px solid var(--gold-bright);border-radius:9px;box-shadow:var(--shadow-md);max-height:220px;overflow-y:auto;margin-top:2px;"></div>
       </div>
+
+      <!-- FILTERS (apply on change). Mechanics are locked to Walk-in, so they get no Type pill. -->
+      <div class="lt-filters">
+        <?php
+        $pill('filter_by', 'Field', ['all' => 'All', 'code' => 'Client ID', 'name' => 'Name', 'plate' => 'Plate Number', 'contact' => 'Contact', 'email' => 'Email'], $filter_by, 'all');
+        if (!$is_mechanic) $pill('client_type', 'Type', ['all' => 'All', 'insurance' => 'Insurance', 'walkin' => 'Walk-in'], $filter_type, 'all');
+        $pill('sort', 'Sort', ['newest' => 'Newest', 'oldest' => 'Oldest', 'name_asc' => 'Name A–Z', 'name_desc' => 'Name Z–A', 'vehicles' => 'Most vehicles'], is_string($sort_by) ? $sort_by : 'newest', 'newest');
+        ?>
+      </div>
+
+      <?php if ($search || $filter_by !== 'all' || $sort_by !== 'newest' || $filter_type !== 'all' || $agent_filter !== $agent_default): ?>
+      <a href="client_list.php" class="lt-clear"><?= icon('x-mark', 13) ?> Clear</a>
+      <?php endif; ?>
+
+      <?php if (!is_mechanic()): ?>
+      <div class="lt-actions">
+        <a href="add_client.php" class="btn-primary"><?= icon('plus', 14) ?> Add Client</a>
+        <div class="lt-more">
+          <button type="button" class="lt-more-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="client-more-menu" title="More actions" aria-label="More actions"><?= icon('ellipsis-horizontal', 18) ?></button>
+          <div class="lt-menu" id="client-more-menu" role="menu" hidden>
+            <a href="import_clients.php" role="menuitem"><?= icon('arrow-up-tray', 15) ?><span>Import<small>Add many clients at once from a CSV file</small></span></a>
+            <a href="recently_deleted.php" role="menuitem"><?= icon('trash', 15) ?><span>Recently Deleted<small>Deleted clients you can still restore</small></span></a>
+          </div>
+        </div>
+      </div>
+      <?php endif; ?>
     </form>
 
     <!-- TABLE -->
@@ -438,17 +393,8 @@ require_once '../../includes/topbar.php';
 </div>
 
 <script src="../../assets/js/shared/agent_filter.js?v=<?= filemtime(__DIR__.'/../../assets/js/shared/agent_filter.js') ?>"></script>
+<script src="../../assets/js/shared/list_toolbar.js?v=<?= filemtime(__DIR__.'/../../assets/js/shared/list_toolbar.js') ?>"></script>
 <script>
-(function() {
-  var toolbar = document.querySelector('.client-toolbar');
-  if (toolbar) {
-    toolbar.querySelectorAll('select[name="filter_by"], select[name="client_type"], select[name="sort"]').forEach(function(select) {
-      select.addEventListener('change', function() {
-        toolbar.submit();
-      });
-    });
-  }
-})();
 
 (function() {
   var input    = document.getElementById('client-search-input');
